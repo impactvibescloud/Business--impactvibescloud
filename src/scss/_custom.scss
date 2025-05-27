@@ -1,0 +1,35 @@
+// Here you can add other styles
+$a-tags: "a, a:active, a:hover, a:visited";
+#{$a-tags} {
+  text-decoration: none;
+}
+.overflow-table {
+  display: block;
+  max-width: -moz-fit-content;
+  max-width: fit-content;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.edit_text {
+  width: 22%;
+}
+
+.highlighted-row {
+  background-color: yellow;
+}
+
+.past-row {
+  background-color: #f2f2f2;
+}
+//blogEditor in CreateBlog.jsx
+.blog-content {
+  // background-color: #f4f4f4;
+  // border: 1px solid black;
+  height: 20rem;
+  scrollbar-width: none;
+  box-shadow: rgba(0, 0, 0, 0.16) 0px 1px 4px;
+  border-radius: 0px 0px 10px 10px;
+}
+.blog-toolbar {
+  background-color: #f2f2f2;
+}
