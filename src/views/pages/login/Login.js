@@ -141,7 +141,7 @@ const Login = () => {
               <CCard className="p-4">
                 <CCardBody>
                   <CForm>
-                    <h1>Visit Wise Business</h1>
+                    <h1>Impactvibescloud Business</h1>
                     <p className="text-medium-emphasis">
                       For Business Owners. Sign in to your account.
                     </p>
