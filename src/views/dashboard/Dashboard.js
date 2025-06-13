@@ -1,97 +1,52 @@
 import React, { lazy } from "react";
 import axios from "axios";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { isAutheticated } from "../../auth.js";
 
 const WidgetsDropdown = lazy(() => import("../widgets/WidgetsDropdown.js"));
 
 const Dashboard = () => {
-  //1 st
-  // const [users, setUsers] = useState([]);
-  // const [salescoordinator, setSalescoordinator] = useState([]);
-  // const [territorymanager, setTerritorymanager] = useState([]);
-  // const [retaildistributor, setRetaildistributor] = useState([]);
-  const [outlets,setOutlets]=useState([]);
-  const [orders,setOrders]=useState([]);
-  const [category, setCategory] = useState(null);
+  const [agents, setAgents] = useState(0);
+  const [user, setUser] = useState({});
   const token = isAutheticated();
 
-  // const getAllUsers = async () => {
-  //   let res = await axios.get(`/api/v1/admin/users`, {
-  //     headers: {
-  //       Authorization: `Bearer ${token}`,
-  //     },
-  //   });
-  //   // console.log(res.data)
-  //   setUsers(res.data?.total_data);
-  // };
-  // const getAllsalescoordinator = async () => {
-  //   let res = await axios.get(`/api/salescoordinator/getAll/`, {
-  //     headers: {
-  //       Authorization: `Bearer ${token}`,
-  //     },
-  //   });
-  //   // console.log(res.data)
-  //   setSalescoordinator(res.data.total_data);
-  // };
+  useEffect(() => {
+    if (!token) return;
+    
+    const fetchUserDetails = async () => {
+      try {
+        const response = await axios.get("/api/v1/user/details", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setUser(response.data.user);
+      } catch (error) {
+        console.error("Failed to fetch user details:", error);
+      }
+    };
 
-  // const getAllterritorymanager = async () => {
-  //   let res = await axios.get(`/api/territorymanager/getAll/`, {
-  //     headers: {
-  //       Authorization: `Bearer ${token}`,
-  //     },
-  //   });
-  //   // console.log(res.data)
-  //   setTerritorymanager(res.data.total_data);
-  // };
-  // const getAllretaildistributor = async () => {
-  //   let res = await axios.get(`/api/getAllRD`, {
-  //     headers: {
-  //       Authorization: `Bearer ${token}`,
-  //     },
-  //   });
-  //   // console.log(res.data)
-  //   setRetaildistributor(res.data.total_data);
-  // };
-  //2nd
-  const getAllOrder=async()=>{
-    const response=await axios.get("/api/all-orders/history",{
-      headers:{
-        Authorization:`Bearer ${token}`
-      }
-    })
-    console.log(response.data)
-    setOrders(response.data.pagination.totalOrders)
-  }
-  const getallOutlets=async()=>{
-    const response=await axios.get("/api/v1/admin/pd",{
-      headers:{
-        Authorization:`Bearer ${token}`
-      }
-    })
-    console.log("outlets",response.data.total_data)
-    setOutlets(response.data.total_data)
-  }
-  const getAllCategory = async () => {
-    let res = await axios.get(`/api/menu-category/getCategories`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    // console.log(res.data.categories);
-    setCategory(res?.data?.categories.length);
-  };
-  // //3rd
-  const [services, setservices] = useState(null);
-  const getAllservices = async () => {
-    let res = await axios.get(`/api/get`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    console.log(res.data);
-    setservices(res?.data?.totalItems);
-  };
+    fetchUserDetails();
+  }, [token]);
+
+  useEffect(() => {
+    if (user?.businessId) {
+      const fetchAgentsCount = async () => {
+        try {
+          const response = await axios.get(`/api/branch/${user.businessId}/branches`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          setAgents(response.data.data?.length || 0);
+        } catch (error) {
+          console.error("Error fetching agents:", error);
+        }
+      };
+
+      fetchAgentsCount();
+    }
+  }, [user, token]);
   // const [Brand, setBrand] = useState(null);
   // const getAllBrands = async () => {
   //   let res = await axios.get(`/api/brand/getBrands`, {
@@ -177,27 +132,10 @@ const Dashboard = () => {
   //   setEvent(res.data.Event)
 
   // }, [token]);
-  useEffect(() => {
-    // getAllUsers();
-    getAllOrder();
-    getallOutlets();
-    getAllCategory();
-    getAllservices();
-    // getAllBrands();
-    // getAllRequests();
-  }, [token]);
   return (
     <>
       <WidgetsDropdown
-        // users={users}
-        // salescoordinator={salescoordinator}
-        // territorymanager={territorymanager}
-        // retaildistributor={retaildistributor}
-        category={category}
-        services={services}
-        // Brand={Brand}
-        orders={orders}
-        outlets={outlets}
+        agents={agents}
       />
     </>
   );
