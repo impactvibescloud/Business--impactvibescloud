@@ -100,7 +100,7 @@ const Branches = () => {
       fetchBranches();
       handleCloseAddBranch();
       Swal.fire({
-        title: "Branch added successfully!",
+        title: "Agent added successfully!",
         icon: "success",
       });
     } catch (error) {
@@ -146,7 +146,7 @@ const Branches = () => {
       fetchBranches();
       handleCloseEditBranch();
       Swal.fire({
-        title: "Branch updated successfully!",
+        title: "Agent updated successfully!",
         icon: "success",
       });
     } catch (error) {
@@ -179,7 +179,7 @@ const Branches = () => {
       fetchBranches(); // Refresh the list
       Swal.fire({
         icon: "success",
-        title: "Branch status updated successfully",
+        title: "Agent status updated successfully",
       });
     } catch (error) {
       console.error("Error suspending branch:", error);
@@ -239,19 +239,19 @@ const Branches = () => {
   return (
     <Box p={3}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5">Branches</Typography>
+        <Typography variant="h5">Agents</Typography>
         <Button variant="contained" onClick={handleAddBranch}>
-          Add Branch
+          Add Agent
         </Button>
       </Stack>
 
-      {/* Add Branch Modal */}
+      {/* Add Agent Modal */}
       <Dialog open={openAddBranch} onClose={handleCloseAddBranch} maxWidth="sm" fullWidth>
-        <DialogTitle>Add New Branch</DialogTitle>
+        <DialogTitle>Add New Agent</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <TextField
-              label="Branch Name"
+              label="Agent Name"
               fullWidth
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
@@ -278,13 +278,13 @@ const Branches = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Edit Branch Modal */}
+      {/* Edit Agent Modal */}
       <Dialog open={openEditBranch} onClose={handleCloseEditBranch} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Branch</DialogTitle>
+        <DialogTitle>Edit Agent</DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <TextField
-              label="Branch Name"
+              label="Agent Name"
               fullWidth
               value={branchName}
               onChange={(e) => setBranchName(e.target.value)}
@@ -311,12 +311,12 @@ const Branches = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Branches Table */}
+      {/* Agents Table */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
             <TableRow>
-              <TableCell>Branch Name</TableCell>
+              <TableCell>Agent Name</TableCell>
               <TableCell>Manager Name</TableCell>
               <TableCell>Manager Email</TableCell>
               <TableCell>Status</TableCell>
@@ -371,7 +371,7 @@ const Branches = () => {
             {!loading && branches.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} align="center">
-                  No branches found.
+                  No agents found.
                 </TableCell>
               </TableRow>
             )}

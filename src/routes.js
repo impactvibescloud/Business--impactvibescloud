@@ -135,8 +135,6 @@ import videos from "./views/video/Video";
 import AddProductsOutlet from "./views/Outlet/AddProductsOutlet";
 import Equipment from './views/Equipment/equipment';
 import AddEquipmentsOutlet from "./views/Outlet/AddEquipmentsOutlet";
-import faces from "./views/faces/faces";
-import Devices from "./views/Devices/Devices";
 import Branches from "./views/Branches/Branches";
 
 const routes = [
@@ -778,18 +776,6 @@ const routes = [
     name: "Add Equipment",
     element: AddEquipmentsOutlet,
     navName: "Employees & Access",
-  },
-  {
-    path: "/customer-visits",
-    name: "Customer Visits",
-    element: faces,
-    navName: "Customer Visits",
-  },
-  {
-    path: "/devices",
-    name: "Devices",
-    element: Devices,
-    navName: "Devices",
   },
   {
     path: "/branch",

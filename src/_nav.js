@@ -10,8 +10,6 @@ import {
   cilViewModule,
   cilHistory,
   cilVideo,
-  cilCamera,
-  cilPeople,
 } from "@coreui/icons";
 import { CNavGroup, CNavItem, } from "@coreui/react";
 
@@ -25,24 +23,10 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: "Branches",
+    name: "Agents",
     icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
     to: "/branch",
-    group: "Branches",
-  },
-  {
-    component: CNavItem,
-    name: "Devices",
-    icon: <CIcon icon={cilCamera} customClassName="nav-icon" />,
-    to: "/Devices",
-    group: "Devices",
-  },
-  {
-    component: CNavItem,
-    name: "Customer Visits",
-    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
-    to: "/customer-visits",
-    group: "customer-visits",
+    group: "Agents",
   },
 ];
 

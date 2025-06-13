@@ -25,7 +25,7 @@ import { isAutheticated } from "src/auth";
 const AppHeader = () => {
   const dispatch = useDispatch();
   const sidebarShow = useSelector((state) => state.sidebarShow);
-  const [AppName, setAppName] = useState("");
+  const [AppName, setAppName] = useState("Businesses");
   const token = isAutheticated();
 
   useEffect(() => {
@@ -35,7 +35,7 @@ const AppHeader = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      setAppName(configDetails.data.result[0]?.appName);
+      setAppName("Businesses");
     }
     getConfiguration();
   }, []);

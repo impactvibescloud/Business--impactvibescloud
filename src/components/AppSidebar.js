@@ -83,7 +83,7 @@ const AppSidebar = () => {
   const [loading, setLoading] = useState(false);
 
   // urlcreated images
-  const [AppName, setAppName] = useState("");
+  const [AppName, setAppName] = useState("ImpactVibes");
   const [HeaderlogoUrl, setHeaderlogoUrl] = useState("");
   const [FooterlogoUrl, setFooterlogoUrl] = useState("");
   const [AdminlogoUrl, setAdminlogoUrl] = useState("");
@@ -95,7 +95,7 @@ const AppSidebar = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      setAppName(configDetails.data.result[0]?.appName);
+      setAppName("ImpactVibes");
       configDetails.data.result.map((item) => {
         setHeaderlogoUrl(item?.logo[0]?.Headerlogo);
         setFooterlogoUrl(item?.logo[0]?.Footerlogo);
@@ -127,7 +127,7 @@ const AppSidebar = () => {
             <img src={AdminlogoUrl} alt="" width="100%" />
           </Link>
         ) : { AppName } ? (
-          <h3>Visit Wise</h3>
+          <h3>ImpactVibes</h3>
         ) : (
           ""
         )}
