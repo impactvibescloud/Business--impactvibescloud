@@ -115,7 +115,7 @@ const EditProfile = () => {
         }
     }
     const handleCancle = () => {
-       Navigate("/dashboard");
+       history("/dashboard");
     }
     useEffect(() => {
 
