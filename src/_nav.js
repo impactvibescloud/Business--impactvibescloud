@@ -28,6 +28,13 @@ const _nav = [
     to: "/branch",
     group: "Agents",
   },
+  {
+    component: CNavItem,
+    name: "Call Logs",
+    icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
+    to: "/callogs",
+    group: "Call Logs",
+  },
 ];
 
 export default _nav;

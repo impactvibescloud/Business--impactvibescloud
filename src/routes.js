@@ -136,6 +136,7 @@ import AddProductsOutlet from "./views/Outlet/AddProductsOutlet";
 import Equipment from './views/Equipment/equipment';
 import AddEquipmentsOutlet from "./views/Outlet/AddEquipmentsOutlet";
 import Branches from "./views/Branches/Branches";
+import CallLogs from './views/CallLogs/CallLogs';
 
 const routes = [
   //dashboard
@@ -782,6 +783,12 @@ const routes = [
     name: "Branch",
     element: Branches,
     navName: "Branch",
+  },
+  {
+    path: '/callogs',
+    name: 'Call Logs',
+    element: CallLogs,
+    navName: "Call Logs",
   },
 ];
 

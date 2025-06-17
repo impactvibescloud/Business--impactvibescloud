@@ -23,3 +23,7 @@ yarn.lock
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# NOTE: dist is intentionally NOT ignored
+# (remove below line if it existed)
+/dist  # <-- This line is removed to ensure dist is tracked
