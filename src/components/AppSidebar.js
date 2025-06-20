@@ -26,7 +26,7 @@ import { Link } from "react-router-dom";
 const AppSidebar = () => {
   const dispatch = useDispatch();
   const unfoldable = useSelector((state) => state.sidebarUnfoldable);
-  const sidebarShow = useSelector((state) => state.sidebarShow);
+  const sidebarShow = useSelector((state) => state.coreUI.sidebarShow); // Updated selector
   const [navigationItem, setNavigationItem] = useState(navigation);
 
   const [userdata, setUserData] = useState(null);
@@ -112,7 +112,7 @@ const AppSidebar = () => {
       unfoldable={unfoldable}
       visible={sidebarShow}
       onVisibleChange={(visible) => {
-        dispatch({ type: "set", sidebarShow: visible });
+        dispatch({ type: "set", payload: { sidebarShow: visible } }); // Updated dispatch action
       }}
     >
       <CSidebarBrand

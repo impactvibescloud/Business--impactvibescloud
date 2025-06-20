@@ -24,7 +24,7 @@ import { isAutheticated } from "src/auth";
 
 const AppHeader = () => {
   const dispatch = useDispatch();
-  const sidebarShow = useSelector((state) => state.sidebarShow);
+  const sidebarShow = useSelector((state) => state.coreUI.sidebarShow); // Updated selector
   const [AppName, setAppName] = useState("Businesses");
   const token = isAutheticated();
 
@@ -44,7 +44,9 @@ const AppHeader = () => {
       <CContainer fluid>
         <CHeaderToggler
           className="ps-1"
-          onClick={() => dispatch({ type: "set", sidebarShow: !sidebarShow })}
+          onClick={() =>
+            dispatch({ type: "set", payload: { sidebarShow: !sidebarShow } }) // Updated dispatch action
+          }
         >
           <CIcon icon={cilMenu} size="lg" />
         </CHeaderToggler>
