@@ -17,6 +17,7 @@ import {
   TextField,
   Stack,
   Chip,
+  MenuItem,
 } from "@mui/material";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -34,6 +35,8 @@ const Branches = () => {
   const [branchStatus, setBranchStatus] = useState("Active");
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [user, setUser] = useState({});
+  const [didNumbers, setDidNumbers] = useState([]);
+  const [selectedDid, setSelectedDid] = useState("");
   const token = isAuthenticated();
 
   useEffect(() => {
@@ -55,6 +58,7 @@ const Branches = () => {
   useEffect(() => {
     if (user?.businessId) {
       fetchBranches();
+      fetchDidNumbers();
     }
   }, [user]);
 
@@ -69,6 +73,25 @@ const Branches = () => {
       setLoading(false);
     } catch (error) {
       console.error("Error fetching branches:", error);
+    }
+  };
+
+  const fetchDidNumbers = async () => {
+    try {
+      const response = await axios.get(
+        `https://api-impactvibescloud.onrender.com/api/trial-orders/business/${user.businessId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      const didNumbers = response.data.data[0]?.didNumbers || [];
+      setDidNumbers(didNumbers.map((did) => ({ id: did, number: did }))); // Format DID numbers
+    } catch (error) {
+      console.error("Error fetching DID numbers:", error);
     }
   };
 
@@ -90,6 +113,7 @@ const Branches = () => {
           managerName,
           branchEmail: managerEmail,
           businessId: user.businessId,
+          didNumber: selectedDid, // Include DID number
         },
         {
           headers: {
@@ -119,6 +143,7 @@ const Branches = () => {
     setManagerName(branch.manager?.name || "");
     setManagerEmail(branch.manager?.email || "");
     setBranchStatus(branch.status || "Active");
+    setSelectedDid(branch.didNumber || ""); // Set DID number for editing
     setOpenEditBranch(true);
   };
 
@@ -136,6 +161,7 @@ const Branches = () => {
           branchName,
           managerName,
           branchEmail: managerEmail,
+          didNumber: selectedDid, // Include DID number in update
         },
         {
           headers: {
@@ -268,6 +294,22 @@ const Branches = () => {
               value={managerEmail}
               onChange={(e) => setManagerEmail(e.target.value)}
             />
+            <TextField
+  select
+  label="Assign DID"
+  fullWidth
+  required
+  value={selectedDid}
+  onChange={(e) => setSelectedDid(e.target.value)}
+>
+  {didNumbers.map((did) => (
+    <MenuItem key={did.id} value={did.id}>
+      {did.number}
+    </MenuItem>
+  ))}
+</TextField>
+
+
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -301,6 +343,19 @@ const Branches = () => {
               value={managerEmail}
               onChange={(e) => setManagerEmail(e.target.value)}
             />
+            <TextField
+              select
+              label="Assign DID"
+              fullWidth
+              value={selectedDid}
+              onChange={(e) => setSelectedDid(e.target.value)}
+            >
+              {didNumbers.map((did) => (
+                <MenuItem key={did.id} value={did.id}>
+                  {did.number}
+                </MenuItem>
+              ))}
+            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
