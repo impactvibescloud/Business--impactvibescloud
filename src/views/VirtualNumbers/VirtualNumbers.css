@@ -1,0 +1,116 @@
+.virtual-numbers-container {
+  padding: 20px;
+}
+
+.virtual-numbers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.virtual-numbers-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.numbers-filter-section {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.search-container {
+  width: 50%;
+}
+
+.virtual-numbers-table {
+  margin-top: 20px;
+}
+
+.number-cell {
+  display: flex;
+  align-items: center;
+}
+
+.add-virtual-number-modal .modal-title {
+  font-weight: 600;
+}
+
+.call-forwarding-settings {
+  background-color: #f8f9fa;
+  border-color: #dee2e6 !important;
+}
+
+.working-days-container {
+  margin-top: 10px;
+}
+
+.working-day-item {
+  min-width: 100px;
+}
+
+.call-hours-select {
+  width: 100px;
+}
+
+.phone-icon {
+  margin-right: 10px;
+  color: #3c4b64;
+}
+
+.number-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Add Virtual Number Modal Styles */
+.add-virtual-number-modal .modal-title {
+  font-weight: 600;
+}
+
+.call-forwarding-settings {
+  background-color: #f8f9fa;
+  border-color: #d8dbe0 !important;
+}
+
+.working-days-container {
+  display: flex;
+  gap: 12px;
+}
+
+.working-day-item {
+  min-width: 100px;
+}
+
+.call-hours-select {
+  min-width: 120px;
+}
+
+.add-number-btn {
+  background-color: #321fdb;
+  border-color: #321fdb;
+}
+
+@media (max-width: 768px) {
+  .virtual-numbers-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .numbers-filter-section {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .search-container {
+    width: 100%;
+  }
+}

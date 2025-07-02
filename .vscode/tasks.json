@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build and run the application",
+			"type": "shell",
+			"command": "cd \"c:/Users/User/OneDrive/Desktop/Business--impactvibescloud\" && npm start",
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build",
+			"isBackground": true
+		}
+	]
+}

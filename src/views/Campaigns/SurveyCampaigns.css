@@ -1,0 +1,151 @@
+/* Survey Campaigns Styles */
+.survey-campaigns-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.new-survey-btn {
+  background-color: #2eb85c;
+  border-color: #2eb85c;
+}
+
+.search-input-container {
+  position: relative;
+}
+
+.filter-btn {
+  border: 1px solid #d8dbe0;
+  background-color: white;
+}
+
+.rows-per-page {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination-info {
+  color: #768192;
+  font-size: 14px;
+}
+
+.survey-status-badge {
+  padding: 5px 10px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.status-active {
+  background-color: rgba(46, 184, 92, 0.1);
+  color: #2eb85c;
+}
+
+.status-draft {
+  background-color: rgba(118, 129, 146, 0.1);
+  color: #768192;
+}
+
+.completion-rate-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar-container {
+  flex-grow: 1;
+  height: 6px;
+  background-color: #ebedef;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #2eb85c;
+}
+
+.completion-rate-text {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #768192;
+}
+
+/* Empty state styles */
+.survey-empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.empty-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.empty-icon {
+  margin-bottom: 20px;
+}
+
+.empty-title {
+  font-size: 20px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.empty-subtitle {
+  color: #768192;
+  margin-bottom: 20px;
+}
+
+/* Create Survey Modal Styles */
+.create-survey-modal .modal-title {
+  font-weight: 600;
+}
+
+.create-survey-modal .modal-header {
+  border-bottom: 1px solid #d8dbe0;
+}
+
+.create-survey-modal .modal-footer {
+  border-top: 1px solid #d8dbe0;
+}
+
+.question-section {
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.question-header {
+  margin-bottom: 15px;
+  font-weight: 500;
+}
+
+.add-question-btn {
+  color: #2eb85c;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.recording-placeholder {
+  color: #768192;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.recording-placeholder:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.response-time-selector {
+  font-size: 14px;
+  color: #768192;
+}
+
+.option-item {
+  margin-bottom: 8px;
+}

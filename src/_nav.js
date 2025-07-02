@@ -10,6 +10,13 @@ import {
   cilViewModule,
   cilHistory,
   cilVideo,
+  cilPeople,
+  cilBullhorn,
+  cilPhone,
+  cilChart,
+  cilGroup,
+  cilDescription,
+  cilDollar,
 } from "@coreui/icons";
 import { CNavGroup, CNavItem, } from "@coreui/react";
 
@@ -30,10 +37,69 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "Contact Lists",
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    to: "/contactlists",
+    group: "Contact Lists",
+  },
+  {
+    component: CNavItem,
     name: "Call Logs",
     icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
     to: "/callogs",
     group: "Call Logs",
+  },
+  {
+    component: CNavGroup,
+    name: "Campaigns",
+    icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: "Autodial",
+        to: "/campaigns/autodial",
+      },
+      {
+        component: CNavItem,
+        name: "Surveys",
+        to: "/campaigns/surveys",
+      },
+    ],
+  },
+  {
+    component: CNavItem,
+    name: "Users & Teams",
+    icon: <CIcon icon={cilGroup} customClassName="nav-icon" />,
+    to: "/users-teams",
+    group: "Users & Teams",
+  },
+  {
+    component: CNavItem,
+    name: "Templates",
+    icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
+    to: "/templates",
+    group: "Templates",
+  },
+  {
+    component: CNavItem,
+    name: "Virtual Numbers",
+    icon: <CIcon icon={cilPhone} customClassName="nav-icon" />,
+    to: "/virtual-numbers",
+    group: "Virtual Numbers",
+  },
+  {
+    component: CNavItem,
+    name: "Billing",
+    icon: <CIcon icon={cilDollar} customClassName="nav-icon" />,
+    to: "/billing",
+    group: "Billing",
+  },
+  {
+    component: CNavItem,
+    name: "Settings",
+    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+    to: "/settings",
+    group: "Settings",
   },
 ];
 
