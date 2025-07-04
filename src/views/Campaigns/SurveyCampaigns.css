@@ -5,10 +5,7 @@
   margin-bottom: 0;
 }
 
-.new-survey-btn {
-  background-color: #2eb85c;
-  border-color: #2eb85c;
-}
+/* Button styles are now managed globally in _button-styles.scss */
 
 .search-input-container {
   position: relative;
@@ -98,6 +95,22 @@
 
 .empty-subtitle {
   color: #768192;
+}
+
+/* Audio upload styles */
+.recording-placeholder {
+  transition: all 0.2s ease;
+}
+
+.recording-placeholder:hover {
+  background-color: #f8f9fa;
+  cursor: pointer;
+  border-color: #2eb85c !important;
+}
+
+.audio-file-selected {
+  border: 1px solid #d8dbe0 !important;
+  background-color: #f8f9fa;
   margin-bottom: 20px;
 }
 

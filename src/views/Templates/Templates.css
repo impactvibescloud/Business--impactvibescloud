@@ -47,7 +47,27 @@
 
 .template-actions {
   display: flex;
-  gap: 5px;
+  gap: 10px;
+}
+
+.edit-button, .delete-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.edit-button:hover {
+  background-color: rgba(51, 102, 255, 0.1);
+  color: #3366ff;
+}
+
+.delete-button:hover {
+  background-color: rgba(229, 62, 62, 0.1);
+  color: #e53e3e;
 }
 
 .pagination-container {
@@ -56,15 +76,7 @@
   justify-content: center;
 }
 
-.add-template-btn {
-  background-color: #5a46eb;
-  border-color: #5a46eb;
-}
-
-.add-template-btn:hover {
-  background-color: #483bc3;
-  border-color: #483bc3;
-}
+/* Button colors are now managed globally in _button-styles.scss */
 
 .required-field::after {
   content: "*";
@@ -101,6 +113,23 @@
 .modal-danger .modal-header {
   background-color: #f8d7da;
   color: #dc3545;
+}
+
+.filter-container .dropdown-item.active {
+  background-color: #f0f5ff;
+  color: #3c8dbc;
+  font-weight: 500;
+}
+
+.filter-container .dropdown-toggle {
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-container .dropdown-toggle svg {
+  margin-right: 6px;
 }
 
 @media (max-width: 768px) {

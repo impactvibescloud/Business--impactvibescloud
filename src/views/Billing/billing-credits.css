@@ -1,0 +1,73 @@
+/* Credits tab styling */
+.credits-tab-content {
+  padding: 20px 0;
+}
+
+.credits-header {
+  margin-bottom: 30px;
+}
+
+.credits-balance-container {
+  margin-bottom: 15px;
+}
+
+.credits-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: #6c757d;
+  margin-bottom: 5px;
+}
+
+.credits-amount {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.view-usage-link {
+  padding-left: 0;
+  color: #321fdb;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.credits-description {
+  color: #6c757d;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.add-credits-section {
+  margin-bottom: 40px;
+}
+
+.payment-options-container {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.payment-method-option {
+  margin-bottom: 15px;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.payment-method-option:hover {
+  background-color: #fff;
+  border-color: #321fdb;
+}
+
+.subscription-settings h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.text-muted {
+  color: #6c757d;
+  font-size: 14px;
+}

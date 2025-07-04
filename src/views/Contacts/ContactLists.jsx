@@ -46,6 +46,8 @@ const ContactLists = () => {
     description: ''
   })
   const [editingList, setEditingList] = useState(null)
+  const [successAlert, setSuccessAlert] = useState({ show: false, message: '' })
+  const [validationError, setValidationError] = useState('')
   
   // Sample data for contact lists
   const [contactLists, setContactLists] = useState([
@@ -110,6 +112,7 @@ const ContactLists = () => {
     setNewList({ name: '', description: '' })
     setSelectedFile(null)
     setEditingList(null)
+    setValidationError('')
   }
 
   const handleInputChange = (e) => {
@@ -127,12 +130,62 @@ const ContactLists = () => {
   }
 
   const handleCreateList = () => {
+    // Validate form
+    if (!newList.name.trim()) {
+      setValidationError('List name is required.')
+      return
+    }
+    
+    setValidationError('')
+    
     // Here you would typically send the data to your backend
     console.log('Creating new list:', newList)
     if (selectedFile) {
       console.log('With file:', selectedFile.name)
     }
+    
+    if (editingList) {
+      // Update existing list
+      setContactLists(prevLists => 
+        prevLists.map(list => 
+          list.id === editingList.id 
+            ? { 
+                ...list, 
+                name: newList.name, 
+                // If there were other editable fields, they would be updated here
+                lastUpdated: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+              } 
+            : list
+        )
+      )
+      setSuccessAlert({
+        show: true, 
+        message: `Contact list "${newList.name}" has been updated successfully.`
+      })
+    } else {
+      // Create new list
+      const newId = Math.max(...contactLists.map(list => list.id)) + 1
+      const newContactList = {
+        id: newId,
+        name: newList.name,
+        contacts: selectedFile ? 0 : 0, // This would typically be determined by the file contents
+        lastUpdated: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+        status: 'Active'
+      }
+      
+      setContactLists(prevLists => [...prevLists, newContactList])
+      setSuccessAlert({
+        show: true, 
+        message: `New contact list "${newList.name}" has been created successfully.`
+      })
+    }
+    
     handleCloseModal()
+    
+    // Hide success message after 5 seconds
+    setTimeout(() => {
+      setSuccessAlert({ show: false, message: '' })
+    }, 5000)
   }
 
   const handleEdit = (list) => {
@@ -191,6 +244,12 @@ const ContactLists = () => {
 
   return (
     <div className="contact-lists-container">
+      {successAlert.show && (
+        <CAlert color="success" dismissible onClose={() => setSuccessAlert({ show: false, message: '' })}>
+          {successAlert.message}
+        </CAlert>
+      )}
+      
       <CCard className="mb-4">
         <CCardBody>
           <CRow className="mb-4 align-items-center">
@@ -265,22 +324,18 @@ const ContactLists = () => {
                     </CTableDataCell>
                     <CTableDataCell className="text-center">
                       <CButton 
-                        color="light" 
-                        size="sm" 
-                        className="action-btn edit-btn me-2"
+                        color="light"
                         onClick={() => handleEdit(list)}
+                        className="me-2"
                       >
-                        <CIcon icon={cilPencil} size="sm" className="me-1" />
-                        Edit
+                        <CIcon icon={cilPencil} />
                       </CButton>
                       <CButton 
-                        color="light" 
-                        size="sm" 
-                        className="action-btn delete-btn"
+                        color="danger"
                         onClick={() => handleDeleteConfirm(list.id)}
+                        disabled={isDeleting}
                       >
-                        <CIcon icon={cilTrash} size="sm" className="me-1" />
-                        Delete
+                        {isDeleting ? <CSpinner size="sm" /> : <CIcon icon={cilTrash} />}
                       </CButton>
                     </CTableDataCell>
                   </CTableRow>
@@ -289,33 +344,33 @@ const ContactLists = () => {
             </CTableBody>
           </CTable>
 
-          {totalPages > 1 && (
-            <CPagination align="end" className="mt-4">
+          <CPagination 
+            aria-label="Page navigation example"
+            className="justify-content-center"
+            style={{ display: totalPages > 1 ? 'flex' : 'none' }}
+          >
+            <CPaginationItem 
+              disabled={currentPage === 1} 
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              Previous
+            </CPaginationItem>
+            {[...Array(totalPages)].map((_, i) => (
               <CPaginationItem 
-                disabled={currentPage === 1}
-                onClick={() => handlePageChange(currentPage - 1)}
+                key={i} 
+                active={i + 1 === currentPage} 
+                onClick={() => handlePageChange(i + 1)}
               >
-                Previous
+                {i + 1}
               </CPaginationItem>
-              
-              {[...Array(totalPages)].map((_, index) => (
-                <CPaginationItem
-                  key={index}
-                  active={currentPage === index + 1}
-                  onClick={() => handlePageChange(index + 1)}
-                >
-                  {index + 1}
-                </CPaginationItem>
-              ))}
-              
-              <CPaginationItem 
-                disabled={currentPage === totalPages}
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
-          )}
+            ))}
+            <CPaginationItem 
+              disabled={currentPage === totalPages} 
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              Next
+            </CPaginationItem>
+          </CPagination>
         </CCardBody>
       </CCard>
 
@@ -325,6 +380,11 @@ const ContactLists = () => {
           <CModalTitle>{editingList ? 'Edit Contact List' : 'New Contact List'}</CModalTitle>
         </CModalHeader>
         <CModalBody>
+          {validationError && (
+            <CAlert color="danger" dismissible onClose={() => setValidationError('')}>
+              {validationError}
+            </CAlert>
+          )}
           <CForm>
             <div className="mb-3">
               <CFormLabel htmlFor="listName">List Name</CFormLabel>
@@ -335,40 +395,29 @@ const ContactLists = () => {
                 value={newList.name}
                 onChange={handleInputChange}
                 placeholder="Enter list name"
+                required
               />
             </div>
             <div className="mb-3">
-              <CFormLabel htmlFor="listDescription">Description (optional)</CFormLabel>
+              <CFormLabel htmlFor="listDescription">Description</CFormLabel>
               <CFormTextarea
                 id="listDescription"
                 name="description"
                 value={newList.description}
                 onChange={handleInputChange}
-                placeholder="Enter description"
+                placeholder="Enter list description"
                 rows={3}
               />
             </div>
-            {!editingList && (
-              <div className="mb-3">
-                <CFormLabel htmlFor="fileUpload">Upload Contacts (CSV or Excel)</CFormLabel>
-                <div className="file-upload-container">
-                  <CFormInput
-                    type="file"
-                    id="fileUpload"
-                    onChange={handleFileChange}
-                    accept=".csv,.xlsx,.xls"
-                  />
-                  <div className="file-upload-help">
-                    <small className="text-muted">
-                      Supported formats: CSV, Excel. 
-                      {selectedFile && (
-                        <span className="ms-2">Selected: {selectedFile.name}</span>
-                      )}
-                    </small>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="mb-3">
+              <CFormLabel htmlFor="fileUpload">Upload Contacts File</CFormLabel>
+              <CFormInput
+                id="fileUpload"
+                type="file"
+                onChange={handleFileChange}
+                accept=".csv, .xlsx, .xls"
+              />
+            </div>
           </CForm>
         </CModalBody>
         <CModalFooter>
@@ -376,50 +425,30 @@ const ContactLists = () => {
             Cancel
           </CButton>
           <CButton color="primary" onClick={handleCreateList}>
-            {editingList ? 'Save Changes' : 'Create List'}
+            {editingList ? 'Update' : 'Create'} List
           </CButton>
         </CModalFooter>
       </CModal>
 
-      {/* Delete Confirmation Modal */}
-      <CModal visible={showDeleteModal} onClose={handleDeleteCancel} size="sm">
-        <CModalHeader>
-          <CModalTitle>Delete Contact List</CModalTitle>
+      <CModal 
+        visible={showDeleteModal} 
+        onClose={handleDeleteCancel}
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>Confirm Deletion</CModalTitle>
         </CModalHeader>
         <CModalBody>
-          {deleteSuccess ? (
-            <CAlert color="success">
-              Contact list deleted successfully!
-            </CAlert>
-          ) : (
-            <>
-              {deleteError && (
-                <CAlert color="danger" className="mb-3">
-                  {deleteError}
-                </CAlert>
-              )}
-              <p>Are you sure you want to delete this contact list? This action cannot be undone.</p>
-            </>
-          )}
+          {deleteError && <CAlert color="danger">{deleteError}</CAlert>}
+          {deleteSuccess && <CAlert color="success">Contact list has been deleted successfully.</CAlert>}
+          <p>Are you sure you want to delete this contact list?</p>
         </CModalBody>
         <CModalFooter>
-          {!deleteSuccess && (
-            <>
-              <CButton color="secondary" onClick={handleDeleteCancel} disabled={isDeleting}>
-                Cancel
-              </CButton>
-              <CButton color="danger" onClick={handleDelete} disabled={isDeleting}>
-                {isDeleting ? (
-                  <>
-                    <CSpinner size="sm" className="me-1" />
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete'
-                )}
-              </CButton>
-            </>
-          )}
+          <CButton color="secondary" onClick={handleDeleteCancel}>
+            Cancel
+          </CButton>
+          <CButton color="danger" onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting ? <CSpinner size="sm" /> : 'Delete'}
+          </CButton>
         </CModalFooter>
       </CModal>
     </div>

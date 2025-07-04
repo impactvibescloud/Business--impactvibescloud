@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CContainer, CRow, CCol, CCard, CCardBody, CCardHeader, CTable, CTableHead, CTableRow, CTableHeaderCell, CTableBody, CTableDataCell, CSpinner } from '@coreui/react'
+import './CallLogs.css'
 
 const dummyCallLogs = [
   { id: 1, caller: 'John Doe', receiver: 'Jane Smith', time: '2025-06-17 10:30', duration: '5 min', status: 'Completed' },
@@ -20,20 +21,25 @@ const CallLogs = () => {
   }, [])
 
   return (
-    <CContainer className="mt-4">
+    <CContainer className="call-logs-container">
       <CRow className="justify-content-center">
         <CCol md={10}>
           <CCard>
-            <CCardHeader>
-              <h4>Call Logs</h4>
+            <CCardHeader className="d-flex justify-content-between align-items-center">
+              <h4 className="call-logs-title">Call Logs</h4>
             </CCardHeader>
             <CCardBody>
               {loading ? (
-                <div className="text-center">
+                <div className="text-center p-4">
                   <CSpinner color="primary" />
                 </div>
+              ) : callLogs.length === 0 ? (
+                <div className="empty-state">
+                  <h4>No call logs found</h4>
+                  <p>There are no call logs available at this time.</p>
+                </div>
               ) : (
-                <CTable hover responsive>
+                <CTable hover responsive className="call-logs-table">
                   <CTableHead>
                     <CTableRow>
                       <CTableHeaderCell>#</CTableHeaderCell>
@@ -48,11 +54,15 @@ const CallLogs = () => {
                     {callLogs.map((log, idx) => (
                       <CTableRow key={log.id}>
                         <CTableDataCell>{idx + 1}</CTableDataCell>
-                        <CTableDataCell>{log.caller}</CTableDataCell>
-                        <CTableDataCell>{log.receiver}</CTableDataCell>
-                        <CTableDataCell>{log.time}</CTableDataCell>
-                        <CTableDataCell>{log.duration}</CTableDataCell>
-                        <CTableDataCell>{log.status}</CTableDataCell>
+                        <CTableDataCell className="caller-name">{log.caller}</CTableDataCell>
+                        <CTableDataCell className="receiver-name">{log.receiver}</CTableDataCell>
+                        <CTableDataCell className="call-time">{log.time}</CTableDataCell>
+                        <CTableDataCell className="call-duration">{log.duration}</CTableDataCell>
+                        <CTableDataCell>
+                          <span className={`call-status ${log.status.toLowerCase() === 'completed' ? 'status-completed' : 'status-missed'}`}>
+                            {log.status}
+                          </span>
+                        </CTableDataCell>
                       </CTableRow>
                     ))}
                   </CTableBody>

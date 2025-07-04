@@ -197,33 +197,29 @@ function AutodialCampaigns() {
                 </CTable>
               </div>
 
-              <div className="pagination-container">
-                <CRow className="align-items-center">
-                  <CCol md={6}>
-                    <div className="rows-per-page">
-                      <span className="pagination-info">
-                        Rows per page:
-                      </span>
-                      <CFormSelect
-                        size="sm"
-                        style={{ width: 'auto' }}
-                      >
-                        <option value={10}>10</option>
-                        <option value={25}>25</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </CFormSelect>
-                    </div>
-                  </CCol>
-                  <CCol md={6} className="text-end">
-                    <span className="pagination-info">
-                      {filteredCampaigns.length > 0 
-                        ? `1-${filteredCampaigns.length} of ${filteredCampaigns.length}`
-                        : '0-0 of 0'
-                      }
-                    </span>
-                  </CCol>
-                </CRow>
+              <div className="table-footer">
+                <div className="rows-per-page">
+                  <span className="rows-text">Rows per page:</span>
+                  <CFormSelect
+                    className="rows-select"
+                    size="sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </CFormSelect>
+                </div>
+                <div className="pagination-info">
+                  {filteredCampaigns.length > 0 
+                    ? `1-${filteredCampaigns.length} of ${filteredCampaigns.length}`
+                    : '0-0 of 0'
+                  }
+                </div>
+                <div className="pagination-controls">
+                  <button className="pagination-button" disabled>&lt;</button>
+                  <button className="pagination-button" disabled>&gt;</button>
+                </div>
               </div>
             </CCardBody>
           </CCard>

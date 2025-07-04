@@ -1,0 +1,275 @@
+// Professional styling for a consistent look
+
+// Text spacing and alignment
+.text-spacing {
+  letter-spacing: 0.01em;
+}
+
+.text-tight {
+  letter-spacing: -0.01em;
+}
+
+// Font weights
+.font-light {
+  font-weight: 300;
+}
+
+.font-normal {
+  font-weight: 400;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+// Text sizes
+.text-xs {
+  font-size: 0.75rem; // 12px
+}
+
+.text-sm {
+  font-size: 0.875rem; // 14px
+}
+
+.text-base {
+  font-size: 1rem; // 16px
+}
+
+.text-lg {
+  font-size: 1.125rem; // 18px
+}
+
+.text-xl {
+  font-size: 1.25rem; // 20px
+}
+
+.text-2xl {
+  font-size: 1.5rem; // 24px
+}
+
+// Professional form styling
+input.form-control,
+select.form-control,
+textarea.form-control {
+  font-size: 0.875rem;
+}
+
+// Table headers
+.table-header {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  color: #495057;
+}
+
+// Card styling
+.card {
+  .card-header {
+    font-weight: 600;
+  }
+}
+
+// Navigation items
+.nav-link {
+  font-weight: 500;
+}
+
+// Section titles
+.section-title {
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  font-size: 1.25rem;
+  color: #3c4b64;
+}
+
+// Button text
+.btn {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+// Badge text
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+// Ensure default text is clean and readable
+body {
+  color: #3c4b64;
+}
+
+// Table pagination styling
+.table-footer,
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  padding: 0.75rem 1rem;
+  gap: 1rem;
+}
+
+.rows-per-page {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: fit-content;
+  white-space: nowrap;
+}
+
+.rows-text,
+.pagination-info {
+  font-size: 0.875rem;
+  margin-right: 0.5rem;
+  white-space: nowrap;
+  color: #5c6873;
+}
+
+.rows-select {
+  width: 70px !important;
+  min-width: 70px !important;
+  display: inline-block !important;
+}
+
+.pagination-info {
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+// Ensure select elements don't break layout
+select.form-select, 
+select.form-control {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+// Additional component styles to match Templates page
+
+// Template page specific styles for consistent look
+.templates-header h1,
+.section-header h1,
+.page-header h1,
+.users-teams-container h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #3c4b64;
+}
+
+// Search controls
+.search-control,
+.search-input,
+input[type="search"] {
+  font-size: 0.875rem;
+  height: 38px;
+}
+
+// Filter dropdowns
+.filter-dropdown .dropdown-toggle {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+// Action buttons
+.action-button, 
+.edit-button, 
+.delete-button {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+// Table cell content
+.user-name, .template-name, .item-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #3c4b64;
+}
+
+.user-email, .template-description, .item-description {
+  font-size: 0.75rem;
+  color: #768192;
+}
+
+// Ensure CoreUI components have consistent font
+.c-sidebar,
+.c-header,
+.c-footer,
+.c-main {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+// Ensure all form elements have consistent font size
+.form-control,
+.form-select,
+.form-check-label,
+.input-group-text {
+  font-size: 0.875rem !important;
+}
+
+// Apply consistent font weight to labels and headings
+label,
+.form-label {
+  font-weight: 500;
+}
+
+// Modal consistent styling
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #3c4b64;
+}
+
+// Alert and notification consistent styling
+.toast-message,
+.alert-success,
+.alert-danger,
+.alert-warning,
+.alert-info {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+// Tab navigation consistent styling
+.nav-tabs .nav-link {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+// Form labels consistent styling
+.modal-label,
+.form-label {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+// Tables consistent styling
+.table-header-cell,
+.table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-cell,
+.table td {
+  font-size: 0.875rem;
+  font-weight: 400;
+}

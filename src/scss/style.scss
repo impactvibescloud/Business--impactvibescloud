@@ -3,6 +3,9 @@
 $enable-ltr: true;
 $enable-rtl: true;
 
+// Global styles for consistent typography
+@import "global-styles";
+
 // Import CoreUI for React components library
 //@import "@coreui/coreui/scss/coreui";
 // Import Chart.js custom tooltips styles
@@ -14,9 +17,21 @@ $enable-rtl: true;
 
 // If you want to add custom CSS you can put it here.
 @import "custom";
+@import "global-professional";
+@import "button-styles";
 
 .container .ql-editor {
   min-height: 5in;
 
   background-color: white;
+}
+
+// Font enforcement for all elements to match Templates page
+body * {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif !important;
+}
+
+// Ensure all pages use consistent font sizing
+html, body {
+  font-size: 0.875rem;
 }

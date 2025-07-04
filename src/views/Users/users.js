@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import swal from "sweetalert";
 // import { API } from "../../data";
 import { isAutheticated } from "../../auth";
+import './Users.css';
 
 function users() {
   const [users, setUsers] = useState([]);

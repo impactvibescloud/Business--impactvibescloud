@@ -28,10 +28,11 @@ import {
   CForm,
   CFormLabel,
   CFormSelect,
-  CFormCheck
+  CFormCheck,
+  CAlert
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch, cilFilter, cilOptions, cilPhone, cilPencil, cilTrash } from '@coreui/icons'
+import { cilPlus, cilSearch, cilFilter, cilPhone, cilPencil, cilTrash } from '@coreui/icons'
 import './VirtualNumbers.css'
 
 function VirtualNumbers() {
@@ -39,28 +40,46 @@ function VirtualNumbers() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('All Numbers')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [numberToDelete, setNumberToDelete] = useState(null)
+  const [editingNumber, setEditingNumber] = useState(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  
   const [newNumber, setNewNumber] = useState({
     name: '',
     number: '',
     location: '',
-    type: 'Local'
+    type: 'Local',
+    forwardCalls: false,
+    recordCalls: false,
+    startTime: '00:00',
+    endTime: '00:00',
+    workingDays: []
   })
   
   // Sample virtual numbers data
-  const virtualNumbers = [
-    { id: 1, name: 'Main Office', number: '+91 98765 43210', location: 'Mumbai', calls: 124, type: 'Toll-Free' },
-    { id: 2, name: 'Customer Support', number: '+91 98765 43211', location: 'Delhi', calls: 87, type: 'Local' },
-    { id: 3, name: 'Sales Team', number: '+91 98765 43212', location: 'Bangalore', calls: 56, type: 'Local' },
-    { id: 4, name: 'Marketing', number: '+91 98765 43213', location: 'Chennai', calls: 32, type: 'Toll-Free' },
-    { id: 5, name: 'Technical Support', number: '+91 98765 43214', location: 'Hyderabad', calls: 45, type: 'Local' },
-  ]
+  const [virtualNumbers, setVirtualNumbers] = useState([
+    { id: 1, name: 'Main Office', number: '+91 98765 43210', location: 'Mumbai', calls: 124, type: 'Toll-Free', forwardCalls: true, recordCalls: true, startTime: '09:00', endTime: '18:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
+    { id: 2, name: 'Customer Support', number: '+91 98765 43211', location: 'Delhi', calls: 87, type: 'Local', forwardCalls: false, recordCalls: true, startTime: '09:00', endTime: '20:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] },
+    { id: 3, name: 'Sales Team', number: '+91 98765 43212', location: 'Bangalore', calls: 56, type: 'Local', forwardCalls: true, recordCalls: false, startTime: '08:00', endTime: '17:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
+    { id: 4, name: 'Marketing', number: '+91 98765 43213', location: 'Chennai', calls: 32, type: 'Toll-Free', forwardCalls: false, recordCalls: false, startTime: '10:00', endTime: '19:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
+    { id: 5, name: 'Technical Support', number: '+91 98765 43214', location: 'Hyderabad', calls: 45, type: 'Local', forwardCalls: true, recordCalls: true, startTime: '00:00', endTime: '23:59', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+  ])
   
-  // Filter numbers by search term
-  const filteredNumbers = virtualNumbers.filter(vn => 
-    vn.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vn.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vn.location.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filter numbers by search term and filter dropdown
+  const filteredNumbers = virtualNumbers.filter(vn => {
+    const matchesSearch = vn.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vn.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vn.location.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    if (activeFilter === 'All Numbers') {
+      return matchesSearch
+    } else {
+      return matchesSearch && vn.type === activeFilter
+    }
+  })
   
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage
@@ -74,50 +93,155 @@ function VirtualNumbers() {
     setCurrentPage(1)
   }
   
+  // Handle filter selection
+  const handleFilterSelect = (filter) => {
+    setActiveFilter(filter)
+    setCurrentPage(1)
+  }
+  
   // Handle opening the add number modal
   const handleOpenAddModal = () => {
+    setNewNumber({
+      name: '',
+      number: '',
+      location: '',
+      type: 'Local',
+      forwardCalls: false,
+      recordCalls: false,
+      startTime: '00:00',
+      endTime: '00:00',
+      workingDays: []
+    })
     setShowAddModal(true)
   }
   
   // Handle closing the add number modal
   const handleCloseAddModal = () => {
     setShowAddModal(false)
-    setNewNumber({
-      name: '',
-      number: '',
-      location: '',
-      type: 'Local'
-    })
   }
   
-  // Handle input change for new number
+  // Handle input change for new/edit number
   const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setNewNumber(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    const { name, value, type, checked } = e.target
+    
+    if (type === 'checkbox') {
+      if (name === 'forwardCalls' || name === 'recordCalls') {
+        setNewNumber(prev => ({
+          ...prev,
+          [name]: checked
+        }))
+      } else {
+        // Handle working days checkboxes
+        const day = e.target.id.replace('day-', '')
+        setNewNumber(prev => {
+          if (checked) {
+            return {
+              ...prev,
+              workingDays: [...prev.workingDays, day]
+            }
+          } else {
+            return {
+              ...prev,
+              workingDays: prev.workingDays.filter(d => d !== day)
+            }
+          }
+        })
+      }
+    } else {
+      setNewNumber(prev => ({
+        ...prev,
+        [name]: value
+      }))
+    }
   }
   
   // Handle adding a new virtual number
   const handleAddNumber = () => {
-    // Here you would typically make an API call to save the number
-    // For now we'll just add it to the local state
+    if (!newNumber.name || !newNumber.number) {
+      return // Simple validation
+    }
+    
     const newVirtualNumber = {
-      id: virtualNumbers.length + 1,
+      id: editingNumber ? editingNumber.id : Math.max(...virtualNumbers.map(vn => vn.id)) + 1,
       name: newNumber.name,
       number: newNumber.number,
       location: newNumber.location,
-      calls: 0,
-      type: newNumber.type
+      calls: editingNumber ? editingNumber.calls : 0,
+      type: newNumber.type,
+      forwardCalls: newNumber.forwardCalls,
+      recordCalls: newNumber.recordCalls,
+      startTime: newNumber.startTime,
+      endTime: newNumber.endTime,
+      workingDays: [...newNumber.workingDays]
+    }
+    
+    if (editingNumber) {
+      // Update existing number
+      setVirtualNumbers(
+        virtualNumbers.map(vn => vn.id === editingNumber.id ? newVirtualNumber : vn)
+      )
+      setSuccessMessage(`Virtual number "${newNumber.name}" has been updated successfully.`)
+    } else {
+      // Add new number
+      setVirtualNumbers([...virtualNumbers, newVirtualNumber])
+      setSuccessMessage(`Virtual number "${newNumber.name}" has been added successfully.`)
     }
     
     // Close the modal
-    handleCloseAddModal()
+    setShowAddModal(false)
+    setShowEditModal(false)
+    setEditingNumber(null)
     
-    // In a real app, you would update state after API call success
-    // setVirtualNumbers([...virtualNumbers, newVirtualNumber])
-    console.log("Adding new number:", newVirtualNumber)
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage('')
+    }, 3000)
+  }
+  
+  // Handle edit number
+  const handleEditNumber = (number) => {
+    setEditingNumber(number)
+    setNewNumber({
+      name: number.name,
+      number: number.number,
+      location: number.location,
+      type: number.type,
+      forwardCalls: number.forwardCalls,
+      recordCalls: number.recordCalls,
+      startTime: number.startTime,
+      endTime: number.endTime,
+      workingDays: [...number.workingDays]
+    })
+    setShowEditModal(true)
+  }
+  
+  // Handle closing the edit modal
+  const handleCloseEditModal = () => {
+    setShowEditModal(false)
+    setEditingNumber(null)
+  }
+  
+  // Handle delete confirmation
+  const handleDeleteConfirm = (number) => {
+    setNumberToDelete(number)
+    setShowDeleteModal(true)
+  }
+  
+  // Handle delete number
+  const handleDeleteNumber = () => {
+    if (!numberToDelete) return
+    
+    setVirtualNumbers(virtualNumbers.filter(vn => vn.id !== numberToDelete.id))
+    setSuccessMessage(`Virtual number "${numberToDelete.name}" has been deleted successfully.`)
+    
+    // Close the modal
+    setShowDeleteModal(false)
+    setNumberToDelete(null)
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage('')
+    }, 3000)
   }
   
   return (
@@ -125,9 +249,16 @@ function VirtualNumbers() {
       <div className="virtual-numbers-header">
         <h1>Virtual Numbers</h1>
         <CButton color="primary" className="add-number-btn" onClick={handleOpenAddModal}>
-          <CIcon icon={cilPlus} /> Add New Number
+          <CIcon icon={cilPlus} /> Add Virtual Number
         </CButton>
       </div>
+      
+      {/* Success message */}
+      {successMessage && (
+        <CAlert color="success" className="mb-4" dismissible onClose={() => setSuccessMessage('')}>
+          {successMessage}
+        </CAlert>
+      )}
       
       <CCard className="mb-4">
         <CCardBody>
@@ -148,12 +279,13 @@ function VirtualNumbers() {
             <div className="filter-container">
               <CDropdown>
                 <CDropdownToggle color="primary" variant="outline">
-                  <CIcon icon={cilFilter} /> Filter
+                  <CIcon icon={cilFilter} /> {activeFilter}
                 </CDropdownToggle>
                 <CDropdownMenu>
-                  <CDropdownItem>All Numbers</CDropdownItem>
-                  <CDropdownItem>Toll-Free</CDropdownItem>
-                  <CDropdownItem>Local</CDropdownItem>
+                  <CDropdownItem onClick={() => handleFilterSelect('All Numbers')}>All Numbers</CDropdownItem>
+                  <CDropdownItem onClick={() => handleFilterSelect('Toll-Free')}>Toll-Free</CDropdownItem>
+                  <CDropdownItem onClick={() => handleFilterSelect('Local')}>Local</CDropdownItem>
+                  <CDropdownItem onClick={() => handleFilterSelect('International')}>International</CDropdownItem>
                 </CDropdownMenu>
               </CDropdown>
             </div>
@@ -171,44 +303,42 @@ function VirtualNumbers() {
               </CTableRow>
             </CTableHead>
             <CTableBody>
-              {currentNumbers.map(vn => (
-                <CTableRow key={vn.id}>
-                  <CTableDataCell>{vn.name}</CTableDataCell>
-                  <CTableDataCell>
-                    <div className="number-cell">
-                      <CIcon icon={cilPhone} className="phone-icon" />
-                      {vn.number}
-                    </div>
-                  </CTableDataCell>
-                  <CTableDataCell>{vn.location}</CTableDataCell>
-                  <CTableDataCell>{vn.calls}</CTableDataCell>
-                  <CTableDataCell>
-                    <CBadge color={vn.type === 'Toll-Free' ? 'success' : 'info'}>
-                      {vn.type}
-                    </CBadge>
-                  </CTableDataCell>
-                  <CTableDataCell>
-                    <div className="number-actions">
-                      <CButton color="primary" variant="ghost" size="sm">
-                        <CIcon icon={cilPencil} />
-                      </CButton>
-                      <CButton color="danger" variant="ghost" size="sm">
-                        <CIcon icon={cilTrash} />
-                      </CButton>
-                      <CDropdown variant="btn-group">
-                        <CDropdownToggle color="secondary" variant="ghost" size="sm">
-                          <CIcon icon={cilOptions} />
-                        </CDropdownToggle>
-                        <CDropdownMenu>
-                          <CDropdownItem>View Details</CDropdownItem>
-                          <CDropdownItem>Call History</CDropdownItem>
-                          <CDropdownItem>Analytics</CDropdownItem>
-                        </CDropdownMenu>
-                      </CDropdown>
-                    </div>
+              {currentNumbers.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan={6} className="text-center py-4">
+                    No virtual numbers found
                   </CTableDataCell>
                 </CTableRow>
-              ))}
+              ) : (
+                currentNumbers.map(vn => (
+                  <CTableRow key={vn.id}>
+                    <CTableDataCell>{vn.name}</CTableDataCell>
+                    <CTableDataCell>
+                      <div className="number-cell">
+                        <CIcon icon={cilPhone} className="phone-icon" />
+                        {vn.number}
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell>{vn.location}</CTableDataCell>
+                    <CTableDataCell>{vn.calls}</CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge color={vn.type === 'Toll-Free' ? 'success' : vn.type === 'International' ? 'warning' : 'info'}>
+                        {vn.type}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="number-actions">
+                        <CButton color="primary" variant="ghost" size="sm" onClick={() => handleEditNumber(vn)} title="Edit number">
+                          <CIcon icon={cilPencil} />
+                        </CButton>
+                        <CButton color="danger" variant="ghost" size="sm" onClick={() => handleDeleteConfirm(vn)} title="Delete number">
+                          <CIcon icon={cilTrash} />
+                        </CButton>
+                      </div>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              )}
             </CTableBody>
           </CTable>
           
@@ -244,16 +374,16 @@ function VirtualNumbers() {
         </CCardBody>
       </CCard>
       
-      {/* Add Virtual Number Modal */}
+      {/* Add/Edit Virtual Number Modal */}
       <CModal 
-        visible={showAddModal} 
-        onClose={handleCloseAddModal}
+        visible={showAddModal || showEditModal} 
+        onClose={showEditModal ? handleCloseEditModal : handleCloseAddModal}
         alignment="center"
         size="lg"
         className="add-virtual-number-modal"
       >
         <CModalHeader closeButton>
-          <CModalTitle>Add Virtual Number</CModalTitle>
+          <CModalTitle>{showEditModal ? 'Edit Virtual Number' : 'Add Virtual Number'}</CModalTitle>
         </CModalHeader>
         <CModalBody>
           <CForm>
@@ -318,13 +448,19 @@ function VirtualNumbers() {
                 <div className="d-flex align-items-center mb-2">
                   <CFormCheck 
                     id="forwardCalls"
+                    name="forwardCalls"
                     label="Forward calls to team members"
+                    checked={newNumber.forwardCalls}
+                    onChange={handleInputChange}
                   />
                 </div>
                 <div className="d-flex align-items-center">
                   <CFormCheck 
                     id="recordCalls"
+                    name="recordCalls"
                     label="Record calls"
+                    checked={newNumber.recordCalls}
+                    onChange={handleInputChange}
                   />
                 </div>
               </div>
@@ -334,58 +470,32 @@ function VirtualNumbers() {
             <div className="mb-3">
               <CFormLabel>Call Hours</CFormLabel>
               <div className="d-flex gap-3">
-                <CFormSelect name="startTime" className="call-hours-select" defaultValue="09:00">
-                  <option value="00:00">00:00</option>
-                  <option value="01:00">01:00</option>
-                  <option value="02:00">02:00</option>
-                  <option value="03:00">03:00</option>
-                  <option value="04:00">04:00</option>
-                  <option value="05:00">05:00</option>
-                  <option value="06:00">06:00</option>
-                  <option value="07:00">07:00</option>
-                  <option value="08:00">08:00</option>
-                  <option value="09:00">09:00</option>
-                  <option value="10:00">10:00</option>
-                  <option value="11:00">11:00</option>
-                  <option value="12:00">12:00</option>
-                  <option value="13:00">13:00</option>
-                  <option value="14:00">14:00</option>
-                  <option value="15:00">15:00</option>
-                  <option value="16:00">16:00</option>
-                  <option value="17:00">17:00</option>
-                  <option value="18:00">18:00</option>
-                  <option value="19:00">19:00</option>
-                  <option value="20:00">20:00</option>
-                  <option value="21:00">21:00</option>
-                  <option value="22:00">22:00</option>
-                  <option value="23:00">23:00</option>
+                <CFormSelect 
+                  name="startTime" 
+                  className="call-hours-select" 
+                  value={newNumber.startTime}
+                  onChange={handleInputChange}
+                >
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const hour = i.toString().padStart(2, '0')
+                    return (
+                      <option key={hour} value={`${hour}:00`}>{hour}:00</option>
+                    )
+                  })}
                 </CFormSelect>
                 <span className="align-self-center">to</span>
-                <CFormSelect name="endTime" className="call-hours-select" defaultValue="18:00">
-                  <option value="00:00">00:00</option>
-                  <option value="01:00">01:00</option>
-                  <option value="02:00">02:00</option>
-                  <option value="03:00">03:00</option>
-                  <option value="04:00">04:00</option>
-                  <option value="05:00">05:00</option>
-                  <option value="06:00">06:00</option>
-                  <option value="07:00">07:00</option>
-                  <option value="08:00">08:00</option>
-                  <option value="09:00">09:00</option>
-                  <option value="10:00">10:00</option>
-                  <option value="11:00">11:00</option>
-                  <option value="12:00">12:00</option>
-                  <option value="13:00">13:00</option>
-                  <option value="14:00">14:00</option>
-                  <option value="15:00">15:00</option>
-                  <option value="16:00">16:00</option>
-                  <option value="17:00">17:00</option>
-                  <option value="18:00">18:00</option>
-                  <option value="19:00">19:00</option>
-                  <option value="20:00">20:00</option>
-                  <option value="21:00">21:00</option>
-                  <option value="22:00">22:00</option>
-                  <option value="23:00">23:00</option>
+                <CFormSelect 
+                  name="endTime" 
+                  className="call-hours-select"
+                  value={newNumber.endTime}
+                  onChange={handleInputChange}
+                >
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const hour = i.toString().padStart(2, '0')
+                    return (
+                      <option key={hour} value={`${hour}:00`}>{hour}:00</option>
+                    )
+                  })}
                 </CFormSelect>
               </div>
             </div>
@@ -399,7 +509,8 @@ function VirtualNumbers() {
                     <CFormCheck 
                       id={`day-${day}`}
                       label={day}
-                      defaultChecked={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].includes(day)}
+                      checked={newNumber.workingDays.includes(day)}
+                      onChange={handleInputChange}
                     />
                   </div>
                 ))}
@@ -411,15 +522,49 @@ function VirtualNumbers() {
         <CModalFooter className="d-flex justify-content-between">
           <CButton 
             color="light"
-            onClick={handleCloseAddModal}
+            onClick={showEditModal ? handleCloseEditModal : handleCloseAddModal}
           >
             Cancel
           </CButton>
           <CButton 
             color="primary"
             onClick={handleAddNumber}
+            disabled={!newNumber.name || !newNumber.number}
           >
-            Add Number
+            {showEditModal ? 'Save Changes' : 'Add Number'}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+      
+      {/* Delete Confirmation Modal */}
+      <CModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        alignment="center"
+        size="sm"
+      >
+        <CModalHeader closeButton>
+          <CModalTitle className="text-danger">Delete Virtual Number</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {numberToDelete && (
+            <p>
+              Are you sure you want to delete the virtual number "{numberToDelete.name}"? This action cannot be undone.
+            </p>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton 
+            color="light" 
+            onClick={() => setShowDeleteModal(false)}
+          >
+            Cancel
+          </CButton>
+          <CButton 
+            color="danger" 
+            onClick={handleDeleteNumber}
+          >
+            Delete
           </CButton>
         </CModalFooter>
       </CModal>

@@ -2,6 +2,7 @@
   background-color: #f8f9fa;
   min-height: 100vh;
   padding: 1.5rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .users-teams-content {
@@ -109,32 +110,36 @@
   text-decoration: none;
 }
 
-.invite-user-btn {
-  background-color: #10b981;
-  border-color: #10b981;
+.invite-user-btn, .create-team-btn, .create-role-btn {
   border-radius: 6px;
   font-weight: 500;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
 }
 
-.invite-user-btn:hover {
-  background-color: #059669;
-  border-color: #059669;
-}
+/* Button colors are now managed globally in _button-styles.scss */
 
-.create-btn {
-  background-color: #10b981;
-  border-color: #10b981;
+.download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 6px;
-  font-weight: 500;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background-color: white;
+  border: 1px solid #d1d5db;
 }
 
-.create-btn:hover {
-  background-color: #059669;
-  border-color: #059669;
+.download-btn:hover {
+  background-color: #f9fafb;
+  border-color: #b9bdc3;
+}
+
+.download-icon {
+  color: #3c8dbc;
+  width: 20px;
+  height: 20px;
 }
 
 .search-input-container {
@@ -192,11 +197,11 @@
 }
 
 .table-header-cell {
-  font-weight: 600;
-  color: #374151;
   font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: #374151;
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -214,6 +219,7 @@
   vertical-align: middle;
   color: #374151;
   font-size: 0.875rem;
+  font-weight: 400;
 }
 
 .user-info {
@@ -359,9 +365,21 @@
   border-color: #fecaca;
 }
 
+.delete-btn.btn-danger {
+  background-color: #e55353;
+  border-color: #e55353;
+  color: white;
+}
+
+.delete-btn.btn-danger:hover {
+  background-color: #d63939;
+  border-color: #d63939;
+}
+
 .create-role-modal .modal-title {
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: #3c4b64;
 }
 
 .create-role-modal .modal-header {
@@ -376,7 +394,8 @@
 .modal-label {
   display: block;
   font-weight: 500;
-  color: #1f2937;
+  font-size: 0.875rem;
+  color: #3c4b64;
   margin-bottom: 0.5rem;
 }
 
@@ -384,10 +403,12 @@
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   padding: 1rem;
+  font-size: 0.875rem;
 }
 
 .permission-item {
   margin-bottom: 0.75rem;
+  font-size: 0.875rem;
 }
 
 .permission-item:last-child {
@@ -418,8 +439,9 @@
 }
 
 .create-team-modal .modal-title {
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: #3c4b64;
 }
 
 .create-team-modal .modal-header {
@@ -535,27 +557,80 @@
 }
 
 .invite-user-modal .invite-btn {
-  background-color: #2eb85c;
-  border-color: #2eb85c;
+  background-color: #3c8dbc; /* Match invite-user-btn color */
+  border-color: #3c8dbc;
   color: white;
-  font-weight: 500;
-  padding: 0.5rem 1.5rem;
-}
-
-.invite-user-modal .cancel-btn {
-  color: #6c757d;
-  background-color: transparent;
-  border-color: transparent;
-  font-weight: 500;
 }
 
 .invite-user-modal .invite-btn:hover {
-  background-color: #26a14f;
-  border-color: #26a14f;
+  background-color: #367fa9;
+  border-color: #367fa9;
 }
 
-.create-btn, .invite-user-btn {
-  background-color: #2eb85c;
-  border-color: #2eb85c;
+/* Specific button styles for each action */
+.invite-user-btn {
+  background-color: #3c8dbc; /* Blue */
+  border-color: #3c8dbc;
   color: white;
+}
+
+.create-team-btn {
+  background-color: #3c8dbc; /* Blue - same as invite-user-btn */
+  border-color: #3c8dbc;
+  color: white;
+}
+
+.create-role-btn {
+  background-color: #3c8dbc; /* Blue - same as invite-user-btn */
+  border-color: #3c8dbc;
+  color: white;
+}
+
+/* Button colors are now managed globally in _button-styles.scss */
+
+.delete-team-modal .modal-title {
+  color: #e55353;
+}
+
+.delete-role-modal .modal-title {
+  color: #e55353;
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1050;
+}
+
+.toast-message {
+  background-color: #10b981;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  animation: fadeOut 3s linear forwards;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.role-permissions {
+  display: flex;
+  flex-direction: column;
+}
+
+.permissions-list-small {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #768192;
+}
+
+.permission-badge {
+  color: #6b7280;
 }

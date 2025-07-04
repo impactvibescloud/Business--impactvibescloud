@@ -31,7 +31,7 @@ import {
   CAlert
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch, cilFilter, cilOptions, cilPencil, cilTrash } from '@coreui/icons'
+import { cilPlus, cilSearch, cilFilter, cilPencil, cilTrash } from '@coreui/icons'
 import './Templates.css'
 
 function Templates() {
@@ -46,6 +46,8 @@ function Templates() {
   const [deleteId, setDeleteId] = useState(null)
   const [formError, setFormError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [deleteSuccessMessage, setDeleteSuccessMessage] = useState('')
+  const [activeFilter, setActiveFilter] = useState('All Templates')
   const [templateForm, setTemplateForm] = useState({
     name: '',
     message: ''
@@ -60,11 +62,22 @@ function Templates() {
     { id: 5, name: 'Survey Request', category: 'Feedback', lastModified: '2025-06-10', status: 'Active', message: 'We value your feedback! Please take a moment to complete our short survey.' }
   ])
   
-  // Filter templates by search term
-  const filteredTemplates = templates.filter(template => 
-    template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.category.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filter templates by search term and status filter
+  const filteredTemplates = templates.filter(template => {
+    // Apply search filter
+    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.category.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    // Apply status filter
+    let matchesFilter = true
+    if (activeFilter === 'Active') {
+      matchesFilter = template.status === 'Active'
+    } else if (activeFilter === 'Inactive') {
+      matchesFilter = template.status === 'Inactive'
+    }
+    
+    return matchesSearch && matchesFilter
+  })
   
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage
@@ -180,34 +193,47 @@ function Templates() {
   const cancelDelete = () => {
     setDeleteId(null)
     setShowDeleteModal(false)
+    setDeleteSuccessMessage('')
   }
   
   const handleDelete = async () => {
     if (!deleteId) return
     
     setIsDeleting(true)
+    setDeleteSuccessMessage('')
     
     try {
       // Simulate API request
       await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Find the template name for better user feedback
+      const templateToDelete = templates.find(template => template.id === deleteId)
+      const templateName = templateToDelete ? templateToDelete.name : 'Template'
       
       // Remove template from state
       setTemplates(prevTemplates => 
         prevTemplates.filter(template => template.id !== deleteId)
       )
       
-      setSuccessMessage('Template deleted successfully!')
+      setDeleteSuccessMessage(`"${templateName}" has been deleted successfully!`)
       
       // Close modal after brief delay
       setTimeout(() => {
         setShowDeleteModal(false)
         setDeleteId(null)
-      }, 1500)
+        setDeleteSuccessMessage('')
+      }, 2000)
     } catch (error) {
       console.error('Error deleting template:', error)
+      setFormError('Failed to delete template. Please try again.')
     } finally {
       setIsDeleting(false)
     }
+  }
+  
+  const handleFilterChange = (filter) => {
+    setActiveFilter(filter)
+    setCurrentPage(1) // Reset to first page when filter changes
   }
   
   return (
@@ -238,12 +264,27 @@ function Templates() {
             <div className="filter-container">
               <CDropdown>
                 <CDropdownToggle color="primary" variant="outline">
-                  <CIcon icon={cilFilter} /> Filter
+                  <CIcon icon={cilFilter} /> {activeFilter}
                 </CDropdownToggle>
                 <CDropdownMenu>
-                  <CDropdownItem>All Templates</CDropdownItem>
-                  <CDropdownItem>Active</CDropdownItem>
-                  <CDropdownItem>Inactive</CDropdownItem>
+                  <CDropdownItem 
+                    onClick={() => handleFilterChange('All Templates')} 
+                    active={activeFilter === 'All Templates'}
+                  >
+                    All Templates {activeFilter === 'All Templates' && '✓'}
+                  </CDropdownItem>
+                  <CDropdownItem 
+                    onClick={() => handleFilterChange('Active')} 
+                    active={activeFilter === 'Active'}
+                  >
+                    Active {activeFilter === 'Active' && '✓'}
+                  </CDropdownItem>
+                  <CDropdownItem 
+                    onClick={() => handleFilterChange('Inactive')} 
+                    active={activeFilter === 'Inactive'}
+                  >
+                    Inactive {activeFilter === 'Inactive' && '✓'}
+                  </CDropdownItem>
                 </CDropdownMenu>
               </CDropdown>
             </div>
@@ -278,6 +319,7 @@ function Templates() {
                         size="sm" 
                         onClick={() => openEditTemplateModal(template)}
                         title="Edit Template"
+                        className="edit-button"
                       >
                         <CIcon icon={cilPencil} />
                       </CButton>
@@ -287,19 +329,10 @@ function Templates() {
                         size="sm" 
                         onClick={() => confirmDelete(template.id)}
                         title="Delete Template"
+                        className="delete-button"
                       >
                         <CIcon icon={cilTrash} />
                       </CButton>
-                      <CDropdown variant="btn-group">
-                        <CDropdownToggle color="secondary" variant="ghost" size="sm">
-                          <CIcon icon={cilOptions} />
-                        </CDropdownToggle>
-                        <CDropdownMenu>
-                          <CDropdownItem>View</CDropdownItem>
-                          <CDropdownItem>Duplicate</CDropdownItem>
-                          <CDropdownItem>{template.status === 'Active' ? 'Deactivate' : 'Activate'}</CDropdownItem>
-                        </CDropdownMenu>
-                      </CDropdown>
                     </div>
                   </CTableDataCell>
                 </CTableRow>
@@ -424,17 +457,25 @@ function Templates() {
           <CModalTitle>Delete Template</CModalTitle>
         </CModalHeader>
         <CModalBody>
-          {successMessage && (
+          {deleteSuccessMessage && (
             <CAlert color="success">
-              {successMessage}
+              {deleteSuccessMessage}
             </CAlert>
           )}
-          {!successMessage && (
-            <p>Are you sure you want to delete this template? This action cannot be undone.</p>
+          {!deleteSuccessMessage && (
+            <>
+              <p>Are you sure you want to delete this template?</p>
+              <p className="text-danger fw-bold">This action cannot be undone.</p>
+              {deleteId && (
+                <p className="mt-3 mb-0 fw-bold">
+                  Template: {templates.find(t => t.id === deleteId)?.name}
+                </p>
+              )}
+            </>
           )}
         </CModalBody>
         <CModalFooter>
-          {!successMessage && (
+          {!deleteSuccessMessage && (
             <>
               <CButton color="secondary" onClick={cancelDelete} disabled={isDeleting}>
                 Cancel

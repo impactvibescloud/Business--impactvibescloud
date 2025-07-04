@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   CCard,
   CCardBody,
@@ -22,10 +22,11 @@ import {
   CForm,
   CFormLabel,
   CFormCheck,
-  CFormTextarea
+  CFormTextarea,
+  CAlert
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch } from '@coreui/icons'
+import { cilPlus, cilSearch, cilTrash, cilCloudUpload } from '@coreui/icons'
 import './SurveyCampaigns.css'
 
 function SurveyCampaigns() {
@@ -38,9 +39,17 @@ function SurveyCampaigns() {
   const [thankYouMessage, setThankYouMessage] = useState('')
   const [responseTime, setResponseTime] = useState('5 secs')
   const [questionType, setQuestionType] = useState('Yes/No')
+  const [audioFile, setAudioFile] = useState(null)
+  const [audioFileName, setAudioFileName] = useState('')
+  const [keypressYes, setKeypressYes] = useState(false)
+  const [keypressNo, setKeypressNo] = useState(true)
+  const [formError, setFormError] = useState('')
+  const [createSuccess, setCreateSuccess] = useState(false)
+  
+  const fileInputRef = useRef(null)
 
   // Sample data for demonstration
-  const surveys = [
+  const [surveys, setSurveys] = useState([
     {
       id: 1,
       name: 'Customer Satisfaction Survey',
@@ -65,7 +74,7 @@ function SurveyCampaigns() {
       status: 'Active',
       completionRate: 74,
     },
-  ]
+  ])
 
   // Filter surveys based on search term and status
   const filteredSurveys = surveys
@@ -93,24 +102,83 @@ function SurveyCampaigns() {
     setThankYouMessage('')
     setResponseTime('5 secs')
     setQuestionType('Yes/No')
+    setAudioFile(null)
+    setAudioFileName('')
+    setKeypressYes(false)
+    setKeypressNo(true)
+    setFormError('')
+  }
+  
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+    
+    // Check if it's an audio file
+    if (!file.type.startsWith('audio/')) {
+      setFormError('Please upload an audio file')
+      return
+    }
+    
+    // Check file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setFormError('File size should not exceed 10MB')
+      return
+    }
+    
+    setAudioFile(file)
+    setAudioFileName(file.name)
+    setFormError('')
+  }
+  
+  const handleBrowseClick = () => {
+    fileInputRef.current.click()
+  }
+  
+  const handleRemoveAudio = () => {
+    setAudioFile(null)
+    setAudioFileName('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
   
   const handleSaveSurvey = () => {
-    // Here you would typically save the survey data to your backend
-    console.log('Saving survey:', { 
-      campaignName, 
-      introText, 
-      questionTitle, 
-      thankYouMessage,
-      responseTime,
-      questionType 
-    })
+    // Validate form
+    if (!campaignName.trim()) {
+      setFormError('Campaign name is required')
+      return
+    }
+    
+    if (!questionTitle.trim()) {
+      setFormError('Question title is required')
+      return
+    }
+    
+    // Create new survey object
+    const today = new Date()
+    const formattedDate = today.toISOString().split('T')[0]
+    
+    const newSurvey = {
+      id: surveys.length + 1,
+      name: campaignName,
+      createdOn: formattedDate,
+      responses: 0,
+      status: 'Draft',
+      completionRate: 0,
+      keypressYes,
+      keypressNo,
+      audioFile: audioFileName
+    }
+    
+    // Add the new survey to the list
+    setSurveys([...surveys, newSurvey])
+    
+    // Show success message briefly
+    setCreateSuccess(true)
+    setTimeout(() => setCreateSuccess(false), 3000)
     
     // Close the modal after saving
     handleCloseModal()
-    
-    // Optionally add the new survey to the list
-    // setResults([...results, newSurvey])
   }
 
   // Function to render status badge with appropriate color
@@ -241,30 +309,26 @@ function SurveyCampaigns() {
                     </CTableBody>
                   </CTable>
 
-                  <div className="pagination-container">
-                    <CRow className="align-items-center">
-                      <CCol md={6}>
-                        <div className="rows-per-page">
-                          <span className="pagination-info">
-                            Rows per page:
-                          </span>
-                          <CFormSelect
-                            size="sm"
-                            style={{ width: 'auto' }}
-                          >
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                          </CFormSelect>
-                        </div>
-                      </CCol>
-                      <CCol md={6} className="text-end">
-                        <span className="pagination-info">
-                          {`1-${filteredSurveys.length} of ${filteredSurveys.length}`}
-                        </span>
-                      </CCol>
-                    </CRow>
+                  <div className="table-footer">
+                    <div className="rows-per-page">
+                      <span className="rows-text">Rows per page:</span>
+                      <CFormSelect
+                        className="rows-select"
+                        size="sm"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </CFormSelect>
+                    </div>
+                    <div className="pagination-info">
+                      {`1-${filteredSurveys.length} of ${filteredSurveys.length}`}
+                    </div>
+                    <div className="pagination-controls">
+                      <button className="pagination-button" disabled>&lt;</button>
+                      <button className="pagination-button" disabled>&gt;</button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -310,6 +374,9 @@ function SurveyCampaigns() {
           <CModalTitle>Create survey</CModalTitle>
         </CModalHeader>
         <CModalBody>
+          {formError && <CAlert color="danger" className="mb-3">{formError}</CAlert>}
+          {createSuccess && <CAlert color="success" className="mb-3">Survey created successfully!</CAlert>}
+          
           <CForm>
             {/* Campaign name */}
             <div className="mb-3">
@@ -337,6 +404,7 @@ function SurveyCampaigns() {
                 placeholder="Enter campaign name"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
+                required
               />
             </div>
 
@@ -356,7 +424,7 @@ function SurveyCampaigns() {
             <div className="question-section mb-3">
               <div className="question-header d-flex align-items-center justify-content-between">
                 <div>QUESTION - 1</div>
-                <button className="btn btn-link add-question-btn p-0">
+                <button type="button" className="btn btn-link add-question-btn p-0">
                   <CIcon icon={cilPlus} size="sm" className="me-1" />
                 </button>
               </div>
@@ -384,14 +452,22 @@ function SurveyCampaigns() {
                   <div className="option-item d-flex align-items-center mb-2">
                     <CFormCheck 
                       id="optionYes"
-                      defaultChecked
+                      checked={keypressYes}
+                      onChange={(e) => {
+                        setKeypressYes(e.target.checked)
+                        if (e.target.checked) setKeypressNo(false)
+                      }}
                     />
                     <CFormLabel htmlFor="optionYes" className="ms-2 mb-0">Yes</CFormLabel>
                   </div>
                   <div className="option-item d-flex align-items-center">
                     <CFormCheck 
                       id="optionNo"
-                      defaultChecked
+                      checked={keypressNo}
+                      onChange={(e) => {
+                        setKeypressNo(e.target.checked)
+                        if (e.target.checked) setKeypressYes(false)
+                      }}
                     />
                     <CFormLabel htmlFor="optionNo" className="ms-2 mb-0">No</CFormLabel>
                   </div>
@@ -407,18 +483,49 @@ function SurveyCampaigns() {
                   placeholder="Enter question title"
                   value={questionTitle}
                   onChange={(e) => setQuestionTitle(e.target.value)}
+                  required
                 />
               </div>
 
               {/* Question recording */}
               <div className="mb-3">
                 <CFormLabel>Question recording</CFormLabel>
-                <div className="recording-placeholder border d-flex align-items-center justify-content-center p-3" style={{height: '60px', borderStyle: 'dashed', borderRadius: '4px'}}>
-                  <div className="text-center">
-                    <CIcon icon={cilPlus} size="sm" className="me-1" />
-                    <span>Upload audio</span>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept="audio/*"
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                />
+                
+                {!audioFile ? (
+                  <div 
+                    className="recording-placeholder border d-flex align-items-center justify-content-center p-3 cursor-pointer" 
+                    style={{height: '60px', borderStyle: 'dashed', borderRadius: '4px', cursor: 'pointer'}}
+                    onClick={handleBrowseClick}
+                  >
+                    <div className="text-center">
+                      <CIcon icon={cilCloudUpload} size="lg" className="me-2" />
+                      <span>Upload audio</span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="audio-file-selected border p-3" style={{borderRadius: '4px', position: 'relative'}}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>Selected file:</strong> {audioFileName}
+                      </div>
+                      <CButton 
+                        color="danger" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={handleRemoveAudio}
+                      >
+                        <CIcon icon={cilTrash} />
+                      </CButton>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -443,7 +550,7 @@ function SurveyCampaigns() {
             Cancel
           </CButton>
           <CButton 
-            color="success"
+            color="primary"
             onClick={handleSaveSurvey}
           >
             Create

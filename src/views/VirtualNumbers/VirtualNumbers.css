@@ -12,6 +12,8 @@
 .virtual-numbers-header h1 {
   margin: 0;
   font-size: 1.75rem;
+  font-weight: 700;
+  color: #3c4b64;
 }
 
 .numbers-filter-section {
@@ -35,6 +37,7 @@
 
 .add-virtual-number-modal .modal-title {
   font-weight: 600;
+  font-size: 1.25rem;
 }
 
 .call-forwarding-settings {
@@ -44,6 +47,8 @@
 
 .working-days-container {
   margin-top: 10px;
+  display: flex;
+  gap: 12px;
 }
 
 .working-day-item {
@@ -52,6 +57,7 @@
 
 .call-hours-select {
   width: 100px;
+  min-width: 120px;
 }
 
 .phone-icon {
@@ -64,38 +70,62 @@
   gap: 5px;
 }
 
+/* Filter styling */
+.filter-container .dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.filter-container .dropdown-toggle.active {
+  background-color: #321fdb;
+  color: white;
+  border-color: #321fdb;
+}
+
+.filter-container .dropdown-menu {
+  min-width: 160px;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* Action buttons styling */
+.number-actions .btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.number-actions .btn-ghost-primary:hover {
+  background-color: rgba(50, 31, 219, 0.1);
+  color: #321fdb;
+}
+
+.number-actions .btn-ghost-danger:hover {
+  background-color: rgba(229, 83, 83, 0.1);
+  color: #e55353;
+}
+
+/* Delete modal styling */
+.modal-header .text-danger {
+  color: #e55353;
+}
+
+/* Success alert styling */
+.alert-success {
+  border-left: 4px solid #2eb85c;
+  background-color: rgba(46, 184, 92, 0.1);
+  color: #2a7d4e;
+}
+
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: center;
-}
-
-/* Add Virtual Number Modal Styles */
-.add-virtual-number-modal .modal-title {
-  font-weight: 600;
-}
-
-.call-forwarding-settings {
-  background-color: #f8f9fa;
-  border-color: #d8dbe0 !important;
-}
-
-.working-days-container {
-  display: flex;
-  gap: 12px;
-}
-
-.working-day-item {
-  min-width: 100px;
-}
-
-.call-hours-select {
-  min-width: 120px;
-}
-
-.add-number-btn {
-  background-color: #321fdb;
-  border-color: #321fdb;
 }
 
 @media (max-width: 768px) {

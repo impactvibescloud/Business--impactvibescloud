@@ -8,6 +8,12 @@
   margin-bottom: 24px;
 }
 
+/* Required field indicator */
+.required-mark {
+  color: #e55353;
+  margin-left: 4px;
+}
+
 .billing-tabs .tab-link {
   color: #768192;
   font-weight: 500;
@@ -143,6 +149,15 @@
   font-size: 12px;
   background-color: #ffe9cc;
   color: #e07a00;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.active-badge {
+  font-size: 12px;
+  background-color: #d1fae5;
+  color: #047857;
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: 500;
@@ -316,78 +331,35 @@
   color: #3c4b64;
 }
 
-.payment-methods-card {
-  border: 1px solid #ebedef;
-  border-radius: 6px;
-  margin-bottom: 20px;
-}
+/* Payment Methods Section Styles - Removed */
 
-.payment-method-item {
-  padding: 16px;
-  border-bottom: 1px solid #ebedef;
-}
-
-.payment-method-item:last-child {
-  border-bottom: none;
-}
-
-.payment-method-icon {
-  width: 40px;
-  height: 40px;
-  background-color: #f0f0f0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.payment-method-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: #3c4b64;
-  margin-bottom: 4px;
-}
-
-.payment-method-number {
-  font-size: 14px;
-  color: #768192;
-}
-
-.add-method-btn {
-  padding: 8px 16px;
-  font-weight: 500;
-}
-
-.billing-history-card {
-  border: 1px solid #ebedef;
-  border-radius: 6px;
+/* Billing History Section Styles */
+.billing-history-section {
+  margin-bottom: 2rem;
 }
 
 .billing-history-header {
-  background-color: #f8f8f8;
-  font-size: 14px;
+  background-color: #f8f9fa;
+  font-size: 0.9rem;
 }
 
 .billing-history-empty {
-  padding: 40px 20px;
-  text-align: center;
+  padding: 3rem 1rem;
+  color: #8a93a2;
 }
 
 .empty-icon {
-  color: #c9c9c9;
-  margin-bottom: 20px;
+  color: #d8dbe0;
+  font-size: 2.5rem;
 }
 
 .empty-message {
-  font-size: 16px;
   font-weight: 500;
-  color: #3c4b64;
-  margin-bottom: 8px;
+  font-size: 1rem;
 }
 
 .empty-description {
-  font-size: 14px;
-  color: #768192;
+  font-size: 0.875rem;
 }
 
 /* Billing Information Form Styles */

@@ -29,10 +29,11 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CFormCheck
+  CFormCheck,
+  CAlert
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilSearch, cilFilter, cilPlus, cilOptions, cilPencil, cilTrash, cilUser, cilSettings, cilX } from '@coreui/icons'
+import { cilSearch, cilPlus, cilPencil, cilTrash, cilUser, cilSettings, cilX, cilCloudDownload } from '@coreui/icons'
 import './UsersTeams.css'
 
 function UsersTeams() {
@@ -48,21 +49,33 @@ function UsersTeams() {
   const [showCreateRoleModal, setShowCreateRoleModal] = useState(false)
   const [newRoleName, setNewRoleName] = useState('')
   const [selectedPermissions, setSelectedPermissions] = useState([])
+  const [editingRoleId, setEditingRoleId] = useState(null)
+  const [showDeleteRoleModal, setShowDeleteRoleModal] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState(null)
+  const [roleSuccessMessage, setRoleSuccessMessage] = useState('')
   
   // Team modal states
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
+  const [newTeamVirtualNumber, setNewTeamVirtualNumber] = useState('')
   const [teamMembers, setTeamMembers] = useState([])
   const [newTeamMember, setNewTeamMember] = useState('')
+  const [editingTeamId, setEditingTeamId] = useState(null)
+  const [showDeleteTeamModal, setShowDeleteTeamModal] = useState(false)
+  const [teamToDelete, setTeamToDelete] = useState(null)
   
   // Invite user modal states
   const [showInviteUserModal, setShowInviteUserModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('')
   const [inviteVirtualNumber, setInviteVirtualNumber] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+
+  // Success message for team creation
+  const [teamSuccessMessage, setTeamSuccessMessage] = useState('')
 
   // Sample data for Users
-  const users = [
+  const [users, setUsers] = useState([
     {
       id: 1,
       name: 'John Smith',
@@ -90,10 +103,10 @@ function UsersTeams() {
       licenses: 'Professional',
       teams: 'Sales, Support'
     }
-  ]
+  ])
 
   // Sample data for Teams
-  const teams = [
+  const [teams, setTeams] = useState([
     {
       id: 1,
       name: 'Sales Team',
@@ -112,32 +125,35 @@ function UsersTeams() {
       virtualNumber: '+1 234 567 8903',
       members: ['Jennifer Lee', 'Robert Miller']
     }
-  ]
+  ])
 
-  // Sample data for Roles
-  const roles = [
+  // Sample data for Roles - changed to useState
+  const [roles, setRoles] = useState([
     {
       id: 1,
       name: 'Admin',
       type: 'System',
       description: 'Full system access with all privileges',
-      users: ['John Smith']
+      users: ['John Smith'],
+      permissions: ['View and manage calls', 'View and manage teams', 'View and manage users', 'View and manage reports', 'Admin access']
     },
     {
       id: 2,
       name: 'Agent',
       type: 'Custom',
       description: 'Can manage calls and customer interactions',
-      users: ['Emily Johnson', 'David Brown']
+      users: ['Emily Johnson', 'David Brown'],
+      permissions: ['View and manage calls']
     },
     {
       id: 3,
       name: 'Manager',
       type: 'Custom',
       description: 'Can manage teams and view reports',
-      users: ['Michael Davis', 'Sarah Wilson']
+      users: ['Michael Davis', 'Sarah Wilson'],
+      permissions: ['View and manage teams', 'View and manage reports']
     }
-  ]
+  ])
 
   // Available permissions for roles
   const availablePermissions = [
@@ -160,19 +176,35 @@ function UsersTeams() {
   // Handle role creation
   const handleCreateRole = () => {
     if (newRoleName.trim()) {
+      if (editingRoleId) {
+        // If we're editing, update the existing role
+        handleUpdateRole()
+        return
+      }
+      
       // In a real app, you would save this to your backend
       const newRole = {
         id: roles.length + 1,
         name: newRoleName,
         type: 'Custom',
         description: `Role with ${selectedPermissions.length} permissions`,
-        users: []
+        users: [],
+        permissions: [...selectedPermissions]
       }
       
+      // Add the new role to the state
+      setRoles([...roles, newRole])
+      
+      // Show success message
+      setRoleSuccessMessage(`Role "${newRoleName}" has been created successfully.`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setRoleSuccessMessage('')
+      }, 3000)
+      
       // Reset form and close modal
-      setNewRoleName('')
-      setSelectedPermissions([])
-      setShowCreateRoleModal(false)
+      resetRoleForm()
     }
   }
 
@@ -192,19 +224,275 @@ function UsersTeams() {
   // Handle team creation
   const handleCreateTeam = () => {
     if (newTeamName.trim()) {
+      if (editingTeamId) {
+        // If we're editing, update the existing team
+        handleUpdateTeam()
+        return
+      }
+      
       // In a real app, you would save this to your backend
       const newTeam = {
         id: teams.length + 1,
         name: newTeamName,
-        virtualNumber: `+1 ${Math.floor(100000000 + Math.random() * 900000000)}`,
+        virtualNumber: newTeamVirtualNumber.trim() || `+1 ${Math.floor(100000000 + Math.random() * 900000000)}`,
         members: teamMembers
       }
       
+      // Add the new team to the state
+      setTeams([...teams, newTeam])
+      
+      // Show success message
+      setTeamSuccessMessage(`Team "${newTeamName}" has been created successfully.`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setTeamSuccessMessage('')
+      }, 3000)
+      
       // Reset form and close modal
-      setNewTeamName('')
-      setTeamMembers([])
-      setShowCreateTeamModal(false)
+      resetTeamForm()
     }
+  }
+
+  // Handle team editing
+  const handleEditTeam = (teamId) => {
+    const teamToEdit = teams.find(team => team.id === teamId)
+    if (teamToEdit) {
+      setEditingTeamId(teamId)
+      setNewTeamName(teamToEdit.name)
+      setNewTeamVirtualNumber(teamToEdit.virtualNumber)
+      setTeamMembers([...teamToEdit.members])
+      setShowCreateTeamModal(true)
+    }
+  }
+
+  // Handle team update
+  const handleUpdateTeam = () => {
+    if (newTeamName.trim()) {
+      const updatedTeams = teams.map(team => {
+        if (team.id === editingTeamId) {
+          return {
+            ...team,
+            name: newTeamName,
+            virtualNumber: newTeamVirtualNumber.trim() || team.virtualNumber,
+            members: teamMembers
+          }
+        }
+        return team
+      })
+      
+      // Update teams state
+      setTeams(updatedTeams)
+      
+      // Show success message
+      setTeamSuccessMessage(`Team "${newTeamName}" has been updated successfully.`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setTeamSuccessMessage('')
+      }, 3000)
+      
+      // Reset form and close modal
+      resetTeamForm()
+    }
+  }
+
+  // Reset team form
+  const resetTeamForm = () => {
+    setNewTeamName('')
+    setNewTeamVirtualNumber('')
+    setTeamMembers([])
+    setEditingTeamId(null)
+    setShowCreateTeamModal(false)
+  }
+
+  // Reset role form
+  const resetRoleForm = () => {
+    setNewRoleName('')
+    setSelectedPermissions([])
+    setEditingRoleId(null)
+    setShowCreateRoleModal(false)
+  }
+
+  // Handle role editing
+  const handleEditRole = (roleId) => {
+    const roleToEdit = roles.find(role => role.id === roleId)
+    if (roleToEdit) {
+      setEditingRoleId(roleId)
+      setNewRoleName(roleToEdit.name)
+      setSelectedPermissions(roleToEdit.permissions || [])
+      setShowCreateRoleModal(true)
+    }
+  }
+
+  // Handle role update
+  const handleUpdateRole = () => {
+    if (newRoleName.trim()) {
+      const updatedRoles = roles.map(role => {
+        if (role.id === editingRoleId) {
+          return {
+            ...role,
+            name: newRoleName,
+            description: `Role with ${selectedPermissions.length} permissions`,
+            permissions: [...selectedPermissions]
+          }
+        }
+        return role
+      })
+      
+      // Update roles state
+      setRoles(updatedRoles)
+      
+      // Show success message
+      setRoleSuccessMessage(`Role "${newRoleName}" has been updated successfully.`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setRoleSuccessMessage('')
+      }, 3000)
+      
+      // Reset form and close modal
+      resetRoleForm()
+    }
+  }
+
+  // Handle team delete confirmation
+  const handleDeleteConfirmation = (teamId) => {
+    const teamToDelete = teams.find(team => team.id === teamId)
+    if (teamToDelete) {
+      setTeamToDelete(teamToDelete)
+      setShowDeleteTeamModal(true)
+    }
+  }
+
+  // Handle team deletion
+  const handleDeleteTeam = () => {
+    if (teamToDelete) {
+      const updatedTeams = teams.filter(team => team.id !== teamToDelete.id)
+      
+      // Update teams state
+      setTeams(updatedTeams)
+      
+      // Show success message
+      setTeamSuccessMessage(`Team "${teamToDelete.name}" has been deleted successfully.`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setTeamSuccessMessage('')
+      }, 3000)
+      
+      // Reset and close modal
+      setTeamToDelete(null)
+      setShowDeleteTeamModal(false)
+    }
+  }
+
+  // Handle role delete confirmation
+  const handleDeleteRoleConfirmation = (roleId) => {
+    const roleToDelete = roles.find(role => role.id === roleId)
+    if (roleToDelete) {
+      setRoleToDelete(roleToDelete)
+      setShowDeleteRoleModal(true)
+    }
+  }
+
+  // Handle role deletion
+  const handleDeleteRole = () => {
+    if (roleToDelete) {
+      const updatedRoles = roles.filter(role => role.id !== roleToDelete.id)
+      
+      // Update roles state
+      setRoles(updatedRoles)
+      
+      // Show success message
+      setRoleSuccessMessage(`Role "${roleToDelete.name}" has been deleted successfully.`)
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setRoleSuccessMessage('')
+      }, 3000)
+      
+      // Reset and close modal
+      setRoleToDelete(null)
+      setShowDeleteRoleModal(false)
+    }
+  }
+
+  // Handle inviting a new user
+  const handleInviteUser = () => {
+    // Basic validation
+    if (!inviteEmail.trim() || !inviteRole) {
+      return
+    }
+    
+    // Create a new user object
+    const newUser = {
+      id: users.length + 1,
+      name: inviteEmail.split('@')[0],  // Extract name from email as placeholder
+      email: inviteEmail,
+      status: 'Active',
+      role: inviteRole,
+      licenses: 'Professional', // Default license
+      teams: 'None'  // Default team
+    }
+    
+    // Add the user to the users array
+    setUsers([...users, newUser])
+    
+    // Show success message
+    setSuccessMessage(`User ${inviteEmail} has been invited successfully.`)
+    
+    // Reset form fields
+    setInviteEmail('')
+    setInviteRole('')
+    setInviteVirtualNumber('')
+    
+    // Close the modal
+    setShowInviteUserModal(false)
+    
+    // Clear success message after 5 seconds
+    setTimeout(() => {
+      setSuccessMessage('')
+    }, 5000)
+  }
+
+  // Handle downloading user data as CSV
+  const handleDownloadUsers = () => {
+    // Get currently filtered users
+    const dataToExport = filteredUsers
+    
+    // Create CSV header
+    const headers = ['Name', 'Email', 'Status', 'Role', 'Licenses', 'Teams']
+    
+    // Create CSV rows
+    const csvRows = [
+      headers.join(','),
+      ...dataToExport.map(user => [
+        user.name,
+        user.email,
+        user.status,
+        user.role,
+        user.licenses,
+        user.teams
+      ].join(','))
+    ]
+    
+    // Combine into CSV string
+    const csvString = csvRows.join('\n')
+    
+    // Create a download link
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    
+    // Create a temporary link and click it to trigger download
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'users_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    
+    // Clean up
+    document.body.removeChild(link)
   }
 
   // Filter users based on search term and filters
@@ -312,6 +600,7 @@ function UsersTeams() {
           </CCol>
           <CCol md={2} className="text-end">
             <CButton 
+              color="primary" 
               className="invite-user-btn"
               onClick={() => setShowInviteUserModal(true)}
             >
@@ -324,17 +613,8 @@ function UsersTeams() {
     } else if (activeTab === 'Teams') {
       return (
         <CRow className="align-items-center mb-3">
-          <CCol md={8}>
-            <CButton
-              color="link"
-              className="clear-all-btn"
-              onClick={() => setSearchTerm('')}
-            >
-              Clear all
-            </CButton>
-          </CCol>
-          <CCol md={4} className="text-end">
-            <CButton className="create-btn" onClick={() => setShowCreateTeamModal(true)}>
+          <CCol md={12} className="text-end">
+            <CButton className="create-team-btn" onClick={() => setShowCreateTeamModal(true)}>
               <CIcon icon={cilPlus} className="me-1" />
               Create Team
             </CButton>
@@ -344,17 +624,8 @@ function UsersTeams() {
     } else if (activeTab === 'Roles') {
       return (
         <CRow className="align-items-center mb-3">
-          <CCol md={8}>
-            <CButton
-              color="link"
-              className="clear-all-btn"
-              onClick={() => setSearchTerm('')}
-            >
-              Clear all
-            </CButton>
-          </CCol>
-          <CCol md={4} className="text-end">
-            <CButton className="create-btn" onClick={() => setShowCreateRoleModal(true)}>
+          <CCol md={12} className="text-end">
+            <CButton className="create-role-btn" onClick={() => setShowCreateRoleModal(true)}>
               <CIcon icon={cilPlus} className="me-1" />
               Create Role
             </CButton>
@@ -475,10 +746,10 @@ function UsersTeams() {
                   </CTableDataCell>
                   <CTableDataCell className="table-cell text-center">
                     <div className="action-buttons">
-                      <CButton color="light" size="sm" className="action-btn edit-btn me-2">
+                      <CButton color="light" size="sm" className="action-btn edit-btn me-2" onClick={() => handleEditTeam(team.id)}>
                         <CIcon icon={cilPencil} size="sm" />
                       </CButton>
-                      <CButton color="light" size="sm" className="action-btn delete-btn">
+                      <CButton color="light" size="sm" className="action-btn delete-btn" onClick={() => handleDeleteConfirmation(team.id)}>
                         <CIcon icon={cilTrash} size="sm" />
                       </CButton>
                     </div>
@@ -532,7 +803,17 @@ function UsersTeams() {
                     </span>
                   </CTableDataCell>
                   <CTableDataCell className="table-cell">
-                    {role.description}
+                    <div className="role-permissions">
+                      {role.description}
+                      <div className="permissions-list-small">
+                        {role.permissions && role.permissions.map((permission, idx) => (
+                          <span key={idx} className="permission-badge">
+                            {permission}
+                            {idx < role.permissions.length - 1 ? ', ' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </CTableDataCell>
                   <CTableDataCell className="table-cell">
                     <div className="role-users">
@@ -546,10 +827,22 @@ function UsersTeams() {
                   </CTableDataCell>
                   <CTableDataCell className="table-cell text-center">
                     <div className="action-buttons">
-                      <CButton color="light" size="sm" className="action-btn edit-btn me-2">
+                      <CButton 
+                        color="light" 
+                        size="sm" 
+                        className="action-btn edit-btn me-2"
+                        onClick={() => handleEditRole(role.id)}
+                        title="Edit role"
+                      >
                         <CIcon icon={cilPencil} size="sm" />
                       </CButton>
-                      <CButton color="light" size="sm" className="action-btn delete-btn">
+                      <CButton 
+                        color="light" 
+                        size="sm" 
+                        className="action-btn delete-btn"
+                        onClick={() => handleDeleteRoleConfirmation(role.id)}
+                        title="Delete role"
+                      >
                         <CIcon icon={cilTrash} size="sm" />
                       </CButton>
                     </div>
@@ -583,13 +876,24 @@ function UsersTeams() {
             </CNav>
 
             <div className="tab-content">
-              {activeTab === 'Users' && (
-                <div className="license-info-section">
-                  <div className="license-info">
-                    {/* License information removed as requested */}
-                  </div>
-                </div>
+              {successMessage && (
+                <CAlert color="success" dismissible onClose={() => setSuccessMessage('')}>
+                  {successMessage}
+                </CAlert>
               )}
+              
+              {teamSuccessMessage && (
+                <CAlert color="success" dismissible onClose={() => setTeamSuccessMessage('')}>
+                  {teamSuccessMessage}
+                </CAlert>
+              )}
+              
+              {roleSuccessMessage && (
+                <CAlert color="success" dismissible onClose={() => setRoleSuccessMessage('')}>
+                  {roleSuccessMessage}
+                </CAlert>
+              )}
+              
 
               <div className="controls-section">
                 {renderTabControls()}
@@ -612,8 +916,14 @@ function UsersTeams() {
                   </CCol>
                   <CCol md={6} className="text-end">
                     <div className="table-controls">
-                      <CIcon icon={cilFilter} className="filter-icon" />
-                      <CIcon icon={cilOptions} className="sort-icon" />
+                      <CButton 
+                        color="light" 
+                        className="download-btn"
+                        onClick={handleDownloadUsers}
+                        title="Download data"
+                      >
+                        <CIcon icon={cilCloudDownload} className="download-icon" />
+                      </CButton>
                     </div>
                   </CCol>
                 </CRow>
@@ -627,37 +937,35 @@ function UsersTeams() {
                     </CTable>
                   </div>
 
-                  <div className="pagination-container">
-                    <CRow className="align-items-center">
-                      <CCol md={6}>
-                        <div className="rows-per-page">
-                          <span className="pagination-info">Rows per page:</span>
-                          <CFormSelect
-                            size="sm"
-                            value={rowsPerPage}
-                            onChange={(e) => setRowsPerPage(Number(e.target.value))}
-                            style={{ width: 'auto' }}
-                          >
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                          </CFormSelect>
-                        </div>
-                      </CCol>
-                      <CCol md={6} className="text-end">
-                        <span className="pagination-info me-3">
-                          {activeTab === 'Users' && filteredUsers.length > 0 ? 
-                            `1-${filteredUsers.length} of ${filteredUsers.length}` : 
-                            activeTab === 'Teams' && filteredTeams.length > 0 ?
-                            `1-${filteredTeams.length} of ${filteredTeams.length}` :
-                            activeTab === 'Roles' && filteredRoles.length > 0 ?
-                            `1-${filteredRoles.length} of ${filteredRoles.length}` :
-                            '0-0 of 0'
-                          }
-                        </span>
-                      </CCol>
-                    </CRow>
+                  <div className="table-footer">
+                    <div className="rows-per-page">
+                      <span className="rows-text">Rows per page:</span>
+                      <CFormSelect
+                        className="rows-select"
+                        size="sm"
+                        value={rowsPerPage}
+                        onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </CFormSelect>
+                    </div>
+                    <div className="pagination-info">
+                      {activeTab === 'Users' && filteredUsers.length > 0 ? 
+                        `1-${filteredUsers.length} of ${filteredUsers.length}` : 
+                        activeTab === 'Teams' && filteredTeams.length > 0 ?
+                        `1-${filteredTeams.length} of ${filteredTeams.length}` :
+                        activeTab === 'Roles' && filteredRoles.length > 0 ?
+                        `1-${filteredRoles.length} of ${filteredRoles.length}` :
+                        '0-0 of 0'
+                      }
+                    </div>
+                    <div className="pagination-controls">
+                      <button className="pagination-button" disabled>&lt;</button>
+                      <button className="pagination-button" disabled>&gt;</button>
+                    </div>
                   </div>
                 </CCardBody>
               </CCard>
@@ -674,7 +982,7 @@ function UsersTeams() {
         className="create-role-modal"
       >
         <CModalHeader closeButton>
-          <CModalTitle>Create role</CModalTitle>
+          <CModalTitle>{editingRoleId ? 'Edit role' : 'Create role'}</CModalTitle>
         </CModalHeader>
         <CModalBody>
           <div className="mb-4">
@@ -707,14 +1015,14 @@ function UsersTeams() {
           <CButton 
             color="link" 
             className="cancel-btn"
-            onClick={() => setShowCreateRoleModal(false)}
+            onClick={resetRoleForm}
           >
             Cancel
           </CButton>
           <CButton 
             color="success" 
             className="save-btn"
-            onClick={handleCreateRole}
+            onClick={editingRoleId ? handleUpdateRole : handleCreateRole}
             disabled={!newRoleName.trim()}
           >
             Save
@@ -730,7 +1038,7 @@ function UsersTeams() {
         className="create-team-modal"
       >
         <CModalHeader closeButton>
-          <CModalTitle>Create team</CModalTitle>
+          <CModalTitle>{editingTeamId ? 'Edit team' : 'Create team'}</CModalTitle>
         </CModalHeader>
         <CModalBody>
           <div className="mb-4">
@@ -740,6 +1048,16 @@ function UsersTeams() {
               placeholder="Enter team name"
               value={newTeamName}
               onChange={(e) => setNewTeamName(e.target.value)}
+            />
+          </div>
+          
+          <div className="mb-4">
+            <label htmlFor="virtualNumber" className="modal-label">Virtual number</label>
+            <CFormInput
+              id="virtualNumber"
+              placeholder="Enter virtual number (e.g., +1 234 567 8900)"
+              value={newTeamVirtualNumber}
+              onChange={(e) => setNewTeamVirtualNumber(e.target.value)}
             />
           </div>
           
@@ -779,15 +1097,15 @@ function UsersTeams() {
           <CButton 
             color="link" 
             className="cancel-btn"
-            onClick={() => setShowCreateTeamModal(false)}
+            onClick={resetTeamForm}
           >
             Cancel
           </CButton>
           <CButton 
             color="success" 
             className="save-btn"
-            onClick={handleCreateTeam}
-            disabled={!newTeamName.trim() || teamMembers.length === 0}
+            onClick={editingTeamId ? handleUpdateTeam : handleCreateTeam}
+            disabled={!newTeamName.trim()}
           >
             Save
           </CButton>
@@ -850,20 +1168,112 @@ function UsersTeams() {
             Cancel
           </CButton>
           <CButton 
-            color="success"
-            onClick={() => {
-              // Handle invite user logic here
-              setShowInviteUserModal(false);
-              setInviteEmail('');
-              setInviteRole('');
-              setInviteVirtualNumber('');
-            }}
+            color="primary"
+            onClick={handleInviteUser}
             className="invite-btn"
+            disabled={!inviteEmail.trim() || !inviteRole}
           >
-            Invite
+            Save
           </CButton>
         </CModalFooter>
       </CModal>
+
+      {/* Delete Team Confirmation Modal */}
+      <CModal
+        alignment="center"
+        visible={showDeleteTeamModal}
+        onClose={() => setShowDeleteTeamModal(false)}
+        className="delete-team-modal"
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>Delete team</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {teamToDelete && (
+            <p>
+              Are you sure you want to delete the team "{teamToDelete.name}"? This action cannot be undone.
+            </p>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton 
+            color="light" 
+            onClick={() => setShowDeleteTeamModal(false)}
+            className="cancel-btn"
+          >
+            Cancel
+          </CButton>
+          <CButton 
+            color="danger"
+            onClick={handleDeleteTeam}
+            className="delete-btn"
+          >
+            Delete
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Delete Role Confirmation Modal */}
+      <CModal
+        alignment="center"
+        visible={showDeleteRoleModal}
+        onClose={() => setShowDeleteRoleModal(false)}
+        className="delete-role-modal"
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>Delete role</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {roleToDelete && (
+            <p>
+              Are you sure you want to delete the role "{roleToDelete.name}"? This action cannot be undone.
+            </p>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton 
+            color="light" 
+            onClick={() => setShowDeleteRoleModal(false)}
+            className="cancel-btn"
+          >
+            Cancel
+          </CButton>
+          <CButton 
+            color="danger"
+            onClick={handleDeleteRole}
+            className="delete-btn"
+          >
+            Delete
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Success message toast */}
+      {successMessage && (
+        <div className="toast-container">
+          <div className="toast-message">
+            {successMessage}
+          </div>
+        </div>
+      )}
+
+      {/* Team Success message toast */}
+      {teamSuccessMessage && (
+        <div className="toast-container">
+          <div className="toast-message">
+            {teamSuccessMessage}
+          </div>
+        </div>
+      )}
+
+      {/* Role Success message toast */}
+      {roleSuccessMessage && (
+        <div className="toast-container">
+          <div className="toast-message">
+            {roleSuccessMessage}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

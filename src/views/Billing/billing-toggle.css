@@ -1,0 +1,49 @@
+.custom-toggle .form-check-input {
+  width: 48px;
+  height: 24px;
+  background-color: #e9ecef;
+  border: none;
+  cursor: pointer;
+}
+
+.custom-toggle .form-check-input:checked {
+  background-color: #321fdb;
+  border-color: #321fdb;
+}
+
+.custom-toggle .form-check-input:focus {
+  box-shadow: 0 0 0 0.25rem rgba(50, 31, 219, 0.25);
+}
+
+.custom-toggle .form-check-input:after {
+  background-color: #fff;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  top: 2px;
+  position: absolute;
+  transition: transform 0.25s ease;
+  border-radius: 50%;
+}
+
+.custom-toggle .form-check-input:checked:after {
+  transform: translateX(24px);
+}
+
+.custom-toggle .form-check-label {
+  font-weight: 500;
+  font-size: 16px;
+  padding-left: 8px;
+}
+
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-wrapper .toggle-title {
+  margin-bottom: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
