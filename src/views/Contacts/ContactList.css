@@ -1,0 +1,205 @@
+.contact-list-container,
+.contact-lists-container {
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.contact-list-title {
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0;
+}
+
+.add-contact-btn {
+  background-color: #5a46eb;
+  border-color: #5a46eb;
+  font-weight: 500;
+}
+
+.add-contact-btn:hover {
+  background-color: #483bc3;
+  border-color: #483bc3;
+}
+
+.contact-table,
+.contact-list-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.contact-table thead,
+.contact-list-table thead {
+  background-color: #f8f9fa;
+}
+
+.contact-table th,
+.contact-list-table th {
+  font-weight: 600;
+  color: #495057;
+  padding: 12px 16px;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.875rem;
+}
+
+.contact-table td,
+.contact-list-table td {
+  vertical-align: middle;
+  padding: 12px 16px;
+  font-size: 0.875rem;
+}
+
+.contact-name,
+.list-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.contact-phone,
+.contact-email {
+  display: flex;
+  align-items: center;
+  color: #495057;
+}
+
+.contact-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tag {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.tag-customer {
+  background-color: #e3f2fd;
+  color: #0d6efd;
+}
+
+.tag-sales-lead {
+  background-color: #fff8e1;
+  color: #ffc107;
+}
+
+.tag-support {
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+.contact-date {
+  color: #6c757d;
+}
+
+.action-btn {
+  font-size: 0.875rem;
+  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.edit-btn:hover {
+  background-color: #e9ecef;
+  color: #5a46eb;
+}
+
+.delete-btn:hover {
+  background-color: #f8d7da;
+  color: #dc3545;
+}
+
+.delete-btn:active,
+.delete-btn:focus {
+  background-color: #dc3545;
+  color: white;
+}
+
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+}
+
+.empty-state-icon {
+  background-color: #f1f3f5;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.empty-state-icon svg {
+  color: #6c757d;
+}
+
+.empty-state h4 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  color: #6c757d;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Additional styles for Contact Lists */
+.list-contacts {
+  color: #495057;
+}
+
+.list-date {
+  color: #6c757d;
+}
+
+.list-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-active {
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+.status-inactive {
+  background-color: #f5f5f5;
+  color: #757575;
+}
+
+.file-upload-container {
+  border: 1px dashed #ced4da;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: #f8f9fa;
+}
+
+.file-upload-help {
+  margin-top: 5px;
+}
+
+/* Modal Styles */
+.modal-title {
+  font-weight: 500;
+  color: #333;
+}
+
+/* Delete confirmation modal styles */
+.modal-danger .modal-header {
+  background-color: #f8d7da;
+  color: #dc3545;
+}

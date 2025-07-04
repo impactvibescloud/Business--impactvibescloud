@@ -1,0 +1,51 @@
+// Button style variables
+$primary-button-color: #5e4fff; // Purple/indigo color from the New Template button
+$primary-button-hover: darken($primary-button-color, 10%);
+$primary-button-active: darken($primary-button-color, 15%);
+$primary-button-text: #ffffff;
+
+// Button styles
+.btn-primary {
+  background-color: $primary-button-color !important;
+  border-color: $primary-button-color !important;
+  color: $primary-button-text !important;
+
+  &:hover, &:focus {
+    background-color: $primary-button-hover !important;
+    border-color: $primary-button-hover !important;
+    color: $primary-button-text !important;
+  }
+
+  &:active, &.active {
+    background-color: $primary-button-active !important;
+    border-color: $primary-button-active !important;
+    color: $primary-button-text !important;
+  }
+}
+
+// Style for outline primary buttons
+.btn-outline-primary {
+  color: $primary-button-color !important;
+  border-color: $primary-button-color !important;
+
+  &:hover, &:focus {
+    background-color: $primary-button-color !important;
+    color: $primary-button-text !important;
+  }
+}
+
+// Make sure "New Template" style buttons match
+[class*="new-"][class*="-btn"],
+[class*="create-"][class*="-btn"],
+.btn-new,
+.btn-create,
+.btn-add {
+  background-color: $primary-button-color !important;
+  border-color: $primary-button-color !important;
+  color: $primary-button-text !important;
+  
+  &:hover, &:focus {
+    background-color: $primary-button-hover !important;
+    border-color: $primary-button-hover !important;
+  }
+}

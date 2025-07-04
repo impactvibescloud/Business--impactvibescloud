@@ -1,0 +1,169 @@
+.buy-number-section {
+  padding: 20px 0;
+}
+
+.section-header {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.number-card {
+  padding: 16px;
+  border: 1px solid #e4e7ea;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.number-card:hover {
+  border-color: #321fdb;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+.number-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.number-value {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.number-location {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.number-type {
+  font-size: 14px;
+  color: #768192;
+}
+
+.number-price {
+  text-align: right;
+}
+
+.price-label {
+  font-size: 14px;
+  color: #768192;
+  margin-right: 8px;
+}
+
+.price-amount {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.number-actions {
+  margin-top: 16px;
+}
+
+.cancel-btn {
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.phone-icon {
+  margin-right: 8px;
+  color: #3c4b64;
+}
+
+.search-container {
+  position: relative;
+}
+
+.available-numbers-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.number-cell {
+  display: flex;
+  align-items: center;
+}
+
+.payment-modal .method-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e4e7ea;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-modal .method-item:hover {
+  border-color: #321fdb;
+  background-color: #f8f9fa;
+}
+
+.payment-modal .method-label {
+  margin-left: 12px;
+  margin-bottom: 0;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.payment-modal .payment-summary {
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.payment-modal .summary-item {
+  margin-bottom: 8px;
+}
+
+.success-icon {
+  width: 70px;
+  height: 70px;
+  background-color: #2eb85c;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  color: white;
+}
+
+.success-check {
+  font-size: 40px;
+  font-weight: bold;
+  color: white;
+}
+
+.purchased-number-item {
+  font-size: 14px;
+  padding: 4px 0;
+  color: #333;
+}
+
+.payment-modal .summary-item:last-child {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e4e7ea;
+}
+
+.no-results {
+  padding: 40px 0;
+  color: #768192;
+}
+
+.no-results-text {
+  font-size: 16px;
+}
+
+.search-filter {
+  max-width: 600px;
+}

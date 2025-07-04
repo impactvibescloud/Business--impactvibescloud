@@ -12,6 +12,14 @@ import Address from "./views/configuration/Address.js";
 import Logo from "./views/configuration/Logo.js";
 import Login from "./views/pages/login/Login";
 
+// Missing Components Imports
+import Templates from "./views/Templates/Templates";
+import UsersTeams from "./views/UsersTeams/UsersTeams";
+// Import the correct VirtualNumbers component
+import VirtualNumbers from "./views/VirtualNumbers/VirtualNumbers";
+import Billing from "./views/Billing/Billing";
+import Payments from "./views/Payments/Payments";
+import Settings from "./views/Settings/Settings";
 
 //Businesses
 
@@ -137,6 +145,9 @@ import Equipment from './views/Equipment/equipment';
 import AddEquipmentsOutlet from "./views/Outlet/AddEquipmentsOutlet";
 import Branches from "./views/Branches/Branches";
 import CallLogs from './views/CallLogs/CallLogs';
+import { ContactList, ContactLists } from "./views/Contacts";
+import AutodialCampaigns from "./views/Campaigns/AutodialCampaigns";
+import SurveyCampaigns from "./views/Campaigns/SurveyCampaigns";
 
 const routes = [
   //dashboard
@@ -758,7 +769,14 @@ const routes = [
     element: EditEmployee,
     navName: "Employees & Access",
   },
-
+  
+  // Templates Route
+  {
+    path: "/templates",
+    name: "Templates",
+    element: Templates,
+    navName: "Templates",
+  },
   // Transporter
   {
     path: "transporter",
@@ -785,10 +803,52 @@ const routes = [
     navName: "Branch",
   },
   {
+    path: "/contactlists",
+    name: "Contact Lists",
+    element: ContactLists,
+    navName: "Contact Lists",
+  },
+  {
     path: '/callogs',
     name: 'Call Logs',
     element: CallLogs,
     navName: "Call Logs",
+  },
+  {
+    path: "/campaigns/autodial",
+    name: "Autodial Campaigns",
+    element: AutodialCampaigns,
+    navName: "Campaigns",
+  },
+  {
+    path: "/campaigns/surveys",
+    name: "Survey Campaigns",
+    element: SurveyCampaigns,
+    navName: "Campaigns",
+  },
+  {
+    path: "/users-teams",
+    name: "Users & Teams",
+    element: UsersTeams,
+    navName: "Users & Teams",
+  },
+  {
+    path: "/virtual-numbers",
+    name: "Virtual Numbers",
+    element: VirtualNumbers,
+    navName: "Virtual Numbers",
+  },
+  {
+    path: "/billing",
+    name: "Billing",
+    element: Billing,
+    navName: "Billing",
+  },
+  {
+    path: "/settings",
+    name: "Settings",
+    element: Settings,
+    navName: "Settings",
   },
 ];
 

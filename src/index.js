@@ -3,7 +3,8 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "react-draft-wysiwyg/dist/react-draft-wysiwyg.css";
 import "react-app-polyfill/stable";
 import "core-js";
-import "bootstrap/dist/css/bootstrap.min.css";
+// Import our custom SCSS for consistent font styling
+import "./scss/style.scss";
 import React from "react";
 import ReactDOM from "react-dom";
 import App from "./App";
