@@ -1,0 +1,17 @@
+/* Call Logs styles */
+.call-logs-container {
+  padding: 20px 0;
+}
+
+.call-logs-title {
+  margin-bottom: 0;
+  font-weight: 600;
+}
+
+.call-log-status-completed {
+  color: #2eb85c;
+}
+
+.call-log-status-missed {
+  color: #e55353;
+}

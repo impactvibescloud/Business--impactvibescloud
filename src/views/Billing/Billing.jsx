@@ -383,10 +383,10 @@ function Billing() {
                                 </div>
                                 <div className="number-details">
                                   <span className="country-name">+91 {location} numbers</span>
-                                  <span className="number-count">{numbers.length} {numbers.length === 1 ? 'number' : 'numbers'}</span>
+                                  <span className="number-count">{Array.isArray(numbers) ? numbers.length : 0} {(Array.isArray(numbers) && numbers.length === 1) ? 'number' : 'numbers'}</span>
                                   <div className="purchased-numbers mt-1">
-                                    {numbers.map(num => (
-                                      <div key={num.id} className="purchased-number-item">
+                                    {Array.isArray(numbers) && numbers.map(num => (
+                                      <div key={num.id || Math.random().toString()} className="purchased-number-item">
                                         {num.number}
                                       </div>
                                     ))}

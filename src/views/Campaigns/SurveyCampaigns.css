@@ -27,22 +27,32 @@
   font-size: 14px;
 }
 
-.survey-status-badge {
-  padding: 5px 10px;
-  border-radius: 50px;
-  font-size: 12px;
-  font-weight: 500;
+.status-badge {
   display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  min-width: 80px;
 }
 
 .status-active {
-  background-color: rgba(46, 184, 92, 0.1);
-  color: #2eb85c;
+  background-color: #2eb85c !important;
+  border: 1px solid #268d47;
+  color: #fff !important;
 }
 
 .status-draft {
-  background-color: rgba(118, 129, 146, 0.1);
-  color: #768192;
+  background-color: #768192 !important;
+  border: 1px solid #5d6778;
+  color: #fff !important;
+}
+
+.status-inactive {
+  background-color: #b1b7c1 !important;
+  border: 1px solid #9da5b1;
+  color: #fff !important;
 }
 
 .completion-rate-container {

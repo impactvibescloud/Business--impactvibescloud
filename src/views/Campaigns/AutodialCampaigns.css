@@ -1,0 +1,74 @@
+/* Autodial Campaigns styles */
+.autodial-campaigns-container {
+  padding: 20px 0;
+}
+
+.autodial-header {
+  margin-bottom: 24px;
+}
+
+.autodial-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.autodial-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.autodial-filters {
+  display: flex;
+  gap: 10px;
+}
+
+.campaign-name {
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  min-width: 80px;
+}
+
+.status-active {
+  background-color: #2eb85c !important;
+  border: 1px solid #268d47;
+  color: #fff !important;
+}
+
+.status-paused {
+  background-color: #f9b115 !important;
+  border: 1px solid #d89710;
+  color: #fff !important;
+}
+
+.status-completed {
+  background-color: #3399ff !important;
+  border: 1px solid #2987e2;
+  color: #fff !important;
+}
+
+.status-draft {
+  background-color: #768192 !important;
+  border: 1px solid #5d6778;
+  color: #fff !important;
+}
+
+.status-failed {
+  background-color: #e55353 !important;
+  border: 1px solid #c94343;
+  color: #fff !important;
+}
+
+.status-inactive {
+  background-color: #b1b7c1 !important;
+  border: 1px solid #9da5b1;
+  color: #fff !important;
+}

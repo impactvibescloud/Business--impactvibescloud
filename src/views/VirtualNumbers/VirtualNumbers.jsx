@@ -1,9 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   CCard,
   CCardBody,
-  CCol,
-  CRow,
   CTable,
   CTableHead,
   CTableRow,
@@ -17,240 +15,267 @@ import {
   CDropdownToggle,
   CDropdownMenu,
   CDropdownItem,
-  CPagination,
-  CPaginationItem,
   CBadge,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CForm,
-  CFormLabel,
-  CFormSelect,
-  CFormCheck,
-  CAlert
+  CAlert,
+  CSpinner,
+  CTooltip
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch, cilFilter, cilPhone, cilPencil, cilTrash } from '@coreui/icons'
+import { cilSearch, cilFilter, cilPhone, cilTrash } from '@coreui/icons'
+import axios from 'axios'
+import { isAutheticated } from '../../auth'
 import './VirtualNumbers.css'
 
 function VirtualNumbers() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
-  const [showAddModal, setShowAddModal] = useState(false)
   const [activeFilter, setActiveFilter] = useState('All Numbers')
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [numberToDelete, setNumberToDelete] = useState(null)
-  const [editingNumber, setEditingNumber] = useState(null)
-  const [showEditModal, setShowEditModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [assignedNumbers, setAssignedNumbers] = useState([])
+  const [releasingNumber, setReleasingNumber] = useState(null)
+  const token = isAutheticated()
   
-  const [newNumber, setNewNumber] = useState({
-    name: '',
-    number: '',
-    location: '',
-    type: 'Local',
-    forwardCalls: false,
-    recordCalls: false,
-    startTime: '00:00',
-    endTime: '00:00',
-    workingDays: []
-  })
-  
-  // Sample virtual numbers data
-  const [virtualNumbers, setVirtualNumbers] = useState([
-    { id: 1, name: 'Main Office', number: '+91 98765 43210', location: 'Mumbai', calls: 124, type: 'Toll-Free', forwardCalls: true, recordCalls: true, startTime: '09:00', endTime: '18:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
-    { id: 2, name: 'Customer Support', number: '+91 98765 43211', location: 'Delhi', calls: 87, type: 'Local', forwardCalls: false, recordCalls: true, startTime: '09:00', endTime: '20:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] },
-    { id: 3, name: 'Sales Team', number: '+91 98765 43212', location: 'Bangalore', calls: 56, type: 'Local', forwardCalls: true, recordCalls: false, startTime: '08:00', endTime: '17:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
-    { id: 4, name: 'Marketing', number: '+91 98765 43213', location: 'Chennai', calls: 32, type: 'Toll-Free', forwardCalls: false, recordCalls: false, startTime: '10:00', endTime: '19:00', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
-    { id: 5, name: 'Technical Support', number: '+91 98765 43214', location: 'Hyderabad', calls: 45, type: 'Local', forwardCalls: true, recordCalls: true, startTime: '00:00', endTime: '23:59', workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
-  ])
-  
-  // Filter numbers by search term and filter dropdown
-  const filteredNumbers = virtualNumbers.filter(vn => {
-    const matchesSearch = vn.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vn.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vn.location.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    if (activeFilter === 'All Numbers') {
-      return matchesSearch
-    } else {
-      return matchesSearch && vn.type === activeFilter
+  // Fetch assigned numbers
+  useEffect(() => {
+    const fetchAssignedNumbers = async (retryCount = 0) => {
+      if (!token) {
+        setError("Authentication token not found. Please log in again.")
+        return
+      }
+      
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        // Using the main endpoint to get all numbers - we'll filter assigned ones in the frontend
+        const apiUrl = `https://api-impactvibescloud.onrender.com/api/numbers`
+        
+        console.log('Fetching virtual numbers from:', apiUrl)
+        
+        const response = await axios.get(apiUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.data) {
+          throw new Error('No data received from API')
+        }
+        
+        console.log('Virtual numbers fetched:', response.data)
+        console.log('Response data type:', typeof response.data)
+        
+        // Detailed inspection of response
+        if (typeof response.data === 'object') {
+          console.log('Response data keys:', Object.keys(response.data))
+        }
+        
+        // Ensure response.data is an array
+        let numbersArray = []
+        
+        if (Array.isArray(response.data)) {
+          console.log('Response data is already an array')
+          numbersArray = response.data.filter(num => num.status === 'assigned')
+        } else if (typeof response.data === 'object') {
+          // Check for common API response patterns
+          if (Array.isArray(response.data.data)) {
+            console.log('Using response.data.data array')
+            numbersArray = response.data.data.filter(num => num.status === 'assigned')
+          } else if (Array.isArray(response.data.numbers)) {
+            console.log('Using response.data.numbers array')
+            numbersArray = response.data.numbers.filter(num => num.status === 'assigned')
+          } else if (Array.isArray(response.data.results)) {
+            console.log('Using response.data.results array')
+            numbersArray = response.data.results.filter(num => num.status === 'assigned')
+          } else if (Array.isArray(response.data.items)) {
+            console.log('Using response.data.items array')
+            numbersArray = response.data.items.filter(num => num.status === 'assigned')
+          } else {
+            console.log('No array found in response, creating empty array')
+          }
+        } else {
+          console.log('Response data is not an object or array')
+        }
+        
+        console.log('Final numbers array:', numbersArray)
+        
+        // Verify if we got valid data
+        if (numbersArray.length === 0 && typeof response.data === 'object' && !Array.isArray(response.data)) {
+          // If response.data isn't an array and we couldn't extract an array,
+          // try to create an array from response.data as a fallback
+          console.log('Attempting to create array from object data')
+          
+          // Check if response.data itself could be a single number object
+          if (response.data.number || response.data._id || response.data.extension) {
+            console.log('Treating response.data as a single item')
+            numbersArray = [response.data]
+          } else {
+            // Last resort: try to extract objects from response.data that look like number records
+            const possibleNumbers = Object.values(response.data)
+              .filter(item => 
+                item && typeof item === 'object' && 
+                (item.number || item.extension || item._id || item.status)
+              )
+            
+            if (possibleNumbers.length > 0) {
+              console.log('Created array from object values:', possibleNumbers)
+              numbersArray = possibleNumbers
+            }
+          }
+        }
+        
+        setAssignedNumbers(numbersArray)
+      } catch (err) {
+        console.error('Error fetching virtual numbers:', err)
+        
+        let errorMessage = 'Unknown error occurred';
+        
+        if (err.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          errorMessage = `Server error: ${err.response.status} - ${err.response.data?.message || 'Unknown server error'}`;
+          console.error('Error response:', err.response.status, err.response.data);
+        } else if (err.request) {
+          // The request was made but no response was received
+          errorMessage = 'No response received from server. Please check your network connection.';
+          console.error('Error request:', err.request);
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          errorMessage = err.message || 'Failed to make request';
+          console.error('Error message:', err.message);
+        }
+        
+        // Implement retry logic (max 2 retries)
+        if (retryCount < 2) {
+          console.log(`Retrying API call (attempt ${retryCount + 1})...`)
+          setTimeout(() => fetchAssignedNumbers(retryCount + 1), 1500) // Slightly longer delay between retries
+          return
+        }
+        
+        setError(`Error fetching assigned numbers: ${errorMessage}`)
+        setAssignedNumbers([])
+      } finally {
+        setIsLoading(false)
+      }
     }
-  })
+    
+    fetchAssignedNumbers(0)
+  }, [token])
   
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentNumbers = filteredNumbers.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(filteredNumbers.length / itemsPerPage)
+  // Filter assigned numbers by search term and active filter
+  const filteredAssignedNumbers = Array.isArray(assignedNumbers) ? assignedNumbers.filter(num => {
+    if (!num) return false
+    
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const matchesSearch = 
+        (num.number && num.number.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (num.extension && num.extension.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (num.city && num.city.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (Array.isArray(num.tag) && num.tag.some(tag => 
+          tag && tag.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        ))
+      
+      if (!matchesSearch) return false
+    }
+    
+    // Filter by number type if not "All Numbers"
+    if (activeFilter !== 'All Numbers') {
+      // Check if tag includes the selected filter
+      const filterLower = activeFilter.toLowerCase()
+      return Array.isArray(num.tag) && num.tag.some(tag => 
+        tag && tag.toString().toLowerCase() === filterLower
+      )
+    }
+    
+    return true
+  }) : []
   
   // Handle search
   const handleSearch = (e) => {
     setSearchTerm(e.target.value)
-    setCurrentPage(1)
   }
   
   // Handle filter selection
   const handleFilterSelect = (filter) => {
     setActiveFilter(filter)
-    setCurrentPage(1)
   }
   
-  // Handle opening the add number modal
-  const handleOpenAddModal = () => {
-    setNewNumber({
-      name: '',
-      number: '',
-      location: '',
-      type: 'Local',
-      forwardCalls: false,
-      recordCalls: false,
-      startTime: '00:00',
-      endTime: '00:00',
-      workingDays: []
-    })
-    setShowAddModal(true)
-  }
-  
-  // Handle closing the add number modal
-  const handleCloseAddModal = () => {
-    setShowAddModal(false)
-  }
-  
-  // Handle input change for new/edit number
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
+  // Release number function
+  const releaseNumber = async (numberId) => {
+    if (!token) {
+      setError("Authentication token not found. Please log in again.")
+      return
+    }
     
-    if (type === 'checkbox') {
-      if (name === 'forwardCalls' || name === 'recordCalls') {
-        setNewNumber(prev => ({
-          ...prev,
-          [name]: checked
-        }))
-      } else {
-        // Handle working days checkboxes
-        const day = e.target.id.replace('day-', '')
-        setNewNumber(prev => {
-          if (checked) {
-            return {
-              ...prev,
-              workingDays: [...prev.workingDays, day]
-            }
-          } else {
-            return {
-              ...prev,
-              workingDays: prev.workingDays.filter(d => d !== day)
-            }
+    if (!numberId) {
+      setError("Number ID is required to release a number")
+      return
+    }
+    
+    // Set the number being released to show spinner
+    setReleasingNumber(numberId)
+    setError(null)
+    
+    try {
+      // Make API call to release the number
+      const apiUrl = `https://api-impactvibescloud.onrender.com/api/numbers/${numberId}`
+      
+      const response = await axios.put(
+        apiUrl, 
+        { status: 'available' }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
-        })
-      }
-    } else {
-      setNewNumber(prev => ({
-        ...prev,
-        [name]: value
-      }))
-    }
-  }
-  
-  // Handle adding a new virtual number
-  const handleAddNumber = () => {
-    if (!newNumber.name || !newNumber.number) {
-      return // Simple validation
-    }
-    
-    const newVirtualNumber = {
-      id: editingNumber ? editingNumber.id : Math.max(...virtualNumbers.map(vn => vn.id)) + 1,
-      name: newNumber.name,
-      number: newNumber.number,
-      location: newNumber.location,
-      calls: editingNumber ? editingNumber.calls : 0,
-      type: newNumber.type,
-      forwardCalls: newNumber.forwardCalls,
-      recordCalls: newNumber.recordCalls,
-      startTime: newNumber.startTime,
-      endTime: newNumber.endTime,
-      workingDays: [...newNumber.workingDays]
-    }
-    
-    if (editingNumber) {
-      // Update existing number
-      setVirtualNumbers(
-        virtualNumbers.map(vn => vn.id === editingNumber.id ? newVirtualNumber : vn)
+        }
       )
-      setSuccessMessage(`Virtual number "${newNumber.name}" has been updated successfully.`)
-    } else {
-      // Add new number
-      setVirtualNumbers([...virtualNumbers, newVirtualNumber])
-      setSuccessMessage(`Virtual number "${newNumber.name}" has been added successfully.`)
+      
+      console.log('Number released response:', response.data)
+      
+      // Update the UI by removing the released number from the list
+      setAssignedNumbers(prevNumbers => 
+        prevNumbers.filter(num => num._id !== numberId)
+      )
+      
+      // Show success message
+      setSuccessMessage(`Virtual number has been successfully released.`)
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(''), 5000)
+    } catch (err) {
+      console.error('Error releasing number:', err)
+      
+      let errorMessage = 'Unknown error occurred';
+      
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        errorMessage = `Server error: ${err.response.status} - ${err.response.data?.message || 'Unknown server error'}`;
+        console.error('Error response:', err.response.status, err.response.data);
+      } else if (err.request) {
+        // The request was made but no response was received
+        errorMessage = 'No response received from server. Please check your network connection.';
+        console.error('Error request:', err.request);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        errorMessage = err.message || 'Failed to make request';
+        console.error('Error message:', err.message);
+      }
+      
+      setError(`Failed to release number: ${errorMessage}`)
+    } finally {
+      setReleasingNumber(null)
     }
-    
-    // Close the modal
-    setShowAddModal(false)
-    setShowEditModal(false)
-    setEditingNumber(null)
-    
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      setSuccessMessage('')
-    }, 3000)
-  }
-  
-  // Handle edit number
-  const handleEditNumber = (number) => {
-    setEditingNumber(number)
-    setNewNumber({
-      name: number.name,
-      number: number.number,
-      location: number.location,
-      type: number.type,
-      forwardCalls: number.forwardCalls,
-      recordCalls: number.recordCalls,
-      startTime: number.startTime,
-      endTime: number.endTime,
-      workingDays: [...number.workingDays]
-    })
-    setShowEditModal(true)
-  }
-  
-  // Handle closing the edit modal
-  const handleCloseEditModal = () => {
-    setShowEditModal(false)
-    setEditingNumber(null)
-  }
-  
-  // Handle delete confirmation
-  const handleDeleteConfirm = (number) => {
-    setNumberToDelete(number)
-    setShowDeleteModal(true)
-  }
-  
-  // Handle delete number
-  const handleDeleteNumber = () => {
-    if (!numberToDelete) return
-    
-    setVirtualNumbers(virtualNumbers.filter(vn => vn.id !== numberToDelete.id))
-    setSuccessMessage(`Virtual number "${numberToDelete.name}" has been deleted successfully.`)
-    
-    // Close the modal
-    setShowDeleteModal(false)
-    setNumberToDelete(null)
-    
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      setSuccessMessage('')
-    }, 3000)
   }
   
   return (
     <div className="virtual-numbers-container">
       <div className="virtual-numbers-header">
         <h1>Virtual Numbers</h1>
-        <CButton color="primary" className="add-number-btn" onClick={handleOpenAddModal}>
-          <CIcon icon={cilPlus} /> Add Virtual Number
-        </CButton>
       </div>
       
       {/* Success message */}
@@ -291,283 +316,107 @@ function VirtualNumbers() {
             </div>
           </div>
           
-          <CTable striped responsive className="virtual-numbers-table">
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>NUMBER NAME</CTableHeaderCell>
-                <CTableHeaderCell>VIRTUAL NUMBER</CTableHeaderCell>
-                <CTableHeaderCell>LOCATION</CTableHeaderCell>
-                <CTableHeaderCell>CALLS</CTableHeaderCell>
-                <CTableHeaderCell>TYPE</CTableHeaderCell>
-                <CTableHeaderCell>ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {currentNumbers.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan={6} className="text-center py-4">
-                    No virtual numbers found
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                currentNumbers.map(vn => (
-                  <CTableRow key={vn.id}>
-                    <CTableDataCell>{vn.name}</CTableDataCell>
-                    <CTableDataCell>
-                      <div className="number-cell">
-                        <CIcon icon={cilPhone} className="phone-icon" />
-                        {vn.number}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>{vn.location}</CTableDataCell>
-                    <CTableDataCell>{vn.calls}</CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge color={vn.type === 'Toll-Free' ? 'success' : vn.type === 'International' ? 'warning' : 'info'}>
-                        {vn.type}
-                      </CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="number-actions">
-                        <CButton color="primary" variant="ghost" size="sm" onClick={() => handleEditNumber(vn)} title="Edit number">
-                          <CIcon icon={cilPencil} />
-                        </CButton>
-                        <CButton color="danger" variant="ghost" size="sm" onClick={() => handleDeleteConfirm(vn)} title="Delete number">
-                          <CIcon icon={cilTrash} />
-                        </CButton>
-                      </div>
-                    </CTableDataCell>
-                  </CTableRow>
-                ))
-              )}
-            </CTableBody>
-          </CTable>
-          
-          {totalPages > 1 && (
-            <CPagination aria-label="Page navigation" className="pagination-container">
-              <CPaginationItem 
-                aria-label="Previous" 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(currentPage - 1)}
-              >
-                <span aria-hidden="true">&laquo;</span>
-              </CPaginationItem>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <CPaginationItem 
-                  key={page} 
-                  active={page === currentPage}
-                  onClick={() => setCurrentPage(page)}
-                >
-                  {page}
-                </CPaginationItem>
-              ))}
-              
-              <CPaginationItem 
-                aria-label="Next" 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(currentPage + 1)}
-              >
-                <span aria-hidden="true">&raquo;</span>
-              </CPaginationItem>
-            </CPagination>
+          {isLoading && (
+            <div className="text-center my-4">
+              <CSpinner color="primary" />
+              <p className="mt-2">Loading assigned numbers...</p>
+            </div>
           )}
+          
+          {error && (
+            <CAlert color="danger" className="my-3">
+              {error}
+            </CAlert>
+          )}
+          
+          {/* API Assigned Numbers Section */}
+          {filteredAssignedNumbers.length > 0 && (
+            <>
+              <h4 className="mb-3 mt-4">Virtual Numbers</h4>
+              <CTable striped responsive className="mb-5 virtual-numbers-table">
+                <CTableHead>
+                  <CTableRow>
+                    <CTableHeaderCell>NUMBER</CTableHeaderCell>
+                    <CTableHeaderCell>LOCATION</CTableHeaderCell>
+                    <CTableHeaderCell>TYPE</CTableHeaderCell>
+                    <CTableHeaderCell>TAGS</CTableHeaderCell>
+                    <CTableHeaderCell>ACTION</CTableHeaderCell>
+                  </CTableRow>
+                </CTableHead>
+                <CTableBody>
+                  {filteredAssignedNumbers.map((num) => (
+                    <CTableRow key={num._id || `num-${num.number}`}>
+                      <CTableDataCell>
+                        <div className="number-cell">
+                          <CIcon icon={cilPhone} className="phone-icon" />
+                          {num.number || '-'}
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell>{num.city || '-'}</CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge color="primary">
+                          {num.type || (Array.isArray(num.tag) && num.tag.length > 0 ? num.tag[0] : 'Standard')}
+                        </CBadge>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        {Array.isArray(num.tag) && num.tag.length > 0 ? (
+                          num.tag.map((tag, index) => (
+                            <CBadge key={index} color="info" className="me-1">
+                              {tag}
+                            </CBadge>
+                          ))
+                        ) : (
+                          <span className="text-muted">No tags</span>
+                        )}
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <CTooltip content="Release this number">
+                          <CButton 
+                            color="danger"
+                            size="sm"
+                            variant="outline" 
+                            onClick={() => releaseNumber(num._id)}
+                            disabled={releasingNumber === num._id}
+                          >
+                            {releasingNumber === num._id ? (
+                              <CSpinner size="sm" />
+                            ) : (
+                              <>
+                                <CIcon icon={cilTrash} className="me-1" />
+                                Release
+                              </>
+                            )}
+                          </CButton>
+                        </CTooltip>
+                      </CTableDataCell>
+                    </CTableRow>
+                  ))}
+                </CTableBody>
+              </CTable>
+            </>
+          )}
+          
+          {/* Show message when no assigned numbers exist */}
+          {!assignedNumbers.length && !isLoading && !error && (
+            <div className="text-center my-5">
+              <CIcon icon={cilPhone} style={{ width: '48px', height: '48px', opacity: 0.5 }} className="mb-3" />
+              <h5>No virtual numbers found</h5>
+              <p className="text-muted mb-4">No virtual numbers are currently assigned to your account.</p>
+            </div>
+          )}
+          
+          {/* Show message when search returns no results but we have numbers */}
+          {assignedNumbers.length > 0 && filteredAssignedNumbers.length === 0 && !isLoading && (
+            <div className="text-center my-5">
+              <p>No virtual numbers match your search criteria</p>
+              <CButton color="light" onClick={() => setSearchTerm('')}>
+                Clear Search
+              </CButton>
+            </div>
+          )}
+        
         </CCardBody>
       </CCard>
-      
-      {/* Add/Edit Virtual Number Modal */}
-      <CModal 
-        visible={showAddModal || showEditModal} 
-        onClose={showEditModal ? handleCloseEditModal : handleCloseAddModal}
-        alignment="center"
-        size="lg"
-        className="add-virtual-number-modal"
-      >
-        <CModalHeader closeButton>
-          <CModalTitle>{showEditModal ? 'Edit Virtual Number' : 'Add Virtual Number'}</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <CForm>
-            {/* Name */}
-            <div className="mb-3">
-              <CFormLabel htmlFor="numberName">Number Name</CFormLabel>
-              <CFormInput
-                type="text"
-                id="numberName"
-                name="name"
-                placeholder="e.g. Sales Line, Support Desk"
-                value={newNumber.name}
-                onChange={handleInputChange}
-              />
-            </div>
-
-            {/* Number */}
-            <div className="mb-3">
-              <CFormLabel htmlFor="virtualNumber">Phone Number</CFormLabel>
-              <CFormInput
-                type="tel"
-                id="virtualNumber"
-                name="number"
-                placeholder="Enter phone number"
-                value={newNumber.number}
-                onChange={handleInputChange}
-              />
-            </div>
-
-            {/* Location */}
-            <div className="mb-3">
-              <CFormLabel htmlFor="location">Location</CFormLabel>
-              <CFormInput
-                type="text"
-                id="location"
-                name="location"
-                placeholder="e.g. Mumbai, Delhi, etc."
-                value={newNumber.location}
-                onChange={handleInputChange}
-              />
-            </div>
-
-            {/* Number Type */}
-            <div className="mb-3">
-              <CFormLabel htmlFor="numberType">Number Type</CFormLabel>
-              <CFormSelect
-                id="numberType"
-                name="type"
-                value={newNumber.type}
-                onChange={handleInputChange}
-              >
-                <option value="Local">Local</option>
-                <option value="Toll-Free">Toll-Free</option>
-                <option value="International">International</option>
-              </CFormSelect>
-            </div>
-
-            {/* Call Forwarding Settings */}
-            <div className="mb-3">
-              <CFormLabel>Call Forwarding</CFormLabel>
-              <div className="call-forwarding-settings border rounded p-3">
-                <div className="d-flex align-items-center mb-2">
-                  <CFormCheck 
-                    id="forwardCalls"
-                    name="forwardCalls"
-                    label="Forward calls to team members"
-                    checked={newNumber.forwardCalls}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div className="d-flex align-items-center">
-                  <CFormCheck 
-                    id="recordCalls"
-                    name="recordCalls"
-                    label="Record calls"
-                    checked={newNumber.recordCalls}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Call Hours */}
-            <div className="mb-3">
-              <CFormLabel>Call Hours</CFormLabel>
-              <div className="d-flex gap-3">
-                <CFormSelect 
-                  name="startTime" 
-                  className="call-hours-select" 
-                  value={newNumber.startTime}
-                  onChange={handleInputChange}
-                >
-                  {Array.from({ length: 24 }).map((_, i) => {
-                    const hour = i.toString().padStart(2, '0')
-                    return (
-                      <option key={hour} value={`${hour}:00`}>{hour}:00</option>
-                    )
-                  })}
-                </CFormSelect>
-                <span className="align-self-center">to</span>
-                <CFormSelect 
-                  name="endTime" 
-                  className="call-hours-select"
-                  value={newNumber.endTime}
-                  onChange={handleInputChange}
-                >
-                  {Array.from({ length: 24 }).map((_, i) => {
-                    const hour = i.toString().padStart(2, '0')
-                    return (
-                      <option key={hour} value={`${hour}:00`}>{hour}:00</option>
-                    )
-                  })}
-                </CFormSelect>
-              </div>
-            </div>
-
-            {/* Working Days */}
-            <div className="mb-3">
-              <CFormLabel>Working Days</CFormLabel>
-              <div className="working-days-container d-flex flex-wrap gap-2">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <div key={day} className="working-day-item">
-                    <CFormCheck 
-                      id={`day-${day}`}
-                      label={day}
-                      checked={newNumber.workingDays.includes(day)}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </CForm>
-        </CModalBody>
-        <CModalFooter className="d-flex justify-content-between">
-          <CButton 
-            color="light"
-            onClick={showEditModal ? handleCloseEditModal : handleCloseAddModal}
-          >
-            Cancel
-          </CButton>
-          <CButton 
-            color="primary"
-            onClick={handleAddNumber}
-            disabled={!newNumber.name || !newNumber.number}
-          >
-            {showEditModal ? 'Save Changes' : 'Add Number'}
-          </CButton>
-        </CModalFooter>
-      </CModal>
-      
-      {/* Delete Confirmation Modal */}
-      <CModal
-        visible={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        alignment="center"
-        size="sm"
-      >
-        <CModalHeader closeButton>
-          <CModalTitle className="text-danger">Delete Virtual Number</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {numberToDelete && (
-            <p>
-              Are you sure you want to delete the virtual number "{numberToDelete.name}"? This action cannot be undone.
-            </p>
-          )}
-        </CModalBody>
-        <CModalFooter>
-          <CButton 
-            color="light" 
-            onClick={() => setShowDeleteModal(false)}
-          >
-            Cancel
-          </CButton>
-          <CButton 
-            color="danger" 
-            onClick={handleDeleteNumber}
-          >
-            Delete
-          </CButton>
-        </CModalFooter>
-      </CModal>
     </div>
   )
 }

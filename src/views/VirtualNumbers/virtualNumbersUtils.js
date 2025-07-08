@@ -19,40 +19,32 @@ export function savePurchasedNumber(numberData) {
 // Get all purchased numbers
 export function getPurchasedNumbers() {
   try {
-    const numbers = localStorage.getItem('purchasedNumbers')
-    return numbers ? JSON.parse(numbers) : []
+    const stored = localStorage.getItem('purchasedNumbers')
+    return stored ? JSON.parse(stored) : []
   } catch (error) {
     console.error('Error retrieving purchased numbers:', error)
     return []
   }
 }
 
-// Get purchased numbers by country
-export function getPurchasedNumbersByCountry() {
+// Get purchased numbers filtered by country
+export function getPurchasedNumbersByCountry(country) {
   const allNumbers = getPurchasedNumbers()
   
+  if (country) {
+    return allNumbers.filter(num => num.country === country)
+  }
+  
   // Group numbers by country/location
-  return allNumbers.reduce((acc, number) => {
-    const location = number.location || 'Other'
-    
-    if (!acc[location]) {
-      acc[location] = []
+  const groupedNumbers = {}
+  
+  allNumbers.forEach(num => {
+    const location = num.country || num.location || 'Unknown'
+    if (!groupedNumbers[location]) {
+      groupedNumbers[location] = []
     }
-    
-    acc[location].push(number)
-    return acc
-  }, {})
-}
-
-// Clear all purchased numbers (for testing)
-export function clearPurchasedNumbers() {
-  localStorage.removeItem('purchasedNumbers')
-}
-
-// Remove a specific purchased number by ID
-export function removePurchasedNumber(numberId) {
-  const numbers = getPurchasedNumbers()
-  const updatedNumbers = numbers.filter(num => num.id !== numberId)
-  localStorage.setItem('purchasedNumbers', JSON.stringify(updatedNumbers))
-  return updatedNumbers
+    groupedNumbers[location].push(num)
+  })
+  
+  return groupedNumbers
 }

@@ -30,6 +30,17 @@
   margin-top: 20px;
 }
 
+/* API assigned numbers styles */
+h4 {
+  color: #3c4b64;
+  font-weight: 600;
+}
+
+h5 {
+  color: #3c4b64;
+  font-weight: 600;
+}
+
 .number-cell {
   display: flex;
   align-items: center;

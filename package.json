@@ -14,7 +14,7 @@
   "author": "The CoreUI Team (https://github.com/orgs/coreui/people)",
   "scripts": {
     "dev": "react-scripts --openssl-legacy-provider start",
-    "build": "react-scripts --openssl-legacy-provider build",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=4096 react-scripts --openssl-legacy-provider build",
     "changelog": "auto-changelog --starting-version 4.1.0 --commit-limit false --hide-credit",
     "eject": "react-scripts eject",
     "lint": "eslint \"src/**/*.js\"",
@@ -84,6 +84,7 @@
   },
   "devDependencies": {
     "auto-changelog": "~2.3.0",
+    "cross-env": "^7.0.3",
     "fuse.js": "^6.6.2",
     "react-scripts": "^5.0.1",
     "sass": "^1.43.5"
