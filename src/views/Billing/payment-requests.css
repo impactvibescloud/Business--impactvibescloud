@@ -1,0 +1,206 @@
+.payment-requests-container {
+  padding: 30px 0;
+}
+
+.payment-requests-header {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3c4b64;
+  margin-bottom: 20px;
+}
+
+.payment-request-card {
+  border: 1px solid #ebedef;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  height: 100%;
+}
+
+.payment-request-card:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.request-date {
+  font-size: 14px;
+  color: #768192;
+}
+
+.request-plan {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.request-details {
+  font-size: 14px;
+  color: #768192;
+  margin-bottom: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.payment-status {
+  font-size: 14px;
+}
+
+.status-paid {
+  color: #2eb85c;
+  font-weight: 500;
+}
+
+.status-unpaid {
+  color: #f9b115;
+  font-weight: 500;
+}
+
+.status-pending {
+  color: #f9b115;
+  font-weight: 500;
+}
+
+.status-failed {
+  color: #e55353;
+  font-weight: 500;
+}
+
+.request-amount {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3c4b64;
+}
+
+.action-buttons {
+  margin-top: auto;
+}
+
+.loading-spinner {
+  min-height: 200px;
+  color: #768192;
+}
+
+.error-message {
+  width: 100%;
+  padding: 15px 0;
+  color: #721c24;
+}
+
+.new-request-btn {
+  padding: 8px 16px;
+  font-weight: 500;
+}
+
+.empty-state {
+  padding: 20px 0;
+}
+
+.empty-icon {
+  opacity: 0.5;
+  color: #768192;
+}
+
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+  color: #321fdb;
+}
+
+/* Payment Modal Styles */
+.payment-modal .modal-content {
+  border-radius: 8px;
+}
+
+.payment-modal .modal-header {
+  border-bottom: 1px solid #e4e7ea;
+  background-color: #f8f9fa;
+}
+
+.payment-modal .modal-footer {
+  border-top: 1px solid #e4e7ea;
+  padding: 0.75rem 1rem;
+}
+
+.payment-modal .modal-dialog {
+  max-width: 500px;
+}
+
+.payment-method-option {
+  padding: 10px 15px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.payment-method-option:hover {
+  background-color: #f8f9fa;
+}
+
+.payment-method-option input:checked + label {
+  font-weight: 500;
+}
+
+.payment-method-options {
+  margin-bottom: 15px;
+}
+
+.upi-section, .card-section, .netbanking-section {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 15px;
+}
+
+.payment-success-icon {
+  font-size: 48px;
+  color: #2eb85c;
+}
+
+.plan-details {
+  padding: 18px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.plan-details h5 {
+  margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.plan-info {
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.total-price {
+  padding-top: 10px;
+  border-top: 1px dashed #e4e7ea;
+  font-size: 16px;
+}
+
+/* Form Field Styles */
+.form-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-select, .form-control {
+  border-radius: 4px;
+  padding: 8px 12px;
+  border: 1px solid #d8dbe0;
+}
+
+.form-select:focus, .form-control:focus {
+  box-shadow: 0 0 0 0.25rem rgba(50, 31, 219, 0.25);
+  border-color: #321fdb;
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   CCard,
   CCardBody,
@@ -30,6 +30,9 @@ import CIcon from '@coreui/icons-react'
 import { cilPlus, cilSearch, cilPencil, cilTrash } from '@coreui/icons'
 import './ContactList.css'
 
+const API_URL = 'https://api-impactvibescloud.onrender.com/api/contact-list'
+const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1MjAzNDkzOX0.aUE1egzY77uQWHOK1q5PTpkglJ_DE2CVUFutHAaaWMU'
+
 const ContactLists = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -48,45 +51,57 @@ const ContactLists = () => {
   const [editingList, setEditingList] = useState(null)
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' })
   const [validationError, setValidationError] = useState('')
+  const [contactLists, setContactLists] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [dataRefreshCounter, setDataRefreshCounter] = useState(0)
   
-  // Sample data for contact lists
-  const [contactLists, setContactLists] = useState([
-    {
-      id: 1,
-      name: 'Sales Prospects',
-      contacts: 245,
-      lastUpdated: '2023-06-15',
-      status: 'Active'
-    },
-    {
-      id: 2,
-      name: 'Marketing Campaign Q2',
-      contacts: 187,
-      lastUpdated: '2023-06-10',
-      status: 'Active'
-    },
-    {
-      id: 3,
-      name: 'Support Clients',
-      contacts: 103,
-      lastUpdated: '2023-05-28',
-      status: 'Active'
-    },
-    {
-      id: 4,
-      name: 'Newsletter Subscribers',
-      contacts: 521,
-      lastUpdated: '2023-05-15',
-      status: 'Active'
-    },
-    {
-      id: 5,
-      name: 'Event Attendees',
-      contacts: 98,
-      lastUpdated: '2023-04-30',
-      status: 'Inactive'
+  const refreshData = () => {
+    setDataRefreshCounter(prev => prev + 1)
+  }
+  
+  useEffect(() => {
+    const fetchContactLists = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        const response = await fetch(API_URL, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error fetching contact lists: ${response.status} ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        
+        if (data && data.success && Array.isArray(data.data)) {
+          setContactLists(data.data.map(list => ({
+            id: list._id || list.id,
+            name: list.name || 'Unnamed List',
+            contacts: Array.isArray(list.contacts) ? list.contacts.length : 0,
+            lastUpdated: list.lastUpdated || list.updatedAt || list.createdAt || new Date().toISOString().split('T')[0],
+            status: list.status || 'Active',
+            businessName: list.businessName || 'Business'
+          })))
+        } else {
+          throw new Error('Received invalid data format from API')
+        }
+      } catch (err) {
+        console.error('Failed to fetch contact lists:', err)
+        setError('Failed to fetch contact lists. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
     }
-  ])
+    
+    fetchContactLists()
+  }, [dataRefreshCounter])
 
   // Filter contact lists based on search term
   const filteredLists = contactLists.filter(list => 
@@ -129,7 +144,7 @@ const ContactLists = () => {
     }
   }
 
-  const handleCreateList = () => {
+  const handleCreateList = async () => {
     // Validate form
     if (!newList.name.trim()) {
       setValidationError('List name is required.')
@@ -138,46 +153,99 @@ const ContactLists = () => {
     
     setValidationError('')
     
-    // Here you would typically send the data to your backend
-    console.log('Creating new list:', newList)
+    // Prepare form data if there's a file to upload
+    let formData = null
     if (selectedFile) {
-      console.log('With file:', selectedFile.name)
+      formData = new FormData()
+      formData.append('file', selectedFile)
+      formData.append('name', newList.name)
+      formData.append('description', newList.description)
     }
     
-    if (editingList) {
-      // Update existing list
-      setContactLists(prevLists => 
-        prevLists.map(list => 
-          list.id === editingList.id 
-            ? { 
-                ...list, 
-                name: newList.name, 
-                // If there were other editable fields, they would be updated here
-                lastUpdated: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
-              } 
-            : list
-        )
-      )
-      setSuccessAlert({
-        show: true, 
-        message: `Contact list "${newList.name}" has been updated successfully.`
-      })
-    } else {
-      // Create new list
-      const newId = Math.max(...contactLists.map(list => list.id)) + 1
-      const newContactList = {
-        id: newId,
-        name: newList.name,
-        contacts: selectedFile ? 0 : 0, // This would typically be determined by the file contents
-        lastUpdated: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
-        status: 'Active'
+    try {
+      if (editingList) {
+        // Update existing list via API
+        const response = await fetch(`${API_URL}/${editingList.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': formData ? undefined : 'application/json',
+          },
+          body: formData ? formData : JSON.stringify({
+            name: newList.name,
+            description: newList.description
+          })
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error updating contact list: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        
+        // Update local state with the response data
+        if (data && data.success) {
+          setContactLists(prevLists => 
+            prevLists.map(list => 
+              list.id === editingList.id 
+                ? { 
+                    ...list, 
+                    name: newList.name, 
+                    lastUpdated: new Date().toISOString().split('T')[0]
+                  } 
+                : list
+            )
+          )
+          
+          setSuccessAlert({
+            show: true, 
+            message: `Contact list "${newList.name}" has been updated successfully.`
+          })
+          refreshData()
+        }
+      } else {
+        // Create new list via API
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': formData ? undefined : 'application/json',
+          },
+          body: formData ? formData : JSON.stringify({
+            name: newList.name,
+            description: newList.description
+          })
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error creating contact list: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        
+        // Add the new list to local state
+        if (data && data.success && data.data) {
+          const newList = data.data
+          const newContactList = {
+            id: newList._id,
+            name: newList.name,
+            contacts: Array.isArray(newList.contacts) ? newList.contacts.length : 0,
+            lastUpdated: newList.updatedAt || newList.createdAt || new Date().toISOString().split('T')[0],
+            status: newList.status || 'Active'
+          }
+          
+          setContactLists(prevLists => [...prevLists, newContactList])
+          setSuccessAlert({
+            show: true, 
+            message: `New contact list "${newList.name}" has been created successfully.`
+          })
+          refreshData()
+        }
       }
-      
-      setContactLists(prevLists => [...prevLists, newContactList])
-      setSuccessAlert({
-        show: true, 
-        message: `New contact list "${newList.name}" has been created successfully.`
-      })
+    } catch (error) {
+      console.error('Error saving contact list:', error)
+      setValidationError(`Failed to ${editingList ? 'update' : 'create'} contact list: ${error.message}`)
+      return
     }
     
     handleCloseModal()
@@ -216,16 +284,23 @@ const ContactLists = () => {
     setDeleteError('')
     
     try {
-      // Here you would typically send a delete request to your backend
-      // Example API call:
-      // await api.delete(`/contact-lists/${deleteId}`)
+      // Send delete request to the API
+      const response = await fetch(`${API_URL}/${deleteId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${AUTH_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      })
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      if (!response.ok) {
+        throw new Error(`Error deleting contact list: ${response.status}`)
+      }
       
       // Update state to remove the deleted list
       setContactLists(prevLists => prevLists.filter(list => list.id !== deleteId))
       setDeleteSuccess(true)
+      refreshData()
       
       // Close the modal after a short delay to show the success message
       setTimeout(() => {
@@ -282,17 +357,31 @@ const ContactLists = () => {
           <CTable hover responsive className="contact-list-table">
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell>LIST NAME</CTableHeaderCell>
-                <CTableHeaderCell>CONTACTS</CTableHeaderCell>
-                <CTableHeaderCell>LAST UPDATED</CTableHeaderCell>
-                <CTableHeaderCell>STATUS</CTableHeaderCell>
+                <CTableHeaderCell>S.NO</CTableHeaderCell>
+                <CTableHeaderCell>BUSINESS NAME</CTableHeaderCell>
+                <CTableHeaderCell>NO OF CONTACTS</CTableHeaderCell>
                 <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
-              {currentLists.length === 0 ? (
+              {loading ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="5" className="text-center py-5">
+                  <CTableDataCell colSpan="4" className="text-center py-5">
+                    <CSpinner color="primary" />
+                    <div className="mt-3">Loading contact lists...</div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : error ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="4" className="text-center py-5">
+                    <CAlert color="danger" className="mb-0">
+                      {error}
+                    </CAlert>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : currentLists.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="4" className="text-center py-5">
                     <div className="empty-state">
                       <div className="empty-state-icon">
                         <CIcon icon={cilPlus} size="xl" />
@@ -306,21 +395,16 @@ const ContactLists = () => {
                   </CTableDataCell>
                 </CTableRow>
               ) : (
-                currentLists.map(list => (
+                currentLists.map((list, index) => (
                   <CTableRow key={list.id}>
+                    <CTableDataCell>
+                      <div className="list-number">{indexOfFirstItem + index + 1}</div>
+                    </CTableDataCell>
                     <CTableDataCell>
                       <div className="list-name">{list.name}</div>
                     </CTableDataCell>
                     <CTableDataCell>
                       <div className="list-contacts">{list.contacts}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="list-date">{list.lastUpdated}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <span className={`list-status status-${list.status.toLowerCase()}`}>
-                        {list.status}
-                      </span>
                     </CTableDataCell>
                     <CTableDataCell className="text-center">
                       <CButton 
@@ -333,9 +417,9 @@ const ContactLists = () => {
                       <CButton 
                         color="danger"
                         onClick={() => handleDeleteConfirm(list.id)}
-                        disabled={isDeleting}
+                        disabled={isDeleting && deleteId === list.id}
                       >
-                        {isDeleting ? <CSpinner size="sm" /> : <CIcon icon={cilTrash} />}
+                        {isDeleting && deleteId === list.id ? <CSpinner size="sm" /> : <CIcon icon={cilTrash} />}
                       </CButton>
                     </CTableDataCell>
                   </CTableRow>

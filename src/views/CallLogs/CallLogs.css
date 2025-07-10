@@ -1,17 +1,142 @@
 /* Call Logs styles */
 .call-logs-container {
-  padding: 20px 0;
+  padding: 20px;
 }
 
-.call-logs-title {
-  margin-bottom: 0;
-  font-weight: 600;
+.call-logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.call-log-status-completed {
+.call-logs-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.call-logs-filter-section {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.search-container {
+  width: 50%;
+}
+
+.call-logs-table {
+  margin-top: 20px;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-badge.success {
+  background-color: #e6f7ea;
   color: #2eb85c;
 }
 
-.call-log-status-missed {
-  color: #e55353;
+.status-badge.missed {
+  background-color: #fde8e8;
+  color: #e53e3e;
+}
+
+.status-badge.busy {
+  background-color: #fff5f5;
+  color: #f56565;
+}
+
+.status-badge.failed {
+  background-color: #fed7d7;
+  color: #c53030;
+}
+
+.status-badge.unknown {
+  background-color: #edf2f7;
+  color: #718096;
+}
+
+.status-badge.completed {
+  background-color: #e6f7ea;
+  color: #2eb85c;
+}
+
+.status-badge.pending {
+  background-color: #ebf8ff;
+  color: #3182ce;
+}
+
+.status-badge.cancelled {
+  background-color: #e2e8f0;
+  color: #718096;
+}
+
+/* Additional status styles based on API values */
+.call-logs-table .text-capitalize {
+  text-transform: capitalize;
+}
+
+.status-badge.outgoing, 
+.status-badge.incoming {
+  background-color: #e6f7ea;
+  color: #2eb85c;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.filter-container .dropdown-item.active {
+  background-color: #f0f5ff;
+  color: #3c8dbc;
+  font-weight: 500;
+}
+
+.filter-container .dropdown-toggle {
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-container .dropdown-toggle svg {
+  margin-right: 6px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.empty-state h4 {
+  color: #6c757d;
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  color: #8e9297;
+}
+
+@media (max-width: 768px) {
+  .call-logs-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .call-logs-filter-section {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .search-container {
+    width: 100%;
+  }
 }

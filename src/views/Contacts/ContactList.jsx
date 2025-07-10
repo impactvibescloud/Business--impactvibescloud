@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   CCard,
   CCardBody,
@@ -18,67 +18,71 @@ import {
   CDropdownMenu,
   CDropdownItem,
   CPagination,
-  CPaginationItem
+  CPaginationItem,
+  CSpinner,
+  CAlert
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilSearch, cilFilter, cilOptions, cilPhone, cilEnvelopeClosed, cilUser } from '@coreui/icons'
 import './ContactList.css'
 
+const API_URL = 'https://api-impactvibescloud.onrender.com/api/contact-list'
+const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1MjAzNDkzOX0.aUE1egzY77uQWHOK1q5PTpkglJ_DE2CVUFutHAaaWMU'
+
 const ContactList = () => {
+  const [contacts, setContacts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   
-  // Sample data for contacts
-  const contacts = [
-    {
-      id: 1,
-      name: 'John Smith',
-      phone: '+1 (555) 123-4567',
-      email: 'john.smith@example.com',
-      tags: ['Customer', 'Sales Lead'],
-      createdAt: '2023-05-15'
-    },
-    {
-      id: 2,
-      name: 'Emily Johnson',
-      phone: '+1 (555) 234-5678',
-      email: 'emily.johnson@example.com',
-      tags: ['Customer'],
-      createdAt: '2023-05-10'
-    },
-    {
-      id: 3,
-      name: 'Michael Davis',
-      phone: '+1 (555) 345-6789',
-      email: 'michael.davis@example.com',
-      tags: ['Sales Lead'],
-      createdAt: '2023-05-05'
-    },
-    {
-      id: 4,
-      name: 'Jessica Wilson',
-      phone: '+1 (555) 456-7890',
-      email: 'jessica.wilson@example.com',
-      tags: ['Customer', 'Support'],
-      createdAt: '2023-04-28'
-    },
-    {
-      id: 5,
-      name: 'Robert Miller',
-      phone: '+1 (555) 567-8901',
-      email: 'robert.miller@example.com',
-      tags: ['Support'],
-      createdAt: '2023-04-20'
+  useEffect(() => {
+    const fetchContacts = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        const response = await fetch(API_URL, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error fetching contacts: ${response.status} ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        
+        if (data && data.success && Array.isArray(data.data)) {
+          setContacts(data.data)
+        } else {
+          throw new Error('Received invalid data format from API')
+        }
+      } catch (err) {
+        console.error('Failed to fetch contacts:', err)
+        setError('Failed to fetch contacts. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+    
+    fetchContacts()
+  }, [])
 
   // Filter contacts based on search term
-  const filteredContacts = contacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.phone.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredContacts = contacts.filter(contact => {
+    const name = contact.name || ''
+    const email = contact.email || ''
+    const phone = contact.phone || ''
+    
+    return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      phone.toLowerCase().includes(searchTerm.toLowerCase())
+  })
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage
@@ -146,73 +150,88 @@ const ContactList = () => {
             </CCol>
           </CRow>
 
-          <CTable hover responsive className="contact-table">
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>CONTACT</CTableHeaderCell>
-                <CTableHeaderCell>PHONE</CTableHeaderCell>
-                <CTableHeaderCell>EMAIL</CTableHeaderCell>
-                <CTableHeaderCell>TAGS</CTableHeaderCell>
-                <CTableHeaderCell>CREATED</CTableHeaderCell>
-                <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {currentContacts.length === 0 ? (
+          {loading ? (
+            <div className="text-center p-4">
+              <CSpinner color="primary" />
+              <p className="mt-2">Loading contacts...</p>
+            </div>
+          ) : error ? (
+            <CAlert color="danger">{error}</CAlert>
+          ) : (
+            <CTable hover responsive className="contact-table">
+              <CTableHead>
                 <CTableRow>
-                  <CTableDataCell colSpan="6" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilUser} size="xl" />
-                      </div>
-                      <h4>No contacts found</h4>
-                      <p>Try adjusting your search or filter to find what you're looking for.</p>
-                    </div>
-                  </CTableDataCell>
+                  <CTableHeaderCell>CONTACT</CTableHeaderCell>
+                  <CTableHeaderCell>PHONE</CTableHeaderCell>
+                  <CTableHeaderCell>EMAIL</CTableHeaderCell>
+                  <CTableHeaderCell>TAGS</CTableHeaderCell>
+                  <CTableHeaderCell>CREATED</CTableHeaderCell>
+                  <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
                 </CTableRow>
-              ) : (
-                currentContacts.map(contact => (
-                  <CTableRow key={contact.id}>
-                    <CTableDataCell>
-                      <div className="contact-name">{contact.name}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-phone">
-                        <CIcon icon={cilPhone} className="me-2 text-muted" />
-                        {contact.phone}
+              </CTableHead>
+              <CTableBody>
+                {currentContacts.length === 0 ? (
+                  <CTableRow>
+                    <CTableDataCell colSpan="6" className="text-center py-5">
+                      <div className="empty-state">
+                        <div className="empty-state-icon">
+                          <CIcon icon={cilUser} size="xl" />
+                        </div>
+                        <h4>No contacts found</h4>
+                        <p>Try adjusting your search or filter to find what you're looking for.</p>
                       </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-email">
-                        <CIcon icon={cilEnvelopeClosed} className="me-2 text-muted" />
-                        {contact.email}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-tags">
-                        {contact.tags.map((tag, index) => (
-                          <span key={index} className={`tag tag-${tag.toLowerCase().replace(' ', '-')}`}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-date">{contact.createdAt}</div>
-                    </CTableDataCell>
-                    <CTableDataCell className="text-center">
-                      <CButton color="light" size="sm" className="action-btn edit-btn me-2">
-                        Edit
-                      </CButton>
-                      <CButton color="light" size="sm" className="action-btn delete-btn">
-                        Delete
-                      </CButton>
                     </CTableDataCell>
                   </CTableRow>
-                ))
-              )}
-            </CTableBody>
-          </CTable>
+                ) : (
+                  currentContacts.map(contact => (
+                    <CTableRow key={contact._id || contact.id}>
+                      <CTableDataCell>
+                        <div className="contact-name">{contact.name || 'Unknown'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="contact-phone">
+                          <CIcon icon={cilPhone} className="me-2 text-muted" />
+                          {contact.phone || 'N/A'}
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="contact-email">
+                          <CIcon icon={cilEnvelopeClosed} className="me-2 text-muted" />
+                          {contact.email || 'N/A'}
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="contact-tags">
+                          {Array.isArray(contact.tags) && contact.tags.length > 0 ? (
+                            contact.tags.map((tag, index) => (
+                              <span key={index} className={`tag tag-${tag.toLowerCase().replace(' ', '-')}`}>
+                                {tag}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="tag tag-none">No Tags</span>
+                          )}
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="contact-date">
+                          {contact.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell className="text-center">
+                        <CButton color="light" size="sm" className="action-btn edit-btn me-2">
+                          Edit
+                        </CButton>
+                        <CButton color="light" size="sm" className="action-btn delete-btn">
+                          Delete
+                        </CButton>
+                      </CTableDataCell>
+                    </CTableRow>
+                  ))
+                )}
+              </CTableBody>
+            </CTable>
+          )}
 
           {totalPages > 1 && (
             <CPagination align="end" className="mt-4">

@@ -42,6 +42,8 @@ import './billing-alerts.css'
 import './billing-buy-number.css'
 import './billing-credits.css'
 import './billing-toggle.css'
+import './payment-requests.css'
+import PaymentRequests from './PaymentRequests'
 
 function Billing() {
   const [activeKey, setActiveKey] = useState(1)
@@ -157,13 +159,18 @@ function Billing() {
       setActiveKey(2)
     } else if (tabParam === 'billing') {
       setActiveKey(3)
+    } else if (tabParam === 'payment-requests') {
+      setActiveKey(4)
     }
   }, [])
   
   // Function to update URL when changing tabs
   const handleTabChange = (key) => {
     setActiveKey(key)
-    const tabParam = key === 1 ? '' : key === 2 ? 'credits' : 'billing'
+    const tabParam = key === 1 ? '' : 
+                    key === 2 ? 'credits' : 
+                    key === 3 ? 'billing' : 
+                    key === 4 ? 'payment-requests' : '';
     
     if (tabParam) {
       const url = new URL(window.location)
@@ -320,6 +327,15 @@ function Billing() {
                 className="tab-link"
               >
                 Billing
+              </CNavLink>
+            </CNavItem>
+            <CNavItem>
+              <CNavLink
+                active={activeKey === 4}
+                onClick={() => handleTabChange(4)}
+                className="tab-link"
+              >
+                Payment Requests
               </CNavLink>
             </CNavItem>
           </CNav>
@@ -879,6 +895,11 @@ function Billing() {
                   </div>
                 </div>
               </div>
+            </CTabPane>
+            
+            {/* Payment Requests Tab */}
+            <CTabPane role="tabpanel" visible={activeKey === 4}>
+              <PaymentRequests />
             </CTabPane>
           </CTabContent>
         </CCardBody>

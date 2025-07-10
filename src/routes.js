@@ -21,6 +21,7 @@ import Billing from "./views/Billing/Billing";
 import Payments from "./views/Payments/Payments";
 import Settings from "./views/Settings/Settings";
 
+
 //Businesses
 
 import Products from "./views/Products/Products";
@@ -145,7 +146,7 @@ import Equipment from './views/Equipment/equipment';
 import AddEquipmentsOutlet from "./views/Outlet/AddEquipmentsOutlet";
 import Branches from "./views/Branches/Branches";
 import CallLogs from './views/CallLogs/CallLogs';
-import { ContactList, ContactLists } from "./views/Contacts";
+import { ContactList, ContactLists, Contacts } from "./views/Contacts";
 import AutodialCampaigns from "./views/Campaigns/AutodialCampaigns";
 import SurveyCampaigns from "./views/Campaigns/SurveyCampaigns";
 
@@ -807,6 +808,12 @@ const routes = [
     name: "Contact Lists",
     element: ContactLists,
     navName: "Contact Lists",
+  },
+  {
+    path: "/contacts",
+    name: "Contacts",
+    element: Contacts,
+    navName: "Contacts",
   },
   {
     path: '/callogs',
