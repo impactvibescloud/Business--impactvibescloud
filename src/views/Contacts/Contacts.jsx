@@ -58,7 +58,8 @@ function Contacts() {
     company: '',
     notes: '',
     tags: [],
-    tags: []
+    businessId: '684fe39ca8254e8906e99aab', // Default business ID
+    branchId: '684fe3bca8254e8906e99aae'    // Default branch ID
   })
   const [editingContact, setEditingContact] = useState(null)
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' })
@@ -179,7 +180,9 @@ function Contacts() {
       email: '',
       company: '',
       notes: '',
-      tags: []
+      tags: [],
+      businessId: '684fe39ca8254e8906e99aab', // Default business ID
+      branchId: '684fe3bca8254e8906e99aae'    // Default branch ID
     })
     setShowContactModal(true)
   }
@@ -224,14 +227,20 @@ function Contacts() {
         // Update existing contact via API
         console.log('Updating contact:', contactForm);
         
+        const formattedUpdateContact = {
+          ...contactForm,
+          businessId: contactForm.businessId || '684fe39ca8254e8906e99aab',
+          branchId: contactForm.branchId || '684fe3bca8254e8906e99aae',
+          tags: Array.isArray(contactForm.tags) ? contactForm.tags : 
+               typeof contactForm.tags === 'string' ? contactForm.tags.split(',').map(tag => tag.trim()) : []
+        };
+        
+        console.log('Formatted contact for update API:', formattedUpdateContact);
+        
         const response = await fetch(`${API_BASE_URL}/contacts/${editingContact.id}`, {
           method: 'PUT',
           headers: API_HEADERS,
-          body: JSON.stringify({
-            ...contactForm,
-            tags: Array.isArray(contactForm.tags) ? contactForm.tags : 
-                 typeof contactForm.tags === 'string' ? contactForm.tags.split(',').map(tag => tag.trim()) : []
-          })
+          body: JSON.stringify(formattedUpdateContact)
         })
         
         if (!response.ok) {
@@ -254,8 +263,9 @@ function Contacts() {
               ? { 
                   ...contactForm, 
                   id: contact.id,
-                  tags: Array.isArray(contactForm.tags) ? contactForm.tags : 
-                        typeof contactForm.tags === 'string' ? contactForm.tags.split(',').map(tag => tag.trim()) : []
+                  businessId: formattedUpdateContact.businessId,
+                  branchId: formattedUpdateContact.branchId,
+                  tags: formattedUpdateContact.tags
                 } 
               : contact
           )
@@ -271,9 +281,13 @@ function Contacts() {
         
         const formattedContact = {
           ...contactForm,
+          businessId: contactForm.businessId || '684fe39ca8254e8906e99aab', // Ensure businessId is included
+          branchId: contactForm.branchId || '684fe3bca8254e8906e99aae',     // Ensure branchId is included
           tags: Array.isArray(contactForm.tags) ? contactForm.tags : 
                 typeof contactForm.tags === 'string' ? contactForm.tags.split(',').map(tag => tag.trim()) : []
         };
+        
+        console.log('Formatted contact for API:', formattedContact);
         
         const response = await fetch(`${API_BASE_URL}/contacts`, {
           method: 'POST',
@@ -313,7 +327,9 @@ function Contacts() {
           email: contactForm.email,
           company: contactForm.company,
           notes: contactForm.notes,
-          tags: formattedContact.tags
+          tags: formattedContact.tags,
+          businessId: formattedContact.businessId,
+          branchId: formattedContact.branchId
         }
         
         // Update local state
@@ -345,7 +361,9 @@ function Contacts() {
       email: contact.email,
       company: contact.company,
       notes: contact.notes || '',
-      tags: contact.tags || []
+      tags: contact.tags || [],
+      businessId: contact.businessId || '684fe39ca8254e8906e99aab',
+      branchId: contact.branchId || '684fe3bca8254e8906e99aae'
     })
     setShowContactModal(true)
   }
@@ -743,35 +761,6 @@ function Contacts() {
               <CFormInput
                 type="text"
                 id="contactTags"
-                name="tags"
-                value={Array.isArray(contactForm.tags) ? contactForm.tags.join(', ') : contactForm.tags}
-                onChange={(e) => {
-                  const tagsValue = e.target.value;
-                  setContactForm(prev => ({
-                    ...prev,
-                    tags: tagsValue.trim() ? tagsValue : []
-                  }));
-                }}
-                placeholder="Enter tags separated by commas"
-              />
-              {(typeof contactForm.tags === 'string' && contactForm.tags.trim()) || 
-               (Array.isArray(contactForm.tags) && contactForm.tags.length > 0) ? (
-                <div className="mt-2 d-flex gap-1 flex-wrap">
-                  {(typeof contactForm.tags === 'string' ? 
-                    contactForm.tags.split(',').map(tag => tag.trim()) : 
-                    contactForm.tags).filter(tag => tag).map((tag, i) => (
-                    <CBadge key={i} color="info" className="text-capitalize" style={{fontSize: '0.75rem'}}>
-                      {tag}
-                    </CBadge>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="contactTags">Tags</CFormLabel>
-              <CFormInput
-                type="text"
-                id="contactTags"
                 placeholder="Enter comma-separated tags (e.g., lead, sales, priority)"
                 value={Array.isArray(contactForm.tags) ? contactForm.tags.join(', ') : ''}
                 onChange={(e) => {
@@ -783,31 +772,6 @@ function Contacts() {
                 }}
               />
               {Array.isArray(contactForm.tags) && contactForm.tags.length > 0 && (
-                <div className="mt-2 d-flex gap-1 flex-wrap">
-                  {contactForm.tags.map((tag, i) => (
-                    <CBadge key={i} color="info" className="text-capitalize" style={{fontSize: '0.75rem'}}>
-                      {tag}
-                    </CBadge>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="contactTags">Tags</CFormLabel>
-              <CFormInput
-                type="text"
-                id="contactTags"
-                placeholder="Enter comma-separated tags (e.g., lead, sales, priority)"
-                value={contactForm.tags ? contactForm.tags.join(', ') : ''}
-                onChange={(e) => {
-                  const tagsString = e.target.value;
-                  const tagsArray = tagsString.split(',')
-                    .map(tag => tag.trim())
-                    .filter(tag => tag !== '');
-                  setContactForm(prev => ({...prev, tags: tagsArray}));
-                }}
-              />
-              {contactForm.tags && contactForm.tags.length > 0 && (
                 <div className="mt-2 d-flex gap-1 flex-wrap">
                   {contactForm.tags.map((tag, i) => (
                     <CBadge key={i} color="info" className="text-capitalize" style={{fontSize: '0.75rem'}}>

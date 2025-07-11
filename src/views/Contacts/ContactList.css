@@ -364,3 +364,51 @@
 .alert-danger {
   border-left: 4px solid #e53e3e;
 }
+
+/* Contact list modal styles */
+.contact-list-preview {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px 0;
+  margin-top: 10px;
+}
+
+.contact-item {
+  transition: background-color 0.2s;
+}
+
+.contact-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* Additional form styles */
+.contact-form-section {
+  padding: 20px;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  margin-bottom: 20px;
+}
+
+.contact-form-section h5 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.selected-contacts-container {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 8px;
+  margin-top: 10px;
+}
+
+.selected-contact {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.selected-contact:hover {
+  background-color: #f1f3f5;
+}

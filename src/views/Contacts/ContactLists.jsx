@@ -22,15 +22,17 @@ import {
   CModalFooter,
   CForm,
   CFormLabel,
-  CFormTextarea,
+  CFormSelect,
   CSpinner,
-  CAlert
+  CAlert,
+  CBadge
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch, cilPencil, cilTrash } from '@coreui/icons'
+import { cilPlus, cilSearch, cilPencil, cilTrash, cilX } from '@coreui/icons'
 import './ContactList.css'
 
 const API_URL = 'https://api-impactvibescloud.onrender.com/api/contact-list'
+const CONTACTS_API_URL = 'https://api-impactvibescloud.onrender.com/api/contacts'
 const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1MjAzNDkzOX0.aUE1egzY77uQWHOK1q5PTpkglJ_DE2CVUFutHAaaWMU'
 
 const ContactLists = () => {
@@ -43,16 +45,19 @@ const ContactLists = () => {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [deleteSuccess, setDeleteSuccess] = useState(false)
-  const [selectedFile, setSelectedFile] = useState(null)
   const [newList, setNewList] = useState({
-    name: '',
-    description: ''
+    name: ''
   })
+  const [contacts, setContacts] = useState([])
+  const [selectedContact, setSelectedContact] = useState('')
+  const [selectedContacts, setSelectedContacts] = useState([])
+  const [isCreating, setIsCreating] = useState(false)
   const [editingList, setEditingList] = useState(null)
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' })
   const [validationError, setValidationError] = useState('')
   const [contactLists, setContactLists] = useState([])
   const [loading, setLoading] = useState(true)
+  const [contactsLoading, setContactsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dataRefreshCounter, setDataRefreshCounter] = useState(0)
   
@@ -103,6 +108,47 @@ const ContactLists = () => {
     fetchContactLists()
   }, [dataRefreshCounter])
 
+  // Fetch all contacts for the dropdown
+  useEffect(() => {
+    const fetchContacts = async () => {
+      setContactsLoading(true)
+      
+      try {
+        const response = await fetch(CONTACTS_API_URL, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Error fetching contacts: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        
+        if (data && data.success && Array.isArray(data.data)) {
+          setContacts(data.data.map(contact => ({
+            id: contact._id || contact.id,
+            name: contact.fullName || contact.name || 'Unnamed Contact',
+            phone: contact.phone || '',
+            email: contact.email || '',
+            company: contact.company || ''
+          })))
+        }
+      } catch (err) {
+        console.error('Failed to fetch contacts:', err)
+      } finally {
+        setContactsLoading(false)
+      }
+    }
+    
+    if (showNewListModal && !editingList) {
+      fetchContacts()
+    }
+  }, [showNewListModal])
+
   // Filter contact lists based on search term
   const filteredLists = contactLists.filter(list => 
     list.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -124,8 +170,9 @@ const ContactLists = () => {
 
   const handleCloseModal = () => {
     setShowNewListModal(false)
-    setNewList({ name: '', description: '' })
-    setSelectedFile(null)
+    setNewList({ name: '' })
+    setSelectedContact('')
+    setSelectedContacts([])
     setEditingList(null)
     setValidationError('')
   }
@@ -138,11 +185,7 @@ const ContactLists = () => {
     }))
   }
 
-  const handleFileChange = (e) => {
-    if (e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
-    }
-  }
+
 
   const handleCreateList = async () => {
     // Validate form
@@ -151,29 +194,35 @@ const ContactLists = () => {
       return
     }
     
-    setValidationError('')
-    
-    // Prepare form data if there's a file to upload
-    let formData = null
-    if (selectedFile) {
-      formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('name', newList.name)
-      formData.append('description', newList.description)
+    if (selectedContacts.length === 0) {
+      setValidationError('Please select at least one contact for the list.')
+      return
     }
+    
+    setValidationError('')
+    setIsCreating(true)
     
     try {
       if (editingList) {
+        // Use hardcoded business and branch IDs
+        const businessId = '684fe39ca8254e8906e99aab'
+        const branchId = '684fe39ca8254e8906e99aab'
+        
+        // Extract contact IDs for the API request
+        const contactIds = selectedContacts.map(contact => contact.id)
+        
         // Update existing list via API
         const response = await fetch(`${API_URL}/${editingList.id}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${AUTH_TOKEN}`,
-            'Content-Type': formData ? undefined : 'application/json',
+            'Content-Type': 'application/json',
           },
-          body: formData ? formData : JSON.stringify({
+          body: JSON.stringify({
             name: newList.name,
-            description: newList.description
+            businessId,
+            branchId,
+            contacts: contactIds
           })
         })
         
@@ -190,7 +239,8 @@ const ContactLists = () => {
               list.id === editingList.id 
                 ? { 
                     ...list, 
-                    name: newList.name, 
+                    name: newList.name,
+                    contacts: contactIds.length,
                     lastUpdated: new Date().toISOString().split('T')[0]
                   } 
                 : list
@@ -199,21 +249,30 @@ const ContactLists = () => {
           
           setSuccessAlert({
             show: true, 
-            message: `Contact list "${newList.name}" has been updated successfully.`
+            message: `Contact list "${newList.name}" has been updated successfully with ${contactIds.length} contacts.`
           })
           refreshData()
         }
       } else {
         // Create new list via API
+        // Use hardcoded business and branch IDs
+        const businessId = '684fe39ca8254e8906e99aab'
+        const branchId = '684fe39ca8254e8906e99aab'
+        
+        // Extract contact IDs for the API request
+        const contactIds = selectedContacts.map(contact => contact.id)
+        
         const response = await fetch(API_URL, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${AUTH_TOKEN}`,
-            'Content-Type': formData ? undefined : 'application/json',
+            'Content-Type': 'application/json',
           },
-          body: formData ? formData : JSON.stringify({
+          body: JSON.stringify({
             name: newList.name,
-            description: newList.description
+            businessId,
+            branchId,
+            contacts: contactIds
           })
         })
         
@@ -225,19 +284,20 @@ const ContactLists = () => {
         
         // Add the new list to local state
         if (data && data.success && data.data) {
-          const newList = data.data
+          const newListData = data.data
           const newContactList = {
-            id: newList._id,
-            name: newList.name,
-            contacts: Array.isArray(newList.contacts) ? newList.contacts.length : 0,
-            lastUpdated: newList.updatedAt || newList.createdAt || new Date().toISOString().split('T')[0],
-            status: newList.status || 'Active'
+            id: newListData._id || newListData.id,
+            name: newListData.name,
+            contacts: contactIds.length,
+            lastUpdated: newListData.updatedAt || newListData.createdAt || new Date().toISOString().split('T')[0],
+            status: newListData.status || 'Active',
+            businessName: newListData.businessName || 'Business'
           }
           
           setContactLists(prevLists => [...prevLists, newContactList])
           setSuccessAlert({
             show: true, 
-            message: `New contact list "${newList.name}" has been created successfully.`
+            message: `New contact list "${newListData.name}" has been created successfully with ${contactIds.length} contacts.`
           })
           refreshData()
         }
@@ -246,6 +306,8 @@ const ContactLists = () => {
       console.error('Error saving contact list:', error)
       setValidationError(`Failed to ${editingList ? 'update' : 'create'} contact list: ${error.message}`)
       return
+    } finally {
+      setIsCreating(false)
     }
     
     handleCloseModal()
@@ -256,12 +318,74 @@ const ContactLists = () => {
     }, 5000)
   }
 
-  const handleEdit = (list) => {
+  const handleEdit = async (list) => {
     setEditingList(list)
     setNewList({
-      name: list.name,
-      description: '' // Assuming description is not shown in the table
+      name: list.name
     })
+    
+    // Load contacts for this list
+    setContactsLoading(true)
+    
+    try {
+      // First fetch all contacts
+      const contactsResponse = await fetch(CONTACTS_API_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${AUTH_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!contactsResponse.ok) {
+        throw new Error(`Error fetching contacts: ${contactsResponse.status}`)
+      }
+      
+      const contactsData = await contactsResponse.json()
+      
+      if (contactsData && contactsData.success && Array.isArray(contactsData.data)) {
+        const allContacts = contactsData.data.map(contact => ({
+          id: contact._id || contact.id,
+          name: contact.fullName || contact.name || 'Unnamed Contact',
+          phone: contact.phone || '',
+          email: contact.email || '',
+          company: contact.company || ''
+        }))
+        
+        setContacts(allContacts)
+        
+        // Now fetch the specific list to get its contacts
+        const listResponse = await fetch(`${API_URL}/${list.id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${AUTH_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (listResponse.ok) {
+          const listData = await listResponse.json()
+          
+          if (listData && listData.success && listData.data && Array.isArray(listData.data.contacts)) {
+            // Find the contacts that are in this list
+            const listContactIds = listData.data.contacts.map(c => 
+              typeof c === 'object' ? c._id || c.id : c
+            )
+            
+            const selectedListContacts = allContacts.filter(contact => 
+              listContactIds.includes(contact.id)
+            )
+            
+            setSelectedContacts(selectedListContacts)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch list contacts:', err)
+    } finally {
+      setContactsLoading(false)
+    }
+    
     setShowNewListModal(true)
   }
 
@@ -315,6 +439,25 @@ const ContactLists = () => {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  const handleContactChange = (e) => {
+    setSelectedContact(e.target.value)
+  }
+  
+  const addContactToList = () => {
+    if (!selectedContact) return
+    
+    const contactToAdd = contacts.find(contact => contact.id === selectedContact)
+    
+    if (contactToAdd && !selectedContacts.some(c => c.id === contactToAdd.id)) {
+      setSelectedContacts([...selectedContacts, contactToAdd])
+      setSelectedContact('')
+    }
+  }
+  
+  const removeContactFromList = (contactId) => {
+    setSelectedContacts(selectedContacts.filter(contact => contact.id !== contactId))
   }
 
   return (
@@ -470,7 +613,7 @@ const ContactLists = () => {
             </CAlert>
           )}
           <CForm>
-            <div className="mb-3">
+            <div className="mb-4">
               <CFormLabel htmlFor="listName">List Name</CFormLabel>
               <CFormInput
                 type="text"
@@ -482,33 +625,81 @@ const ContactLists = () => {
                 required
               />
             </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="listDescription">Description</CFormLabel>
-              <CFormTextarea
-                id="listDescription"
-                name="description"
-                value={newList.description}
-                onChange={handleInputChange}
-                placeholder="Enter list description"
-                rows={3}
-              />
+            
+            <div className="mb-4">
+              <CRow className="align-items-end">
+                <CCol md={9}>
+                  <CFormLabel htmlFor="contactSelect">Add Contacts</CFormLabel>
+                  <CFormSelect
+                    id="contactSelect"
+                    value={selectedContact}
+                    onChange={handleContactChange}
+                    disabled={contactsLoading}
+                  >
+                    <option value="">Select a contact to add</option>
+                    {contacts
+                      .filter(contact => !selectedContacts.some(sc => sc.id === contact.id))
+                      .map(contact => (
+                        <option key={contact.id} value={contact.id}>
+                          {contact.name} - {contact.phone} {contact.email ? `(${contact.email})` : ''}
+                        </option>
+                      ))
+                    }
+                  </CFormSelect>
+                  {contactsLoading && (
+                    <div className="mt-2">
+                      <CSpinner size="sm" className="me-2" />
+                      Loading contacts...
+                    </div>
+                  )}
+                </CCol>
+                <CCol md={3}>
+                  <CButton color="primary" className="w-100" onClick={addContactToList} disabled={!selectedContact}>
+                    <CIcon icon={cilPlus} className="me-2" />
+                    Add
+                  </CButton>
+                </CCol>
+              </CRow>
             </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="fileUpload">Upload Contacts File</CFormLabel>
-              <CFormInput
-                id="fileUpload"
-                type="file"
-                onChange={handleFileChange}
-                accept=".csv, .xlsx, .xls"
-              />
-            </div>
+            
+            {selectedContacts.length > 0 && (
+              <div className="mb-4">
+                <h5>Selected Contacts ({selectedContacts.length})</h5>
+                <div className="selected-contacts-container">
+                  {selectedContacts.map(contact => (
+                    <div 
+                      key={contact.id} 
+                      className="selected-contact d-flex justify-content-between align-items-center p-2 mb-2 border rounded"
+                    >
+                      <div>
+                        <div className="fw-bold">{contact.name}</div>
+                        <div className="small text-muted">
+                          {contact.phone}
+                          {contact.email && ` | ${contact.email}`}
+                          {contact.company && ` | ${contact.company}`}
+                        </div>
+                      </div>
+                      <CButton 
+                        color="danger" 
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeContactFromList(contact.id)}
+                      >
+                        <CIcon icon={cilX} size="sm" />
+                      </CButton>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CForm>
         </CModalBody>
         <CModalFooter>
           <CButton color="secondary" onClick={handleCloseModal}>
             Cancel
           </CButton>
-          <CButton color="primary" onClick={handleCreateList}>
+          <CButton color="primary" onClick={handleCreateList} disabled={isCreating}>
+            {isCreating ? <CSpinner size="sm" className="me-2" /> : null}
             {editingList ? 'Update' : 'Create'} List
           </CButton>
         </CModalFooter>
