@@ -89,6 +89,7 @@
     "react-scripts": "^5.0.1",
     "sass": "^1.43.5"
   },
+  "proxy": "https://api-impactvibescloud.onrender.com",
   "engines": {
     "node": ">=18.x"
   }

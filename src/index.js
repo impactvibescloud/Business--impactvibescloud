@@ -14,17 +14,22 @@ import axios from "axios";
 import { store } from "./redux/store";
 import { cibGmail } from "@coreui/icons";
 import { createRoot } from "react-dom/client";
+import { setupAxiosInterceptors } from './utils/axiosInterceptors'
 
 const setupAxios = () => {
-  // axios.defaults.baseURL = "http://localhost:5040";
-  axios.defaults.baseURL = "https://api-impactvibescloud.onrender.com";
-  // axios.defaults.baseURL = "https://api.cnapp.co.in";
-
+  // Use proxy configuration - set baseURL to empty since package.json proxy handles routing
+  axios.defaults.baseURL = "";
+  
   axios.defaults.headers = {
     "Cache-Control": "no-cache,no-store",
     Pragma: "no-cache",
     Expires: "0",
   };
+  
+  // Setup interceptors to handle errors gracefully
+  setupAxiosInterceptors();
+  
+  console.log('✅ Axios setup complete - baseURL:', axios.defaults.baseURL);
 };
 
 setupAxios();

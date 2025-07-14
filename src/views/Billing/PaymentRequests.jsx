@@ -15,10 +15,12 @@ import {
   CFormInput,
   CSpinner
 } from '@coreui/react'
+import { API_CONFIG, API_HEADERS, ENDPOINTS, apiCall } from '../../config/api'
 import './payment-requests.css'
 
 function PaymentRequests() {
   const [paymentRequests, setPaymentRequests] = useState([])
+  const [requestPlanNames, setRequestPlanNames] = useState({}) // Store plan names for each request
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showNewRequestModal, setShowNewRequestModal] = useState(false)
@@ -45,19 +47,7 @@ function PaymentRequests() {
   const fetchPaymentRequests = async () => {
     try {
       setLoading(true)
-      const response = await fetch('https://api-impactvibescloud.onrender.com/api/billing/business/684fe39da8254e8906e99aad', {
-        headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
-        }
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API error response:', response.status, errorText)
-        throw new Error(`Failed to fetch payment requests: ${response.status} ${response.statusText}`)
-      }
-      
-      const data = await response.json()
+      const data = await apiCall(ENDPOINTS.BILLING_BUSINESS('684fe39da8254e8906e99aad'))
       console.log('Payment requests data:', data)
       
       // Prioritize data.data as per the API structure shown
@@ -94,6 +84,10 @@ function PaymentRequests() {
       });
       
       setPaymentRequests(processedData)
+      
+      // Fetch plan names for all requests
+      await fetchPlanNamesForRequests(processedData)
+      
       setLoading(false)
     } catch (err) {
       console.error('Error fetching payment requests:', err)
@@ -102,31 +96,74 @@ function PaymentRequests() {
     }
   }
 
-  const fetchPlanDetails = async (planId) => {
-    if (!planId) return
+  const fetchPlanNamesForRequests = async (requests) => {
+    const planNamesMap = {}
+    
+    // Fetch plan names for each request concurrently
+    const planNamePromises = requests.map(async (request) => {
+      const invoiceId = request.invoiceId || request._id
+      if (invoiceId) {
+        try {
+          const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
+          const responseData = data.data || data
+          const planName = responseData.planId?.planName || responseData.planName || 'Subscription Plan'
+          planNamesMap[request._id] = planName
+        } catch (err) {
+          console.error(`Error fetching plan name for request ${request._id}:`, err)
+          planNamesMap[request._id] = 'Subscription Plan'
+        }
+      } else {
+        planNamesMap[request._id] = 'Subscription Plan'
+      }
+    })
+    
+    await Promise.all(planNamePromises)
+    setRequestPlanNames(planNamesMap)
+  }
+
+  const fetchPlanDetails = async (invoiceId) => {
+    if (!invoiceId) return
     
     setLoadingPlanDetails(true)
     try {
-      const response = await fetch(`https://api-impactvibescloud.onrender.com/api/plans/${planId}`, {
-        headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTM2ODk3M30.Je1vRey76ElXFx-FSH2oEdto8xM_Lqti0090gp-zRmA'
-        }
+      const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
+      console.log('Invoice details full response:', data)
+      console.log('Invoice data structure:', data.data || data)
+      
+      // Extract all fields from the invoice API response - data structure access
+      const responseData = data.data || data; // Handle both direct data and wrapped response
+      
+      console.log('Plan ID object:', responseData.planId)
+      console.log('Plan Name from planId:', responseData.planId?.planName)
+      
+      setPlanDetails({
+        planName: responseData.planId?.planName || responseData.planName || 'Subscription Plan',
+        rental: responseData.planId?.rental || responseData.rental || responseData.amount || 0,
+        discountPercent: responseData.planId?.discountPercent || responseData.discountPercent || 0,
+        displayDiscount: responseData.planId?.displayDiscount || responseData.displayDiscount || 0,
+        totalAfterDiscount: responseData.planId?.totalAfterDiscount || responseData.totalAfterDiscount || 0,
+        duration: responseData.planId?.duration || responseData.duration || 30,
+        gracePeriod: responseData.planId?.gracePeriod || responseData.gracePeriod || 0,
+        paymentMode: responseData.paymentMode || 'Monthly',
+        totalAmount: responseData.totalAmount || 0,
+        gst: responseData.gst || 0,
+        balance: responseData.balance || 0
       })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch plan details: ${response.status} ${response.statusText}`)
-      }
-      
-      const data = await response.json()
-      console.log('Plan details:', data)
-      if (data.success && data.data) {
-        setPlanDetails(data.data)
-      } else {
-        setPlanDetails(data)
-      }
     } catch (err) {
       console.error('Error fetching plan details:', err)
-      setPlanDetails({ planName: 'Subscription Plan', rental: 0 })
+      setPlanDetails({ 
+        planName: 'Subscription Plan', 
+        rental: 0, 
+        discountPercent: 0,
+        displayDiscount: 0,
+        totalAfterDiscount: 0,
+        duration: 30,
+        gracePeriod: 0,
+        paymentMode: 'Monthly',
+        totalAmount: 0, 
+        balance: 0, 
+        gst: 0 
+      })
     } finally {
       setLoadingPlanDetails(false)
     }
@@ -136,7 +173,7 @@ function PaymentRequests() {
     if (!request || !request._id) return
     
     setSelectedRequest(request)
-    await fetchPlanDetails(request.planId || '685151bbcc646630b0126f6c') // Use default plan ID if not provided
+    await fetchPlanDetails(request.invoiceId || request._id)
     setShowPaymentModal(true)
   }
 
@@ -144,21 +181,13 @@ function PaymentRequests() {
     if (!id) return
     
     try {
-      const response = await fetch(`https://api-impactvibescloud.onrender.com/api/billing/${id}`, {
+      await apiCall(ENDPOINTS.BILLING_UPDATE(id), {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
-        },
         body: JSON.stringify({
           status: "rejected",
           paymentStatus: "unpaid"
         })
       })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to reject payment: ${response.status} ${response.statusText}`)
-      }
       
       // Update the local state to reflect the change
       setPaymentRequests(prevRequests => 
@@ -189,12 +218,8 @@ function PaymentRequests() {
     setProcessingPayment(true)
     try {
       // Update the payment request status using the provided API
-      const response = await fetch(`https://api-impactvibescloud.onrender.com/api/billing/${selectedRequest._id}`, {
+      const data = await apiCall(ENDPOINTS.BILLING_UPDATE(selectedRequest._id), {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
-        },
         body: JSON.stringify({
           status: "approved",
           paymentStatus: "paid",
@@ -202,11 +227,6 @@ function PaymentRequests() {
         })
       })
       
-      if (!response.ok) {
-        throw new Error(`Failed to process payment: ${response.status} ${response.statusText}`)
-      }
-      
-      const data = await response.json()
       console.log('Payment processed:', data)
       
       // Update the local state to reflect the change
@@ -329,16 +349,12 @@ function PaymentRequests() {
                         {getStatusBadge(request.status)}
                       </div>
                       <h4 className="request-plan">
-                        {request.planName || 
-                         (request.template && request.template.includes('plan') ? 
-                            request.template.match(/plan\s+([^,]+)/i)?.[1] : 
-                            'Subscription Plan')}
+                        {requestPlanNames[request._id] || request.planName || 'Loading...'}
                       </h4>
                       <p className="request-details">{request.template || request.details || request.description}</p>
                       <div className="payment-status mb-3">
                         Payment Status: <span className={`status-${(request.paymentStatus || 'pending').toLowerCase()}`}>{request.paymentStatus || 'Pending'}</span>
                       </div>
-                      <div className="request-amount mb-3">₹{(request.totalAfterDiscount || request.amount || request.price || request.rental || 1275).toLocaleString('en-IN')}</div>
                       
                       {(request.status === 'Pending' || request.status === 'pending') && (
                         <div className="action-buttons">
@@ -445,31 +461,74 @@ function PaymentRequests() {
                 <h5>{planDetails?.planName || selectedRequest?.planName || 'Subscription Plan'}</h5>
                 
                 <div className="plan-info">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="text-muted">Base Price:</span>
-                    <span className="fw-bold">₹{(planDetails?.rental || selectedRequest?.amount || 0).toLocaleString('en-IN')}</span>
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">Rental:</span>
+                        <span className="fw-bold">₹{(planDetails?.rental || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">Discount:</span>
+                        <span className="fw-bold text-success">{planDetails?.discountPercent || 0}%</span>
+                      </div>
+                    </div>
                   </div>
                   
-                  {planDetails?.discountPercent > 0 && (
-                    <>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <span className="text-muted">Discount ({planDetails.discountPercent}%):</span>
-                        <span className="fw-bold text-success">-₹{(planDetails.displayDiscount || 0).toLocaleString('en-IN')}</span>
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">Discount Amount:</span>
+                        <span className="fw-bold text-success">₹{(planDetails?.displayDiscount || 0).toLocaleString('en-IN')}</span>
                       </div>
-                      
-                      <div className="d-flex justify-content-between align-items-center mb-2 total-price">
-                        <span className="text-muted fw-bold">Total:</span>
-                        <span className="fw-bold">₹{(planDetails.totalAfterDiscount || planDetails?.rental || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    </>
-                  )}
-                  
-                  {planDetails?.duration > 0 && (
-                    <div className="d-flex justify-content-between align-items-center mt-3">
-                      <span className="text-muted">Duration:</span>
-                      <span>{planDetails.duration} days</span>
                     </div>
-                  )}
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">After Discount:</span>
+                        <span className="fw-bold">₹{(planDetails?.totalAfterDiscount || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">Duration:</span>
+                        <span className="fw-bold">{planDetails?.duration || 0} days</span>
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">Grace Period:</span>
+                        <span className="fw-bold">{planDetails?.gracePeriod || 0} days</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">Payment Mode:</span>
+                        <span className="fw-bold">{planDetails?.paymentMode || 'Monthly'}</span>
+                      </div>
+                    </div>
+                    <div className="col-6">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted small">GST Amount:</span>
+                        <span className="fw-bold">₹{(planDetails?.gst || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border-top pt-3">
+                    <div className="d-flex justify-content-center">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="text-muted fw-bold me-3">Total Balance:</span>
+                        <span className="fw-bold text-danger">₹{(planDetails?.balance || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               

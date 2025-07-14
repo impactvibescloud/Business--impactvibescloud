@@ -50,8 +50,10 @@ const AppSidebar = () => {
           // console.log(response.data)
           const data = response.data;
           if (
-            (data.success && data.user.role === "business_admin") ||
-            data.user.role === "Employee"
+            data.success && 
+            data.user && 
+            data.user.role && 
+            (data.user.role === "business_admin" || data.user.role === "Employee")
           ) {
             setUserData(data.user);
           } else {
@@ -90,17 +92,31 @@ const AppSidebar = () => {
 
   useEffect(() => {
     async function getConfiguration() {
-      const configDetails = await axios.get(`/api/config`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setAppName("ImpactVibes");
-      configDetails.data.result.map((item) => {
-        setHeaderlogoUrl(item?.logo[0]?.Headerlogo);
-        setFooterlogoUrl(item?.logo[0]?.Footerlogo);
-        setAdminlogoUrl(item?.logo[0]?.Adminlogo);
-      });
+      try {
+        const configDetails = await axios.get(`/api/config`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setAppName("ImpactVibes");
+        
+        // Safely check if result exists and is an array
+        if (configDetails.data && configDetails.data.result && Array.isArray(configDetails.data.result)) {
+          configDetails.data.result.map((item) => {
+            if (item?.logo && item.logo[0]) {
+              setHeaderlogoUrl(item.logo[0].Headerlogo || "");
+              setFooterlogoUrl(item.logo[0].Footerlogo || "");
+              setAdminlogoUrl(item.logo[0].Adminlogo || "");
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Config API failed, using defaults:', error.message);
+        setAppName("ImpactVibes");
+        setHeaderlogoUrl("");
+        setFooterlogoUrl("");
+        setAdminlogoUrl("");
+      }
     }
     getConfiguration();
   }, []);
