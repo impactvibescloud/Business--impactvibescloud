@@ -22,7 +22,7 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilSearch, cilFilter, cilPhone, cilTrash } from '@coreui/icons'
-import axios from 'axios'
+import { apiCall } from '../../config/api'
 import { isAutheticated } from '../../auth'
 import './VirtualNumbers.css'
 
@@ -48,50 +48,42 @@ function VirtualNumbers() {
       setError(null)
       
       try {
-        // Using the main endpoint to get all numbers - we'll filter assigned ones in the frontend
-        const apiUrl = `https://api-impactvibescloud.onrender.com/api/numbers`
+        console.log('Fetching virtual numbers from proxy API')
         
-        console.log('Fetching virtual numbers from:', apiUrl)
+        const response = await apiCall('/api/numbers', 'GET')
         
-        const response = await axios.get(apiUrl, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (!response.data) {
+        if (!response) {
           throw new Error('No data received from API')
         }
         
-        console.log('Virtual numbers fetched:', response.data)
-        console.log('Response data type:', typeof response.data)
+        console.log('Virtual numbers fetched:', response)
+        console.log('Response data type:', typeof response)
         
         // Detailed inspection of response
         if (typeof response.data === 'object') {
           console.log('Response data keys:', Object.keys(response.data))
         }
         
-        // Ensure response.data is an array
+        // Ensure response is an array
         let numbersArray = []
         
-        if (Array.isArray(response.data)) {
-          console.log('Response data is already an array')
-          numbersArray = response.data.filter(num => num.status === 'assigned')
-        } else if (typeof response.data === 'object') {
+        if (Array.isArray(response)) {
+          console.log('Response is already an array')
+          numbersArray = response.filter(num => num.status === 'assigned')
+        } else if (typeof response === 'object') {
           // Check for common API response patterns
-          if (Array.isArray(response.data.data)) {
-            console.log('Using response.data.data array')
-            numbersArray = response.data.data.filter(num => num.status === 'assigned')
-          } else if (Array.isArray(response.data.numbers)) {
-            console.log('Using response.data.numbers array')
-            numbersArray = response.data.numbers.filter(num => num.status === 'assigned')
-          } else if (Array.isArray(response.data.results)) {
-            console.log('Using response.data.results array')
-            numbersArray = response.data.results.filter(num => num.status === 'assigned')
-          } else if (Array.isArray(response.data.items)) {
-            console.log('Using response.data.items array')
-            numbersArray = response.data.items.filter(num => num.status === 'assigned')
+          if (Array.isArray(response.data)) {
+            console.log('Using response.data array')
+            numbersArray = response.data.filter(num => num.status === 'assigned')
+          } else if (Array.isArray(response.numbers)) {
+            console.log('Using response.numbers array')
+            numbersArray = response.numbers.filter(num => num.status === 'assigned')
+          } else if (Array.isArray(response.results)) {
+            console.log('Using response.results array')
+            numbersArray = response.results.filter(num => num.status === 'assigned')
+          } else if (Array.isArray(response.items)) {
+            console.log('Using response.items array')
+            numbersArray = response.items.filter(num => num.status === 'assigned')
           } else {
             console.log('No array found in response, creating empty array')
           }
@@ -102,18 +94,18 @@ function VirtualNumbers() {
         console.log('Final numbers array:', numbersArray)
         
         // Verify if we got valid data
-        if (numbersArray.length === 0 && typeof response.data === 'object' && !Array.isArray(response.data)) {
-          // If response.data isn't an array and we couldn't extract an array,
-          // try to create an array from response.data as a fallback
+        if (numbersArray.length === 0 && typeof response === 'object' && !Array.isArray(response)) {
+          // If response isn't an array and we couldn't extract an array,
+          // try to create an array from response as a fallback
           console.log('Attempting to create array from object data')
           
-          // Check if response.data itself could be a single number object
-          if (response.data.number || response.data._id || response.data.extension) {
-            console.log('Treating response.data as a single item')
-            numbersArray = [response.data]
+          // Check if response itself could be a single number object
+          if (response.number || response._id || response.extension) {
+            console.log('Treating response as a single item')
+            numbersArray = [response]
           } else {
-            // Last resort: try to extract objects from response.data that look like number records
-            const possibleNumbers = Object.values(response.data)
+            // Last resort: try to extract objects from response that look like number records
+            const possibleNumbers = Object.values(response)
               .filter(item => 
                 item && typeof item === 'object' && 
                 (item.number || item.extension || item._id || item.status)
@@ -220,19 +212,9 @@ function VirtualNumbers() {
     setError(null)
     
     try {
-      // Make API call to release the number
-      const apiUrl = `https://api-impactvibescloud.onrender.com/api/numbers/${numberId}`
+      console.log('Releasing number via proxy API')
       
-      const response = await axios.put(
-        apiUrl, 
-        { status: 'available' }, 
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+      const response = await apiCall(`/api/numbers/${numberId}`, 'PUT', { status: 'available' })
       
       console.log('Number released response:', response.data)
       

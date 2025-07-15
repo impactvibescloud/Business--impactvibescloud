@@ -31,15 +31,8 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilSearch, cilPencil, cilTrash, cilUser, cilPhone, cilEnvelopeClosed, cilBriefcase, cilNotes, cilArrowLeft } from '@coreui/icons'
+import { apiCall } from '../../config/api'
 import './ContactList.css'
-
-// API constants
-const API_BASE_URL = 'https://api-impactvibescloud.onrender.com/api'
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1MjAzNDkzOX0.aUE1egzY77uQWHOK1q5PTpkglJ_DE2CVUFutHAaaWMU'
-const API_HEADERS = {
-  'Authorization': `Bearer ${API_TOKEN}`,
-  'Content-Type': 'application/json'
-}
 
 function Contacts() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -77,16 +70,13 @@ function Contacts() {
       setError(null)
       
       try {
-        const response = await fetch(`${API_BASE_URL}/contacts`, {
-          method: 'GET',
-          headers: API_HEADERS
-        })
+        const response = await apiCall('/api/contacts', 'GET')
         
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`)
+        if (!response) {
+          throw new Error(`API error: No data received`)
         }
         
-        const data = await response.json()
+        const data = response
         console.log('API Response:', data)
         
         // Check different possible response formats with detailed logging
@@ -237,24 +227,9 @@ function Contacts() {
         
         console.log('Formatted contact for update API:', formattedUpdateContact);
         
-        const response = await fetch(`${API_BASE_URL}/contacts/${editingContact.id}`, {
-          method: 'PUT',
-          headers: API_HEADERS,
-          body: JSON.stringify(formattedUpdateContact)
-        })
+        const response = await apiCall(`/api/contacts/${editingContact.id}`, 'PUT', formattedUpdateContact)
         
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error');
-          console.error('API Update Error Response:', errorText);
-          throw new Error(`API error: ${response.status} - ${errorText}`)
-        }
-        
-        const data = await response.json().catch(err => {
-          console.log('No JSON response for update, using form data');
-          return { success: true };
-        });
-        
-        console.log('Update response:', data);
+        console.log('Update response:', response);
         
         // Update local state
         setContacts(prevContacts => 
@@ -289,26 +264,12 @@ function Contacts() {
         
         console.log('Formatted contact for API:', formattedContact);
         
-        const response = await fetch(`${API_BASE_URL}/contacts`, {
-          method: 'POST',
-          headers: API_HEADERS,
-          body: JSON.stringify(formattedContact)
-        })
+        const response = await apiCall('/api/contacts', 'POST', formattedContact)
         
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => 'Unknown error');
-          console.error('API Create Error Response:', errorText);
-          throw new Error(`API error: ${response.status} - ${errorText}`)
-        }
-        
-        const data = await response.json().catch(err => {
-          console.error('Failed to parse JSON from create response:', err);
-          return { contact: { _id: Date.now().toString() } }; // Fallback ID
-        });
-        
-        console.log('Create response data:', data);
+        console.log('Create response data:', response);
         
         let newContactId;
+        const data = response.data || response;
         if (data.contact && (data.contact._id || data.contact.id)) {
           newContactId = data.contact._id || data.contact.id;
         } else if (data._id || data.id) {
@@ -400,24 +361,9 @@ function Contacts() {
       // Delete contact via API
       console.log(`Deleting contact with ID: ${deleteId}`);
       
-      const response = await fetch(`${API_BASE_URL}/contacts/${deleteId}`, {
-        method: 'DELETE',
-        headers: API_HEADERS
-      })
+      const response = await apiCall(`/api/contacts/${deleteId}`, 'DELETE')
       
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('API Delete Error Response:', errorText);
-        throw new Error(`API error: ${response.status} - ${errorText}`)
-      }
-      
-      // Check for successful response
-      try {
-        const data = await response.json();
-        console.log('Delete response:', data);
-      } catch (err) {
-        console.log('No JSON response for delete, assuming success');
-      }
+      console.log('Delete response:', response);
       
       // Update state to remove the deleted contact
       setContacts(prevContacts => prevContacts.filter(contact => contact.id !== deleteId))

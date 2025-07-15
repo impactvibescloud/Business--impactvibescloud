@@ -1,6 +1,7 @@
 // API Configuration for the application
 // This file centralizes all API endpoints and configurations to avoid CORS issues
 import axios from 'axios'
+import { debouncedApiCall } from '../utils/apiDebouncer'
 
 // API Configuration with fallback support
 export const API_CONFIG = {
@@ -38,90 +39,71 @@ export const ENDPOINTS = {
   CONTACTS: '/api/contacts',
   CONTACT_LISTS: '/api/contact-list',
   
+  // Call logs endpoints
+  CALL_LOGS: '/api/call-logs',
+  
+  // Branches endpoints
+  BRANCHES: '/api/branches',
+  
+  // Virtual Numbers endpoints
+  NUMBERS: '/api/numbers',
+  
   // Plan endpoints
-  PLANS: (planId) => `/api/plans/${planId}`
+  PLANS: (planId) => `/api/plans/${planId}`,
+  
+  // Other common endpoints
+  REPORTS: '/api/reports',
+  SETTINGS: '/api/settings',
+  DASHBOARD: '/api/dashboard'
 }
 
 // Utility function to make API calls using axios (which supports proxy)
-export const apiCall = async (endpoint, options = {}) => {
-  const { method = 'GET', data, headers = {}, ...restOptions } = options
+export const apiCall = async (endpoint, method = 'GET', data = null, options = {}) => {
+  // Create a unique key for debouncing based on endpoint and method
+  const debounceKey = `${method.toUpperCase()}_${endpoint}`
   
-  const config = {
-    url: endpoint, // Use endpoint directly since axios baseURL is already configured
-    method,
-    headers: {
-      ...API_HEADERS,
-      ...headers
-    },
-    ...restOptions
+  // Use debouncing for GET requests to prevent rapid successive calls
+  if (method.toUpperCase() === 'GET') {
+    return debouncedApiCall(debounceKey, async () => {
+      return await makeRequest(endpoint, method, data, options)
+    })
   }
   
-  if (data) {
+  // For non-GET requests, make request directly
+  return await makeRequest(endpoint, method, data, options)
+}
+
+// Internal function to make the actual request
+const makeRequest = async (endpoint, method, data, options) => {
+  const config = {
+    url: endpoint, // Use endpoint directly since axios baseURL is already configured
+    method: method.toUpperCase(),
+    headers: {
+      ...API_HEADERS,
+      ...(options.headers || {})
+    },
+    ...options
+  }
+  
+  if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
     config.data = data
   }
   
   try {
-    console.log(`Making API call to: ${endpoint}`)
+    // Only log API calls in development mode to reduce console noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🌐 API: ${method} ${endpoint}`)
+    }
     const response = await axios(config)
-    return response.data
+    return response.data // Return just the data, not the whole response object
   } catch (error) {
-    console.warn('API call failed:', error.message, 'for endpoint:', endpoint)
-    
-    // Return graceful fallbacks for specific endpoints
-    if (endpoint.includes('/user/details')) {
-      console.warn('User details API failed, returning mock data')
-      return {
-        success: true,
-        message: 'Mock user data (API unavailable)',
-        user: {
-          role: 'business_admin',
-          name: 'Admin User',
-          email: 'admin@example.com',
-          businessId: '684fe39da8254e8906e99aad'
-        }
-      }
+    // Silent handling - the interceptor will handle fallbacks
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`⚠️ API failed: ${endpoint} - ${error.message}`)
     }
     
-    if (endpoint.includes('/config')) {
-      console.warn('Config API failed, returning mock config')
-      return {
-        success: true,
-        message: 'Mock config (API unavailable)',
-        result: [{
-          logo: [{ Headerlogo: '', Footerlogo: '', Adminlogo: '' }],
-          copyrightMessage: 'ImpactVibes Cloud'
-        }]
-      }
-    }
-    
-    if (endpoint.includes('/billing/business')) {
-      console.warn('Billing API failed, returning mock billing data')
-      return {
-        success: true,
-        message: 'Mock billing data (API unavailable)',
-        data: []
-      }
-    }
-    
-    if (endpoint.includes('/invoices/')) {
-      console.warn('Invoice API failed, returning mock invoice data')
-      return {
-        success: true,
-        message: 'Mock invoice data (API unavailable)',
-        data: {
-          amount: 29.99,
-          planName: 'Basic Plan',
-          description: 'Monthly subscription'
-        }
-      }
-    }
-    
-    // For other endpoints, return a failed response
-    return {
-      success: false,
-      message: error.message || 'API call failed',
-      data: null
-    }
+    // Let the interceptor handle the error and fallbacks
+    throw error
   }
 }
 

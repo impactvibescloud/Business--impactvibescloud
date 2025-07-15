@@ -29,11 +29,8 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilSearch, cilPencil, cilTrash, cilX } from '@coreui/icons'
+import { apiCall } from '../../config/api'
 import './ContactList.css'
-
-const API_URL = 'https://api-impactvibescloud.onrender.com/api/contact-list'
-const CONTACTS_API_URL = 'https://api-impactvibescloud.onrender.com/api/contacts'
-const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1MjAzNDkzOX0.aUE1egzY77uQWHOK1q5PTpkglJ_DE2CVUFutHAaaWMU'
 
 const ContactLists = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -71,19 +68,13 @@ const ContactLists = () => {
       setError(null)
       
       try {
-        const response = await fetch(API_URL, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${AUTH_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
-        })
+        const response = await apiCall('/api/contact-list', 'GET')
         
-        if (!response.ok) {
-          throw new Error(`Error fetching contact lists: ${response.status} ${response.statusText}`)
+        if (!response) {
+          throw new Error('No data received from API')
         }
         
-        const data = await response.json()
+        const data = response
         
         if (data && data.success && Array.isArray(data.data)) {
           setContactLists(data.data.map(list => ({

@@ -24,9 +24,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilSearch, cilFilter } from '@coreui/icons'
 import './CallLogs.css'
-
-const API_URL = 'https://api-impactvibescloud.onrender.com/api/call-logs'
-const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
+import { ENDPOINTS, apiCall } from '../../config/api'
 
 const CallLogs = () => {
   const [callLogs, setCallLogs] = useState([])
@@ -43,28 +41,40 @@ const CallLogs = () => {
       setError(null)
       
       try {
-        const response = await fetch(API_URL, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${AUTH_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
-        })
+        const data = await apiCall(ENDPOINTS.CALL_LOGS)
+        console.log('Call logs response:', data)
+        console.log('Call logs data type:', typeof data)
+        console.log('Call logs data keys:', data ? Object.keys(data) : 'no data')
         
-        if (!response.ok) {
-          throw new Error(`Error fetching call logs: ${response.status} ${response.statusText}`)
-        }
-        
-        const data = await response.json()
+        let callLogsArray = []
         
         if (data && data.success && Array.isArray(data.data)) {
-          setCallLogs(data.data)
+          callLogsArray = data.data
+          console.log('Using data.data array, length:', callLogsArray.length)
+        } else if (Array.isArray(data)) {
+          callLogsArray = data
+          console.log('Using direct array, length:', callLogsArray.length)
+        } else if (data && Array.isArray(data.callLogs)) {
+          callLogsArray = data.callLogs
+          console.log('Using data.callLogs array, length:', callLogsArray.length)
+        } else if (data && Array.isArray(data.logs)) {
+          callLogsArray = data.logs
+          console.log('Using data.logs array, length:', callLogsArray.length)
         } else {
-          throw new Error('Received invalid data format from API')
+          console.log('No valid call logs array found in response')
+          console.log('Response structure:', data)
+          callLogsArray = []
         }
+        
+        console.log('Final callLogsArray:', callLogsArray)
+        console.log('Final callLogsArray length:', callLogsArray.length)
+        console.log('Setting callLogs state with:', callLogsArray)
+        setCallLogs(callLogsArray)
+        console.log('CallLogs state updated with:', callLogsArray.length, 'items')
       } catch (err) {
         console.error('Failed to fetch call logs:', err)
         setError('Failed to fetch call logs. Please try again later.')
+        setCallLogs([]) // Set empty array on error
       } finally {
         setLoading(false)
       }
@@ -221,10 +231,20 @@ const CallLogs = () => {
           ) : error ? (
             <CAlert color="danger">{error}</CAlert>
           ) : filteredCallLogs.length === 0 ? (
-            <div className="empty-state">
-              <h4>No call logs found</h4>
-              <p>There are no call logs available matching your search criteria.</p>
-            </div>
+            (() => {
+              console.log('Rendering CallLogs - callLogs:', callLogs)
+              console.log('Rendering CallLogs - callLogs.length:', callLogs.length)
+              console.log('Rendering CallLogs - filteredCallLogs:', filteredCallLogs)
+              console.log('Rendering CallLogs - filteredCallLogs.length:', filteredCallLogs.length)
+              console.log('Rendering CallLogs - loading:', loading)
+              console.log('Rendering CallLogs - error:', error)
+              return (
+                <div className="empty-state">
+                  <h4>No call logs found</h4>
+                  <p>There are no call logs available matching your search criteria.</p>
+                </div>
+              )
+            })()
           ) : (
             <>
               <CTable striped responsive className="call-logs-table">

@@ -79,7 +79,7 @@ const Branches = () => {
   const fetchDidNumbers = async () => {
     try {
       const response = await axios.get(
-        `https://api-impactvibescloud.onrender.com/api/trial-orders/business/${user.businessId}`,
+        `/api/trial-orders/business/${user.businessId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

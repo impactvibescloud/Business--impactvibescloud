@@ -15,6 +15,7 @@ import { store } from "./redux/store";
 import { cibGmail } from "@coreui/icons";
 import { createRoot } from "react-dom/client";
 import { setupAxiosInterceptors } from './utils/axiosInterceptors'
+import { setupFetchInterceptor } from './utils/fetchInterceptor'
 
 const setupAxios = () => {
   // Use proxy configuration - set baseURL to empty since package.json proxy handles routing
@@ -29,7 +30,10 @@ const setupAxios = () => {
   // Setup interceptors to handle errors gracefully
   setupAxiosInterceptors();
   
-  console.log('✅ Axios setup complete - baseURL:', axios.defaults.baseURL);
+  // Setup fetch interceptor for any remaining direct fetch calls
+  setupFetchInterceptor();
+  
+  console.log('✅ Axios and Fetch setup complete - baseURL:', axios.defaults.baseURL);
 };
 
 setupAxios();
