@@ -1,19 +1,24 @@
 import React, { useState } from 'react'
 import {
+  CRow,
+  CCol,
   CCard,
   CCardBody,
-  CCol,
-  CRow,
   CTable,
+  CTableHead,
+  CTableRow,
+  CTableHeaderCell,
   CTableBody,
   CTableDataCell,
-  CTableHead,
-  CTableHeaderCell,
-  CTableRow,
   CButton,
   CFormInput,
   CFormSelect,
-  CBadge
+  CBadge,
+  CSpinner,
+  CAlert,
+  CInputGroup,
+  CPagination,
+  CPaginationItem
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilSearch, cilPlus } from '@coreui/icons'
@@ -21,7 +26,10 @@ import './AutodialCampaigns.css'
 
 function AutodialCampaigns() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('Campaign status')
+  const [statusFilter, setStatusFilter] = useState('All Status')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [loading, setLoading] = useState(false)
 
   // Sample data for demonstration
   const campaigns = [
@@ -57,12 +65,23 @@ function AutodialCampaigns() {
       campaign.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .filter(campaign => 
-      statusFilter === 'Campaign status' || campaign.status === statusFilter
+      statusFilter === 'All Status' || campaign.status === statusFilter
     )
+
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentCampaigns = filteredCampaigns.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage)
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber)
+  }
 
   const handleClearFilters = () => {
     setSearchTerm('')
-    setStatusFilter('Campaign status')
+    setStatusFilter('All Status')
+    setCurrentPage(1)
   }
 
   // Function to render status badge with appropriate color
@@ -82,157 +101,155 @@ function AutodialCampaigns() {
 
   return (
     <div className="autodial-campaigns-container">
-      <CRow>
-        <CCol xs={12}>
-          <div className="autodial-campaigns-header">
-            <div className="d-flex justify-content-between align-items-center">
-              <h1 className="autodial-campaigns-title">Autodial campaigns</h1>
-              <CButton className="new-campaign-btn d-flex align-items-center">
+      <CCard className="mb-4">
+        <CCardBody>
+          <CRow className="mb-4 align-items-center">
+            <CCol md={6}>
+              <h1 className="autodial-campaigns-title">Autodial Campaigns</h1>
+            </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
+              <CButton color="primary" className="add-campaign-btn">
                 <CIcon icon={cilPlus} className="me-2" />
                 New Campaign
               </CButton>
-            </div>
-          </div>
+            </CCol>
+          </CRow>
           
-          <div className="autodial-campaigns-controls">
-            <CRow className="mb-4 align-items-center">
-              <CCol md={4}>
-                <div className="search-input-container">
-                  <CIcon icon={cilSearch} className="search-icon" />
-                  <CFormInput
-                    type="text"
-                    placeholder="Search campaigns..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="search-input"
-                  />
-                </div>
-              </CCol>
-              <CCol md={3}>
-                <CFormSelect
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="Campaign status">Campaign status</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                  <option value="Paused">Paused</option>
-                </CFormSelect>
-              </CCol>
-              <CCol md={2}>
-                <CButton
-                  color="link"
-                  onClick={handleClearFilters}
-                  className="clear-filters-btn"
-                >
-                  Clear filters
+          <CRow className="mb-4">
+            <CCol md={6}>
+              <CInputGroup>
+                <CFormInput
+                  placeholder="Search campaigns..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <CButton type="button" color="primary" variant="outline">
+                  <CIcon icon={cilSearch} />
                 </CButton>
-              </CCol>
-            </CRow>
-          </div>
+              </CInputGroup>
+            </CCol>
+            <CCol md={3}>
+              <CFormSelect
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="All Status">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Paused">Paused</option>
+              </CFormSelect>
+            </CCol>
+            <CCol md={3}>
+              <CButton
+                color="link"
+                onClick={handleClearFilters}
+                className="clear-filters-btn"
+              >
+                Clear filters
+              </CButton>
+            </CCol>
+          </CRow>
 
-          <CCard className="campaigns-table-card">
-            <CCardBody className="p-0">
-              <div className="campaigns-table-container">
-                <CTable hover className="mb-0">
-                  <CTableHead className="table-header">
-                    <CTableRow>
-                      <CTableHeaderCell className="table-header-cell">
-                        CAMPAIGN
-                      </CTableHeaderCell>
-                      <CTableHeaderCell className="table-header-cell-center">
-                        CREATED ON
-                      </CTableHeaderCell>
-                      <CTableHeaderCell className="table-header-cell-center">
-                        CONTACTS
-                      </CTableHeaderCell>
-                      <CTableHeaderCell className="table-header-cell-center">
-                        REACHED
-                      </CTableHeaderCell>
-                      <CTableHeaderCell className="table-header-cell-center">
-                        STATUS
-                      </CTableHeaderCell>
-                    </CTableRow>
-                  </CTableHead>
-                  <CTableBody>
-                    {filteredCampaigns.length > 0 ? (
-                      filteredCampaigns.map((campaign) => (
-                        <CTableRow key={campaign.id} className="table-row">
-                          <CTableDataCell className="table-cell">
-                            <span className="campaign-name">{campaign.name}</span>
-                          </CTableDataCell>
-                          <CTableDataCell className="table-cell text-center">
-                            {campaign.createdOn}
-                          </CTableDataCell>
-                          <CTableDataCell className="table-cell text-center">
-                            {campaign.contacts.toLocaleString()}
-                          </CTableDataCell>
-                          <CTableDataCell className="table-cell text-center">
-                            {campaign.reached.toLocaleString()} ({Math.round((campaign.reached / campaign.contacts) * 100)}%)
-                          </CTableDataCell>
-                          <CTableDataCell className="table-cell text-center">
-                            {renderStatusBadge(campaign.status)}
-                          </CTableDataCell>
-                        </CTableRow>
-                      ))
-                    ) : (
-                      <CTableRow>
-                        <CTableDataCell colSpan="5" className="empty-state">
-                          <div className="empty-content">
-                            <div className="empty-icon">
-                              <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                                <path 
-                                  d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" 
-                                  stroke="#9CA3AF" 
-                                  strokeWidth="2" 
-                                  strokeLinecap="round" 
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </div>
-                            <h3 className="empty-title">No data</h3>
-                            <p className="empty-subtitle">No records found for selection.</p>
-                          </div>
-                        </CTableDataCell>
-                      </CTableRow>
-                    )}
-                  </CTableBody>
-                </CTable>
-              </div>
-
-              <div className="pagination-container">
-                <CRow className="align-items-center">
-                  <CCol md={6}>
-                    <div className="rows-per-page">
-                      <span className="pagination-info">
-                        Rows per page:
-                      </span>
-                      <CFormSelect
-                        size="sm"
-                        style={{ width: 'auto' }}
-                      >
-                        <option value={10}>10</option>
-                        <option value={25}>25</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </CFormSelect>
+          <CTable hover responsive className="campaigns-table">
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>S.NO</CTableHeaderCell>
+                <CTableHeaderCell>CAMPAIGN NAME</CTableHeaderCell>
+                <CTableHeaderCell>CREATED ON</CTableHeaderCell>
+                <CTableHeaderCell>CONTACTS</CTableHeaderCell>
+                <CTableHeaderCell>REACHED</CTableHeaderCell>
+                <CTableHeaderCell>STATUS</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {loading ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <CSpinner color="primary" />
+                    <div className="mt-3">Loading campaigns...</div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : currentCampaigns.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <CIcon icon={cilPlus} size="xl" />
+                      </div>
+                      <h4>No campaigns found</h4>
+                      <p>Create your first autodial campaign to get started.</p>
+                      <CButton color="primary" className="mt-3">
+                        <CIcon icon={cilPlus} className="me-2" />
+                        New Campaign
+                      </CButton>
                     </div>
-                  </CCol>
-                  <CCol md={6} className="text-end">
-                    <span className="pagination-info">
-                      {filteredCampaigns.length > 0 
-                        ? `1-${filteredCampaigns.length} of ${filteredCampaigns.length}`
-                        : '0-0 of 0'
-                      }
-                    </span>
-                  </CCol>
-                </CRow>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : (
+                currentCampaigns.map((campaign, index) => (
+                  <CTableRow key={campaign.id}>
+                    <CTableDataCell>
+                      <div className="campaign-number">{indexOfFirstItem + index + 1}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="campaign-name">{campaign.name}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="campaign-date">{campaign.createdOn}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="campaign-contacts">{campaign.contacts.toLocaleString()}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="campaign-reached">
+                        {campaign.reached.toLocaleString()} ({Math.round((campaign.reached / campaign.contacts) * 100)}%)
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge 
+                        color={campaign.status === 'Active' ? 'success' : 
+                               campaign.status === 'Paused' ? 'warning' : 'secondary'}
+                        className="status-badge"
+                      >
+                        {campaign.status}
+                      </CBadge>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              )}
+            </CTableBody>
+          </CTable>
+
+          {totalPages > 1 && (
+            <CPagination 
+              aria-label="Page navigation example"
+              className="justify-content-center mt-4"
+            >
+              <CPaginationItem 
+                disabled={currentPage === 1} 
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                Previous
+              </CPaginationItem>
+              {[...Array(totalPages)].map((_, i) => (
+                <CPaginationItem 
+                  key={i} 
+                  active={i + 1 === currentPage} 
+                  onClick={() => handlePageChange(i + 1)}
+                >
+                  {i + 1}
+                </CPaginationItem>
+              ))}
+              <CPaginationItem 
+                disabled={currentPage === totalPages} 
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Next
+              </CPaginationItem>
+            </CPagination>
+          )}
+        </CCardBody>
+      </CCard>
     </div>
   )
 }

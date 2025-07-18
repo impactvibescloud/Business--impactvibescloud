@@ -72,11 +72,11 @@ function Contacts() {
       try {
         const response = await apiCall('/api/contacts', 'GET')
         
-        if (!response) {
+        if (!response || !response.data) {
           throw new Error(`API error: No data received`)
         }
         
-        const data = response
+        const data = response.data
         console.log('API Response:', data)
         
         // Check different possible response formats with detailed logging
@@ -229,7 +229,14 @@ function Contacts() {
         
         const response = await apiCall(`/api/contacts/${editingContact.id}`, 'PUT', formattedUpdateContact)
         
-        console.log('Update response:', response);
+        if (!response || !response.success) {
+          console.error('API Update Error Response:', response);
+          throw new Error('Failed to update contact')
+        }
+        
+        const data = response;
+        
+        console.log('Update response:', data);
         
         // Update local state
         setContacts(prevContacts => 
@@ -266,10 +273,16 @@ function Contacts() {
         
         const response = await apiCall('/api/contacts', 'POST', formattedContact)
         
-        console.log('Create response data:', response);
+        if (!response || !response.success) {
+          console.error('API Create Error Response:', response);
+          throw new Error('Failed to create contact')
+        }
+        
+        const data = response;
+        
+        console.log('Create response data:', data);
         
         let newContactId;
-        const data = response.data || response;
         if (data.contact && (data.contact._id || data.contact.id)) {
           newContactId = data.contact._id || data.contact.id;
         } else if (data._id || data.id) {
@@ -362,6 +375,11 @@ function Contacts() {
       console.log(`Deleting contact with ID: ${deleteId}`);
       
       const response = await apiCall(`/api/contacts/${deleteId}`, 'DELETE')
+      
+      if (!response || !response.success) {
+        console.error('API Delete Error Response:', response);
+        throw new Error('Failed to delete contact')
+      }
       
       console.log('Delete response:', response);
       

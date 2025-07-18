@@ -45,13 +45,13 @@ export const AppSidebarNav = ({ items }) => {
     return (
       <Component
         idx={String(index)}
-        key={index}
+        key={`navgroup-${index}-${name}`}
         toggler={navLink(name, icon)}
         visible={location.pathname.startsWith(to)}
         {...rest}
       >
         {item.items?.map((item, index) =>
-          item.items ? navGroup(item, index) : navItem(item, index)
+          item.items ? navGroup(item, `${index}-${item.name}`) : navItem(item, `${index}-${item.name}`)
         )}
       </Component>
     );
@@ -61,7 +61,7 @@ export const AppSidebarNav = ({ items }) => {
     <React.Fragment>
       {items &&
         items.map((item, index) =>
-          item.items ? navGroup(item, index) : navItem(item, index)
+          item.items ? navGroup(item, `main-${index}-${item.name}`) : navItem(item, `main-${index}-${item.name}`)
         )}
     </React.Fragment>
   );

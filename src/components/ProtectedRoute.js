@@ -43,13 +43,11 @@ import { jwtDecode } from 'jwt-decode'
 const isTokenExpired = (token) => {
   try {
     const decodedToken = jwtDecode(token)
-    // console.log('Decoded Token:', decodedToken) // Debugging
     const currentTime = Date.now() / 1000
-    // console.log('Current Time:', currentTime) // Debugging
-    // console.log('Token Expiration Time:', decodedToken.exp) // Debugging
-    return decodedToken.exp < currentTime
+    // Add 5 minute buffer to account for clock skew
+    return decodedToken.exp < (currentTime + 300)
   } catch (error) {
-    console.error('Error decoding token:', error) // Debugging
+    console.error('Error decoding token:', error)
     return true // If there's an error decoding the token, consider it expired
   }
 }
@@ -60,20 +58,42 @@ const ProtectedRoute = ({ element: Element }) => {
   useEffect(() => {
     const checkToken = () => {
       const token = localStorage.getItem('authToken')
-    //   console.log('Token:', token) // Debugging
-      if (!token || isTokenExpired(token)) {
-        // console.log('Token is expired or not present, redirecting to login')
+      
+      if (!token) {
+        console.log('🚪 No token found - redirecting to login')
         navigate('/')
-      } else {
-        // console.log('Token is valid')
+        return
+      }
+      
+      if (isTokenExpired(token)) {
+        console.log('⏰ Token expired - redirecting to login')
+        localStorage.removeItem('authToken')
+        navigate('/')
+        return
       }
     }
 
-    checkToken();
-    const intervalId = setInterval(checkToken, 1 * 60 * 1000);
+    // Check token immediately
+    checkToken()
+    
+    // Check token every 2 minutes instead of 1 minute (less aggressive)
+    const intervalId = setInterval(checkToken, 2 * 60 * 1000)
 
-    // Clear interval on component unmount
-    return () => clearInterval(intervalId);
+    // Also check token when page becomes visible (user returns to tab)
+    const visibilityChangeHandler = () => {
+      if (!document.hidden) {
+        console.log('👁️ Page visible - checking token')
+        checkToken()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', visibilityChangeHandler)
+
+    // Clear interval and event listener on component unmount
+    return () => {
+      clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', visibilityChangeHandler)
+    }
   }, [navigate])
 
   return <Element />

@@ -40,15 +40,9 @@ function PaymentRequests() {
   const [processingPayment, setProcessingPayment] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   
-  // Reject confirmation states
-  const [showRejectModal, setShowRejectModal] = useState(false)
-  const [rejectingRequest, setRejectingRequest] = useState(null)
-  const [processingReject, setProcessingReject] = useState(false)
-  const [rejectSuccess, setRejectSuccess] = useState(false)
-  
   // Invoice details modal states
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
-  const [selectedInvoiceRequest, setSelectedInvoiceRequest] = useState(null)
+  const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [invoiceDetails, setInvoiceDetails] = useState(null)
   const [loadingInvoiceDetails, setLoadingInvoiceDetails] = useState(false)
 
@@ -61,8 +55,6 @@ function PaymentRequests() {
       setLoading(true)
       const data = await apiCall(ENDPOINTS.BILLING_BUSINESS('684fe39da8254e8906e99aad'))
       console.log('Payment requests data:', data)
-      console.log('Payment requests data type:', typeof data)
-      console.log('Payment requests data keys:', data ? Object.keys(data) : 'no data')
       
       // Prioritize data.data as per the API structure shown
       let paymentRequestsData = []
@@ -70,27 +62,18 @@ function PaymentRequests() {
       if (data && data.success && Array.isArray(data.data)) {
         // This is the expected format from the API
         paymentRequestsData = data.data
-        console.log('Using data.data array, length:', paymentRequestsData.length)
       } else if (Array.isArray(data)) {
         paymentRequestsData = data
-        console.log('Using direct array, length:', paymentRequestsData.length)
       } else if (typeof data === 'object') {
         // Fallback to checking other common patterns
         if (Array.isArray(data.requests)) {
           paymentRequestsData = data.requests
-          console.log('Using data.requests array, length:', paymentRequestsData.length)
         } else if (Array.isArray(data.paymentRequests)) {
           paymentRequestsData = data.paymentRequests
-          console.log('Using data.paymentRequests array, length:', paymentRequestsData.length)
         } else if (Array.isArray(data.results)) {
           paymentRequestsData = data.results
-          console.log('Using data.results array, length:', paymentRequestsData.length)
         }
       }
-      
-      console.log('Final paymentRequestsData:', paymentRequestsData)
-      console.log('Final paymentRequestsData length:', paymentRequestsData.length)
-      console.log('Setting paymentRequests with data:', paymentRequestsData)
       
       // Process data to ensure template is properly parsed
       const processedData = paymentRequestsData.map(request => {
@@ -106,9 +89,7 @@ function PaymentRequests() {
         return request;
       });
       
-      console.log('Processed paymentRequestsData:', processedData)
       setPaymentRequests(processedData)
-      console.log('PaymentRequests state updated with:', processedData.length, 'items')
       
       // Fetch plan names for all requests
       await fetchPlanNamesForRequests(processedData)
@@ -129,34 +110,33 @@ function PaymentRequests() {
       const invoiceId = request.invoiceId || request._id
       if (invoiceId) {
         try {
+          console.log(`Fetching plan name for invoice ID: ${invoiceId}`)
           const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
-          console.log(`Plan name data for request ${request._id}:`, data)
-          const responseData = data.data || data
-          console.log(`Response data for request ${request._id}:`, responseData)
-          console.log(`Plan ID object:`, responseData.planId)
-          console.log(`Plan name from planId:`, responseData.planId?.planName)
-          console.log(`Direct plan name:`, responseData.planName)
+          console.log(`Plan name API response for ${invoiceId}:`, data)
           
-          // Try multiple paths to get the plan name
-          let planName = null
-          if (responseData.planId && typeof responseData.planId === 'object') {
+          const responseData = data.data || data
+          
+          // Try multiple ways to extract plan name from the API response
+          let planName = 'Subscription Plan' // default fallback
+          
+          if (responseData.planId?.planName) {
             planName = responseData.planId.planName
           } else if (responseData.planName) {
             planName = responseData.planName
-          } else if (responseData.plan && responseData.plan.planName) {
+          } else if (responseData.plan?.name) {
+            planName = responseData.plan.name
+          } else if (responseData.plan?.planName) {
             planName = responseData.plan.planName
-          } else if (responseData.planDetails && responseData.planDetails.planName) {
-            planName = responseData.planDetails.planName
           }
           
-          console.log(`Final plan name for request ${request._id}:`, planName)
-          planNamesMap[request._id] = planName || 'Premium Plan'
+          console.log(`Extracted plan name for ${invoiceId}: ${planName}`)
+          planNamesMap[request._id] = planName
         } catch (err) {
           console.error(`Error fetching plan name for request ${request._id}:`, err)
-          planNamesMap[request._id] = 'Premium Plan'
+          planNamesMap[request._id] = 'Subscription Plan'
         }
       } else {
-        planNamesMap[request._id] = 'Premium Plan'
+        planNamesMap[request._id] = 'Subscription Plan'
       }
     })
     
@@ -221,121 +201,64 @@ function PaymentRequests() {
     setShowPaymentModal(true)
   }
 
-  const handleReject = (request) => {
-    if (!request) return
+  const handleCardClick = async (request) => {
+    if (!request || !request._id) return
     
-    setRejectingRequest(request)
-    setShowRejectModal(true)
-  }
-  
-  const confirmReject = async () => {
-    if (!rejectingRequest || !rejectingRequest._id) return
-    
-    setProcessingReject(true)
     try {
-      console.log('Rejecting payment request:', rejectingRequest._id)
+      setLoadingInvoiceDetails(true)
+      setSelectedInvoice(request)
       
-      const response = await apiCall(`/api/billing/${rejectingRequest._id}`, 'PUT', {
-        status: "rejected",
-        paymentStatus: "unpaid"
+      const invoiceId = request.invoiceId || request._id
+      const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
+      
+      console.log('Invoice details response:', data)
+      
+      const invoiceInfo = data.data || data
+      setInvoiceDetails(invoiceInfo)
+      setShowInvoiceModal(true)
+    } catch (error) {
+      console.error('Error fetching invoice details:', error)
+      // Show basic details if API fails
+      setInvoiceDetails({
+        id: request._id,
+        planName: requestPlanNames[request._id] || request.planName || 'Plan Details',
+        status: request.status,
+        paymentStatus: request.paymentStatus,
+        date: request.date || request.requestedAt,
+        details: request.template || request.details || request.description,
+        amount: request.amount || 0
       })
-      
-      console.log('Reject response:', response)
+      setShowInvoiceModal(true)
+    } finally {
+      setLoadingInvoiceDetails(false)
+    }
+  }
+
+  const handleReject = async (id) => {
+    if (!id) return
+    
+    try {
+      await apiCall(
+        ENDPOINTS.BILLING_UPDATE(id), 
+        'PUT',
+        {
+          status: "rejected",
+          paymentStatus: "unpaid"
+        }
+      )
       
       // Update the local state to reflect the change
       setPaymentRequests(prevRequests => 
         prevRequests.map(req => 
-          req._id === rejectingRequest._id 
+          req._id === id 
             ? { ...req, status: 'rejected', paymentStatus: 'unpaid' } 
             : req
         )
       )
       
-      // Show success feedback
-      setRejectSuccess(true)
-      setShowRejectModal(false)
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setRejectSuccess(false)
-      }, 3000)
-      
     } catch (err) {
       console.error('Error rejecting payment:', err)
       alert('Failed to reject payment request. Please try again.')
-    } finally {
-      setProcessingReject(false)
-      setRejectingRequest(null)
-    }
-  }
-  
-  const handleCardClick = async (request) => {
-    if (!request) return
-    
-    setSelectedInvoiceRequest(request)
-    setShowInvoiceModal(true)
-    
-    // Fetch detailed invoice information
-    await fetchInvoiceDetails(request.invoiceId || request._id)
-  }
-  
-  const fetchInvoiceDetails = async (invoiceId) => {
-    if (!invoiceId) return
-    
-    setLoadingInvoiceDetails(true)
-    try {
-      const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
-      console.log('Invoice details for modal:', data)
-      
-      const responseData = data.data || data
-      
-      setInvoiceDetails({
-        invoiceId: responseData._id || invoiceId,
-        planName: responseData.planId?.planName || responseData.planName || 'Subscription Plan',
-        businessId: responseData.businessId || 'N/A',
-        planId: responseData.planId?._id || responseData.planId || 'N/A',
-        rental: responseData.planId?.rental || responseData.rental || responseData.amount || 0,
-        discountPercent: responseData.planId?.discountPercent || responseData.discountPercent || 0,
-        displayDiscount: responseData.planId?.displayDiscount || responseData.displayDiscount || 0,
-        totalAfterDiscount: responseData.planId?.totalAfterDiscount || responseData.totalAfterDiscount || 0,
-        duration: responseData.planId?.duration || responseData.duration || 30,
-        gracePeriod: responseData.planId?.gracePeriod || responseData.gracePeriod || 0,
-        paymentMode: responseData.paymentMode || 'Monthly',
-        totalAmount: responseData.totalAmount || 0,
-        gst: responseData.gst || 0,
-        balance: responseData.balance || 0,
-        status: selectedInvoiceRequest?.status || responseData.status || 'pending',
-        paymentStatus: selectedInvoiceRequest?.status === 'rejected' ? 'failed' : 
-                      selectedInvoiceRequest?.status === 'approved' ? 'paid' : 
-                      selectedInvoiceRequest?.paymentStatus || responseData.paymentStatus || 'unpaid',
-        requestedAt: responseData.requestedAt || responseData.createdAt || new Date().toISOString(),
-        template: responseData.template || 'No description available'
-      })
-    } catch (err) {
-      console.error('Error fetching invoice details:', err)
-      setInvoiceDetails({
-        invoiceId: invoiceId,
-        planName: 'Subscription Plan',
-        businessId: 'N/A',
-        planId: 'N/A',
-        rental: 0,
-        discountPercent: 0,
-        displayDiscount: 0,
-        totalAfterDiscount: 0,
-        duration: 30,
-        gracePeriod: 0,
-        paymentMode: 'Monthly',
-        totalAmount: 0,
-        gst: 0,
-        balance: 0,
-        status: selectedInvoiceRequest?.status || 'pending',
-        paymentStatus: selectedInvoiceRequest?.status === 'rejected' ? 'failed' : 
-                      selectedInvoiceRequest?.status === 'approved' ? 'paid' : 'unpaid',
-        requestedAt: selectedInvoiceRequest?.requestedAt || new Date().toISOString(),
-        template: selectedInvoiceRequest?.template || 'No description available'
-      })
-    } finally {
-      setLoadingInvoiceDetails(false)
     }
   }
   
@@ -353,14 +276,15 @@ function PaymentRequests() {
     setProcessingPayment(true)
     try {
       // Update the payment request status using the provided API
-      const data = await apiCall(ENDPOINTS.BILLING_UPDATE(selectedRequest._id), {
-        method: 'PUT',
-        body: JSON.stringify({
+      const data = await apiCall(
+        ENDPOINTS.BILLING_UPDATE(selectedRequest._id), 
+        'PUT',
+        {
           status: "approved",
           paymentStatus: "paid",
           template: selectedRequest.template || `An order request generated for plan ${planDetails?.planName || 'Subscription Plan'}, Business ID: ${selectedRequest.businessId || '123'}, Plan ID: ${selectedRequest.planId || '456'}, Status: approved, Payment Status: paid`
-        })
-      })
+        }
+      )
       
       console.log('Payment processed:', data)
       
@@ -425,60 +349,9 @@ function PaymentRequests() {
 
   return (
     <div className="payment-requests-container">
-      <style jsx>{`
-        .payment-request-card {
-          transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        }
-        .payment-request-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .info-label {
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: #6c757d;
-          margin-bottom: 0.25rem;
-          display: block;
-        }
-        .info-value {
-          font-size: 0.9rem;
-          font-weight: 500;
-          color: #212529;
-        }
-        .section-title {
-          color: #495057;
-          border-bottom: 2px solid #dee2e6;
-          padding-bottom: 0.5rem;
-        }
-        .info-group {
-          background: #f8f9fa;
-          padding: 0.75rem;
-          border-radius: 0.375rem;
-          border-left: 3px solid #007bff;
-        }
-        .balance-section .info-group {
-          border-left-color: #dc3545;
-          background: #fff5f5;
-        }
-      `}</style>
       <div className="payment-requests-header d-flex justify-content-between align-items-center mb-4">
         <h2>Payment Requests</h2>
       </div>
-
-      {/* Success Messages */}
-      {rejectSuccess && (
-        <div className="alert alert-success alert-dismissible fade show" role="alert">
-          <strong>Success!</strong> Payment request has been rejected successfully.
-          <button type="button" className="btn-close" aria-label="Close" onClick={() => setRejectSuccess(false)}></button>
-        </div>
-      )}
-
-      {paymentSuccess && (
-        <div className="alert alert-success alert-dismissible fade show" role="alert">
-          <strong>Success!</strong> Payment has been processed successfully.
-          <button type="button" className="btn-close" aria-label="Close" onClick={() => setPaymentSuccess(false)}></button>
-        </div>
-      )}
 
       {/* Pending Payment Requests Section */}
       <div className="pending-requests-section mb-4">
@@ -514,64 +387,60 @@ function PaymentRequests() {
           </CCard>
         ) : (
           <CRow className="payment-request-cards">
-            {(() => {
-              console.log('Rendering PaymentRequests - paymentRequests:', paymentRequests)
-              console.log('Rendering PaymentRequests - paymentRequests.length:', paymentRequests.length)
-              console.log('Rendering PaymentRequests - loading:', loading)
-              console.log('Rendering PaymentRequests - error:', error)
-              return null
-            })()}
             {paymentRequests.length > 0 ? (
-              paymentRequests.map((request) => {
-                console.log('Rendering payment request:', request)
-                return (
-                  <CCol xs={12} sm={6} md={4} xl={3} key={request.id || request._id} className="mb-4">
-                    <CCard 
-                      className="h-100 payment-request-card" 
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleCardClick(request)}
-                    >
-                      <CCardBody>
-                        <div className="mb-2 d-flex justify-content-between">
-                          <div className="request-date">{request.date || (request.requestedAt ? new Date(request.requestedAt).toLocaleDateString('en-US', { 
-                            month: '2-digit', 
-                            day: '2-digit', 
-                            year: 'numeric' 
-                          }) : currentDate)}</div>
-                          {getStatusBadge(request.status)}
+              paymentRequests.map((request) => (
+                <CCol xs={12} sm={6} md={4} xl={3} key={request.id || request._id} className="mb-4">
+                  <CCard 
+                    className="h-100 payment-request-card" 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleCardClick(request)}
+                  >
+                    <CCardBody>
+                      <div className="mb-2 d-flex justify-content-between">
+                        <div className="request-date">{request.date || (request.requestedAt ? new Date(request.requestedAt).toLocaleDateString('en-US', { 
+                          month: '2-digit', 
+                          day: '2-digit', 
+                          year: 'numeric' 
+                        }) : currentDate)}</div>
+                        {getStatusBadge(request.status)}
+                      </div>
+                      <h4 className="request-plan">
+                        {requestPlanNames[request._id] || request.planName || 'Loading...'}
+                      </h4>
+                      <p className="request-details">{request.template || request.details || request.description}</p>
+                      <div className="payment-status mb-3">
+                        Payment Status: <span className={`status-${(request.paymentStatus || 'pending').toLowerCase()}`}>{request.paymentStatus || 'Pending'}</span>
+                      </div>
+                      
+                      {(request.status === 'Pending' || request.status === 'pending') && (
+                        <div className="action-buttons">
+                          <CButton 
+                            color="success" 
+                            size="sm" 
+                            className="me-2"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleAccept(request)
+                            }}
+                          >
+                            Accept
+                          </CButton>
+                          <CButton 
+                            color="danger" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleReject(request.id || request._id)
+                            }}
+                          >
+                            Reject
+                          </CButton>
                         </div>
-                        <h4 className="request-plan">
-                          {requestPlanNames[request._id] || request.planName || 'Loading...'}
-                        </h4>
-                        <p className="request-details">{request.template || request.details || request.description}</p>
-                        <div className="payment-status mb-3">
-                          Payment Status: <span className={`status-${(request.paymentStatus || 'pending').toLowerCase()}`}>{request.paymentStatus || 'Pending'}</span>
-                        </div>
-                        
-                        {(request.status === 'Pending' || request.status === 'pending') && (
-                          <div className="action-buttons" onClick={(e) => e.stopPropagation()}>
-                            <CButton 
-                              color="success" 
-                              size="sm" 
-                              className="me-2"
-                              onClick={() => handleAccept(request)}
-                            >
-                              Accept
-                            </CButton>
-                            <CButton 
-                              color="danger" 
-                              size="sm"
-                              onClick={() => handleReject(request)}
-                            >
-                              Reject
-                            </CButton>
-                          </div>
-                        )}
-                      </CCardBody>
-                    </CCard>
-                  </CCol>
-                )
-              })
+                      )}
+                    </CCardBody>
+                  </CCard>
+                </CCol>
+              ))
             ) : (
               <CCol xs={12}>
                 <CCard className="text-center py-5">
@@ -629,7 +498,7 @@ function PaymentRequests() {
         onClose={() => !processingPayment && !paymentSuccess && setShowPaymentModal(false)}
         className="payment-modal"
         backdrop="static"
-        size="md"
+        size="lg"
       >
         <CModalHeader closeButton={!processingPayment && !paymentSuccess}>
           <CModalTitle>Complete Payment</CModalTitle>
@@ -653,7 +522,9 @@ function PaymentRequests() {
               <div className="plan-details mb-4">
                 <h5>{planDetails?.planName || selectedRequest?.planName || 'Subscription Plan'}</h5>
                 
-                <div className="plan-info">
+                {/* Plan Details Section */}
+                <div className="plan-info mb-4">
+                  <h6 className="text-primary mb-3">Plan Details</h6>
                   <div className="row g-2 mb-3">
                     <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
@@ -663,7 +534,7 @@ function PaymentRequests() {
                     </div>
                     <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Discount:</span>
+                        <span className="text-muted small">Discount Percent:</span>
                         <span className="fw-bold text-success">{planDetails?.discountPercent || 0}%</span>
                       </div>
                     </div>
@@ -672,13 +543,13 @@ function PaymentRequests() {
                   <div className="row g-2 mb-3">
                     <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Discount Amount:</span>
+                        <span className="text-muted small">Display Discount:</span>
                         <span className="fw-bold text-success">₹{(planDetails?.displayDiscount || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                     <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">After Discount:</span>
+                        <span className="text-muted small">Total After Discount:</span>
                         <span className="fw-bold">₹{(planDetails?.totalAfterDiscount || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
@@ -698,26 +569,30 @@ function PaymentRequests() {
                       </div>
                     </div>
                   </div>
-                  
+                </div>
+                
+                {/* Invoice Details Section */}
+                <div className="invoice-details mb-4">
+                  <h6 className="text-primary mb-3">Invoice Details</h6>
                   <div className="row g-2 mb-3">
                     <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Payment Mode:</span>
-                        <span className="fw-bold">{planDetails?.paymentMode || 'Monthly'}</span>
+                        <span className="text-muted small">Total Amount:</span>
+                        <span className="fw-bold">₹{(planDetails?.totalAmount || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                     <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">GST Amount:</span>
+                        <span className="text-muted small">GST:</span>
                         <span className="fw-bold">₹{(planDetails?.gst || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="border-top pt-3">
-                    <div className="d-flex justify-content-center">
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
                       <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted fw-bold me-3">Total Balance:</span>
+                        <span className="text-muted small">Balance:</span>
                         <span className="fw-bold text-danger">₹{(planDetails?.balance || 0).toLocaleString('en-IN')}</span>
                       </div>
                     </div>
@@ -867,74 +742,10 @@ function PaymentRequests() {
         )}
       </CModal>
 
-      {/* Reject Confirmation Modal */}
-      <CModal 
-        visible={showRejectModal} 
-        onClose={() => {
-          setShowRejectModal(false)
-          setRejectingRequest(null)
-        }}
-        alignment="center"
-        size="md"
-      >
-        <CModalHeader>
-          <CModalTitle>Confirm Rejection</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <div className="text-center">
-            <div className="mb-3">
-              <i className="bi bi-exclamation-triangle text-warning" style={{ fontSize: '48px' }}></i>
-            </div>
-            <h5>Are you sure you want to reject this payment request?</h5>
-            {rejectingRequest && (
-              <div className="mt-3">
-                <p className="text-muted">
-                  <strong>Plan:</strong> {rejectingRequest.planName || 'Subscription Plan'}<br/>
-                  <strong>Amount:</strong> ₹{rejectingRequest.amount || 'N/A'}<br/>
-                  <strong>Date:</strong> {rejectingRequest.date || (rejectingRequest.requestedAt ? new Date(rejectingRequest.requestedAt).toLocaleDateString('en-US', { 
-                    month: '2-digit', 
-                    day: '2-digit', 
-                    year: 'numeric' 
-                  }) : 'N/A')}
-                </p>
-              </div>
-            )}
-            <p className="text-muted">This action cannot be undone. The payment request will be marked as rejected.</p>
-          </div>
-        </CModalBody>
-        <CModalFooter>
-          <CButton 
-            color="secondary" 
-            onClick={() => {
-              setShowRejectModal(false)
-              setRejectingRequest(null)
-            }}
-            disabled={processingReject}
-          >
-            Cancel
-          </CButton>
-          <CButton 
-            color="danger" 
-            onClick={confirmReject}
-            disabled={processingReject}
-          >
-            {processingReject ? (
-              <>
-                <CSpinner size="sm" className="me-2" />
-                Rejecting...
-              </>
-            ) : (
-              'Yes, Reject'
-            )}
-          </CButton>
-        </CModalFooter>
-      </CModal>
-
       {/* Invoice Details Modal */}
       <CModal 
         visible={showInvoiceModal} 
         onClose={() => setShowInvoiceModal(false)}
-        alignment="center"
         size="lg"
       >
         <CModalHeader closeButton>
@@ -944,148 +755,83 @@ function PaymentRequests() {
           {loadingInvoiceDetails ? (
             <div className="text-center py-4">
               <CSpinner color="primary" />
-              <p className="mt-3 mb-0">Loading invoice details...</p>
+              <p className="mt-2">Loading invoice details...</p>
             </div>
           ) : invoiceDetails ? (
             <div className="invoice-details">
-              {/* Status and Basic Info */}
-              <div className="row mb-4">
+              <div className="row mb-3">
                 <div className="col-md-6">
-                  <div className="info-group mb-3">
-                    <label className="info-label">Status</label>
-                    <div>{getStatusBadge(invoiceDetails.status)}</div>
-                  </div>
+                  <strong>Invoice ID:</strong> {invoiceDetails.id || selectedInvoice?._id}
                 </div>
                 <div className="col-md-6">
-                  <div className="info-group mb-3">
-                    <label className="info-label">Payment Status</label>
-                    <div>
-                      <CBadge color={
-                        invoiceDetails.paymentStatus === 'paid' ? 'success' : 
-                        invoiceDetails.paymentStatus === 'failed' ? 'danger' :
-                        invoiceDetails.paymentStatus === 'unpaid' ? 'warning' : 
-                        'info'
-                      }>
-                        {invoiceDetails.status === 'approved' ? 'paid' : 
-                         invoiceDetails.status === 'rejected' ? 'failed' : 
-                         invoiceDetails.paymentStatus || 'unpaid'}
-                      </CBadge>
-                    </div>
-                  </div>
+                  <strong>Date:</strong> {invoiceDetails.date || (selectedInvoice?.requestedAt ? new Date(selectedInvoice.requestedAt).toLocaleDateString() : 'N/A')}
                 </div>
               </div>
-
-              {/* Plan Information */}
-              <div className="plan-info-section mb-4">
-                <h5 className="section-title mb-3">Plan Information</h5>
-                <div className="row">
-                  <div className="col-md-12 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Plan Name</label>
-                      <div className="info-value">{invoiceDetails.planName}</div>
-                    </div>
-                  </div>
+              <div className="row mb-3">
+                <div className="col-md-6">
+                  <strong>Plan Name:</strong> {invoiceDetails.planName || requestPlanNames[selectedInvoice?._id] || 'N/A'}
+                </div>
+                <div className="col-md-6">
+                  <strong>Status:</strong> {getStatusBadge(invoiceDetails.status || selectedInvoice?.status)}
                 </div>
               </div>
-
-              {/* Financial Details */}
-              <div className="financial-details-section mb-4">
-                <h5 className="section-title mb-3">Financial Details</h5>
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Rental Amount</label>
-                      <div className="info-value">₹{invoiceDetails.rental.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Discount Percentage</label>
-                      <div className="info-value text-success">{invoiceDetails.discountPercent}%</div>
-                    </div>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Discount Amount</label>
-                      <div className="info-value text-success">₹{invoiceDetails.displayDiscount.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">After Discount</label>
-                      <div className="info-value">₹{invoiceDetails.totalAfterDiscount.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">GST Amount</label>
-                      <div className="info-value">₹{invoiceDetails.gst.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Total Amount</label>
-                      <div className="info-value fw-bold">₹{invoiceDetails.totalAmount.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
+              <div className="row mb-3">
+                <div className="col-md-6">
+                  <strong>Payment Status:</strong> 
+                  <span className={`ms-2 status-${(invoiceDetails.paymentStatus || selectedInvoice?.paymentStatus || 'pending').toLowerCase()}`}>
+                    {invoiceDetails.paymentStatus || selectedInvoice?.paymentStatus || 'Pending'}
+                  </span>
                 </div>
-                <div className="balance-section">
-                  <div className="info-group">
-                    <label className="info-label">Outstanding Balance</label>
-                    <div className="info-value text-danger fw-bold fs-5">₹{invoiceDetails.balance.toLocaleString('en-IN')}</div>
-                  </div>
+                <div className="col-md-6">
+                  <strong>Amount:</strong> ₹{invoiceDetails.amount || invoiceDetails.totalAmount || selectedInvoice?.amount || 0}
                 </div>
               </div>
-
-              {/* Subscription Details */}
-              <div className="subscription-details-section mb-4">
-                <h5 className="section-title mb-3">Subscription Details</h5>
-                <div className="row">
-                  <div className="col-md-4 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Duration</label>
-                      <div className="info-value">{invoiceDetails.duration} days</div>
-                    </div>
-                  </div>
-                  <div className="col-md-4 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Grace Period</label>
-                      <div className="info-value">{invoiceDetails.gracePeriod} days</div>
-                    </div>
-                  </div>
-                  <div className="col-md-4 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Payment Mode</label>
-                      <div className="info-value">{invoiceDetails.paymentMode}</div>
-                    </div>
-                  </div>
+              <div className="row mb-3">
+                <div className="col-md-6">
+                  <strong>GST:</strong> ₹{invoiceDetails.gst || invoiceDetails.tax || selectedInvoice?.gst || 0}
+                </div>
+                <div className="col-md-6">
+                  <strong>Balance:</strong> ₹{invoiceDetails.balance || invoiceDetails.remainingAmount || selectedInvoice?.balance || 0}
                 </div>
               </div>
-
-              {/* Request Information */}
-              <div className="request-info-section mb-4">
-                <h5 className="section-title mb-3">Request Information</h5>
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <div className="info-group">
-                      <label className="info-label">Requested Date</label>
-                      <div className="info-value">
-                        {new Date(invoiceDetails.requestedAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    </div>
+              {(invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details) && (
+                <div className="row mb-3">
+                  <div className="col-12">
+                    <strong>Description:</strong>
+                    <p className="mt-1">{invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details}</p>
                   </div>
                 </div>
-                <div className="info-group">
-                  <label className="info-label">Description</label>
-                  <div className="info-value">{invoiceDetails.template}</div>
+              )}
+              {invoiceDetails.rental && (
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <strong>Rental:</strong> ₹{invoiceDetails.rental}
+                  </div>
+                  <div className="col-md-6">
+                    <strong>GST:</strong> ₹{invoiceDetails.gst || 0}
+                  </div>
                 </div>
-              </div>
+              )}
+              {invoiceDetails.discountPercent && (
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <strong>Discount:</strong> {invoiceDetails.discountPercent}%
+                  </div>
+                  <div className="col-md-6">
+                    <strong>Total After Discount:</strong> ₹{invoiceDetails.totalAfterDiscount || 0}
+                  </div>
+                </div>
+              )}
+              {invoiceDetails.duration && (
+                <div className="row mb-3">
+                  <div className="col-md-6">
+                    <strong>Duration:</strong> {invoiceDetails.duration} days
+                  </div>
+                  <div className="col-md-6">
+                    <strong>Payment Mode:</strong> {invoiceDetails.paymentMode || 'Monthly'}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-4">
@@ -1094,34 +840,19 @@ function PaymentRequests() {
           )}
         </CModalBody>
         <CModalFooter>
-          <CButton 
-            color="secondary" 
-            onClick={() => setShowInvoiceModal(false)}
-          >
+          <CButton color="secondary" onClick={() => setShowInvoiceModal(false)}>
             Close
           </CButton>
-          {selectedInvoiceRequest && (selectedInvoiceRequest.status === 'pending' || selectedInvoiceRequest.status === 'Pending') && (
-            <>
-              <CButton 
-                color="success" 
-                onClick={() => {
-                  setShowInvoiceModal(false)
-                  handleAccept(selectedInvoiceRequest)
-                }}
-                className="me-2"
-              >
-                Accept Payment
-              </CButton>
-              <CButton 
-                color="danger" 
-                onClick={() => {
-                  setShowInvoiceModal(false)
-                  handleReject(selectedInvoiceRequest)
-                }}
-              >
-                Reject Payment
-              </CButton>
-            </>
+          {selectedInvoice && (selectedInvoice.status === 'Pending' || selectedInvoice.status === 'pending') && (
+            <CButton 
+              color="success" 
+              onClick={() => {
+                setShowInvoiceModal(false)
+                handleAccept(selectedInvoice)
+              }}
+            >
+              Accept & Pay
+            </CButton>
           )}
         </CModalFooter>
       </CModal>

@@ -1,44 +1,60 @@
+/* Virtual Numbers styles - ContactList matching */
 .virtual-numbers-container {
   padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-.virtual-numbers-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+.virtual-numbers-title {
+  font-size: 1.75rem !important;
+  font-weight: 500 !important;
+  color: #333 !important;
+  margin-bottom: 0 !important;
 }
 
-.virtual-numbers-header h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #3c4b64;
+.add-number-btn {
+  background-color: #5a46eb !important;
+  border-color: #5a46eb !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
 }
 
-.numbers-filter-section {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.search-container {
-  width: 50%;
+.add-number-btn:hover {
+  background-color: #483bc3 !important;
+  border-color: #483bc3 !important;
 }
 
 .virtual-numbers-table {
-  margin-top: 20px;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  font-size: 0.875rem !important;
 }
 
-/* API assigned numbers styles */
-h4 {
-  color: #3c4b64;
-  font-weight: 600;
+.virtual-numbers-table thead {
+  background-color: #f8f9fa !important;
 }
 
-h5 {
-  color: #3c4b64;
-  font-weight: 600;
+.virtual-numbers-table th {
+  font-weight: 600 !important;
+  color: #495057 !important;
+  padding: 12px 16px !important;
+  border-bottom: 2px solid #dee2e6 !important;
+  font-size: 0.875rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.virtual-numbers-table td {
+  vertical-align: middle !important;
+  padding: 12px 16px !important;
+  font-size: 0.875rem !important;
+  color: #495057 !important;
+}
+
+.number-serial {
+  font-weight: 500 !important;
+  color: #6c757d !important;
 }
 
 .number-cell {
@@ -46,57 +62,135 @@ h5 {
   align-items: center;
 }
 
-.add-virtual-number-modal .modal-title {
-  font-weight: 600;
-  font-size: 1.25rem;
+.number-value {
+  font-weight: 500 !important;
+  color: #495057 !important;
 }
 
-.call-forwarding-settings {
-  background-color: #f8f9fa;
-  border-color: #dee2e6 !important;
-}
-
-.working-days-container {
-  margin-top: 10px;
-  display: flex;
-  gap: 12px;
-}
-
-.working-day-item {
-  min-width: 100px;
-}
-
-.call-hours-select {
-  width: 100px;
-  min-width: 120px;
+.location-value {
+  color: #495057 !important;
 }
 
 .phone-icon {
-  margin-right: 10px;
-  color: #3c4b64;
+  color: #6c757d !important;
+  width: 16px !important;
+  height: 16px !important;
 }
 
-.number-actions {
+.type-badge {
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.tags-container {
   display: flex;
-  gap: 5px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-/* Filter styling */
-.filter-container .dropdown-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.tag-badge {
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
 }
 
-.filter-container .dropdown-toggle.active {
-  background-color: #321fdb;
-  color: white;
-  border-color: #321fdb;
+.action-btn {
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
 }
 
-.filter-container .dropdown-menu {
-  min-width: 160px;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+.clear-filters-btn {
+  font-size: 0.875rem !important;
+  color: #007bff !important;
+  text-decoration: none !important;
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+}
+
+.clear-filters-btn:hover {
+  text-decoration: underline !important;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-state-icon {
+  color: #6c757d;
+  margin-bottom: 16px;
+}
+
+.empty-state h4 {
+  font-size: 1.25rem !important;
+  font-weight: 500 !important;
+  color: #495057 !important;
+  margin-bottom: 8px !important;
+}
+
+.empty-state p {
+  font-size: 0.875rem !important;
+  color: #6c757d !important;
+  margin-bottom: 24px !important;
+}
+
+/* Pagination styles */
+.page-link {
+  font-size: 0.875rem !important;
+  color: #007bff !important;
+}
+
+.page-item.active .page-link {
+  background-color: #007bff !important;
+  border-color: #007bff !important;
+}
+
+/* Input styles */
+.form-control, .form-select {
+  font-size: 0.875rem !important;
+  border-radius: 6px !important;
+}
+
+/* Alert styles */
+.alert {
+  font-size: 0.875rem !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .virtual-numbers-container {
+    padding: 15px;
+  }
+  
+  .virtual-numbers-title {
+    font-size: 1.5rem !important;
+  }
+  
+  .virtual-numbers-table {
+    font-size: 0.8rem !important;
+  }
+  
+  .virtual-numbers-table th,
+  .virtual-numbers-table td {
+    padding: 8px 12px !important;
+  }
+  
+  .number-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .tags-container {
+    flex-direction: column;
+    gap: 2px;
+  }
 }
 
 /* Action buttons styling */

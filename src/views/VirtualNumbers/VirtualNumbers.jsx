@@ -11,17 +11,18 @@ import {
   CButton,
   CInputGroup,
   CFormInput,
-  CDropdown,
-  CDropdownToggle,
-  CDropdownMenu,
-  CDropdownItem,
+  CFormSelect,
   CBadge,
   CAlert,
   CSpinner,
-  CTooltip
+  CTooltip,
+  CRow,
+  CCol,
+  CPagination,
+  CPaginationItem
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilSearch, cilFilter, cilPhone, cilTrash } from '@coreui/icons'
+import { cilSearch, cilPhone, cilTrash, cilPlus } from '@coreui/icons'
 import { apiCall } from '../../config/api'
 import { isAutheticated } from '../../auth'
 import './VirtualNumbers.css'
@@ -34,6 +35,8 @@ function VirtualNumbers() {
   const [error, setError] = useState(null)
   const [assignedNumbers, setAssignedNumbers] = useState([])
   const [releasingNumber, setReleasingNumber] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   const token = isAutheticated()
   
   // Fetch assigned numbers
@@ -50,7 +53,12 @@ function VirtualNumbers() {
       try {
         console.log('Fetching virtual numbers from proxy API')
         
-        const response = await apiCall('/api/numbers', 'GET')
+        const response = await apiCall('/api/numbers', 'GET', null, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
         
         if (!response) {
           throw new Error('No data received from API')
@@ -127,8 +135,22 @@ function VirtualNumbers() {
         if (err.response) {
           // The request was made and the server responded with a status code
           // that falls out of the range of 2xx
-          errorMessage = `Server error: ${err.response.status} - ${err.response.data?.message || 'Unknown server error'}`;
           console.error('Error response:', err.response.status, err.response.data);
+          
+          if (err.response.status === 403) {
+            errorMessage = 'Access denied. Please check your authentication or contact support.';
+            // Clear token and redirect to login if 403
+            localStorage.removeItem('authToken');
+            window.location.href = '/';
+            return;
+          } else if (err.response.status === 401) {
+            errorMessage = 'Authentication failed. Please log in again.';
+            localStorage.removeItem('authToken');
+            window.location.href = '/';
+            return;
+          } else {
+            errorMessage = `Server error: ${err.response.status} - ${err.response.data?.message || 'Unknown server error'}`;
+          }
         } else if (err.request) {
           // The request was made but no response was received
           errorMessage = 'No response received from server. Please check your network connection.';
@@ -185,14 +207,32 @@ function VirtualNumbers() {
     return true
   }) : []
   
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentNumbers = filteredAssignedNumbers.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredAssignedNumbers.length / itemsPerPage)
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber)
+  }
+
+  const handleClearFilters = () => {
+    setSearchTerm('')
+    setActiveFilter('All Numbers')
+    setCurrentPage(1)
+  }
+  
   // Handle search
   const handleSearch = (e) => {
     setSearchTerm(e.target.value)
+    setCurrentPage(1)
   }
   
   // Handle filter selection
   const handleFilterSelect = (filter) => {
     setActiveFilter(filter)
+    setCurrentPage(1)
   }
   
   // Release number function
@@ -214,7 +254,12 @@ function VirtualNumbers() {
     try {
       console.log('Releasing number via proxy API')
       
-      const response = await apiCall(`/api/numbers/${numberId}`, 'PUT', { status: 'available' })
+      const response = await apiCall(`/api/numbers/${numberId}`, 'PUT', { status: 'available' }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       
       console.log('Number released response:', response.data)
       
@@ -236,8 +281,18 @@ function VirtualNumbers() {
       if (err.response) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
-        errorMessage = `Server error: ${err.response.status} - ${err.response.data?.message || 'Unknown server error'}`;
         console.error('Error response:', err.response.status, err.response.data);
+        
+        if (err.response.status === 403) {
+          errorMessage = 'Access denied. You do not have permission to release this number.';
+        } else if (err.response.status === 401) {
+          errorMessage = 'Authentication failed. Please log in again.';
+          localStorage.removeItem('authToken');
+          window.location.href = '/';
+          return;
+        } else {
+          errorMessage = `Server error: ${err.response.status} - ${err.response.data?.message || 'Unknown server error'}`;
+        }
       } else if (err.request) {
         // The request was made but no response was received
         errorMessage = 'No response received from server. Please check your network connection.';
@@ -256,11 +311,6 @@ function VirtualNumbers() {
   
   return (
     <div className="virtual-numbers-container">
-      <div className="virtual-numbers-header">
-        <h1>Virtual Numbers</h1>
-      </div>
-      
-      {/* Success message */}
       {successMessage && (
         <CAlert color="success" className="mb-4" dismissible onClose={() => setSuccessMessage('')}>
           {successMessage}
@@ -269,134 +319,182 @@ function VirtualNumbers() {
       
       <CCard className="mb-4">
         <CCardBody>
-          <div className="numbers-filter-section">
-            <div className="search-container">
+          <CRow className="mb-4 align-items-center">
+            <CCol md={6}>
+              <h1 className="virtual-numbers-title">Virtual Numbers</h1>
+            </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
+              <CButton color="primary" className="add-number-btn">
+                <CIcon icon={cilPlus} className="me-2" />
+                Add Number
+              </CButton>
+            </CCol>
+          </CRow>
+          
+          <CRow className="mb-4">
+            <CCol md={6}>
               <CInputGroup>
                 <CFormInput
                   placeholder="Search numbers..."
                   value={searchTerm}
                   onChange={handleSearch}
                 />
-                <CButton color="primary" variant="outline">
+                <CButton type="button" color="primary" variant="outline">
                   <CIcon icon={cilSearch} />
                 </CButton>
               </CInputGroup>
-            </div>
-            
-            <div className="filter-container">
-              <CDropdown>
-                <CDropdownToggle color="primary" variant="outline">
-                  <CIcon icon={cilFilter} /> {activeFilter}
-                </CDropdownToggle>
-                <CDropdownMenu>
-                  <CDropdownItem onClick={() => handleFilterSelect('All Numbers')}>All Numbers</CDropdownItem>
-                  <CDropdownItem onClick={() => handleFilterSelect('Toll-Free')}>Toll-Free</CDropdownItem>
-                  <CDropdownItem onClick={() => handleFilterSelect('Local')}>Local</CDropdownItem>
-                  <CDropdownItem onClick={() => handleFilterSelect('International')}>International</CDropdownItem>
-                </CDropdownMenu>
-              </CDropdown>
-            </div>
-          </div>
-          
-          {isLoading && (
-            <div className="text-center my-4">
-              <CSpinner color="primary" />
-              <p className="mt-2">Loading assigned numbers...</p>
-            </div>
-          )}
-          
+            </CCol>
+            <CCol md={3}>
+              <CFormSelect
+                value={activeFilter}
+                onChange={(e) => handleFilterSelect(e.target.value)}
+              >
+                <option value="All Numbers">All Numbers</option>
+                <option value="Toll-Free">Toll-Free</option>
+                <option value="Local">Local</option>
+                <option value="International">International</option>
+              </CFormSelect>
+            </CCol>
+            <CCol md={3}>
+              <CButton
+                color="link"
+                onClick={handleClearFilters}
+                className="clear-filters-btn"
+              >
+                Clear filters
+              </CButton>
+            </CCol>
+          </CRow>
+
           {error && (
             <CAlert color="danger" className="my-3">
               {error}
             </CAlert>
           )}
-          
-          {/* API Assigned Numbers Section */}
-          {filteredAssignedNumbers.length > 0 && (
-            <>
-              <h4 className="mb-3 mt-4">Virtual Numbers</h4>
-              <CTable striped responsive className="mb-5 virtual-numbers-table">
-                <CTableHead>
-                  <CTableRow>
-                    <CTableHeaderCell>NUMBER</CTableHeaderCell>
-                    <CTableHeaderCell>LOCATION</CTableHeaderCell>
-                    <CTableHeaderCell>TYPE</CTableHeaderCell>
-                    <CTableHeaderCell>TAGS</CTableHeaderCell>
-                    <CTableHeaderCell>ACTION</CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
-                <CTableBody>
-                  {filteredAssignedNumbers.map((num) => (
-                    <CTableRow key={num._id || `num-${num.number}`}>
-                      <CTableDataCell>
-                        <div className="number-cell">
-                          <CIcon icon={cilPhone} className="phone-icon" />
-                          {num.number || '-'}
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell>{num.city || '-'}</CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge color="primary">
-                          {num.type || (Array.isArray(num.tag) && num.tag.length > 0 ? num.tag[0] : 'Standard')}
-                        </CBadge>
-                      </CTableDataCell>
-                      <CTableDataCell>
+
+          <CTable hover responsive className="virtual-numbers-table">
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>S.NO</CTableHeaderCell>
+                <CTableHeaderCell>NUMBER</CTableHeaderCell>
+                <CTableHeaderCell>LOCATION</CTableHeaderCell>
+                <CTableHeaderCell>TYPE</CTableHeaderCell>
+                <CTableHeaderCell>TAGS</CTableHeaderCell>
+                <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {isLoading ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <CSpinner color="primary" />
+                    <div className="mt-3">Loading virtual numbers...</div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : currentNumbers.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <CIcon icon={cilPhone} size="xl" />
+                      </div>
+                      <h4>No virtual numbers found</h4>
+                      <p>No virtual numbers are currently assigned to your account.</p>
+                      <CButton color="primary" className="mt-3">
+                        <CIcon icon={cilPlus} className="me-2" />
+                        Add Number
+                      </CButton>
+                    </div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : (
+                currentNumbers.map((num, index) => (
+                  <CTableRow key={num._id || `num-${num.number}`}>
+                    <CTableDataCell>
+                      <div className="number-serial">{indexOfFirstItem + index + 1}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="number-cell">
+                        <CIcon icon={cilPhone} className="phone-icon me-2" />
+                        <span className="number-value">{num.number || '-'}</span>
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="location-value">{num.city || '-'}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge color="primary" className="type-badge">
+                        {num.type || (Array.isArray(num.tag) && num.tag.length > 0 ? num.tag[0] : 'Standard')}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="tags-container">
                         {Array.isArray(num.tag) && num.tag.length > 0 ? (
-                          num.tag.map((tag, index) => (
-                            <CBadge key={index} color="info" className="me-1">
+                          num.tag.map((tag, tagIndex) => (
+                            <CBadge key={tagIndex} color="info" className="tag-badge me-1">
                               {tag}
                             </CBadge>
                           ))
                         ) : (
                           <span className="text-muted">No tags</span>
                         )}
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <CTooltip content="Release this number">
-                          <CButton 
-                            color="danger"
-                            size="sm"
-                            variant="outline" 
-                            onClick={() => releaseNumber(num._id)}
-                            disabled={releasingNumber === num._id}
-                          >
-                            {releasingNumber === num._id ? (
-                              <CSpinner size="sm" />
-                            ) : (
-                              <>
-                                <CIcon icon={cilTrash} className="me-1" />
-                                Release
-                              </>
-                            )}
-                          </CButton>
-                        </CTooltip>
-                      </CTableDataCell>
-                    </CTableRow>
-                  ))}
-                </CTableBody>
-              </CTable>
-            </>
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell className="text-center">
+                      <CTooltip content="Release this number">
+                        <CButton 
+                          color="danger"
+                          size="sm"
+                          variant="outline" 
+                          onClick={() => releaseNumber(num._id)}
+                          disabled={releasingNumber === num._id}
+                          className="action-btn"
+                        >
+                          {releasingNumber === num._id ? (
+                            <CSpinner size="sm" />
+                          ) : (
+                            <>
+                              <CIcon icon={cilTrash} className="me-1" />
+                              Release
+                            </>
+                          )}
+                        </CButton>
+                      </CTooltip>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              )}
+            </CTableBody>
+          </CTable>
+
+          {totalPages > 1 && (
+            <CPagination 
+              aria-label="Page navigation example"
+              className="justify-content-center mt-4"
+            >
+              <CPaginationItem 
+                disabled={currentPage === 1} 
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                Previous
+              </CPaginationItem>
+              {[...Array(totalPages)].map((_, i) => (
+                <CPaginationItem 
+                  key={i} 
+                  active={i + 1 === currentPage} 
+                  onClick={() => handlePageChange(i + 1)}
+                >
+                  {i + 1}
+                </CPaginationItem>
+              ))}
+              <CPaginationItem 
+                disabled={currentPage === totalPages} 
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Next
+              </CPaginationItem>
+            </CPagination>
           )}
-          
-          {/* Show message when no assigned numbers exist */}
-          {!assignedNumbers.length && !isLoading && !error && (
-            <div className="text-center my-5">
-              <CIcon icon={cilPhone} style={{ width: '48px', height: '48px', opacity: 0.5 }} className="mb-3" />
-              <h5>No virtual numbers found</h5>
-              <p className="text-muted mb-4">No virtual numbers are currently assigned to your account.</p>
-            </div>
-          )}
-          
-          {/* Show message when search returns no results but we have numbers */}
-          {assignedNumbers.length > 0 && filteredAssignedNumbers.length === 0 && !isLoading && (
-            <div className="text-center my-5">
-              <p>No virtual numbers match your search criteria</p>
-              <CButton color="light" onClick={() => setSearchTerm('')}>
-                Clear Search
-              </CButton>
-            </div>
-          )}
-        
         </CCardBody>
       </CCard>
     </div>

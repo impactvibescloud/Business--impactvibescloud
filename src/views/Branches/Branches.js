@@ -1,32 +1,46 @@
 import React, { useState, useEffect } from "react";
 import {
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Button,
-  Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Stack,
-  Chip,
-  MenuItem,
-} from "@mui/material";
+  CRow,
+  CCol,
+  CCard,
+  CCardBody,
+  CButton,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormInput,
+  CFormLabel,
+  CFormSelect,
+  CTable,
+  CTableHead,
+  CTableRow,
+  CTableHeaderCell,
+  CTableBody,
+  CTableDataCell,
+  CBadge,
+  CSpinner,
+  CAlert,
+  CInputGroup,
+  CPagination,
+  CPaginationItem
+} from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilPlus, cilPencil, cilTrash, cilSearch } from '@coreui/icons'
 import axios from "axios";
 import Swal from "sweetalert2";
+import './Branches.css'
 
 const isAuthenticated = () => localStorage.getItem("authToken");
 
 const Branches = () => {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [openAddBranch, setOpenAddBranch] = useState(false);
   const [openEditBranch, setOpenEditBranch] = useState(false);
   const [branchName, setBranchName] = useState("");
@@ -37,6 +51,7 @@ const Branches = () => {
   const [user, setUser] = useState({});
   const [didNumbers, setDidNumbers] = useState([]);
   const [selectedDid, setSelectedDid] = useState("");
+  const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
   const token = isAuthenticated();
 
   useEffect(() => {
@@ -123,10 +138,13 @@ const Branches = () => {
       );
       fetchBranches();
       handleCloseAddBranch();
-      Swal.fire({
-        title: "Agent added successfully!",
-        icon: "success",
+      setSuccessAlert({
+        show: true,
+        message: `Agent "${branchName}" added successfully!`
       });
+      setTimeout(() => {
+        setSuccessAlert({ show: false, message: '' });
+      }, 5000);
     } catch (error) {
       console.error("Error adding branch:", error);
       Swal.fire({
@@ -135,6 +153,23 @@ const Branches = () => {
         icon: "error",
       });
     }
+  };
+
+  // Filter branches based on search term
+  const filteredBranches = branches.filter(branch => 
+    branch.branchName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    branch.manager?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    branch.manager?.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentBranches = filteredBranches.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredBranches.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   const handleEditBranch = (branch) => {
@@ -171,10 +206,13 @@ const Branches = () => {
       );
       fetchBranches();
       handleCloseEditBranch();
-      Swal.fire({
-        title: "Agent updated successfully!",
-        icon: "success",
+      setSuccessAlert({
+        show: true,
+        message: `Agent "${branchName}" updated successfully!`
       });
+      setTimeout(() => {
+        setSuccessAlert({ show: false, message: '' });
+      }, 5000);
     } catch (error) {
       Swal.fire({
         title: "Error",
@@ -263,177 +301,284 @@ const Branches = () => {
   };
 
   return (
-    <Box p={3}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5">Agents</Typography>
-        <Button variant="contained" onClick={handleAddBranch}>
-          Add Agent
-        </Button>
-      </Stack>
+    <div className="branches-container">
+      {successAlert.show && (
+        <CAlert color="success" dismissible onClose={() => setSuccessAlert({ show: false, message: '' })}>
+          {successAlert.message}
+        </CAlert>
+      )}
+      
+      <CCard className="mb-4">
+        <CCardBody>
+          <CRow className="mb-4 align-items-center">
+            <CCol md={6}>
+              <h1 className="branches-title">Agents</h1>
+            </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
+              <CButton color="primary" className="add-agent-btn" onClick={handleAddBranch}>
+                <CIcon icon={cilPlus} className="me-2" />
+                Add Agent
+              </CButton>
+            </CCol>
+          </CRow>
+          
+          <CRow className="mb-4">
+            <CCol md={6}>
+              <CInputGroup>
+                <CFormInput
+                  placeholder="Search agents..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <CButton type="button" color="primary" variant="outline">
+                  <CIcon icon={cilSearch} />
+                </CButton>
+              </CInputGroup>
+            </CCol>
+          </CRow>
+
+          <CTable hover responsive className="branches-table">
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>S.NO</CTableHeaderCell>
+                <CTableHeaderCell>AGENT NAME</CTableHeaderCell>
+                <CTableHeaderCell>MANAGER NAME</CTableHeaderCell>
+                <CTableHeaderCell>MANAGER EMAIL</CTableHeaderCell>
+                <CTableHeaderCell>STATUS</CTableHeaderCell>
+                <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {loading ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <CSpinner color="primary" />
+                    <div className="mt-3">Loading agents...</div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : currentBranches.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <CIcon icon={cilPlus} size="xl" />
+                      </div>
+                      <h4>No agents found</h4>
+                      <p>Create your first agent to get started.</p>
+                      <CButton color="primary" className="mt-3" onClick={handleAddBranch}>
+                        Add Agent
+                      </CButton>
+                    </div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : (
+                currentBranches.map((branch, index) => (
+                  <CTableRow key={branch._id}>
+                    <CTableDataCell>
+                      <div className="agent-number">{indexOfFirstItem + index + 1}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="agent-name">{branch.branchName}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="manager-name">{branch.manager?.name || "-"}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="manager-email">{branch.manager?.email || "-"}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge 
+                        color={branch.isSuspended ? "warning" : "success"}
+                        className="status-badge"
+                      >
+                        {branch.isSuspended ? "Suspended" : "Active"}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell className="text-center">
+                      <CButton 
+                        color="light"
+                        onClick={() => handleEditBranch(branch)}
+                        className="me-2"
+                        size="sm"
+                      >
+                        <CIcon icon={cilPencil} />
+                      </CButton>
+                      <CButton 
+                        color={branch.isSuspended ? "success" : "warning"}
+                        onClick={() => handleSuspendBranch(branch.id)}
+                        className="me-2"
+                        size="sm"
+                      >
+                        {branch.isSuspended ? "Activate" : "Suspend"}
+                      </CButton>
+                      <CButton 
+                        color="info"
+                        onClick={() => handleResetPassword(branch.manager.email)}
+                        size="sm"
+                      >
+                        Reset
+                      </CButton>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              )}
+            </CTableBody>
+          </CTable>
+
+          {totalPages > 1 && (
+            <CPagination 
+              aria-label="Page navigation example"
+              className="justify-content-center mt-4"
+            >
+              <CPaginationItem 
+                disabled={currentPage === 1} 
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                Previous
+              </CPaginationItem>
+              {[...Array(totalPages)].map((_, i) => (
+                <CPaginationItem 
+                  key={i} 
+                  active={i + 1 === currentPage} 
+                  onClick={() => handlePageChange(i + 1)}
+                >
+                  {i + 1}
+                </CPaginationItem>
+              ))}
+              <CPaginationItem 
+                disabled={currentPage === totalPages} 
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Next
+              </CPaginationItem>
+            </CPagination>
+          )}
+        </CCardBody>
+      </CCard>
 
       {/* Add Agent Modal */}
-      <Dialog open={openAddBranch} onClose={handleCloseAddBranch} maxWidth="sm" fullWidth>
-        <DialogTitle>Add New Agent</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} mt={1}>
-            <TextField
-              label="Agent Name"
-              fullWidth
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
-            />
-            <TextField
-              label="Manager Name"
-              fullWidth
-              value={managerName}
-              onChange={(e) => setManagerName(e.target.value)}
-            />
-            <TextField
-              label="Manager Email"
-              fullWidth
-              value={managerEmail}
-              onChange={(e) => setManagerEmail(e.target.value)}
-            />
-            <TextField
-  select
-  label="Assign DID"
-  fullWidth
-  required
-  value={selectedDid}
-  onChange={(e) => setSelectedDid(e.target.value)}
->
-  {didNumbers.map((did) => (
-    <MenuItem key={did.id} value={did.id}>
-      {did.number}
-    </MenuItem>
-  ))}
-</TextField>
-
-
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddBranch}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveBranch}>
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <CModal visible={openAddBranch} onClose={handleCloseAddBranch} size="lg">
+        <CModalHeader>
+          <CModalTitle>Add New Agent</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <CForm>
+            <div className="mb-3">
+              <CFormLabel htmlFor="agentName">Agent Name</CFormLabel>
+              <CFormInput
+                type="text"
+                id="agentName"
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value)}
+                placeholder="Enter agent name"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="managerEmail">Manager Email</CFormLabel>
+              <CFormInput
+                type="email"
+                id="managerEmail"
+                value={managerEmail}
+                onChange={(e) => setManagerEmail(e.target.value)}
+                placeholder="Enter manager email"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="assignDid">Assign DID</CFormLabel>
+              <CFormSelect
+                id="assignDid"
+                value={selectedDid}
+                onChange={(e) => setSelectedDid(e.target.value)}
+                required
+              >
+                <option value="">Select DID Number</option>
+                {didNumbers.map((did) => (
+                  <option key={did.id} value={did.id}>
+                    {did.number}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+          </CForm>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={handleCloseAddBranch}>
+            Cancel
+          </CButton>
+          <CButton color="primary" onClick={handleSaveBranch}>
+            Save Agent
+          </CButton>
+        </CModalFooter>
+      </CModal>
 
       {/* Edit Agent Modal */}
-      <Dialog open={openEditBranch} onClose={handleCloseEditBranch} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Agent</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} mt={1}>
-            <TextField
-              label="Agent Name"
-              fullWidth
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
-            />
-            <TextField
-              label="Manager Name"
-              fullWidth
-              value={managerName}
-              onChange={(e) => setManagerName(e.target.value)}
-            />
-            <TextField
-              label="Manager Email"
-              fullWidth
-              value={managerEmail}
-              onChange={(e) => setManagerEmail(e.target.value)}
-            />
-            <TextField
-              select
-              label="Assign DID"
-              fullWidth
-              value={selectedDid}
-              onChange={(e) => setSelectedDid(e.target.value)}
-            >
-              {didNumbers.map((did) => (
-                <MenuItem key={did.id} value={did.id}>
-                  {did.number}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditBranch}>Cancel</Button>
-          <Button variant="contained" onClick={handleUpdateBranch}>
-            Update
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Agents Table */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
-            <TableRow>
-              <TableCell>Agent Name</TableCell>
-              <TableCell>Manager Name</TableCell>
-              <TableCell>Manager Email</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="center">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {branches.map((branch) => (
-              <TableRow key={branch._id}>
-                <TableCell>{branch.branchName}</TableCell>
-                <TableCell>{branch.manager?.name || "-"}</TableCell>
-                <TableCell>{branch.manager?.email || "-"}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={branch.isSuspended ? "Suspended" : "Active"}
-                    color={branch.isSuspended ? "warning" : "success"}
-                    variant="outlined"
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell align="center">
-                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => handleEditBranch(branch)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color={branch.isSuspended ? "success" : "warning"}
-                      onClick={() => handleSuspendBranch(branch.id)}
-                    >
-                      {branch.isSuspended
-                          ? "Activate"
-                          : "Suspend"}
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="info"
-                      onClick={() => handleResetPassword(branch.manager.email)}
-                    >
-                      Reset
-                    </Button>
-                  </Stack>
-                </TableCell>
-              </TableRow>
-            ))}
-            {!loading && branches.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  No agents found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
+      <CModal visible={openEditBranch} onClose={handleCloseEditBranch} size="lg">
+        <CModalHeader>
+          <CModalTitle>Edit Agent</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <CForm>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editAgentName">Agent Name</CFormLabel>
+              <CFormInput
+                type="text"
+                id="editAgentName"
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value)}
+                placeholder="Enter agent name"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editManagerName">Manager Name</CFormLabel>
+              <CFormInput
+                type="text"
+                id="editManagerName"
+                value={managerName}
+                onChange={(e) => setManagerName(e.target.value)}
+                placeholder="Enter manager name"
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editManagerEmail">Manager Email</CFormLabel>
+              <CFormInput
+                type="email"
+                id="editManagerEmail"
+                value={managerEmail}
+                onChange={(e) => setManagerEmail(e.target.value)}
+                placeholder="Enter manager email"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editAssignDid">Assign DID</CFormLabel>
+              <CFormSelect
+                id="editAssignDid"
+                value={selectedDid}
+                onChange={(e) => setSelectedDid(e.target.value)}
+              >
+                <option value="">Select DID Number</option>
+                {didNumbers.map((did) => (
+                  <option key={did.id} value={did.id}>
+                    {did.number}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+          </CForm>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={handleCloseEditBranch}>
+            Cancel
+          </CButton>
+          <CButton color="primary" onClick={handleUpdateBranch}>
+            Update Agent
+          </CButton>
+        </CModalFooter>
+      </CModal>
+    </div>
   );
 };
 

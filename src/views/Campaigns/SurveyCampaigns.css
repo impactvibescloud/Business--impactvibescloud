@@ -1,67 +1,80 @@
-/* Survey Campaigns Styles */
+/* Survey Campaigns styles - ContactList matching */
+.survey-campaigns-container {
+  font-family: 'Roboto', sans-serif;
+  padding: 0;
+}
+
 .survey-campaigns-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin-bottom: 0;
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 1.75rem !important;
+  font-weight: 500 !important;
+  color: #333 !important;
+  margin-bottom: 0 !important;
 }
 
-/* Button styles are now managed globally in _button-styles.scss */
-
-.search-input-container {
-  position: relative;
+.add-survey-btn {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
 }
 
-.filter-btn {
-  border: 1px solid #d8dbe0;
-  background-color: white;
+.surveys-table {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
 }
 
-.rows-per-page {
+.surveys-table th {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: #6c757d !important;
+  background-color: #f8f9fa !important;
+  border-bottom: 2px solid #dee2e6 !important;
+  padding: 12px 16px !important;
+}
+
+.surveys-table td {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
+  padding: 12px 16px !important;
+  vertical-align: middle !important;
+  color: #495057 !important;
+}
+
+.survey-number {
+  font-family: 'Roboto', sans-serif !important;
+  font-weight: 500 !important;
+  color: #6c757d !important;
+}
+
+.survey-name {
+  font-family: 'Roboto', sans-serif !important;
+  font-weight: 500 !important;
+  color: #495057 !important;
+}
+
+.survey-date {
+  font-family: 'Roboto', sans-serif !important;
+  color: #6c757d !important;
+}
+
+.survey-responses {
+  font-family: 'Roboto', sans-serif !important;
+  font-weight: 500 !important;
+  color: #495057 !important;
+}
+
+.completion-rate-wrapper {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.pagination-info {
-  color: #768192;
-  font-size: 14px;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-weight: 600;
-  color: #fff;
-  text-align: center;
-  min-width: 80px;
-}
-
-.status-active {
-  background-color: #2eb85c !important;
-  border: 1px solid #268d47;
-  color: #fff !important;
-}
-
-.status-draft {
-  background-color: #768192 !important;
-  border: 1px solid #5d6778;
-  color: #fff !important;
-}
-
-.status-inactive {
-  background-color: #b1b7c1 !important;
-  border: 1px solid #9da5b1;
-  color: #fff !important;
-}
-
-.completion-rate-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.progress-bar-container {
+.completion-rate-bar {
   flex-grow: 1;
   height: 6px;
   background-color: #ebedef;
@@ -69,106 +82,104 @@
   overflow: hidden;
 }
 
-.progress-bar {
+.completion-rate-progress {
   height: 100%;
   background-color: #2eb85c;
+  transition: width 0.3s ease;
 }
 
 .completion-rate-text {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.75rem !important;
+  color: #6c757d !important;
   white-space: nowrap;
-  font-size: 13px;
-  color: #768192;
 }
 
-/* Empty state styles */
-.survey-empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
+.status-badge {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
 }
 
-.empty-content {
+.clear-filters-btn {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
+  color: #007bff !important;
+  text-decoration: none !important;
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+}
+
+.clear-filters-btn:hover {
+  text-decoration: underline !important;
+}
+
+.empty-state {
   text-align: center;
-  max-width: 400px;
+  padding: 60px 20px;
 }
 
-.empty-icon {
-  margin-bottom: 20px;
+.empty-state-icon {
+  color: #6c757d;
+  margin-bottom: 16px;
 }
 
-.empty-title {
-  font-size: 20px;
-  margin-bottom: 10px;
-  font-weight: 600;
+.empty-state h4 {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 1.25rem !important;
+  font-weight: 500 !important;
+  color: #495057 !important;
+  margin-bottom: 8px !important;
 }
 
-.empty-subtitle {
-  color: #768192;
+.empty-state p {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
+  color: #6c757d !important;
+  margin-bottom: 24px !important;
 }
 
-/* Audio upload styles */
-.recording-placeholder {
-  transition: all 0.2s ease;
+/* Pagination styles */
+.page-link {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
+  color: #007bff !important;
 }
 
-.recording-placeholder:hover {
-  background-color: #f8f9fa;
-  cursor: pointer;
-  border-color: #2eb85c !important;
+.page-item.active .page-link {
+  background-color: #007bff !important;
+  border-color: #007bff !important;
 }
 
-.audio-file-selected {
-  border: 1px solid #d8dbe0 !important;
-  background-color: #f8f9fa;
-  margin-bottom: 20px;
+/* Input styles */
+.form-control, .form-select {
+  font-family: 'Roboto', sans-serif !important;
+  font-size: 0.875rem !important;
+  border-radius: 6px !important;
 }
 
-/* Create Survey Modal Styles */
-.create-survey-modal .modal-title {
-  font-weight: 600;
-}
-
-.create-survey-modal .modal-header {
-  border-bottom: 1px solid #d8dbe0;
-}
-
-.create-survey-modal .modal-footer {
-  border-top: 1px solid #d8dbe0;
-}
-
-.question-section {
-  padding: 20px;
-  background-color: #f8f9fa;
-  border-radius: 4px;
-}
-
-.question-header {
-  margin-bottom: 15px;
-  font-weight: 500;
-}
-
-.add-question-btn {
-  color: #2eb85c;
-  font-size: 14px;
-  text-decoration: none;
-}
-
-.recording-placeholder {
-  color: #768192;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.recording-placeholder:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.response-time-selector {
-  font-size: 14px;
-  color: #768192;
-}
-
-.option-item {
-  margin-bottom: 8px;
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .survey-campaigns-title {
+    font-size: 1.5rem !important;
+  }
+  
+  .surveys-table {
+    font-size: 0.8rem !important;
+  }
+  
+  .surveys-table th,
+  .surveys-table td {
+    padding: 8px 12px !important;
+  }
+  
+  .completion-rate-wrapper {
+    flex-direction: column;
+    gap: 4px;
+  }
 }

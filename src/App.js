@@ -200,6 +200,11 @@ import "./scss/style.scss";
 import ProtectedRoute from "./components/ProtectedRoute";
 import axios from "axios";
 import ForgotPassword from "./views/pages/register/ForgotPassword";
+
+// Import timeout prevention utilities
+import setupAxiosInterceptors from "./utils/axiosInterceptors";
+import { setupFetchInterceptor } from "./utils/fetchInterceptor";
+
 // Containers
 const DefaultLayout = React.lazy(() => import("./layout/DefaultLayout"));
 
@@ -213,6 +218,24 @@ const Page500 = React.lazy(() => import("./views/pages/page500/Page500"));
 const App = () => {
   const [userdata, setUserData] = useState(null);
   const token = isAutheticated();
+
+  // Initialize timeout prevention systems
+  useEffect(() => {
+    console.log('🚀 Initializing timeout prevention systems...')
+    
+    // Setup axios interceptors for better error handling and session management
+    setupAxiosInterceptors()
+    
+    // Setup fetch interceptor for any remaining direct fetch calls
+    setupFetchInterceptor()
+    
+    // Store session start time for reference
+    if (!localStorage.getItem('sessionStart')) {
+      localStorage.setItem('sessionStart', Date.now().toString())
+    }
+    
+    console.log('✅ Basic interceptors initialized')
+  }, [])
 
   useEffect(() => {
     const getUser = async () => {
@@ -244,7 +267,12 @@ const App = () => {
     getUser();
   }, [token]);
   return (
-    <HashRouter>
+    <HashRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
       <Suspense
         fallback={
           <div className="pt-3 text-center">

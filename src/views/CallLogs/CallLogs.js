@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import {
+  CRow,
+  CCol,
   CCard,
   CCardBody,
-  CCardHeader,
   CTable,
   CTableHead,
   CTableRow,
@@ -19,7 +20,8 @@ import {
   CDropdownItem,
   CPagination,
   CPaginationItem,
-  CAlert
+  CAlert,
+  CBadge
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilSearch, cilFilter } from '@coreui/icons'
@@ -42,35 +44,15 @@ const CallLogs = () => {
       
       try {
         const data = await apiCall(ENDPOINTS.CALL_LOGS)
-        console.log('Call logs response:', data)
-        console.log('Call logs data type:', typeof data)
-        console.log('Call logs data keys:', data ? Object.keys(data) : 'no data')
-        
-        let callLogsArray = []
         
         if (data && data.success && Array.isArray(data.data)) {
-          callLogsArray = data.data
-          console.log('Using data.data array, length:', callLogsArray.length)
+          setCallLogs(data.data)
         } else if (Array.isArray(data)) {
-          callLogsArray = data
-          console.log('Using direct array, length:', callLogsArray.length)
-        } else if (data && Array.isArray(data.callLogs)) {
-          callLogsArray = data.callLogs
-          console.log('Using data.callLogs array, length:', callLogsArray.length)
-        } else if (data && Array.isArray(data.logs)) {
-          callLogsArray = data.logs
-          console.log('Using data.logs array, length:', callLogsArray.length)
+          setCallLogs(data)
         } else {
-          console.log('No valid call logs array found in response')
-          console.log('Response structure:', data)
-          callLogsArray = []
+          // Handle fallback case
+          setCallLogs([])
         }
-        
-        console.log('Final callLogsArray:', callLogsArray)
-        console.log('Final callLogsArray length:', callLogsArray.length)
-        console.log('Setting callLogs state with:', callLogsArray)
-        setCallLogs(callLogsArray)
-        console.log('CallLogs state updated with:', callLogsArray.length, 'items')
       } catch (err) {
         console.error('Failed to fetch call logs:', err)
         setError('Failed to fetch call logs. Please try again later.')
@@ -131,14 +113,16 @@ const CallLogs = () => {
     
     // Apply status filter
     let matchesFilter = true
-    if (activeFilter === 'Success') {
-      matchesFilter = status.toLowerCase() === 'success'
-    } else if (activeFilter === 'Failed') {
-      matchesFilter = status.toLowerCase().includes('fail') || status.toLowerCase().includes('error')
-    } else if (activeFilter === 'Outgoing') {
-      matchesFilter = callType.toLowerCase() === 'outgoing'
-    } else if (activeFilter === 'Incoming') {
-      matchesFilter = callType.toLowerCase() === 'incoming'
+    if (activeFilter !== 'All Calls') {
+      if (activeFilter === 'Success') {
+        matchesFilter = status.toLowerCase() === 'success'
+      } else if (activeFilter === 'Failed') {
+        matchesFilter = status.toLowerCase().includes('fail') || status.toLowerCase().includes('error')
+      } else if (activeFilter === 'Outgoing') {
+        matchesFilter = callType.toLowerCase() === 'outgoing'
+      } else if (activeFilter === 'Incoming') {
+        matchesFilter = callType.toLowerCase() === 'incoming'
+      }
     }
     
     return matchesSearch && matchesFilter
@@ -163,30 +147,17 @@ const CallLogs = () => {
 
   return (
     <div className="call-logs-container">
-      <div className="call-logs-header">
-        <h1>Call Logs</h1>
-      </div>
-      
       <CCard className="mb-4">
         <CCardBody>
-          <div className="call-logs-filter-section">
-            <div className="search-container">
-              <CInputGroup>
-                <CFormInput
-                  placeholder="Search call logs..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                />
-                <CButton color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </div>
-            
-            <div className="filter-container">
+          <CRow className="mb-4 align-items-center">
+            <CCol md={6}>
+              <h1 className="call-logs-title">Call Logs</h1>
+            </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
               <CDropdown>
-                <CDropdownToggle color="primary" variant="outline">
-                  <CIcon icon={cilFilter} /> {activeFilter}
+                <CDropdownToggle color="primary" variant="outline" className="filter-btn">
+                  <CIcon icon={cilFilter} className="me-2" />
+                  {activeFilter}
                 </CDropdownToggle>
                 <CDropdownMenu>
                   <CDropdownItem 
@@ -221,94 +192,127 @@ const CallLogs = () => {
                   </CDropdownItem>
                 </CDropdownMenu>
               </CDropdown>
-            </div>
-          </div>
+            </CCol>
+          </CRow>
           
-          {loading ? (
-            <div className="text-center p-4">
-              <CSpinner color="primary" />
-            </div>
-          ) : error ? (
-            <CAlert color="danger">{error}</CAlert>
-          ) : filteredCallLogs.length === 0 ? (
-            (() => {
-              console.log('Rendering CallLogs - callLogs:', callLogs)
-              console.log('Rendering CallLogs - callLogs.length:', callLogs.length)
-              console.log('Rendering CallLogs - filteredCallLogs:', filteredCallLogs)
-              console.log('Rendering CallLogs - filteredCallLogs.length:', filteredCallLogs.length)
-              console.log('Rendering CallLogs - loading:', loading)
-              console.log('Rendering CallLogs - error:', error)
-              return (
-                <div className="empty-state">
-                  <h4>No call logs found</h4>
-                  <p>There are no call logs available matching your search criteria.</p>
-                </div>
-              )
-            })()
-          ) : (
-            <>
-              <CTable striped responsive className="call-logs-table">
-                <CTableHead>
-                  <CTableRow>
-                    <CTableHeaderCell>CONTACT</CTableHeaderCell>
-                    <CTableHeaderCell>CALL TYPE</CTableHeaderCell>
-                    <CTableHeaderCell>CALL DATE</CTableHeaderCell>
-                    <CTableHeaderCell>STATUS</CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
-                <CTableBody>
-                  {currentCallLogs.map(log => {
-                    const contact = log.contact || 'Unknown'
-                    const callType = log.callType || 'Unknown'
-                    const callDate = formatDate(log.callDate || log.createdAt)
-                    const status = formatCallStatus(log.status)
-                    
-                    return (
-                      <CTableRow key={log._id}>
-                        <CTableDataCell>{contact}</CTableDataCell>
-                        <CTableDataCell className="text-capitalize">{callType}</CTableDataCell>
-                        <CTableDataCell>{callDate}</CTableDataCell>
-                        <CTableDataCell>
-                          <span className={`status-badge ${status.toLowerCase()}`}>
-                            {status}
-                          </span>
-                        </CTableDataCell>
-                      </CTableRow>
-                    )
-                  })}
-                </CTableBody>
-              </CTable>
-              
-              {totalPages > 1 && (
-                <CPagination aria-label="Page navigation" className="pagination-container">
-                  <CPaginationItem 
-                    aria-label="Previous" 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    <span aria-hidden="true">&laquo;</span>
-                  </CPaginationItem>
+          <CRow className="mb-4">
+            <CCol md={6}>
+              <CInputGroup>
+                <CFormInput
+                  placeholder="Search call logs..."
+                  value={searchTerm}
+                  onChange={handleSearch}
+                />
+                <CButton type="button" color="primary" variant="outline">
+                  <CIcon icon={cilSearch} />
+                </CButton>
+              </CInputGroup>
+            </CCol>
+          </CRow>
+
+          <CTable hover responsive className="call-logs-table">
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>S.NO</CTableHeaderCell>
+                <CTableHeaderCell>CONTACT</CTableHeaderCell>
+                <CTableHeaderCell>CALL TYPE</CTableHeaderCell>
+                <CTableHeaderCell>CALL DATE</CTableHeaderCell>
+                <CTableHeaderCell>STATUS</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {loading ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="5" className="text-center py-5">
+                    <CSpinner color="primary" />
+                    <div className="mt-3">Loading call logs...</div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : error ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="5" className="text-center py-5">
+                    <CAlert color="danger" className="mb-0">
+                      {error}
+                    </CAlert>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : currentCallLogs.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="5" className="text-center py-5">
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <CIcon icon={cilSearch} size="xl" />
+                      </div>
+                      <h4>No call logs found</h4>
+                      <p>There are no call logs available matching your search criteria.</p>
+                    </div>
+                  </CTableDataCell>
+                </CTableRow>
+              ) : (
+                currentCallLogs.map((log, index) => {
+                  const contact = log.contact || 'Unknown'
+                  const callType = log.callType || 'Unknown'
+                  const callDate = formatDate(log.callDate || log.createdAt)
+                  const status = formatCallStatus(log.status)
                   
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <CPaginationItem 
-                      key={page} 
-                      active={page === currentPage}
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </CPaginationItem>
-                  ))}
-                  
-                  <CPaginationItem 
-                    aria-label="Next" 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    <span aria-hidden="true">&raquo;</span>
-                  </CPaginationItem>
-                </CPagination>
+                  return (
+                    <CTableRow key={log._id}>
+                      <CTableDataCell>
+                        <div className="log-number">{indexOfFirstItem + index + 1}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="log-contact">{contact}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="log-type text-capitalize">{callType}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="log-date">{callDate}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge 
+                          color={status.toLowerCase() === 'success' ? 'success' : 
+                                 status.toLowerCase().includes('fail') ? 'danger' : 
+                                 status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
+                          className="status-badge"
+                        >
+                          {status}
+                        </CBadge>
+                      </CTableDataCell>
+                    </CTableRow>
+                  )
+                })
               )}
-            </>
+            </CTableBody>
+          </CTable>
+
+          {totalPages > 1 && (
+            <CPagination 
+              aria-label="Page navigation example"
+              className="justify-content-center mt-4"
+            >
+              <CPaginationItem 
+                disabled={currentPage === 1} 
+                onClick={() => setCurrentPage(currentPage - 1)}
+              >
+                Previous
+              </CPaginationItem>
+              {[...Array(totalPages)].map((_, i) => (
+                <CPaginationItem 
+                  key={i} 
+                  active={i + 1 === currentPage} 
+                  onClick={() => setCurrentPage(i + 1)}
+                >
+                  {i + 1}
+                </CPaginationItem>
+              ))}
+              <CPaginationItem 
+                disabled={currentPage === totalPages} 
+                onClick={() => setCurrentPage(currentPage + 1)}
+              >
+                Next
+              </CPaginationItem>
+            </CPagination>
           )}
         </CCardBody>
       </CCard>

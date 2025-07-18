@@ -1,7 +1,6 @@
 // API Configuration for the application
 // This file centralizes all API endpoints and configurations to avoid CORS issues
 import axios from 'axios'
-import { debouncedApiCall } from '../utils/apiDebouncer'
 
 // API Configuration with fallback support
 export const API_CONFIG = {
@@ -32,6 +31,9 @@ export const ENDPOINTS = {
   BILLING_BUSINESS: (businessId) => `/api/billing/business/${businessId}`,
   BILLING_UPDATE: (id) => `/api/billing/${id}`,
   
+  // Business endpoints
+  BUSINESS_DETAILS: (businessId) => `/api/business/get_one/${businessId}`,
+  
   // Invoice endpoints
   INVOICES: (invoiceId) => `/api/invoices/${invoiceId}`,
   
@@ -59,52 +61,46 @@ export const ENDPOINTS = {
 
 // Utility function to make API calls using axios (which supports proxy)
 export const apiCall = async (endpoint, method = 'GET', data = null, options = {}) => {
-  // Create a unique key for debouncing based on endpoint and method
-  const debounceKey = `${method.toUpperCase()}_${endpoint}`
-  
-  // Use debouncing for GET requests to prevent rapid successive calls
-  if (method.toUpperCase() === 'GET') {
-    return debouncedApiCall(debounceKey, async () => {
-      return await makeRequest(endpoint, method, data, options)
-    })
-  }
-  
-  // For non-GET requests, make request directly
-  return await makeRequest(endpoint, method, data, options)
-}
-
-// Internal function to make the actual request
-const makeRequest = async (endpoint, method, data, options) => {
-  const config = {
-    url: endpoint, // Use endpoint directly since axios baseURL is already configured
-    method: method.toUpperCase(),
-    headers: {
-      ...API_HEADERS,
-      ...(options.headers || {})
-    },
-    ...options
-  }
-  
-  if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
-    config.data = data
-  }
-  
-  try {
-    // Only log API calls in development mode to reduce console noise
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🌐 API: ${method} ${endpoint}`)
-    }
-    const response = await axios(config)
-    return response.data // Return just the data, not the whole response object
-  } catch (error) {
-    // Silent handling - the interceptor will handle fallbacks
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(`⚠️ API failed: ${endpoint} - ${error.message}`)
+  // Internal function to make the actual request
+  const makeRequest = async () => {
+    // Get the actual auth token from localStorage if available
+    const authToken = localStorage.getItem('authToken') || API_CONFIG.AUTH_TOKEN
+    
+    const config = {
+      url: endpoint, // Use endpoint directly since axios baseURL is already configured
+      method: method.toUpperCase(),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+        ...(options.headers || {})
+      },
+      ...options
     }
     
-    // Let the interceptor handle the error and fallbacks
-    throw error
+    if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+      config.data = data
+    }
+    
+    try {
+      // Only log API calls in development mode to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🌐 API: ${method} ${endpoint}`)
+      }
+      const response = await axios(config)
+      return response.data
+    } catch (error) {
+      // Silent handling - the interceptor will handle fallbacks
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ API failed: ${endpoint} - ${error.message}`)
+      }
+      
+      // Let the interceptor handle the error and fallbacks
+      throw error
+    }
   }
+  
+  // Make request directly without debouncing
+  return await makeRequest()
 }
 
 export default API_CONFIG

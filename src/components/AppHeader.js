@@ -18,12 +18,13 @@ import "./AppHeader.css";
 import { AppBreadcrumb } from "./index";
 import { AppHeaderDropdown } from "./header/index";
 import { logo } from "src/assets/brand/logo";
+import ConnectionStatus from "./ConnectionStatus";
 import axios from "axios";
 import { useEffect } from "react";
 import { useState } from "react";
 import { isAutheticated } from "src/auth";
 import { useNavigate } from "react-router-dom";
-import { getCredits } from "src/views/Billing/creditUtils";
+import { getCredits, fetchCreditsFromAPI } from "src/views/Billing/creditUtils";
 
 const AppHeader = () => {
   const dispatch = useDispatch();
@@ -31,6 +32,7 @@ const AppHeader = () => {
   const sidebarShow = useSelector((state) => state.coreUI.sidebarShow); // Updated selector
   const [AppName, setAppName] = useState("Businesses");
   const [credits, setCredits] = useState(0);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const token = isAutheticated();
   
   const handleAddCredits = () => {
@@ -47,13 +49,19 @@ const AppHeader = () => {
       setAppName("Businesses");
     }
     
-    function getUserCredits() {
+    async function getUserCredits() {
       try {
-        // Get credits from localStorage through the utility function
-        const userCredits = getCredits();
-        setCredits(userCredits || 0);
+        setIsLoadingCredits(true);
+        // First try to fetch from API
+        const apiCredits = await fetchCreditsFromAPI();
+        setCredits(apiCredits || 0);
       } catch (error) {
-        console.log("Error fetching user credits:", error);
+        console.log("Error fetching user credits from API:", error);
+        // Fallback to localStorage
+        const localCredits = getCredits();
+        setCredits(localCredits || 0);
+      } finally {
+        setIsLoadingCredits(false);
       }
     }
     
@@ -70,9 +78,15 @@ const AppHeader = () => {
     getConfiguration();
     getUserCredits();
     
-    // Clean up event listener on component unmount
+    // Set up periodic refresh for credits (every 30 seconds)
+    const creditsRefreshInterval = setInterval(() => {
+      getUserCredits();
+    }, 30000);
+    
+    // Clean up event listener and interval on component unmount
     return () => {
       window.removeEventListener('creditsUpdated', handleCreditsUpdated);
+      clearInterval(creditsRefreshInterval);
     };
   }, []);
   return (
@@ -107,11 +121,16 @@ const AppHeader = () => {
           </CNavItem> */}
         </CHeaderNav>
         <CHeaderNav>
+          <ConnectionStatus />
           <CNavItem>
             <div className="credits-display d-flex align-items-center me-3">
               <span className="credits-label me-2">Credits:</span>
               <div className="d-flex align-items-center">
-                <span className="credits-value fw-bold">₹{credits}</span>
+                {isLoadingCredits ? (
+                  <span className="credits-value fw-bold">Loading...</span>
+                ) : (
+                  <span className="credits-value fw-bold">₹{credits}</span>
+                )}
                 <span 
                   className="credits-add-icon ms-2" 
                   onClick={handleAddCredits}

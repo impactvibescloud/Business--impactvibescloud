@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { getPurchasedNumbers, getPurchasedNumbersByCountry, savePurchasedNumber } from '../VirtualNumbers/virtualNumbersUtils'
-import { getCredits, saveCredits } from './creditUtils'
+import { getCredits, saveCredits, fetchCreditsFromAPI } from './creditUtils'
 import {
   CCard,
   CCardBody,
@@ -90,9 +90,19 @@ function Billing() {
     const groupedNumbers = getPurchasedNumbersByCountry()
     setNumbersByCountry(groupedNumbers)
     
-    // Load credits
-    const userCredits = getCredits()
-    setCredits(userCredits)
+    // Load credits from API first, then fallback to localStorage
+    const loadCredits = async () => {
+      try {
+        const apiCredits = await fetchCreditsFromAPI()
+        setCredits(apiCredits)
+      } catch (error) {
+        console.error('Error fetching credits from API:', error)
+        const userCredits = getCredits()
+        setCredits(userCredits)
+      }
+    }
+    
+    loadCredits()
   }, [])
   
   // Handle save changes
@@ -350,6 +360,20 @@ function Billing() {
                       <div>
                         <h3 className="plan-title">Account Overview</h3>
                       </div>
+                      <CButton 
+                        color="outline-primary" 
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const apiCredits = await fetchCreditsFromAPI()
+                            setCredits(apiCredits)
+                          } catch (error) {
+                            console.error('Error refreshing credits:', error)
+                          }
+                        }}
+                      >
+                        Refresh Credits
+                      </CButton>
                     </div>
                     
                     <CRow className="plan-stats">
