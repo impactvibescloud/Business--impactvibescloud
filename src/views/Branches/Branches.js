@@ -342,7 +342,7 @@ const Branches = () => {
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
                 <CTableHeaderCell>AGENT NAME</CTableHeaderCell>
-                <CTableHeaderCell>MANAGER EMAIL</CTableHeaderCell>
+                <CTableHeaderCell>EMAIL ADDRESS</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
                 <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
               </CTableRow>
