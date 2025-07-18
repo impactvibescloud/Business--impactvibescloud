@@ -37,17 +37,17 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: "Contact Lists",
-    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
-    to: "/contactlists",
-    group: "Contact Lists",
-  },
-  {
-    component: CNavItem,
     name: "Contacts",
     icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
     to: "/contacts",
     group: "Contacts",
+  },
+  {
+    component: CNavItem,
+    name: "Contact Lists",
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    to: "/contactlists",
+    group: "Contact Lists",
   },
   {
     component: CNavItem,

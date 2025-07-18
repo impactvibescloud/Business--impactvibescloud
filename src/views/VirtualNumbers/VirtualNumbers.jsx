@@ -181,30 +181,30 @@ function VirtualNumbers() {
   // Filter assigned numbers by search term and active filter
   const filteredAssignedNumbers = Array.isArray(assignedNumbers) ? assignedNumbers.filter(num => {
     if (!num) return false
-    
+
     // Filter by search term
     if (searchTerm.trim()) {
-      const matchesSearch = 
+      const matchesSearch =
         (num.number && num.number.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
         (num.extension && num.extension.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
         (num.city && num.city.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (Array.isArray(num.tag) && num.tag.some(tag => 
+        (Array.isArray(num.tag) && num.tag.some(tag =>
           tag && tag.toString().toLowerCase().includes(searchTerm.toLowerCase())
         ))
-      
+
       if (!matchesSearch) return false
     }
-    
-    // Filter by number type if not "All Numbers"
-    if (activeFilter !== 'All Numbers') {
-      // Check if tag includes the selected filter
-      const filterLower = activeFilter.toLowerCase()
-      return Array.isArray(num.tag) && num.tag.some(tag => 
-        tag && tag.toString().toLowerCase() === filterLower
-      )
+
+    // If 'All Numbers' is selected, do not filter by tag/type
+    if (activeFilter === 'All Numbers') {
+      return true
     }
-    
-    return true
+
+    // Filter by number type
+    const filterLower = activeFilter.toLowerCase()
+    return Array.isArray(num.tag) && num.tag.some(tag =>
+      tag && tag.toString().toLowerCase() === filterLower
+    )
   }) : []
   
   // Pagination
@@ -320,14 +320,8 @@ function VirtualNumbers() {
       <CCard className="mb-4">
         <CCardBody>
           <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
+            <CCol md={12}>
               <h1 className="virtual-numbers-title">Virtual Numbers</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              <CButton color="primary" className="add-number-btn">
-                <CIcon icon={cilPlus} className="me-2" />
-                Add Number
-              </CButton>
             </CCol>
           </CRow>
           
@@ -400,10 +394,6 @@ function VirtualNumbers() {
                       </div>
                       <h4>No virtual numbers found</h4>
                       <p>No virtual numbers are currently assigned to your account.</p>
-                      <CButton color="primary" className="mt-3">
-                        <CIcon icon={cilPlus} className="me-2" />
-                        Add Number
-                      </CButton>
                     </div>
                   </CTableDataCell>
                 </CTableRow>

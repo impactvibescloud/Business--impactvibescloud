@@ -342,7 +342,6 @@ const Branches = () => {
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
                 <CTableHeaderCell>AGENT NAME</CTableHeaderCell>
-                <CTableHeaderCell>MANAGER NAME</CTableHeaderCell>
                 <CTableHeaderCell>MANAGER EMAIL</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
                 <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
@@ -379,9 +378,6 @@ const Branches = () => {
                     </CTableDataCell>
                     <CTableDataCell>
                       <div className="agent-name">{branch.branchName}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="manager-name">{branch.manager?.name || "-"}</div>
                     </CTableDataCell>
                     <CTableDataCell>
                       <div className="manager-email">{branch.manager?.email || "-"}</div>
@@ -475,13 +471,13 @@ const Branches = () => {
               />
             </div>
             <div className="mb-3">
-              <CFormLabel htmlFor="managerEmail">Manager Email</CFormLabel>
+              <CFormLabel htmlFor="managerEmail">Email Address</CFormLabel>
               <CFormInput
                 type="email"
                 id="managerEmail"
                 value={managerEmail}
                 onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="Enter manager email"
+                placeholder="Enter email address"
                 required
               />
             </div>
@@ -542,13 +538,13 @@ const Branches = () => {
               />
             </div>
             <div className="mb-3">
-              <CFormLabel htmlFor="editManagerEmail">Manager Email</CFormLabel>
+              <CFormLabel htmlFor="editManagerEmail">Email Address</CFormLabel>
               <CFormInput
                 type="email"
                 id="editManagerEmail"
                 value={managerEmail}
                 onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="Enter manager email"
+                placeholder="Enter email address"
                 required
               />
             </div>
