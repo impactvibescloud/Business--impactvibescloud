@@ -15,6 +15,9 @@ import {
   CFormInput,
   CSpinner
 } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilCloudDownload } from '@coreui/icons'
+import jsPDF from 'jspdf'
 import { API_CONFIG, API_HEADERS, ENDPOINTS, apiCall } from '../../config/api'
 import './payment-requests.css'
 
@@ -232,6 +235,135 @@ function PaymentRequests() {
     } finally {
       setLoadingInvoiceDetails(false)
     }
+  }
+
+  const handleDownloadInvoice = () => {
+    if (!invoiceDetails && !selectedInvoice) return
+
+    // Create invoice data structure
+    const invoice = invoiceDetails || selectedInvoice
+    const invoiceData = {
+      id: invoice.id || invoice._id || 'N/A',
+      date: invoice.date || (invoice.requestedAt ? new Date(invoice.requestedAt).toLocaleDateString() : new Date().toLocaleDateString()),
+      planName: invoice.planName || requestPlanNames[invoice._id] || 'N/A',
+      status: invoice.status || 'N/A',
+      paymentStatus: invoice.paymentStatus || 'pending',
+      amount: invoice.amount || invoice.totalAmount || 0,
+      gst: invoice.gst || invoice.tax || 0,
+      balance: invoice.balance || invoice.remainingAmount || 0,
+      description: invoice.details || invoice.template || invoice.description || 'Credit Note Invoice Upgrade Request'
+    }
+
+    // Create PDF
+    const doc = new jsPDF()
+    
+    // Set font
+    doc.setFont('helvetica', 'normal')
+    
+    // Header
+    doc.setFontSize(20)
+    doc.setTextColor(40, 40, 40)
+    doc.text('INVOICE DETAILS', 105, 30, { align: 'center' })
+    
+    // Line separator
+    doc.setLineWidth(0.5)
+    doc.line(20, 40, 190, 40)
+    
+    // Invoice details
+    doc.setFontSize(12)
+    doc.setTextColor(0, 0, 0)
+    
+    let yPosition = 60
+    const lineHeight = 15
+    
+    // Invoice ID
+    doc.setFont('helvetica', 'bold')
+    doc.text('Invoice ID:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoiceData.id, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Date
+    doc.setFont('helvetica', 'bold')
+    doc.text('Date:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoiceData.date, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Plan Name
+    doc.setFont('helvetica', 'bold')
+    doc.text('Plan Name:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoiceData.planName, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Status
+    doc.setFont('helvetica', 'bold')
+    doc.text('Status:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoiceData.status, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Payment Status
+    doc.setFont('helvetica', 'bold')
+    doc.text('Payment Status:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoiceData.paymentStatus, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Amount
+    doc.setFont('helvetica', 'bold')
+    doc.text('Amount:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`₹${invoiceData.amount}`, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // GST
+    doc.setFont('helvetica', 'bold')
+    doc.text('GST:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`₹${invoiceData.gst}`, 70, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Balance
+    doc.setFont('helvetica', 'bold')
+    doc.text('Balance:', 20, yPosition)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`₹${invoiceData.balance}`, 70, yPosition)
+    
+    yPosition += lineHeight * 2
+    
+    // Description
+    doc.setFont('helvetica', 'bold')
+    doc.text('Description:', 20, yPosition)
+    yPosition += lineHeight
+    
+    doc.setFont('helvetica', 'normal')
+    const splitDescription = doc.splitTextToSize(invoiceData.description, 170)
+    doc.text(splitDescription, 20, yPosition)
+    
+    yPosition += splitDescription.length * 6 + lineHeight
+    
+    // Footer line
+    doc.setLineWidth(0.5)
+    doc.line(20, yPosition, 190, yPosition)
+    
+    yPosition += lineHeight
+    
+    // Generated timestamp
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, yPosition)
+    
+    // Download PDF
+    doc.save(`Invoice_${invoiceData.id}_${new Date().toISOString().split('T')[0]}.pdf`)
   }
 
   const handleReject = async (id) => {
@@ -840,6 +972,15 @@ function PaymentRequests() {
           )}
         </CModalBody>
         <CModalFooter>
+          <CButton 
+            color="primary" 
+            variant="outline"
+            onClick={handleDownloadInvoice}
+            className="me-2"
+          >
+            <CIcon icon={cilCloudDownload} className="me-1" />
+            Download
+          </CButton>
           <CButton color="secondary" onClick={() => setShowInvoiceModal(false)}>
             Close
           </CButton>

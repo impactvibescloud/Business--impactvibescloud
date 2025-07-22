@@ -18,6 +18,7 @@ import UsersTeams from "./views/UsersTeams/UsersTeams";
 // Import the correct VirtualNumbers component
 import VirtualNumbers from "./views/VirtualNumbers/VirtualNumbers";
 import Billing from "./views/Billing/Billing";
+import ReportsAnalytics from "./views/ReportsAnalytics/ReportsAnalytics";
 import Payments from "./views/Payments/Payments";
 import Settings from "./views/Settings/Settings";
 
@@ -850,6 +851,12 @@ const routes = [
     name: "Billing",
     element: Billing,
     navName: "Billing",
+  },
+  {
+    path: "/reports-analytics",
+    name: "Reports & Analytics",
+    element: ReportsAnalytics,
+    navName: "Reports & Analytics",
   },
   {
     path: "/settings",

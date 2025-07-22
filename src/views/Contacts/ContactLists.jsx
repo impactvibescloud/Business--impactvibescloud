@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import * as XLSX from 'xlsx'
 import {
   CRow,
   CCol,
@@ -47,6 +48,9 @@ const ContactLists = () => {
   const [newList, setNewList] = useState({
     name: ''
   })
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [uploadedContacts, setUploadedContacts] = useState([])
+  const [fileError, setFileError] = useState('')
   const [contacts, setContacts] = useState([])
   const [selectedContact, setSelectedContact] = useState('')
   const [selectedContacts, setSelectedContacts] = useState([])
@@ -237,6 +241,9 @@ const ContactLists = () => {
     setSelectedContacts([])
     setEditingList(null)
     setValidationError('')
+    setUploadedFile(null)
+    setUploadedContacts([])
+    setFileError('')
   }
 
   const handleInputChange = (e) => {
@@ -245,6 +252,105 @@ const ContactLists = () => {
       ...prev,
       [name]: value
     }))
+  }
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Reset previous errors and uploads
+    setFileError('')
+    setUploadedContacts([])
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'text/csv', // .csv
+      'application/vnd.ms-excel' // .xls (additional support)
+    ]
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop()
+    if (!['xlsx', 'csv', 'xls'].includes(fileExtension)) {
+      setFileError('Please upload only .xlsx or .csv files')
+      return
+    }
+
+    setUploadedFile(file)
+    processUploadedFile(file)
+  }
+
+  const processUploadedFile = (file) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      try {
+        const data = e.target.result
+        let contacts = []
+        
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          // Process CSV file
+          const lines = data.split('\n')
+          
+          // Skip header row if it exists
+          const startIndex = lines[0] && (lines[0].toLowerCase().includes('name') || lines[0].toLowerCase().includes('phone')) ? 1 : 0
+          
+          for (let i = startIndex; i < lines.length; i++) {
+            const line = lines[i].trim()
+            if (line) {
+              const columns = line.split(',').map(col => col.trim().replace(/["']/g, ''))
+              if (columns.length >= 2 && columns[0] && columns[1]) {
+                contacts.push({
+                  id: `upload-${Date.now()}-${i}`,
+                  name: columns[0] || `Contact ${i + 1}`,
+                  phone: columns[1] || '',
+                  email: columns[2] || '',
+                  company: columns[3] || ''
+                })
+              }
+            }
+          }
+        } else if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+          // Process Excel file
+          const workbook = XLSX.read(data, { type: 'array' })
+          const sheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[sheetName]
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+          
+          // Skip header row if it exists
+          const startIndex = jsonData[0] && (
+            String(jsonData[0][0]).toLowerCase().includes('name') || 
+            String(jsonData[0][1]).toLowerCase().includes('phone')
+          ) ? 1 : 0
+          
+          for (let i = startIndex; i < jsonData.length; i++) {
+            const row = jsonData[i]
+            if (row && row.length >= 2 && row[0] && row[1]) {
+              contacts.push({
+                id: `upload-${Date.now()}-${i}`,
+                name: String(row[0] || `Contact ${i + 1}`),
+                phone: String(row[1] || ''),
+                email: String(row[2] || ''),
+                company: String(row[3] || '')
+              })
+            }
+          }
+        }
+        
+        setUploadedContacts(contacts)
+        if (contacts.length === 0) {
+          setFileError('No valid contacts found in the file. Please ensure your file has Name and Phone columns.')
+        }
+      } catch (error) {
+        setFileError('Error processing file. Please check the file format and try again.')
+        console.error('File processing error:', error)
+      }
+    }
+    
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      reader.readAsText(file)
+    } else {
+      reader.readAsArrayBuffer(file)
+    }
   }
 
 
@@ -256,8 +362,8 @@ const ContactLists = () => {
       return
     }
     
-    if (selectedContacts.length === 0) {
-      setValidationError('Please select at least one contact for the list.')
+    if (uploadedContacts.length === 0) {
+      setValidationError('Please upload a file with contacts for the list.')
       return
     }
     
@@ -270,8 +376,8 @@ const ContactLists = () => {
         const businessId = '684fe39ca8254e8906e99aab'
         const branchId = '684fe39ca8254e8906e99aab'
         
-        // Extract contact IDs for the API request
-        const contactIds = selectedContacts.map(contact => contact.id)
+        // For uploaded contacts, we need to create them first or use their IDs
+        const contactIds = uploadedContacts.map(contact => contact.id)
         
         // Update existing list via API
         const response = await apiCall(`/api/contact-list/${editingList.id}`, 'PUT', {
@@ -314,8 +420,8 @@ const ContactLists = () => {
         const businessId = '684fe39ca8254e8906e99aab'
         const branchId = '684fe39ca8254e8906e99aab'
         
-        // Extract contact IDs for the API request
-        const contactIds = selectedContacts.map(contact => contact.id)
+        // For uploaded contacts, we need to create them first or use their IDs
+        const contactIds = uploadedContacts.map(contact => contact.id)
         
         const response = await apiCall('/api/contact-list', 'POST', {
           name: newList.name,
@@ -507,7 +613,7 @@ const ContactLists = () => {
             <CCol md={6}>
               <CInputGroup>
                 <CFormInput
-                  placeholder="Search lists..."
+                  placeholder="Search contact lists..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -522,7 +628,7 @@ const ContactLists = () => {
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>BUSINESS NAME</CTableHeaderCell>
+                <CTableHeaderCell>CONTACT LIST NAME</CTableHeaderCell>
                 <CTableHeaderCell>NO OF CONTACTS</CTableHeaderCell>
                 <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
               </CTableRow>
@@ -622,7 +728,7 @@ const ContactLists = () => {
         </CCardBody>
       </CCard>
 
-      {/* New List Modal */}
+      {/* New Contact List Modal */}
       <CModal visible={showNewListModal} onClose={handleCloseModal} size="lg">
         <CModalHeader>
           <CModalTitle>{editingList ? 'Edit Contact List' : 'New Contact List'}</CModalTitle>
@@ -648,117 +754,44 @@ const ContactLists = () => {
             </div>
             
             <div className="mb-4">
-              <CRow className="align-items-end">
-                <CCol md={9}>
-                  <CFormLabel htmlFor="contactSelect">Add Contacts</CFormLabel>
-                  <CFormSelect
-                    id="contactSelect"
-                    value={selectedContact}
-                    onChange={handleContactChange}
-                    disabled={contactsLoading}
-                  >
-                    <option value="">
-                      {contactsLoading 
-                        ? 'Loading contacts...' 
-                        : contacts.length === 0 
-                          ? 'No contacts available - Please add contacts first'
-                          : 'Select a contact to add'
-                      }
-                    </option>
-                    {contacts
-                      .filter(contact => !selectedContacts.some(sc => sc.id === contact.id))
-                      .map(contact => (
-                        <option key={contact.id} value={contact.id}>
-                          {contact.name} - {contact.phone} {contact.email ? `(${contact.email})` : ''}
-                        </option>
-                      ))
-                    }
-                  </CFormSelect>
-                  {contactsLoading && (
-                    <div className="mt-2">
-                      <CSpinner size="sm" className="me-2" />
-                      Loading contacts...
-                    </div>
-                  )}
-                  {!contactsLoading && contacts.length === 0 && (
-                    <div className="mt-2 text-muted small">
-                      <i className="bi bi-info-circle me-1"></i>
-                      No contacts found. Please add contacts to your account first before creating a contact list.
-                    </div>
-                  )}
-                  {!contactsLoading && contacts.length > 0 && (
-                    <div className="mt-2 text-muted small">
-                      <i className="bi bi-check-circle me-1"></i>
-                      {contacts.length} contact{contacts.length !== 1 ? 's' : ''} available
-                    </div>
-                  )}
-                </CCol>
-                <CCol md={3}>
-                  <CButton 
-                    color="primary" 
-                    className="w-100" 
-                    onClick={addContactToList} 
-                    disabled={!selectedContact || contactsLoading}
-                  >
-                    <CIcon icon={cilPlus} className="me-2" />
-                    Add
-                  </CButton>
-                  {!contactsLoading && contacts.length === 0 && (
-                    <CButton 
-                      color="secondary" 
-                      size="sm" 
-                      className="w-100 mt-2" 
-                      onClick={() => {
-                        console.log('Manually refreshing contacts...')
-                        setContactsLoading(true)
-                        // Re-trigger the contacts fetch
-                        setTimeout(() => {
-                          const fetchContacts = async () => {
-                            try {
-                              const data = await apiCall(ENDPOINTS.CONTACTS)
-                              console.log('Manual refresh - Contacts API response:', data)
-                              
-                              let contactsData = []
-                              if (data && data.success && Array.isArray(data.data)) {
-                                contactsData = data.data
-                              } else if (Array.isArray(data)) {
-                                contactsData = data
-                              }
-                              
-                              const formattedContacts = contactsData.map(contact => ({
-                                id: contact._id || contact.id || `contact-${Date.now()}-${Math.random()}`,
-                                name: contact.fullName || contact.name || contact.firstName || 'Unnamed Contact',
-                                phone: contact.phone || contact.phoneNumber || '',
-                                email: contact.email || '',
-                                company: contact.company || contact.organization || ''
-                              }))
-                              
-                              setContacts(formattedContacts)
-                            } catch (err) {
-                              console.error('Manual refresh failed:', err)
-                            } finally {
-                              setContactsLoading(false)
-                            }
-                          }
-                          fetchContacts()
-                        }, 100)
-                      }}
-                    >
-                      Retry Loading
-                    </CButton>
-                  )}
-                </CCol>
-              </CRow>
+              <CFormLabel htmlFor="fileUpload">Upload Contacts File</CFormLabel>
+              <CFormInput
+                type="file"
+                id="fileUpload"
+                accept=".xlsx,.csv"
+                onChange={handleFileUpload}
+                className="mb-2"
+              />
+              <div className="text-muted small">
+                <i className="bi bi-info-circle me-1"></i>
+                Please upload a .xlsx or .csv file containing contact information (Name, Phone, Email, Company)
+              </div>
+              {fileError && (
+                <CAlert color="danger" className="mt-2 mb-0">
+                  {fileError}
+                </CAlert>
+              )}
+              {uploadedFile && !fileError && (
+                <div className="mt-2">
+                  <CBadge color="success" className="me-2">
+                    <i className="bi bi-check-circle me-1"></i>
+                    File uploaded: {uploadedFile.name}
+                  </CBadge>
+                  <span className="text-muted small">
+                    ({uploadedContacts.length} contacts found)
+                  </span>
+                </div>
+              )}
             </div>
             
-            {selectedContacts.length > 0 && (
+            {uploadedContacts.length > 0 && (
               <div className="mb-4">
-                <h5>Selected Contacts ({selectedContacts.length})</h5>
-                <div className="selected-contacts-container">
-                  {selectedContacts.map(contact => (
+                <h5>Uploaded Contacts ({uploadedContacts.length})</h5>
+                <div className="uploaded-contacts-container" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {uploadedContacts.slice(0, 5).map(contact => (
                     <div 
                       key={contact.id} 
-                      className="selected-contact d-flex justify-content-between align-items-center p-2 mb-2 border rounded"
+                      className="uploaded-contact d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-light"
                     >
                       <div>
                         <div className="fw-bold">{contact.name}</div>
@@ -768,16 +801,13 @@ const ContactLists = () => {
                           {contact.company && ` | ${contact.company}`}
                         </div>
                       </div>
-                      <CButton 
-                        color="danger" 
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeContactFromList(contact.id)}
-                      >
-                        <CIcon icon={cilX} size="sm" />
-                      </CButton>
                     </div>
                   ))}
+                  {uploadedContacts.length > 5 && (
+                    <div className="text-center text-muted small">
+                      ... and {uploadedContacts.length - 5} more contacts
+                    </div>
+                  )}
                 </div>
               </div>
             )}

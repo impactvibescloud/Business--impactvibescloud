@@ -247,3 +247,52 @@
     width: 100%;
   }
 }
+
+/* Expandable Row Styles */
+.table-row-expanded {
+  background-color: rgba(90, 70, 235, 0.05) !important;
+}
+
+.call-details-container {
+  background-color: #f8f9fa;
+  border-left: 4px solid #5a46eb;
+  margin: 0;
+}
+
+.call-detail-item {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.call-detail-item strong {
+  color: #333;
+  font-weight: 600;
+  min-width: 140px;
+  margin-bottom: 4px;
+}
+
+.call-detail-item span {
+  color: #666;
+  flex: 1;
+}
+
+.call-details-container .btn {
+  font-size: 0.875rem;
+  padding: 4px 12px;
+}
+
+.call-details-container .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Hover effect for clickable rows */
+.call-logs-table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.call-logs-table tbody tr.table-row-expanded:hover {
+  background-color: rgba(90, 70, 235, 0.08) !important;
+}

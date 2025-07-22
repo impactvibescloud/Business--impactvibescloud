@@ -1,12 +1,12 @@
-import React, { lazy } from "react";
+import React from "react";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { isAutheticated } from "../../auth.js";
-
-const WidgetsDropdown = lazy(() => import("../widgets/WidgetsDropdown.js"));
+import WidgetsDropdown from "../widgets/WidgetsDropdown.js";
 
 const Dashboard = () => {
   const [agents, setAgents] = useState(0);
+  const [agentStatuses, setAgentStatuses] = useState({ active: 0, deactive: 0, break: 0 });
   const [user, setUser] = useState({});
   const token = isAutheticated();
 
@@ -38,21 +38,41 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (user?.businessId) {
-      const fetchAgentsCount = async () => {
+      const fetchAgentsData = async () => {
         try {
           const response = await axios.get(`/api/branch/${user.businessId}/branches`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           });
-          setAgents(response.data.data?.length || 0);
+          const branchesData = response.data.data || [];
+          setAgents(branchesData.length);
+          
+          // Calculate agent statuses
+          const statusCounts = { active: 0, deactive: 0, break: 0 };
+          branchesData.forEach(branch => {
+            if (branch.isSuspended) {
+              statusCounts.deactive++;
+            } else {
+              // Check call status or other indicators for break/active
+              const callStatus = branch.callStatus || 'active';
+              if (callStatus.toLowerCase().includes('break') || callStatus.toLowerCase().includes('pause')) {
+                statusCounts.break++;
+              } else {
+                statusCounts.active++;
+              }
+            }
+          });
+          
+          setAgentStatuses(statusCounts);
         } catch (error) {
           console.warn("Agents API failed:", error.message);
-          setAgents(0); // Fallback value
+          setAgents(0);
+          setAgentStatuses({ active: 0, deactive: 0, break: 0 });
         }
       };
 
-      fetchAgentsCount();
+      fetchAgentsData();
     }
   }, [user, token]);
   // const [Brand, setBrand] = useState(null);
@@ -142,8 +162,9 @@ const Dashboard = () => {
   // }, [token]);
   return (
     <>
-      <WidgetsDropdown
+            <WidgetsDropdown
         agents={agents}
+        agentStatuses={agentStatuses}
       />
     </>
   );

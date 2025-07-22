@@ -103,6 +103,13 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "Reports & Analytics",
+    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    to: "/reports-analytics",
+    group: "Reports & Analytics",
+  },
+  {
+    component: CNavItem,
     name: "Settings",
     icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
     to: "/settings",

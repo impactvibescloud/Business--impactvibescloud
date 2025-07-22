@@ -44,6 +44,11 @@ const Branches = () => {
   const [openAddBranch, setOpenAddBranch] = useState(false);
   const [openEditBranch, setOpenEditBranch] = useState(false);
   const [branchName, setBranchName] = useState("");
+  const [agentPhone, setAgentPhone] = useState("");
+  const [department, setDepartment] = useState("");
+  const [timeGroup, setTimeGroup] = useState("");
+  const [timeCondition, setTimeCondition] = useState("");
+  const [stickyAgents, setStickyAgents] = useState("");
   const [managerName, setManagerName] = useState("");
   const [managerEmail, setManagerEmail] = useState("");
   const [branchStatus, setBranchStatus] = useState("Active");
@@ -52,6 +57,7 @@ const Branches = () => {
   const [didNumbers, setDidNumbers] = useState([]);
   const [selectedDid, setSelectedDid] = useState("");
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
+  const [expandedAgent, setExpandedAgent] = useState(null);
   const token = isAuthenticated();
 
   useEffect(() => {
@@ -224,6 +230,11 @@ const Branches = () => {
 
   const resetForm = () => {
     setBranchName("");
+    setAgentPhone("");
+    setDepartment("");
+    setTimeGroup("");
+    setTimeCondition("");
+    setStickyAgents("");
     setManagerName("");
     setManagerEmail("");
     setBranchStatus("Active");
@@ -300,6 +311,10 @@ const Branches = () => {
     }
   };
 
+  const handleAgentRowClick = (branch) => {
+    setExpandedAgent(expandedAgent === branch._id ? null : branch._id);
+  };
+
   return (
     <div className="branches-container">
       {successAlert.show && (
@@ -343,21 +358,23 @@ const Branches = () => {
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
                 <CTableHeaderCell>AGENT NAME</CTableHeaderCell>
                 <CTableHeaderCell>EMAIL ADDRESS</CTableHeaderCell>
+                <CTableHeaderCell>DEPARTMENT</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
+                <CTableHeaderCell>CALL STATUS</CTableHeaderCell>
                 <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
               {loading ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="6" className="text-center py-5">
+                  <CTableDataCell colSpan="8" className="text-center py-5">
                     <CSpinner color="primary" />
                     <div className="mt-3">Loading agents...</div>
                   </CTableDataCell>
                 </CTableRow>
               ) : currentBranches.length === 0 ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="6" className="text-center py-5">
+                  <CTableDataCell colSpan="8" className="text-center py-5">
                     <div className="empty-state">
                       <div className="empty-state-icon">
                         <CIcon icon={cilPlus} size="xl" />
@@ -372,50 +389,185 @@ const Branches = () => {
                 </CTableRow>
               ) : (
                 currentBranches.map((branch, index) => (
-                  <CTableRow key={branch._id}>
-                    <CTableDataCell>
-                      <div className="agent-number">{indexOfFirstItem + index + 1}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="agent-name">{branch.branchName}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="manager-email">{branch.manager?.email || "-"}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge 
-                        color={branch.isSuspended ? "warning" : "success"}
-                        className="status-badge"
-                      >
-                        {branch.isSuspended ? "Suspended" : "Active"}
-                      </CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell className="text-center">
-                      <CButton 
-                        color="light"
-                        onClick={() => handleEditBranch(branch)}
-                        className="me-2"
-                        size="sm"
-                      >
-                        <CIcon icon={cilPencil} />
-                      </CButton>
-                      <CButton 
-                        color={branch.isSuspended ? "success" : "warning"}
-                        onClick={() => handleSuspendBranch(branch.id)}
-                        className="me-2"
-                        size="sm"
-                      >
-                        {branch.isSuspended ? "Activate" : "Suspend"}
-                      </CButton>
-                      <CButton 
-                        color="info"
-                        onClick={() => handleResetPassword(branch.manager.email)}
-                        size="sm"
-                      >
-                        Reset
-                      </CButton>
-                    </CTableDataCell>
-                  </CTableRow>
+                  <React.Fragment key={branch._id}>
+                    <CTableRow 
+                      onClick={() => handleAgentRowClick(branch)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <CTableDataCell>
+                        <div className="agent-number">{indexOfFirstItem + index + 1}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="agent-name">{branch.branchName}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="manager-email">{branch.manager?.email || "-"}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="department-name">{branch.department || ""}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge 
+                          color={branch.isSuspended ? "warning" : "success"}
+                          className="status-badge"
+                        >
+                          {branch.isSuspended ? "Suspended" : "Active"}
+                        </CBadge>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge 
+                          color="info"
+                          className="call-status-badge"
+                        >
+                          Available
+                        </CBadge>
+                      </CTableDataCell>
+                      <CTableDataCell className="text-center">
+                        <CButton 
+                          color="light"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditBranch(branch);
+                          }}
+                          className="me-2"
+                          size="sm"
+                        >
+                          <CIcon icon={cilPencil} />
+                        </CButton>
+                        <CButton 
+                          color={branch.isSuspended ? "success" : "warning"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSuspendBranch(branch.id);
+                          }}
+                          className="me-2"
+                          size="sm"
+                        >
+                          {branch.isSuspended ? "Activate" : "Suspend"}
+                        </CButton>
+                        <CButton 
+                          color="info"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResetPassword(branch.manager.email);
+                          }}
+                          size="sm"
+                        >
+                          Reset
+                        </CButton>
+                      </CTableDataCell>
+                    </CTableRow>
+                    {/* Expanded Details Row */}
+                    {expandedAgent === branch._id && (
+                      <CTableRow>
+                        <CTableDataCell colSpan="8" style={{ padding: 0, backgroundColor: '#f8f9fa' }}>
+                          <div style={{ padding: '20px' }}>
+                            <CRow className="mb-4">
+                              <CCol>
+                                <h5 className="mb-3">Agent Details - {branch.branchName}</h5>
+                              </CCol>
+                            </CRow>
+                            
+                            {/* Call Details Section */}
+                            <CRow className="mb-4">
+                              <CCol>
+                                <h6 className="mb-3">Call Details</h6>
+                                <CRow>
+                                  <CCol md={3}>
+                                    <div className="text-center p-3 border rounded bg-white">
+                                      <h4 className="text-primary mb-1">45</h4>
+                                      <small className="text-muted">Outbound Calls</small>
+                                    </div>
+                                  </CCol>
+                                  <CCol md={3}>
+                                    <div className="text-center p-3 border rounded bg-white">
+                                      <h4 className="text-success mb-1">32</h4>
+                                      <small className="text-muted">Inbound Calls</small>
+                                    </div>
+                                  </CCol>
+                                  <CCol md={3}>
+                                    <div className="text-center p-3 border rounded bg-white">
+                                      <h4 className="text-warning mb-1">8</h4>
+                                      <small className="text-muted">Missed Calls</small>
+                                    </div>
+                                  </CCol>
+                                  <CCol md={3}>
+                                    <div className="text-center p-3 border rounded bg-white">
+                                      <h4 className="text-danger mb-1">3</h4>
+                                      <small className="text-muted">Hang Calls</small>
+                                    </div>
+                                  </CCol>
+                                </CRow>
+                              </CCol>
+                            </CRow>
+
+                            {/* Working Hours Section */}
+                            <CRow className="mb-4">
+                              <CCol>
+                                <h6 className="mb-3">Working Hours</h6>
+                                <div className="p-3 border rounded bg-white">
+                                  <CRow>
+                                    <CCol md={6}>
+                                      <div className="mb-2">
+                                        <strong>Start Time:</strong> 9:00 AM
+                                      </div>
+                                      <div className="mb-2">
+                                        <strong>End Time:</strong> 6:00 PM
+                                      </div>
+                                    </CCol>
+                                    <CCol md={6}>
+                                      <div className="mb-2">
+                                        <strong>Break Time:</strong> 1:00 PM - 2:00 PM
+                                      </div>
+                                      <div className="mb-2">
+                                        <strong>Total Hours:</strong> 8 hours
+                                      </div>
+                                    </CCol>
+                                  </CRow>
+                                </div>
+                              </CCol>
+                            </CRow>
+
+                            {/* Active Hours Section */}
+                            <CRow>
+                              <CCol>
+                                <h6 className="mb-3">Active Hours (Today)</h6>
+                                <div className="p-3 border rounded bg-white">
+                                  <CRow>
+                                    <CCol md={4}>
+                                      <div className="mb-2">
+                                        <strong>Login Time:</strong> 9:15 AM
+                                      </div>
+                                      <div className="mb-2">
+                                        <strong>Total Active Time:</strong> 6h 45m
+                                      </div>
+                                    </CCol>
+                                    <CCol md={4}>
+                                      <div className="mb-2">
+                                        <strong>Break Duration:</strong> 1h 15m
+                                      </div>
+                                      <div className="mb-2">
+                                        <strong>Idle Time:</strong> 30m
+                                      </div>
+                                    </CCol>
+                                    <CCol md={4}>
+                                      <div className="mb-2">
+                                        <strong>Current Status:</strong> 
+                                        <CBadge color="success" className="ms-2">Online</CBadge>
+                                      </div>
+                                      <div className="mb-2">
+                                        <strong>Last Activity:</strong> 2 minutes ago
+                                      </div>
+                                    </CCol>
+                                  </CRow>
+                                </div>
+                              </CCol>
+                            </CRow>
+                          </div>
+                        </CTableDataCell>
+                      </CTableRow>
+                    )}
+                  </React.Fragment>
                 ))
               )}
             </CTableBody>
@@ -471,6 +623,17 @@ const Branches = () => {
               />
             </div>
             <div className="mb-3">
+              <CFormLabel htmlFor="agentPhone">Agent Phone Number</CFormLabel>
+              <CFormInput
+                type="text"
+                id="agentPhone"
+                value={agentPhone}
+                onChange={e => setAgentPhone(e.target.value)}
+                placeholder="Enter agent phone number"
+                required
+              />
+            </div>
+            <div className="mb-3">
               <CFormLabel htmlFor="managerEmail">Email Address</CFormLabel>
               <CFormInput
                 type="email"
@@ -480,6 +643,57 @@ const Branches = () => {
                 placeholder="Enter email address"
                 required
               />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="department">Department</CFormLabel>
+              <CFormInput
+                type="text"
+                id="department"
+                value={department}
+                onChange={e => setDepartment(e.target.value)}
+                placeholder="Enter department"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="timeGroup">Time Group</CFormLabel>
+              <CFormSelect
+                id="timeGroup"
+                value={timeGroup}
+                onChange={e => setTimeGroup(e.target.value)}
+                required
+              >
+                <option value="">Select Shifts</option>
+                <option value="morning">Morning Shift (8 AM - 4 PM)</option>
+                <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
+                <option value="evening">Evening Shift (4 PM - 12 AM)</option>
+                <option value="night">Night Shift (10 PM - 6 AM)</option>
+                <option value="24hours">24 Hours</option>
+              </CFormSelect>
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="timeCondition">Time Condition</CFormLabel>
+              <CFormInput
+                type="text"
+                id="timeCondition"
+                value={timeCondition}
+                onChange={e => setTimeCondition(e.target.value)}
+                placeholder="Enter time condition"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="stickyAgents">Sticky Agents</CFormLabel>
+              <CFormSelect
+                id="stickyAgents"
+                value={stickyAgents}
+                onChange={e => setStickyAgents(e.target.value)}
+                required
+              >
+                <option value="">Select Option</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </CFormSelect>
             </div>
             <div className="mb-3">
               <CFormLabel htmlFor="assignDid">Assign DID</CFormLabel>

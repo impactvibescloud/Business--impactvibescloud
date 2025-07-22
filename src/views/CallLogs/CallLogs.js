@@ -21,10 +21,20 @@ import {
   CPagination,
   CPaginationItem,
   CAlert,
-  CBadge
+  CBadge,
+  CCollapse
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilSearch, cilFilter } from '@coreui/icons'
+import { 
+  cilTrash, 
+  cilSearch, 
+  cilFilter, 
+  cilCloudDownload,
+  cilChevronTop,
+  cilChevronBottom,
+  cilMediaPlay,
+  cilCloudDownload as cilDownload
+} from '@coreui/icons'
 import './CallLogs.css'
 import { ENDPOINTS, apiCall } from '../../config/api'
 
@@ -36,6 +46,7 @@ const CallLogs = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [activeFilter, setActiveFilter] = useState('All Calls')
+  const [expandedRow, setExpandedRow] = useState(null)
 
   useEffect(() => {
     const fetchCallLogs = async () => {
@@ -143,6 +154,47 @@ const CallLogs = () => {
   const handleFilterChange = (filter) => {
     setActiveFilter(filter)
     setCurrentPage(1) // Reset to first page when filter changes
+  }
+
+  const handleRowClick = (logId) => {
+    setExpandedRow(expandedRow === logId ? null : logId)
+  }
+
+  const handlePlayRecording = (recordingUrl) => {
+    if (recordingUrl) {
+      // Create an audio element and play the recording
+      const audio = new Audio(recordingUrl)
+      audio.play().catch(err => {
+        console.error('Error playing audio:', err)
+        alert('Unable to play recording')
+      })
+    } else {
+      alert('No recording available for this call')
+    }
+  }
+
+  const handleDownloadRecording = (recordingUrl, fileName) => {
+    if (recordingUrl) {
+      // Create a temporary link and trigger download
+      const link = document.createElement('a')
+      link.href = recordingUrl
+      link.download = fileName || 'call-recording.mp3'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else {
+      alert('No recording available for download')
+    }
+  }
+
+  const formatDuration = (duration) => {
+    if (!duration) return '00:00'
+    
+    const seconds = parseInt(duration)
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
   return (
@@ -254,32 +306,120 @@ const CallLogs = () => {
                   const callType = log.callType || 'Unknown'
                   const callDate = formatDate(log.callDate || log.createdAt)
                   const status = formatCallStatus(log.status)
+                  const isExpanded = expandedRow === log._id
                   
                   return (
-                    <CTableRow key={log._id}>
-                      <CTableDataCell>
-                        <div className="log-number">{indexOfFirstItem + index + 1}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="log-contact">{contact}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="log-type text-capitalize">{callType}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="log-date">{callDate}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge 
-                          color={status.toLowerCase() === 'success' ? 'success' : 
-                                 status.toLowerCase().includes('fail') ? 'danger' : 
-                                 status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
-                          className="status-badge"
-                        >
-                          {status}
-                        </CBadge>
-                      </CTableDataCell>
-                    </CTableRow>
+                    <React.Fragment key={log._id}>
+                      <CTableRow 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleRowClick(log._id)}
+                        className={isExpanded ? 'table-row-expanded' : ''}
+                      >
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <span className="log-number me-2">{indexOfFirstItem + index + 1}</span>
+                            <CIcon 
+                              icon={isExpanded ? cilChevronTop : cilChevronBottom} 
+                              size="sm" 
+                              className="text-muted"
+                            />
+                          </div>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <div className="log-contact">{contact}</div>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <div className="log-type text-capitalize">{callType}</div>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <div className="log-date">{callDate}</div>
+                        </CTableDataCell>
+                        <CTableDataCell>
+                          <CBadge 
+                            color={status.toLowerCase() === 'success' ? 'success' : 
+                                   status.toLowerCase().includes('fail') ? 'danger' : 
+                                   status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
+                            className="status-badge"
+                          >
+                            {status}
+                          </CBadge>
+                        </CTableDataCell>
+                      </CTableRow>
+                      
+                      {/* Expanded Row Details */}
+                      <CTableRow>
+                        <CTableDataCell colSpan="5" className="p-0">
+                          <CCollapse visible={isExpanded}>
+                            <div className="call-details-container p-4 bg-light border-top">
+                              <CRow>
+                                <CCol md={6}>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Call Initiated By:</strong>
+                                    <span className="ms-2">{log.initiatedBy || log.caller || 'Unknown'}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Call Received By:</strong>
+                                    <span className="ms-2">{log.receivedBy || log.receiver || 'Unknown'}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Call Rejected By:</strong>
+                                    <span className="ms-2">{log.rejectedBy || 'N/A'}</span>
+                                  </div>
+                                </CCol>
+                                <CCol md={6}>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Hang Up By:</strong>
+                                    <span className="ms-2">{log.hangUpBy || log.endedBy || 'Unknown'}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Call Duration:</strong>
+                                    <span className="ms-2">{formatDuration(log.duration || log.callDuration)}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Call Recording:</strong>
+                                    <div className="ms-2 d-flex gap-2">
+                                      {log.recordingUrl || log.recording ? (
+                                        <>
+                                          <CButton 
+                                            size="sm" 
+                                            color="primary" 
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handlePlayRecording(log.recordingUrl || log.recording)
+                                            }}
+                                          >
+                                            <CIcon icon={cilMediaPlay} className="me-1" />
+                                            Play
+                                          </CButton>
+                                          <CButton 
+                                            size="sm" 
+                                            color="success" 
+                                            variant="outline"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleDownloadRecording(
+                                                log.recordingUrl || log.recording, 
+                                                `call-recording-${log._id}.mp3`
+                                              )
+                                            }}
+                                          >
+                                            <CIcon icon={cilCloudDownload} className="me-1" />
+                                            Download
+                                          </CButton>
+                                        </>
+                                      ) : (
+                                        <span className="text-muted">No recording available</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CCol>
+                              </CRow>
+                            </div>
+                          </CCollapse>
+                        </CTableDataCell>
+                      </CTableRow>
+                    </React.Fragment>
                   )
                 })
               )}

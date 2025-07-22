@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { getPurchasedNumbers, getPurchasedNumbersByCountry, savePurchasedNumber } from '../VirtualNumbers/virtualNumbersUtils'
-import { getCredits, saveCredits, fetchCreditsFromAPI } from './creditUtils'
 import {
   CCard,
   CCardBody,
@@ -40,7 +39,6 @@ import { cilSearch, cilPhone, cilArrowLeft } from '@coreui/icons'
 import './Billing.css'
 import './billing-alerts.css'
 import './billing-buy-number.css'
-import './billing-credits.css'
 import './billing-toggle.css'
 import './payment-requests.css'
 import PaymentRequests from './PaymentRequests'
@@ -60,16 +58,6 @@ function Billing() {
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false)
   const [paymentSuccessful, setPaymentSuccessful] = useState(false)
   
-  // Credit management states
-  const [credits, setCredits] = useState(0)
-  const [creditAmount, setCreditAmount] = useState('')
-  const [showPaymentOptions, setShowPaymentOptions] = useState(false)
-  const [creditPaymentMethod, setCreditPaymentMethod] = useState('')
-  const [isProcessingCredits, setIsProcessingCredits] = useState(false)
-  const [autoPaySubscription, setAutoPaySubscription] = useState(false)
-  const [notifyLowBalance, setNotifyLowBalance] = useState(false)
-  const [lowBalanceThreshold, setLowBalanceThreshold] = useState(100)
-  
   const navigate = useNavigate()
   
   // Indian states array
@@ -82,27 +70,13 @@ function Billing() {
     "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
   ]
   
-  // Load purchased numbers and credits on component mount
+  // Load purchased numbers on component mount
   useEffect(() => {
     const numbers = getPurchasedNumbers()
     setPurchasedNumbers(numbers)
     
     const groupedNumbers = getPurchasedNumbersByCountry()
     setNumbersByCountry(groupedNumbers)
-    
-    // Load credits from API first, then fallback to localStorage
-    const loadCredits = async () => {
-      try {
-        const apiCredits = await fetchCreditsFromAPI()
-        setCredits(apiCredits)
-      } catch (error) {
-        console.error('Error fetching credits from API:', error)
-        const userCredits = getCredits()
-        setCredits(userCredits)
-      }
-    }
-    
-    loadCredits()
   }, [])
   
   // Handle save changes
@@ -165,12 +139,10 @@ function Billing() {
     const urlParams = new URLSearchParams(window.location.search)
     const tabParam = urlParams.get('tab')
     
-    if (tabParam === 'credits') {
+    if (tabParam === 'billing') {
       setActiveKey(2)
-    } else if (tabParam === 'billing') {
-      setActiveKey(3)
     } else if (tabParam === 'payment-requests') {
-      setActiveKey(4)
+      setActiveKey(3)
     }
   }, [])
   
@@ -178,9 +150,8 @@ function Billing() {
   const handleTabChange = (key) => {
     setActiveKey(key)
     const tabParam = key === 1 ? '' : 
-                    key === 2 ? 'credits' : 
-                    key === 3 ? 'billing' : 
-                    key === 4 ? 'payment-requests' : '';
+                    key === 2 ? 'billing' : 
+                    key === 3 ? 'payment-requests' : '';
     
     if (tabParam) {
       const url = new URL(window.location)
@@ -257,54 +228,6 @@ function Billing() {
     }, 1500)
   }
   
-  // Handle credit payment method selection
-  const handleCreditPaymentMethodChange = (e) => {
-    setCreditPaymentMethod(e.target.value)
-  }
-  
-  // Handle adding credits
-  const handleAddCredits = () => {
-    if (!creditPaymentMethod || !creditAmount) return
-    
-    setIsProcessingCredits(true)
-    
-    // Simulate credit purchase processing
-    setTimeout(() => {
-      // Add credits to the balance using utility function
-      const amount = parseInt(creditAmount, 10) || 0
-      const updatedCredits = saveCredits(amount)
-      setCredits(updatedCredits)
-      
-      // Reset form
-      setIsProcessingCredits(false)
-      setCreditAmount('')
-      setCreditPaymentMethod('')
-      setShowPaymentOptions(false)
-      
-      // Show success message
-      setShowSuccessMessage(true)
-      setTimeout(() => {
-        setShowSuccessMessage(false)
-      }, 3000)
-    }, 1500)
-  }
-  
-  // Handle view usage
-  const handleViewUsage = () => {
-    // This would typically open a detailed view of credits usage
-    console.log('View credits usage history')
-  }
-  
-  // Handle saving low balance threshold
-  const handleSaveThreshold = () => {
-    // This would typically save the threshold to the backend
-    console.log(`Low balance threshold saved: ${lowBalanceThreshold}`)
-    setShowSuccessMessage(true)
-    setTimeout(() => {
-      setShowSuccessMessage(false)
-    }, 3000)
-  }
-  
   return (
     <div className="billing-container">
       <h1 className="page-title">Plans & Numbers</h1>
@@ -327,22 +250,13 @@ function Billing() {
                 onClick={() => handleTabChange(2)}
                 className="tab-link"
               >
-                Credits
+                Billing
               </CNavLink>
             </CNavItem>
             <CNavItem>
               <CNavLink
                 active={activeKey === 3}
                 onClick={() => handleTabChange(3)}
-                className="tab-link"
-              >
-                Billing
-              </CNavLink>
-            </CNavItem>
-            <CNavItem>
-              <CNavLink
-                active={activeKey === 4}
-                onClick={() => handleTabChange(4)}
                 className="tab-link"
               >
                 Payment Requests
@@ -360,33 +274,13 @@ function Billing() {
                       <div>
                         <h3 className="plan-title">Account Overview</h3>
                       </div>
-                      <CButton 
-                        color="outline-primary" 
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            const apiCredits = await fetchCreditsFromAPI()
-                            setCredits(apiCredits)
-                          } catch (error) {
-                            console.error('Error refreshing credits:', error)
-                          }
-                        }}
-                      >
-                        Refresh Credits
-                      </CButton>
                     </div>
                     
                     <CRow className="plan-stats">
-                      <CCol md={6}>
+                      <CCol md={12}>
                         <div className="stat-item">
                           <span className="stat-label">Total calls</span>
                           <span className="stat-value">0</span>
-                        </div>
-                      </CCol>
-                      <CCol md={6}>
-                        <div className="stat-item">
-                          <span className="stat-label">Credit balance</span>
-                          <span className="stat-value">₹{credits}</span>
                         </div>
                       </CCol>
                     </CRow>
@@ -604,224 +498,6 @@ function Billing() {
             
             <CTabPane role="tabpanel" visible={activeKey === 2}>
               <div className="tab-content-wrapper">
-                {/* Credits Tab Content */}
-                <div className="credits-tab-content">
-                  <div className="credits-header mb-4">
-                    <div className="credits-balance-container">
-                      <h4 className="credits-label">Credits (INR)</h4>
-                      <div className="credits-amount">₹{credits}</div>
-                      <CButton 
-                        color="link" 
-                        className="view-usage-link"
-                        onClick={() => handleViewUsage()}
-                      >
-                        View usage
-                      </CButton>
-                    </div>
-                    <p className="credits-description">
-                      Credits are used for calling and transcription. It can also be used for subscription payments.
-                    </p>
-                  </div>
-                  
-                  <div className="add-credits-section mb-4">
-                    <h4 className="mb-3">Add credits</h4>
-                    {showSuccessMessage && (
-                      <CAlert color="success" className="mb-3">
-                        Credits added successfully!
-                      </CAlert>
-                    )}
-                    <div className="d-flex align-items-end">
-                      <div className="me-2" style={{ width: '200px' }}>
-                        <CInputGroup>
-                          <CInputGroupText>₹</CInputGroupText>
-                          <CFormInput 
-                            type="number" 
-                            min="100" 
-                            placeholder="Enter amount" 
-                            value={creditAmount}
-                            onChange={(e) => setCreditAmount(e.target.value)}
-                          />
-                        </CInputGroup>
-                      </div>
-                      <CButton 
-                        color="secondary" 
-                        onClick={() => setShowPaymentOptions(true)}
-                        disabled={!creditAmount || creditAmount < 100}
-                      >
-                        Add
-                      </CButton>
-                    </div>
-                    
-                    {showPaymentOptions && (
-                      <div className="payment-options-container mt-4">
-                        <h5 className="mb-3">Select payment method</h5>
-                        <div className="payment-methods-list">
-                          <div className="payment-method-option">
-                            <CFormCheck
-                              type="radio"
-                              name="creditPaymentMethod"
-                              id="credit-upi"
-                              value="upi"
-                              label="UPI"
-                              checked={creditPaymentMethod === 'upi'}
-                              onChange={handleCreditPaymentMethodChange}
-                            />
-                          </div>
-                          
-                          <div className="payment-method-option">
-                            <CFormCheck
-                              type="radio"
-                              name="creditPaymentMethod"
-                              id="credit-card"
-                              value="card"
-                              label="Credit/Debit Card"
-                              checked={creditPaymentMethod === 'card'}
-                              onChange={handleCreditPaymentMethodChange}
-                            />
-                          </div>
-                          
-                          <div className="payment-method-option">
-                            <CFormCheck
-                              type="radio"
-                              name="creditPaymentMethod"
-                              id="credit-netbanking"
-                              value="netbanking"
-                              label="Net Banking"
-                              checked={creditPaymentMethod === 'netbanking'}
-                              onChange={handleCreditPaymentMethodChange}
-                            />
-                          </div>
-                        </div>
-                        
-                        {creditPaymentMethod && (
-                          <div className="payment-form mt-4">
-                            {creditPaymentMethod === 'upi' && (
-                              <div className="upi-form">
-                                <CFormInput
-                                  type="text"
-                                  placeholder="Enter UPI ID"
-                                  className="mb-3"
-                                />
-                              </div>
-                            )}
-                            
-                            {creditPaymentMethod === 'card' && (
-                              <div className="card-form">
-                                <CFormInput
-                                  type="text"
-                                  placeholder="Card Number"
-                                  className="mb-2"
-                                />
-                                <CRow>
-                                  <CCol md={6}>
-                                    <CFormInput
-                                      type="text"
-                                      placeholder="MM/YY"
-                                      className="mb-2"
-                                    />
-                                  </CCol>
-                                  <CCol md={6}>
-                                    <CFormInput
-                                      type="text"
-                                      placeholder="CVV"
-                                      className="mb-2"
-                                    />
-                                  </CCol>
-                                </CRow>
-                              </div>
-                            )}
-                            
-                            {creditPaymentMethod === 'netbanking' && (
-                              <div className="netbanking-form">
-                                <CFormSelect
-                                  className="mb-3"
-                                >
-                                  <option value="">Select Bank</option>
-                                  <option value="sbi">State Bank of India</option>
-                                  <option value="hdfc">HDFC Bank</option>
-                                  <option value="icici">ICICI Bank</option>
-                                  <option value="axis">Axis Bank</option>
-                                </CFormSelect>
-                              </div>
-                            )}
-                            
-                            <div className="d-flex justify-content-end mt-3">
-                              <CButton
-                                color="secondary"
-                                variant="outline"
-                                onClick={() => setShowPaymentOptions(false)}
-                                className="me-2"
-                              >
-                                Cancel
-                              </CButton>
-                              <CButton
-                                color="primary"
-                                onClick={handleAddCredits}
-                                disabled={isProcessingCredits}
-                              >
-                                {isProcessingCredits ? 'Processing...' : 'Add Credits'}
-                              </CButton>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="subscription-settings">
-                    <div className="toggle-wrapper mb-3">
-                      <h4 className="toggle-title">Subscription payments</h4>
-                      <div className="custom-toggle">
-                        <CFormSwitch 
-                          id="subscriptionSwitch" 
-                          checked={autoPaySubscription}
-                          onChange={() => setAutoPaySubscription(!autoPaySubscription)}
-                          label=""
-                        />
-                      </div>
-                    </div>
-                    <p className="text-muted">Automatically pay for your subscriptions using credits.</p>
-                    
-                    <div className="toggle-wrapper mt-4 mb-3">
-                      <h4 className="toggle-title">Notify low balance</h4>
-                      <div className="custom-toggle">
-                        <CFormSwitch 
-                          id="lowBalanceSwitch" 
-                          checked={notifyLowBalance}
-                          onChange={() => setNotifyLowBalance(!notifyLowBalance)}
-                          label=""
-                        />
-                      </div>
-                    </div>
-                    <p className="text-muted mb-3">Billing contacts will receive email notification when balance falls below:</p>
-                    <div className="d-flex">
-                      <div style={{ width: '120px' }}>
-                        <CInputGroup>
-                          <CInputGroupText>₹</CInputGroupText>
-                          <CFormInput 
-                            type="number" 
-                            min="0" 
-                            value={lowBalanceThreshold}
-                            onChange={(e) => setLowBalanceThreshold(e.target.value)}
-                            disabled={!notifyLowBalance}
-                          />
-                        </CInputGroup>
-                      </div>
-                      <CButton 
-                        color="secondary" 
-                        className="ms-2"
-                        onClick={handleSaveThreshold}
-                      >
-                        Save
-                      </CButton>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CTabPane>
-            
-            <CTabPane role="tabpanel" visible={activeKey === 3}>
-              <div className="tab-content-wrapper">
                 {/* Billing Tab Content */}
                 <div className="billing-tab-content">
                   <h3 className="mb-4">Billing Details</h3>
@@ -922,7 +598,7 @@ function Billing() {
             </CTabPane>
             
             {/* Payment Requests Tab */}
-            <CTabPane role="tabpanel" visible={activeKey === 4}>
+            <CTabPane role="tabpanel" visible={activeKey === 3}>
               <PaymentRequests />
             </CTabPane>
           </CTabContent>
