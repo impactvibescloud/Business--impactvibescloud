@@ -237,62 +237,72 @@ function Templates() {
   }
   
   return (
-    <div className="templates-container">
-      <div className="templates-header">
-        <h1>Message Templates</h1>
-        <CButton color="primary" className="add-template-btn" onClick={openNewTemplateModal}>
-          <CIcon icon={cilPlus} /> New Template
-        </CButton>
-      </div>
-      
+    <div className="contact-list-container">
       <CCard className="mb-4">
         <CCardBody>
-          <div className="templates-filter-section">
-            <div className="search-container">
+          <CRow className="mb-4 align-items-center">
+            <CCol md={6}>
+              <h1 className="contact-list-title">Message Templates</h1>
+            </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
+              <CButton
+                color="primary"
+                className="add-contact-btn"
+                onClick={openNewTemplateModal}
+              >
+                <CIcon icon={cilPlus} className="me-2" />
+                New Template
+              </CButton>
+            </CCol>
+          </CRow>
+          
+          <CRow className="mb-4">
+            <CCol md={4}>
               <CInputGroup>
                 <CFormInput
                   placeholder="Search templates..."
                   value={searchTerm}
                   onChange={handleSearch}
                 />
-                <CButton color="primary" variant="outline">
+                <CButton type="button" color="primary" variant="outline">
                   <CIcon icon={cilSearch} />
                 </CButton>
               </CInputGroup>
-            </div>
-            
-            <div className="filter-container">
+            </CCol>
+            <CCol md={4}>
               <CDropdown>
                 <CDropdownToggle color="primary" variant="outline">
-                  <CIcon icon={cilFilter} /> {activeFilter}
+                  <CIcon icon={cilFilter} className="me-2" />
+                  {activeFilter}
                 </CDropdownToggle>
                 <CDropdownMenu>
                   <CDropdownItem 
                     onClick={() => handleFilterChange('All Templates')} 
                     active={activeFilter === 'All Templates'}
                   >
-                    All Templates {activeFilter === 'All Templates' && '✓'}
+                    All Templates
                   </CDropdownItem>
                   <CDropdownItem 
                     onClick={() => handleFilterChange('Active')} 
                     active={activeFilter === 'Active'}
                   >
-                    Active {activeFilter === 'Active' && '✓'}
+                    Active
                   </CDropdownItem>
                   <CDropdownItem 
                     onClick={() => handleFilterChange('Inactive')} 
                     active={activeFilter === 'Inactive'}
                   >
-                    Inactive {activeFilter === 'Inactive' && '✓'}
+                    Inactive
                   </CDropdownItem>
                 </CDropdownMenu>
               </CDropdown>
-            </div>
-          </div>
+            </CCol>
+          </CRow>
           
-          <CTable striped responsive className="templates-table">
+          <CTable hover responsive className="contact-table">
             <CTableHead>
               <CTableRow>
+                <CTableHeaderCell>S.NO</CTableHeaderCell>
                 <CTableHeaderCell>TEMPLATE NAME</CTableHeaderCell>
                 <CTableHeaderCell>CATEGORY</CTableHeaderCell>
                 <CTableHeaderCell>LAST MODIFIED</CTableHeaderCell>
@@ -301,71 +311,92 @@ function Templates() {
               </CTableRow>
             </CTableHead>
             <CTableBody>
-              {currentTemplates.map(template => (
-                <CTableRow key={template.id}>
-                  <CTableDataCell>{template.name}</CTableDataCell>
-                  <CTableDataCell>{template.category}</CTableDataCell>
-                  <CTableDataCell>{template.lastModified}</CTableDataCell>
-                  <CTableDataCell>
-                    <span className={`status-badge ${template.status.toLowerCase()}`}>
-                      {template.status}
-                    </span>
-                  </CTableDataCell>
-                  <CTableDataCell>
-                    <div className="template-actions">
-                      <CButton 
-                        color="primary" 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => openEditTemplateModal(template)}
-                        title="Edit Template"
-                        className="edit-button"
-                      >
-                        <CIcon icon={cilPencil} />
-                      </CButton>
-                      <CButton 
-                        color="danger" 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => confirmDelete(template.id)}
-                        title="Delete Template"
-                        className="delete-button"
-                      >
-                        <CIcon icon={cilTrash} />
-                      </CButton>
+              {currentTemplates.length === 0 ? (
+                <CTableRow>
+                  <CTableDataCell colSpan="6" className="text-center py-5">
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <CIcon icon={cilPlus} size="xl" />
+                      </div>
+                      <h4>No templates found</h4>
+                      <p>No message templates match your current search or filter criteria.</p>
                     </div>
                   </CTableDataCell>
                 </CTableRow>
-              ))}
+              ) : (
+                currentTemplates.map((template, index) => (
+                  <CTableRow key={template.id}>
+                    <CTableDataCell>
+                      <div className="contact-number">{indexOfFirstItem + index + 1}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="contact-name">{template.name}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="contact-phone">{template.category}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="contact-phone">{template.lastModified}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <span className={`status-badge ${template.status.toLowerCase()}`}>
+                        {template.status}
+                      </span>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="template-actions">
+                        <CButton 
+                          color="primary" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => openEditTemplateModal(template)}
+                          title="Edit Template"
+                          className="me-2"
+                        >
+                          <CIcon icon={cilPencil} />
+                        </CButton>
+                        <CButton 
+                          color="danger" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => confirmDelete(template.id)}
+                          title="Delete Template"
+                        >
+                          <CIcon icon={cilTrash} />
+                        </CButton>
+                      </div>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))
+              )}
             </CTableBody>
           </CTable>
           
           {totalPages > 1 && (
-            <CPagination aria-label="Page navigation" className="pagination-container">
+            <CPagination 
+              aria-label="Page navigation example"
+              className="justify-content-center mt-4"
+            >
               <CPaginationItem 
-                aria-label="Previous" 
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(currentPage - 1)}
               >
-                <span aria-hidden="true">&laquo;</span>
+                Previous
               </CPaginationItem>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              {[...Array(totalPages)].map((_, i) => (
                 <CPaginationItem 
-                  key={page} 
-                  active={page === currentPage}
-                  onClick={() => setCurrentPage(page)}
+                  key={i} 
+                  active={i + 1 === currentPage}
+                  onClick={() => setCurrentPage(i + 1)}
                 >
-                  {page}
+                  {i + 1}
                 </CPaginationItem>
               ))}
-              
               <CPaginationItem 
-                aria-label="Next" 
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(currentPage + 1)}
               >
-                <span aria-hidden="true">&raquo;</span>
+                Next
               </CPaginationItem>
             </CPagination>
           )}

@@ -188,6 +188,7 @@ function VirtualNumbers() {
         (num.number && num.number.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
         (num.extension && num.extension.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
         (num.city && num.city.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (num.type && num.type.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
         (Array.isArray(num.tag) && num.tag.some(tag =>
           tag && tag.toString().toLowerCase().includes(searchTerm.toLowerCase())
         ))
@@ -195,16 +196,45 @@ function VirtualNumbers() {
       if (!matchesSearch) return false
     }
 
-    // If 'All Numbers' is selected, do not filter by tag/type
+    // If 'All Numbers' is selected, return all numbers (no additional filtering)
     if (activeFilter === 'All Numbers') {
       return true
     }
 
-    // Filter by number type
+    // Filter by number type - check both num.type and num.tag array
     const filterLower = activeFilter.toLowerCase()
-    return Array.isArray(num.tag) && num.tag.some(tag =>
+    
+    // Check if the filter matches the direct type field
+    if (num.type && num.type.toString().toLowerCase() === filterLower) {
+      return true
+    }
+    
+    // Check if the filter matches any tag in the tag array
+    if (Array.isArray(num.tag) && num.tag.some(tag =>
       tag && tag.toString().toLowerCase() === filterLower
-    )
+    )) {
+      return true
+    }
+    
+    // Handle special filter mappings
+    if (filterLower === 'toll-free' && num.type && 
+        (num.type.toString().toLowerCase().includes('toll') || 
+         num.type.toString().toLowerCase().includes('free'))) {
+      return true
+    }
+    
+    if (filterLower === 'local' && num.type && 
+        num.type.toString().toLowerCase().includes('local')) {
+      return true
+    }
+    
+    if (filterLower === 'international' && num.type && 
+        (num.type.toString().toLowerCase().includes('international') || 
+         num.type.toString().toLowerCase().includes('global'))) {
+      return true
+    }
+
+    return false
   }) : []
   
   // Pagination
@@ -310,7 +340,7 @@ function VirtualNumbers() {
   }
   
   return (
-    <div className="virtual-numbers-container">
+    <div className="contact-list-container">
       {successMessage && (
         <CAlert color="success" className="mb-4" dismissible onClose={() => setSuccessMessage('')}>
           {successMessage}
@@ -320,13 +350,23 @@ function VirtualNumbers() {
       <CCard className="mb-4">
         <CCardBody>
           <CRow className="mb-4 align-items-center">
-            <CCol md={12}>
-              <h1 className="virtual-numbers-title">Virtual Numbers</h1>
+            <CCol md={6}>
+              <h1 className="contact-list-title">Virtual Numbers</h1>
+            </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
+              <CButton
+                color="primary"
+                className="add-contact-btn"
+                onClick={handleClearFilters}
+              >
+                <CIcon icon={cilTrash} className="me-2" />
+                Clear Filters
+              </CButton>
             </CCol>
           </CRow>
           
           <CRow className="mb-4">
-            <CCol md={6}>
+            <CCol md={4}>
               <CInputGroup>
                 <CFormInput
                   placeholder="Search numbers..."
@@ -338,7 +378,7 @@ function VirtualNumbers() {
                 </CButton>
               </CInputGroup>
             </CCol>
-            <CCol md={3}>
+            <CCol md={4}>
               <CFormSelect
                 value={activeFilter}
                 onChange={(e) => handleFilterSelect(e.target.value)}
@@ -349,15 +389,6 @@ function VirtualNumbers() {
                 <option value="International">International</option>
               </CFormSelect>
             </CCol>
-            <CCol md={3}>
-              <CButton
-                color="link"
-                onClick={handleClearFilters}
-                className="clear-filters-btn"
-              >
-                Clear filters
-              </CButton>
-            </CCol>
           </CRow>
 
           {error && (
@@ -366,7 +397,7 @@ function VirtualNumbers() {
             </CAlert>
           )}
 
-          <CTable hover responsive className="virtual-numbers-table">
+          <CTable hover responsive className="contact-table">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
@@ -374,7 +405,7 @@ function VirtualNumbers() {
                 <CTableHeaderCell>LOCATION</CTableHeaderCell>
                 <CTableHeaderCell>TYPE</CTableHeaderCell>
                 <CTableHeaderCell>TAGS</CTableHeaderCell>
-                <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
+                <CTableHeaderCell>ACTIONS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -401,52 +432,48 @@ function VirtualNumbers() {
                 currentNumbers.map((num, index) => (
                   <CTableRow key={num._id || `num-${num.number}`}>
                     <CTableDataCell>
-                      <div className="number-serial">{indexOfFirstItem + index + 1}</div>
+                      <div className="contact-number">{indexOfFirstItem + index + 1}</div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="number-cell">
-                        <CIcon icon={cilPhone} className="phone-icon me-2" />
-                        <span className="number-value">{num.number || '-'}</span>
+                      <div className="contact-name">
+                        <CIcon icon={cilPhone} className="me-2" />
+                        {num.number || '-'}
                       </div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="location-value">{num.city || '-'}</div>
+                      <div className="contact-phone">{num.city || '-'}</div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <CBadge color="primary" className="type-badge">
+                      <CBadge color="primary">
                         {num.type || (Array.isArray(num.tag) && num.tag.length > 0 ? num.tag[0] : 'Standard')}
                       </CBadge>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="tags-container">
+                      <div className="d-flex gap-1 flex-wrap">
                         {Array.isArray(num.tag) && num.tag.length > 0 ? (
                           num.tag.map((tag, tagIndex) => (
-                            <CBadge key={tagIndex} color="info" className="tag-badge me-1">
+                            <CBadge key={tagIndex} color="info" className="text-capitalize" style={{fontSize: '0.75rem'}}>
                               {tag}
                             </CBadge>
                           ))
                         ) : (
-                          <span className="text-muted">No tags</span>
+                          <span className="text-muted fst-italic">No tags</span>
                         )}
                       </div>
                     </CTableDataCell>
-                    <CTableDataCell className="text-center">
+                    <CTableDataCell>
                       <CTooltip content="Release this number">
                         <CButton 
                           color="danger"
                           size="sm"
-                          variant="outline" 
+                          variant="ghost" 
                           onClick={() => releaseNumber(num._id)}
                           disabled={releasingNumber === num._id}
-                          className="action-btn"
                         >
                           {releasingNumber === num._id ? (
                             <CSpinner size="sm" />
                           ) : (
-                            <>
-                              <CIcon icon={cilTrash} className="me-1" />
-                              Release
-                            </>
+                            <CIcon icon={cilTrash} />
                           )}
                         </CButton>
                       </CTooltip>

@@ -100,15 +100,15 @@ function AutodialCampaigns() {
   }
 
   return (
-    <div className="autodial-campaigns-container">
+    <div className="contact-list-container">
       <CCard className="mb-4">
         <CCardBody>
           <CRow className="mb-4 align-items-center">
             <CCol md={6}>
-              <h1 className="autodial-campaigns-title">Autodial Campaigns</h1>
+              <h1 className="contact-list-title">Autodial Campaigns</h1>
             </CCol>
             <CCol md={6} className="d-flex justify-content-end">
-              <CButton color="primary" className="add-campaign-btn">
+              <CButton color="primary" className="add-contact-btn">
                 <CIcon icon={cilPlus} className="me-2" />
                 New Campaign
               </CButton>
@@ -116,7 +116,7 @@ function AutodialCampaigns() {
           </CRow>
           
           <CRow className="mb-4">
-            <CCol md={6}>
+            <CCol md={4}>
               <CInputGroup>
                 <CFormInput
                   placeholder="Search campaigns..."
@@ -128,7 +128,7 @@ function AutodialCampaigns() {
                 </CButton>
               </CInputGroup>
             </CCol>
-            <CCol md={3}>
+            <CCol md={4}>
               <CFormSelect
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -139,18 +139,9 @@ function AutodialCampaigns() {
                 <option value="Paused">Paused</option>
               </CFormSelect>
             </CCol>
-            <CCol md={3}>
-              <CButton
-                color="link"
-                onClick={handleClearFilters}
-                className="clear-filters-btn"
-              >
-                Clear filters
-              </CButton>
-            </CCol>
           </CRow>
 
-          <CTable hover responsive className="campaigns-table">
+          <CTable hover responsive className="contact-table">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
@@ -178,10 +169,6 @@ function AutodialCampaigns() {
                       </div>
                       <h4>No campaigns found</h4>
                       <p>Create your first autodial campaign to get started.</p>
-                      <CButton color="primary" className="mt-3">
-                        <CIcon icon={cilPlus} className="me-2" />
-                        New Campaign
-                      </CButton>
                     </div>
                   </CTableDataCell>
                 </CTableRow>
@@ -189,19 +176,19 @@ function AutodialCampaigns() {
                 currentCampaigns.map((campaign, index) => (
                   <CTableRow key={campaign.id}>
                     <CTableDataCell>
-                      <div className="campaign-number">{indexOfFirstItem + index + 1}</div>
+                      <div className="contact-number">{indexOfFirstItem + index + 1}</div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="campaign-name">{campaign.name}</div>
+                      <div className="contact-name">{campaign.name}</div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="campaign-date">{campaign.createdOn}</div>
+                      <div className="contact-phone">{campaign.createdOn}</div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="campaign-contacts">{campaign.contacts.toLocaleString()}</div>
+                      <div className="contact-phone">{campaign.contacts.toLocaleString()}</div>
                     </CTableDataCell>
                     <CTableDataCell>
-                      <div className="campaign-reached">
+                      <div className="contact-phone">
                         {campaign.reached.toLocaleString()} ({Math.round((campaign.reached / campaign.contacts) * 100)}%)
                       </div>
                     </CTableDataCell>

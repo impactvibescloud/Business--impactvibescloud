@@ -21,6 +21,7 @@ import Billing from "./views/Billing/Billing";
 import ReportsAnalytics from "./views/ReportsAnalytics/ReportsAnalytics";
 import Payments from "./views/Payments/Payments";
 import Settings from "./views/Settings/Settings";
+import Department from "./views/Department/Department";
 
 
 //Businesses
@@ -821,6 +822,12 @@ const routes = [
     name: 'Call Logs',
     element: CallLogs,
     navName: "Call Logs",
+  },
+  {
+    path: '/department',
+    name: 'Department',
+    element: Department,
+    navName: "Department",
   },
   {
     path: "/campaigns/autodial",

@@ -1,122 +1,70 @@
-/* Survey Campaigns styles - ContactList matching */
-.survey-campaigns-container {
-  font-family: 'Roboto', sans-serif;
-  padding: 0;
+.contact-list-container {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 24px;
 }
 
-.survey-campaigns-title {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 1.75rem !important;
-  font-weight: 500 !important;
-  color: #333 !important;
-  margin-bottom: 0 !important;
+.contact-list-title {
+  font-size: 1.75rem;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  margin-bottom: 0;
+  color: #333;
 }
 
-.add-survey-btn {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  padding: 8px 16px !important;
-  border-radius: 6px !important;
-}
-
-.surveys-table {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-}
-
-.surveys-table th {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  color: #6c757d !important;
-  background-color: #f8f9fa !important;
-  border-bottom: 2px solid #dee2e6 !important;
-  padding: 12px 16px !important;
-}
-
-.surveys-table td {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-  padding: 12px 16px !important;
-  vertical-align: middle !important;
-  color: #495057 !important;
-}
-
-.survey-number {
-  font-family: 'Roboto', sans-serif !important;
-  font-weight: 500 !important;
-  color: #6c757d !important;
-}
-
-.survey-name {
-  font-family: 'Roboto', sans-serif !important;
-  font-weight: 500 !important;
-  color: #495057 !important;
-}
-
-.survey-date {
-  font-family: 'Roboto', sans-serif !important;
-  color: #6c757d !important;
-}
-
-.survey-responses {
-  font-family: 'Roboto', sans-serif !important;
-  font-weight: 500 !important;
-  color: #495057 !important;
-}
-
-.completion-rate-wrapper {
-  display: flex;
+.add-contact-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
-.completion-rate-bar {
-  flex-grow: 1;
-  height: 6px;
-  background-color: #ebedef;
-  border-radius: 3px;
+.add-contact-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.contact-table {
+  border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.completion-rate-progress {
-  height: 100%;
-  background-color: #2eb85c;
-  transition: width 0.3s ease;
+.contact-table thead th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: none;
+  padding: 16px 12px;
+  color: #6c757d;
 }
 
-.completion-rate-text {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.75rem !important;
-  color: #6c757d !important;
-  white-space: nowrap;
+.contact-table tbody td {
+  padding: 16px 12px;
+  border-top: 1px solid #dee2e6;
+  vertical-align: middle;
 }
 
-.status-badge {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.75rem !important;
-  font-weight: 500 !important;
-  padding: 4px 8px !important;
-  border-radius: 4px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
+.contact-number {
+  font-weight: 500;
+  color: #6c757d;
+  font-size: 0.9rem;
 }
 
-.clear-filters-btn {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-  color: #007bff !important;
-  text-decoration: none !important;
-  padding: 0 !important;
-  border: none !important;
-  background: none !important;
+.contact-name {
+  font-weight: 500;
+  color: #212529;
+  font-size: 0.95rem;
 }
 
-.clear-filters-btn:hover {
-  text-decoration: underline !important;
+.contact-phone {
+  color: #6c757d;
+  font-size: 0.9rem;
 }
 
 .empty-state {
@@ -130,56 +78,67 @@
 }
 
 .empty-state h4 {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 1.25rem !important;
-  font-weight: 500 !important;
-  color: #495057 !important;
-  margin-bottom: 8px !important;
+  color: #495057;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .empty-state p {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-  color: #6c757d !important;
-  margin-bottom: 24px !important;
+  color: #6c757d;
+  margin-bottom: 0;
+  font-size: 0.95rem;
 }
 
-/* Pagination styles */
-.page-link {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-  color: #007bff !important;
+/* Modal styles for create survey */
+.create-survey-modal .modal-dialog {
+  max-width: 600px;
 }
 
-.page-item.active .page-link {
-  background-color: #007bff !important;
-  border-color: #007bff !important;
+.question-section {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #f8f9fa;
 }
 
-/* Input styles */
-.form-control, .form-select {
-  font-family: 'Roboto', sans-serif !important;
-  font-size: 0.875rem !important;
-  border-radius: 6px !important;
+.question-header {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 16px;
+  font-size: 0.875rem;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .survey-campaigns-title {
-    font-size: 1.5rem !important;
-  }
-  
-  .surveys-table {
-    font-size: 0.8rem !important;
-  }
-  
-  .surveys-table th,
-  .surveys-table td {
-    padding: 8px 12px !important;
-  }
-  
-  .completion-rate-wrapper {
-    flex-direction: column;
-    gap: 4px;
-  }
+.add-question-btn {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.add-question-btn:hover {
+  text-decoration: underline;
+}
+
+.option-item {
+  padding: 8px 0;
+}
+
+.response-time-selector {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.recording-placeholder {
+  background-color: #f8f9fa;
+  border-color: #dee2e6 !important;
+  color: #6c757d;
+}
+
+.recording-placeholder:hover {
+  background-color: #e9ecef;
+}
+
+.audio-file-selected {
+  background-color: #fff;
+  border-color: #dee2e6;
 }

@@ -17,6 +17,7 @@ import {
   cilGroup,
   cilDescription,
   cilDollar,
+  cilBuilding,
 } from "@coreui/icons";
 import { CNavGroup, CNavItem, } from "@coreui/react";
 
@@ -55,6 +56,13 @@ const _nav = [
     icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
     to: "/callogs",
     group: "Call Logs",
+  },
+  {
+    component: CNavItem,
+    name: "Department",
+    icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />,
+    to: "/department",
+    group: "Department",
   },
   {
     component: CNavGroup,
