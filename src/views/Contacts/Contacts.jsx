@@ -423,7 +423,34 @@ function Contacts() {
               <CCol md={6}>
                 <h1 className="contact-list-title">Contacts</h1>
               </CCol>
-              <CCol md={6} className="d-flex justify-content-end">
+              <CCol md={6} className="d-flex justify-content-end align-items-center gap-2">
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  style={{ display: 'none' }}
+                  id="bulk-upload-input"
+                  onChange={async (e) => {
+                    if (!e.target.files || e.target.files.length === 0) return
+                    const file = e.target.files[0]
+                    const formData = new FormData()
+                    formData.append('file', file)
+                    try {
+                      await apiCall('/api/contacts/bulk-upload', 'POST', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+                      setSuccessAlert({ show: true, message: 'Contacts uploaded successfully.' })
+                    } catch (err) {
+                      setSuccessAlert({ show: true, message: 'Bulk upload failed.' })
+                    }
+                    e.target.value = ''
+                  }}
+                />
+                <CButton
+                  color="secondary"
+                  className="me-2"
+                  style={{ backgroundColor: '#e2e8f0', color: '#333', border: 'none' }}
+                  onClick={() => document.getElementById('bulk-upload-input').click()}
+                >
+                  Bulk Upload
+                </CButton>
                 <CButton color="primary" className="add-contact-btn" onClick={handleNewContact}>
                   <CIcon icon={cilPlus} className="me-2" />
                   New Contact

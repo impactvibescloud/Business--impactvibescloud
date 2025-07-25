@@ -22,12 +22,13 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilChart, cilCloudDownload, cilSearch } from '@coreui/icons'
+import { apiCall } from '../../config/api'
 import './ReportsAnalytics.css'
 
 const ReportsAnalytics = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [reportType, setReportType] = useState('call-logs')
+  const [reportType, setReportType] = useState('data-access-logs')
   const [dateRange, setDateRange] = useState('today')
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -101,30 +102,79 @@ const ReportsAnalytics = () => {
 
   const fetchReportData = async () => {
     setLoading(true)
+    setError(null)
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      if (reportType === 'call-logs') {
+      if (reportType === 'data-access-logs') {
+        const response = await apiCall('api/data-access-logs', 'GET').catch(err => {
+          console.error('API call failed:', err)
+          throw err
+        })
+        
+        let dataArray = null
+        
+        if (response && response.data && Array.isArray(response.data)) {
+          dataArray = response.data
+        } else if (response && Array.isArray(response)) {
+          dataArray = response
+        } else if (response && response.logs && Array.isArray(response.logs)) {
+          dataArray = response.logs
+        } else if (response && response.result && Array.isArray(response.result)) {
+          dataArray = response.result
+        } else if (response && typeof response === 'object') {
+          const arrayProp = Object.entries(response).find(([_, val]) => Array.isArray(val))
+          if (arrayProp) {
+            dataArray = arrayProp[1]
+          }
+        }
+        
+        if (dataArray && dataArray.length > 0) {
+          setReportData(dataArray.map((log, index) => {
+            const userEmail = (log.user && log.user.email) || log.userEmail || log.user_email || log.email || 'N/A'
+            return {
+              id: String(log._id || log.id || `log-${index}-${Date.now()}`),
+              userId: String(userEmail),
+              accessType: String(log.action || log.accessType || log.access_type || log.type || 'N/A'),
+              resourceAccessed: String(log.resource || log.resourceAccessed || log.resource_accessed || 'N/A'),
+              timestamp: String(log.createdAt || log.timestamp || log.created_at || log.date || new Date().toISOString()),
+              ipAddress: String(log.ipAddress || log.ip_address || log.ip || 'N/A'),
+              status: String(log.status || 'Success')
+            }
+          }))
+        } else {
+          setReportData([])
+        }
+      } else if (reportType === 'call-logs') {
+        await new Promise(resolve => setTimeout(resolve, 1000))
         setReportData(mockCallLogsData)
       } else if (reportType === 'agent-performance') {
+        await new Promise(resolve => setTimeout(resolve, 1000))
         setReportData(mockAgentData)
       } else {
         setReportData([])
       }
     } catch (err) {
-      setError('Failed to fetch report data')
+      console.error('Failed to fetch report data:', err)
+      setError('Failed to fetch report data. Please try again later.')
+      setReportData([])
     } finally {
-      setLoading(false)
+      setTimeout(() => {
+        setLoading(false)
+      }, 100)
     }
   }
 
   const handleDownloadReport = () => {
-    // Create CSV content
     let csvContent = ''
     let headers = []
     
-    if (reportType === 'call-logs') {
+    if (reportType === 'data-access-logs') {
+      headers = ['ID', 'User Email', 'Action', 'Resource', 'Timestamp', 'IP Address']
+      csvContent = headers.join(',') + '\n'
+      reportData.forEach(row => {
+        csvContent += `"${row.id}","${row.userId}","${row.accessType}","${row.resourceAccessed}","${row.timestamp}","${row.ipAddress}"\n`
+      })
+    } else if (reportType === 'call-logs') {
       headers = ['ID', 'Caller', 'Receiver', 'Duration', 'Timestamp', 'Status', 'Type']
       csvContent = headers.join(',') + '\n'
       reportData.forEach(row => {
@@ -138,7 +188,6 @@ const ReportsAnalytics = () => {
       })
     }
 
-    // Download CSV file
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -151,13 +200,33 @@ const ReportsAnalytics = () => {
   }
 
   const filteredData = reportData.filter(item => {
-    if (reportType === 'call-logs') {
-      return item.caller.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             item.receiver.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             item.status.toLowerCase().includes(searchTerm.toLowerCase())
+    if (reportType === 'data-access-logs') {
+      const userId = String(item.userId || '').toLowerCase()
+      const accessType = String(item.accessType || '').toLowerCase()
+      const resourceAccessed = String(item.resourceAccessed || '').toLowerCase()
+      const status = String(item.status || '').toLowerCase()
+      const searchLower = searchTerm.toLowerCase()
+      
+      return userId.includes(searchLower) ||
+             accessType.includes(searchLower) ||
+             resourceAccessed.includes(searchLower) ||
+             status.includes(searchLower)
+    } else if (reportType === 'call-logs') {
+      const caller = String(item.caller || '').toLowerCase()
+      const receiver = String(item.receiver || '').toLowerCase()
+      const status = String(item.status || '').toLowerCase()
+      const searchLower = searchTerm.toLowerCase()
+      
+      return caller.includes(searchLower) ||
+             receiver.includes(searchLower) ||
+             status.includes(searchLower)
     } else if (reportType === 'agent-performance') {
-      return item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             item.status.toLowerCase().includes(searchTerm.toLowerCase())
+      const name = String(item.name || '').toLowerCase()
+      const status = String(item.status || '').toLowerCase()
+      const searchLower = searchTerm.toLowerCase()
+      
+      return name.includes(searchLower) ||
+             status.includes(searchLower)
     }
     return true
   })
@@ -182,7 +251,18 @@ const ReportsAnalytics = () => {
   }
 
   const renderTableHeaders = () => {
-    if (reportType === 'call-logs') {
+    if (reportType === 'data-access-logs') {
+      return (
+        <CTableRow>
+          <CTableHeaderCell>S.NO</CTableHeaderCell>
+          <CTableHeaderCell>USER EMAIL</CTableHeaderCell>
+          <CTableHeaderCell>ACTION</CTableHeaderCell>
+          <CTableHeaderCell>RESOURCE</CTableHeaderCell>
+          <CTableHeaderCell>TIMESTAMP</CTableHeaderCell>
+          <CTableHeaderCell>IP ADDRESS</CTableHeaderCell>
+        </CTableRow>
+      )
+    } else if (reportType === 'call-logs') {
       return (
         <CTableRow>
           <CTableHeaderCell>S.NO</CTableHeaderCell>
@@ -212,7 +292,25 @@ const ReportsAnalytics = () => {
         <CTableDataCell>
           <div className="contact-number">{indexOfFirstItem + index + 1}</div>
         </CTableDataCell>
-        {reportType === 'call-logs' ? (
+        {reportType === 'data-access-logs' ? (
+          <>
+            <CTableDataCell>
+              <div className="contact-name">{String(item.userId || 'N/A')}</div>
+            </CTableDataCell>
+            <CTableDataCell>
+              <div className="contact-phone">{String(item.accessType || 'N/A')}</div>
+            </CTableDataCell>
+            <CTableDataCell>
+              <div className="contact-phone">{String(item.resourceAccessed || 'N/A')}</div>
+            </CTableDataCell>
+            <CTableDataCell>
+              <div className="contact-phone">{new Date(item.timestamp).toLocaleString()}</div>
+            </CTableDataCell>
+            <CTableDataCell>
+              <div className="contact-phone">{String(item.ipAddress || 'N/A')}</div>
+            </CTableDataCell>
+          </>
+        ) : reportType === 'call-logs' ? (
           <>
             <CTableDataCell>
               <div className="contact-name">{item.caller}</div>
@@ -274,6 +372,7 @@ const ReportsAnalytics = () => {
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value)}
               >
+                <option value="data-access-logs">Data Access Logs</option>
                 <option value="call-logs">Call Logs Report</option>
                 <option value="agent-performance">Agent Performance Report</option>
                 <option value="campaign-analytics">Campaign Analytics</option>
@@ -346,32 +445,33 @@ const ReportsAnalytics = () => {
           </CTable>
 
           {totalPages > 1 && (
-            <CPagination 
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
-                  onClick={() => handlePageChange(i + 1)}
+            <CRow className="mt-4">
+              <CCol className="d-flex justify-content-between align-items-center">
+                <div className="pagination-info">
+                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} entries
+                </div>
+                <CPagination 
+                  aria-label="Page navigation example"
+                  className="mb-0"
                 >
-                  {i + 1}
-                </CPaginationItem>
-              ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
+                  <CPaginationItem 
+                    disabled={currentPage === 1} 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                  >
+                    Previous
+                  </CPaginationItem>
+                  <CPaginationItem active>
+                    {currentPage} of {totalPages}
+                  </CPaginationItem>
+                  <CPaginationItem 
+                    disabled={currentPage === totalPages} 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                  >
+                    Next
+                  </CPaginationItem>
+                </CPagination>
+              </CCol>
+            </CRow>
           )}
         </CCardBody>
       </CCard>
