@@ -4,7 +4,7 @@ import axios from 'axios'
 
 // API Configuration with fallback support
 export const API_CONFIG = {
-  LOCAL_URL: 'http://localhost:5040/api',
+  LOCAL_URL: 'http://localhost:5042/api', // Updated to use port 5042 as per user's API
   PROXY_URL: '/api', // Using proxy from package.json
   PRODUCTION_URL: 'https://api-impactvibescloud.onrender.com/api',
   AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
@@ -49,6 +49,10 @@ export const ENDPOINTS = {
   
   // Virtual Numbers endpoints
   NUMBERS: '/api/numbers',
+  
+  // Department endpoints
+  DEPARTMENTS: '/api/departments',
+  DEPARTMENT_BY_ID: (id) => `/api/departments/${id}`,
   
   // Plan endpoints
   PLANS: (planId) => `/api/plans/${planId}`,

@@ -16,6 +16,18 @@ import { cibGmail } from "@coreui/icons";
 import { createRoot } from "react-dom/client";
 import { setupAxiosInterceptors } from './utils/axiosInterceptors'
 import { setupFetchInterceptor } from './utils/fetchInterceptor'
+import { disableConsoleOutput } from './utils/logger'
+
+// Configure debug mode - set to true to enable console logs
+window.DEBUG_MODE = false;
+
+// Disable non-essential console output for better performance
+if (!window.DEBUG_MODE) {
+  disableConsoleOutput();
+}
+
+// Configure debug mode
+window.DEBUG_MODE = false; // Set this to false to disable most console logs
 
 const setupAxios = () => {
   // Use proxy configuration - set baseURL to empty since package.json proxy handles routing
@@ -33,7 +45,9 @@ const setupAxios = () => {
   // Setup fetch interceptor for any remaining direct fetch calls
   setupFetchInterceptor();
   
-  console.log('✅ Axios and Fetch setup complete - baseURL:', axios.defaults.baseURL);
+  if (window.DEBUG_MODE) {
+    console.log('✅ Axios and Fetch setup complete - baseURL:', axios.defaults.baseURL);
+  }
 };
 
 setupAxios();

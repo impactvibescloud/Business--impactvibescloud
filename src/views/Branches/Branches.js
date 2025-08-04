@@ -32,6 +32,7 @@ import { cilPlus, cilPencil, cilTrash, cilSearch } from '@coreui/icons'
 import axios from "axios";
 import Swal from "sweetalert2";
 import './Branches.css'
+import { API_CONFIG } from '../../config/api';
 
 const isAuthenticated = () => localStorage.getItem("authToken");
 
@@ -58,6 +59,8 @@ const Branches = () => {
   const [selectedDid, setSelectedDid] = useState("");
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
   const [expandedAgent, setExpandedAgent] = useState(null);
+  const [callDetails, setCallDetails] = useState({});
+  const [loadingCallDetails, setLoadingCallDetails] = useState({});
   const token = isAuthenticated();
 
   useEffect(() => {
@@ -311,8 +314,107 @@ const Branches = () => {
     }
   };
 
+  const fetchCallDetails = async (branch) => {
+    // Extract user ID from the branch - prioritize manager's userId
+    const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
+    
+    try {
+      // Set loading state for this user
+      setLoadingCallDetails(prevState => ({
+        ...prevState,
+        [userId]: true
+      }));
+      
+      console.log('Using userId for state management:', userId);
+      
+      console.log('Branch data:', branch);
+      console.log('Looking for user ID in branch:', {
+        'manager?.userId': branch.manager?.userId,
+        'branch.userId': branch.userId,
+        'branch.managerId': branch.managerId,
+        'fallback to branch._id': branch._id,
+        'selected userId': userId
+      });
+      
+      if (!userId) {
+        console.error("No user ID found for this branch:", branch);
+        setLoadingCallDetails(prevState => ({
+          ...prevState,
+          [userId]: false
+        }));
+        return;
+      }
+      
+      console.log(`Fetching call details for user ID: ${userId}`);
+      
+      // Construct URL using configuration from API_CONFIG
+      const baseUrl = API_CONFIG.LOCAL_URL.includes('localhost:5042') 
+        ? 'http://localhost:5040' // Use the correct port for call-uses API
+        : API_CONFIG.PRODUCTION_URL.replace('/api', ''); // For production
+        
+      const apiUrl = `${baseUrl}/api/call-uses/user/${userId}`;
+      console.log('API URL being called:', apiUrl);
+      
+      // Using the API endpoint with full URL as shown in the curl command
+      const response = await axios.get(
+        apiUrl,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache,no-store'
+          },
+        }
+      );
+      
+      console.log('Call details response:', response.data);
+      console.log('Response structure:', JSON.stringify(response.data, null, 2));
+      
+      // Check if we need to access data through a nested property
+      let callDetailsData = {};
+      
+      if (response.data && response.data.callUses && response.data.callUses.length > 0) {
+        // Extract the first call use object from the array
+        callDetailsData = response.data.callUses[0];
+        console.log('Found call data in callUses array:', callDetailsData);
+      } else if (response.data && response.data.data) {
+        callDetailsData = response.data.data;
+        console.log('Using nested data property');
+      } else {
+        callDetailsData = response.data;
+        console.log('Using response data directly');
+      }
+      
+      // Store the call details in state
+      setCallDetails(prevDetails => ({
+        ...prevDetails,
+        [userId]: callDetailsData
+      }));
+    } catch (error) {
+      console.error("Error fetching call details:", error);
+      console.error("Error details:", error.response ? error.response.data : 'No response data');
+    } finally {
+      // Set loading state to false
+      setLoadingCallDetails(prevState => ({
+        ...prevState,
+        [userId]: false
+      }));
+    }
+  };
+
   const handleAgentRowClick = (branch) => {
-    setExpandedAgent(expandedAgent === branch._id ? null : branch._id);
+    const newExpandedId = expandedAgent === branch._id ? null : branch._id;
+    setExpandedAgent(newExpandedId);
+    
+    // If expanding and we don't have call details yet, fetch them
+    if (newExpandedId) {
+      // Get the user ID for state management consistency
+      const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
+      if (!callDetails[userId]) {
+        fetchCallDetails(branch);
+      }
+    }
   };
 
   return (
@@ -472,32 +574,51 @@ const Branches = () => {
                             <CRow className="mb-4">
                               <CCol>
                                 <h6 className="mb-3">Call Details</h6>
-                                <CRow>
-                                  <CCol md={3}>
-                                    <div className="text-center p-3 border rounded bg-white">
-                                      <h4 className="text-primary mb-1">45</h4>
-                                      <small className="text-muted">Outbound Calls</small>
+                                {(() => {
+                                  // Get the user ID for state management consistency
+                                  const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
+                                  return loadingCallDetails[userId] ? (
+                                    <div className="text-center py-4">
+                                      <CSpinner color="primary" />
+                                      <div className="mt-2">Loading call details...</div>
                                     </div>
-                                  </CCol>
-                                  <CCol md={3}>
-                                    <div className="text-center p-3 border rounded bg-white">
-                                      <h4 className="text-success mb-1">32</h4>
-                                      <small className="text-muted">Inbound Calls</small>
-                                    </div>
-                                  </CCol>
-                                  <CCol md={3}>
-                                    <div className="text-center p-3 border rounded bg-white">
-                                      <h4 className="text-warning mb-1">8</h4>
-                                      <small className="text-muted">Missed Calls</small>
-                                    </div>
-                                  </CCol>
-                                  <CCol md={3}>
-                                    <div className="text-center p-3 border rounded bg-white">
-                                      <h4 className="text-danger mb-1">3</h4>
-                                      <small className="text-muted">Hang Calls</small>
-                                    </div>
-                                  </CCol>
-                                </CRow>
+                                  ) : (
+                                    <CRow>
+                                      <CCol md={3}>
+                                        <div className="text-center p-3 border rounded bg-white">
+                                          <h4 className="text-primary mb-1">
+                                            {callDetails[userId]?.outboundCalls || 0}
+                                          </h4>
+                                          <small className="text-muted">Outbound Calls</small>
+                                        </div>
+                                      </CCol>
+                                      <CCol md={3}>
+                                        <div className="text-center p-3 border rounded bg-white">
+                                          <h4 className="text-success mb-1">
+                                            {callDetails[userId]?.inboundCalls || 0}
+                                          </h4>
+                                          <small className="text-muted">Inbound Calls</small>
+                                        </div>
+                                      </CCol>
+                                      <CCol md={3}>
+                                        <div className="text-center p-3 border rounded bg-white">
+                                          <h4 className="text-warning mb-1">
+                                            {callDetails[userId]?.missedCalls || 0}
+                                          </h4>
+                                          <small className="text-muted">Missed Calls</small>
+                                        </div>
+                                      </CCol>
+                                      <CCol md={3}>
+                                        <div className="text-center p-3 border rounded bg-white">
+                                          <h4 className="text-danger mb-1">
+                                            {callDetails[userId]?.hangCalls || 0}
+                                          </h4>
+                                          <small className="text-muted">Hang Calls</small>
+                                        </div>
+                                      </CCol>
+                                    </CRow>
+                                  );
+                                })()}
                               </CCol>
                             </CRow>
 
