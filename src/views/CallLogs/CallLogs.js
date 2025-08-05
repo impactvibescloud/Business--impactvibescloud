@@ -57,6 +57,8 @@ const CallLogs = () => {
         const data = await apiCall(ENDPOINTS.CALL_LOGS)
         
         if (data && data.success && Array.isArray(data.data)) {
+          // Handle the specific response format where data is in data property
+          console.log('API Response:', data)
           setCallLogs(data.data)
         } else if (Array.isArray(data)) {
           setCallLogs(data)
@@ -106,7 +108,7 @@ const CallLogs = () => {
 
   // Filter call logs by search term and status filter
   const filteredCallLogs = callLogs.filter(log => {
-    // Safely access properties
+    // Safely access properties based on the response format
     const contact = String(log.contact || '')
     const callType = String(log.callType || '')
     const callDate = log.callDate || log.createdAt || ''
@@ -126,7 +128,7 @@ const CallLogs = () => {
     let matchesFilter = true
     if (activeFilter !== 'All Calls') {
       if (activeFilter === 'Success') {
-        matchesFilter = status.toLowerCase() === 'success'
+        matchesFilter = status.toLowerCase() === 'success' || status.toLowerCase() === 'completed'
       } else if (activeFilter === 'Failed') {
         matchesFilter = status.toLowerCase().includes('fail') || status.toLowerCase().includes('error')
       } else if (activeFilter === 'Outgoing') {
@@ -336,7 +338,7 @@ const CallLogs = () => {
                         </CTableDataCell>
                         <CTableDataCell>
                           <CBadge 
-                            color={status.toLowerCase() === 'success' ? 'success' : 
+                            color={status.toLowerCase() === 'success' || status.toLowerCase() === 'completed' ? 'success' : 
                                    status.toLowerCase().includes('fail') ? 'danger' : 
                                    status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
                             className="status-badge"
@@ -355,30 +357,46 @@ const CallLogs = () => {
                                 <CCol md={6}>
                                   <div className="call-detail-item mb-3">
                                     <strong>Call Initiated By:</strong>
-                                    <span className="ms-2">{log.initiatedBy || log.caller || 'Unknown'}</span>
+                                    <span className="ms-2">{log.callInitiatedBy || 'Unknown'}</span>
                                   </div>
                                   <div className="call-detail-item mb-3">
                                     <strong>Call Received By:</strong>
-                                    <span className="ms-2">{log.receivedBy || log.receiver || 'Unknown'}</span>
+                                    <span className="ms-2">{log.callReceivedBy || 'N/A'}</span>
                                   </div>
                                   <div className="call-detail-item mb-3">
                                     <strong>Call Rejected By:</strong>
-                                    <span className="ms-2">{log.rejectedBy || 'N/A'}</span>
+                                    <span className="ms-2">{log.callRejectedBy || 'N/A'}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Virtual Number:</strong>
+                                    <span className="ms-2">{log.virtualNumber || 'N/A'}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Team:</strong>
+                                    <span className="ms-2">{log.team || 'N/A'}</span>
                                   </div>
                                 </CCol>
                                 <CCol md={6}>
                                   <div className="call-detail-item mb-3">
                                     <strong>Hang Up By:</strong>
-                                    <span className="ms-2">{log.hangUpBy || log.endedBy || 'Unknown'}</span>
+                                    <span className="ms-2">{log.hangUpBy || 'Unknown'}</span>
                                   </div>
                                   <div className="call-detail-item mb-3">
                                     <strong>Call Duration:</strong>
-                                    <span className="ms-2">{formatDuration(log.duration || log.callDuration)}</span>
+                                    <span className="ms-2">{formatDuration(log.callDuration || log.duration)}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Call Cost:</strong>
+                                    <span className="ms-2">${log.cost ? log.cost.toFixed(2) : 'N/A'}</span>
+                                  </div>
+                                  <div className="call-detail-item mb-3">
+                                    <strong>Notes:</strong>
+                                    <span className="ms-2">{log.notes || 'No notes available'}</span>
                                   </div>
                                   <div className="call-detail-item mb-3">
                                     <strong>Call Recording:</strong>
                                     <div className="ms-2 d-flex gap-2">
-                                      {log.recordingUrl || log.recording ? (
+                                      {log.callRecording ? (
                                         <>
                                           <CButton 
                                             size="sm" 
@@ -386,7 +404,7 @@ const CallLogs = () => {
                                             variant="outline"
                                             onClick={(e) => {
                                               e.stopPropagation()
-                                              handlePlayRecording(log.recordingUrl || log.recording)
+                                              handlePlayRecording(log.callRecording)
                                             }}
                                           >
                                             <CIcon icon={cilMediaPlay} className="me-1" />
@@ -399,7 +417,7 @@ const CallLogs = () => {
                                             onClick={(e) => {
                                               e.stopPropagation()
                                               handleDownloadRecording(
-                                                log.recordingUrl || log.recording, 
+                                                log.callRecording, 
                                                 `call-recording-${log._id}.mp3`
                                               )
                                             }}
@@ -415,6 +433,22 @@ const CallLogs = () => {
                                   </div>
                                 </CCol>
                               </CRow>
+                              {log.tags && log.tags.length > 0 && (
+                                <CRow className="mt-3">
+                                  <CCol md={12}>
+                                    <div className="call-detail-item">
+                                      <strong>Tags:</strong>
+                                      <div className="ms-2 mt-2 d-flex flex-wrap gap-2">
+                                        {log.tags.map((tag, i) => (
+                                          <CBadge key={i} color="info" className="py-2 px-3">
+                                            {tag}
+                                          </CBadge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </CCol>
+                                </CRow>
+                              )}
                             </div>
                           </CCollapse>
                         </CTableDataCell>

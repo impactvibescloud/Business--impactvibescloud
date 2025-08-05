@@ -23,6 +23,31 @@ let connectionQuality = 'good' // good, poor, offline
 let failedRequestCount = 0
 const MAX_FAILED_REQUESTS = 5
 
+// Logging control
+const ENABLE_VERBOSE_LOGS = false // Set to false to disable most logs
+
+// Centralized logging function
+const log = (type, ...args) => {
+  if (!ENABLE_VERBOSE_LOGS && type !== 'error') {
+    return // Skip non-error logs when verbose logging is disabled
+  }
+  
+  // Only log errors by default
+  switch(type) {
+    case 'log':
+      console.log(...args)
+      break
+    case 'warn':
+      console.warn(...args)
+      break
+    case 'error':
+      console.error(...args)
+      break
+    default:
+      console.log(...args)
+  }
+}
+
 // Generate fallback data based on endpoint
 const generateFallbackData = (url) => {
   if (url.includes('/config')) {
@@ -74,17 +99,15 @@ export const setupAxiosInterceptors = () => {
         timestamp: Date.now()
       }
       
-      // Auto-extend session for API calls (except auth endpoints)
-      if (!config.url?.includes('/login') && !config.url?.includes('/logout')) {
-        const now = Date.now()
-        if (now - lastSessionExtension > SESSION_EXTENSION_INTERVAL) {
-          lastSessionExtension = now
-          localStorage.setItem('lastAPICall', now.toString())
-          console.log('🔄 Session extended via API call')
-        }
-      }
-      
-      // Add retry configuration for important requests
+          // Auto-extend session for API calls (except auth endpoints)
+        if (!config.url?.includes('/login') && !config.url?.includes('/logout')) {
+          const now = Date.now()
+          if (now - lastSessionExtension > SESSION_EXTENSION_INTERVAL) {
+            lastSessionExtension = now
+            localStorage.setItem('lastAPICall', now.toString())
+            // Remove console log for session extension
+          }
+        }      // Add retry configuration for important requests
       if (!config.retry) {
         config.retry = {
           retries: 3,
@@ -101,14 +124,14 @@ export const setupAxiosInterceptors = () => {
       if (config.url && config.url.includes('https://api-impactvibescloud.onrender.com')) {
         const originalUrl = config.url
         config.url = config.url.replace('https://api-impactvibescloud.onrender.com', '')
-        console.log('🔄 Redirected axios request from', originalUrl, 'to', config.url)
+        // Remove console log for URL redirection
       }
       
       // Also handle URLs that start with the production API without https
       if (config.url && config.url.includes('api-impactvibescloud.onrender.com')) {
         const originalUrl = config.url
         config.url = config.url.replace(/.*api-impactvibescloud\.onrender\.com/, '')
-        console.log('🔄 Redirected axios request from', originalUrl, 'to', config.url)
+        // Remove console log for URL redirection
       }
       
       return config
@@ -153,7 +176,7 @@ export const setupAxiosInterceptors = () => {
             cachedResponse: cached.data,
             cacheAge: Date.now() - cached.timestamp
           }
-          console.log(`📦 Using cached data for: ${url} (${Math.round((Date.now() - cached.timestamp) / 1000)}s old)`)
+          // Remove log for cached data
         } else {
           // Adaptive request throttling based on connection quality
           const now = Date.now()
@@ -171,7 +194,7 @@ export const setupAxiosInterceptors = () => {
           
           // If we've made too many requests recently, serve cached data or fallback
           if (requestTimestamps.length >= requestLimit) {
-            console.warn(`🚦 Request throttled for: ${url} - serving cached/fallback data`)
+            // Remove throttle warning
             
             // Serve cached data even if expired, or fallback data
             if (cached) {
@@ -512,7 +535,11 @@ export const setupAxiosInterceptors = () => {
   )
   
   interceptorsSetup = true
-  console.log('✅ Axios interceptors setup complete with session management')
+  
+  // Only log in debug mode
+  if (window.DEBUG_MODE) {
+    console.log('✅ Axios interceptors setup complete with session management')
+  }
 }
 
 export default setupAxiosInterceptors

@@ -26,14 +26,22 @@ import { apiCall } from '../../config/api'
 import './ReportsAnalytics.css'
 
 const ReportsAnalytics = () => {
+  // API Configuration for business contact person data logs
+  const API_CONFIG = {
+    businessContactPersonId: '684fe39ca8254e8906e99aab',
+    authToken: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
+  }
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [reportType, setReportType] = useState('data-access-logs')
   const [dateRange, setDateRange] = useState('today')
   const [searchTerm, setSearchTerm] = useState('')
+  const [resourceFilter, setResourceFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [reportData, setReportData] = useState([])
+  const [availableResources, setAvailableResources] = useState([])
 
   // Mock data for demonstration
   const mockCallLogsData = [
@@ -98,6 +106,10 @@ const ReportsAnalytics = () => {
 
   useEffect(() => {
     fetchReportData()
+    // Reset resource filter when report type changes
+    if (reportType !== 'data-access-logs') {
+      setResourceFilter('all')
+    }
   }, [reportType, dateRange])
 
   const fetchReportData = async () => {
@@ -106,9 +118,25 @@ const ReportsAnalytics = () => {
     
     try {
       if (reportType === 'data-access-logs') {
-        const response = await apiCall('api/data-access-logs', 'GET').catch(err => {
-          console.error('API call failed:', err)
-          throw err
+        // Fetch business contact person related data logs
+        const response = await apiCall(
+          `api/data-access-logs/user/${API_CONFIG.businessContactPersonId}`, 
+          'GET', 
+          null, 
+          {
+            'Authorization': API_CONFIG.authToken,
+            'Content-Type': 'application/json'
+          }
+        ).catch(err => {
+          console.error('Business contact person data logs API call failed:', err)
+          // If the specific API fails, show a more descriptive error
+          if (err.response && err.response.status === 401) {
+            throw new Error('Authentication failed. Please check the authorization token.')
+          } else if (err.response && err.response.status === 404) {
+            throw new Error('Business contact person not found or no data available.')
+          } else {
+            throw new Error('Failed to fetch business contact person data logs.')
+          }
         })
         
         let dataArray = null
@@ -129,7 +157,7 @@ const ReportsAnalytics = () => {
         }
         
         if (dataArray && dataArray.length > 0) {
-          setReportData(dataArray.map((log, index) => {
+          const processedData = dataArray.map((log, index) => {
             const userEmail = (log.user && log.user.email) || log.userEmail || log.user_email || log.email || 'N/A'
             return {
               id: String(log._id || log.id || `log-${index}-${Date.now()}`),
@@ -140,9 +168,18 @@ const ReportsAnalytics = () => {
               ipAddress: String(log.ipAddress || log.ip_address || log.ip || 'N/A'),
               status: String(log.status || 'Success')
             }
-          }))
+          })
+          
+          setReportData(processedData)
+          
+          // Extract unique resources for filter dropdown
+          const uniqueResources = [...new Set(processedData.map(item => item.resourceAccessed))]
+            .filter(resource => resource !== 'N/A')
+            .sort()
+          setAvailableResources(uniqueResources)
         } else {
           setReportData([])
+          setAvailableResources([])
         }
       } else if (reportType === 'call-logs') {
         await new Promise(resolve => setTimeout(resolve, 1000))
@@ -155,7 +192,7 @@ const ReportsAnalytics = () => {
       }
     } catch (err) {
       console.error('Failed to fetch report data:', err)
-      setError('Failed to fetch report data. Please try again later.')
+      setError(err.message || 'Failed to fetch report data. Please try again later.')
       setReportData([])
     } finally {
       setTimeout(() => {
@@ -207,10 +244,17 @@ const ReportsAnalytics = () => {
       const status = String(item.status || '').toLowerCase()
       const searchLower = searchTerm.toLowerCase()
       
-      return userId.includes(searchLower) ||
-             accessType.includes(searchLower) ||
-             resourceAccessed.includes(searchLower) ||
-             status.includes(searchLower)
+      // Apply search filter
+      const matchesSearch = userId.includes(searchLower) ||
+                           accessType.includes(searchLower) ||
+                           resourceAccessed.includes(searchLower) ||
+                           status.includes(searchLower)
+      
+      // Apply resource filter
+      const matchesResource = resourceFilter === 'all' || 
+                             item.resourceAccessed === resourceFilter
+      
+      return matchesSearch && matchesResource
     } else if (reportType === 'call-logs') {
       const caller = String(item.caller || '').toLowerCase()
       const receiver = String(item.receiver || '').toLowerCase()
@@ -230,6 +274,11 @@ const ReportsAnalytics = () => {
     }
     return true
   })
+
+  // Reset current page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, resourceFilter])
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage
@@ -367,19 +416,19 @@ const ReportsAnalytics = () => {
           
           {/* Filters Section */}
           <CRow className="mb-4">
-            <CCol md={3}>
+            {/* <CCol md={2}>
               <CFormSelect
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value)}
               >
-                <option value="data-access-logs">Data Access Logs</option>
+                <option value="data-access-logs">Business Data Logs</option>
                 <option value="call-logs">Call Logs Report</option>
                 <option value="agent-performance">Agent Performance Report</option>
                 <option value="campaign-analytics">Campaign Analytics</option>
                 <option value="contact-analytics">Contact Analytics</option>
               </CFormSelect>
-            </CCol>
-            <CCol md={3}>
+            </CCol> */}
+            <CCol md={2}>
               <CFormSelect
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
@@ -393,7 +442,22 @@ const ReportsAnalytics = () => {
                 <option value="custom">Custom Range</option>
               </CFormSelect>
             </CCol>
-            <CCol md={6}>
+            {reportType === 'data-access-logs' && (
+              <CCol md={2}>
+                <CFormSelect
+                  value={resourceFilter}
+                  onChange={(e) => setResourceFilter(e.target.value)}
+                >
+                  <option value="all">All Resources</option>
+                  {availableResources.map((resource, index) => (
+                    <option key={index} value={resource}>
+                      {resource}
+                    </option>
+                  ))}
+                </CFormSelect>
+              </CCol>
+            )}
+            <CCol md={reportType === 'data-access-logs' ? 6 : 8}>
               <CInputGroup>
                 <CFormInput
                   placeholder="Search reports..."
@@ -406,6 +470,30 @@ const ReportsAnalytics = () => {
               </CInputGroup>
             </CCol>
           </CRow>
+
+          {/* Active Filters Display */}
+          {reportType === 'data-access-logs' && resourceFilter !== 'all' && (
+            <CRow className="mb-3">
+              <CCol>
+                <div className="d-flex align-items-center">
+                  <small className="text-muted me-2">Active filters:</small>
+                  <CBadge color="info" className="me-2">
+                    Resource: {resourceFilter}
+                    <CButton
+                      size="sm"
+                      color="info"
+                      variant="ghost"
+                      className="ms-1 p-0"
+                      style={{ fontSize: '10px', lineHeight: '1' }}
+                      onClick={() => setResourceFilter('all')}
+                    >
+                      ×
+                    </CButton>
+                  </CBadge>
+                </div>
+              </CCol>
+            </CRow>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -449,6 +537,9 @@ const ReportsAnalytics = () => {
               <CCol className="d-flex justify-content-between align-items-center">
                 <div className="pagination-info">
                   Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} entries
+                  {filteredData.length < reportData.length && (
+                    <span className="text-muted"> (filtered from {reportData.length} total)</span>
+                  )}
                 </div>
                 <CPagination 
                   aria-label="Page navigation example"

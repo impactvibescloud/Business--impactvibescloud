@@ -9,7 +9,19 @@ import {
   CFormSelect,
   CInputGroup,
   CFormInput,
-  CButton
+  CButton,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CTable,
+  CTableHead,
+  CTableRow,
+  CTableHeaderCell,
+  CTableBody,
+  CTableDataCell,
+  CBadge
 } from "@coreui/react";
 import CIcon from '@coreui/icons-react';
 import { cilPhone, cilCheckCircle, cilArrowRight, cilMinus, cilX, cilPeople, cilCalendar, cilCloudDownload, cilChart } from '@coreui/icons';
@@ -31,7 +43,7 @@ ChartJS.register(
   LinearScale
 );
 
-function WidgetsDropdown({ agents, agentStatuses }) {
+function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetails = [], totalBreakTime = 0 }) {
   const [timeFilter, setTimeFilter] = useState('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -63,8 +75,14 @@ function WidgetsDropdown({ agents, agentStatuses }) {
 
   const agentStatus = getAgentStatusData();
 
-  // Sample data - replace with actual API data
+  // Use real call stats from props or use sample data based on filters
   const getCallData = () => {
+    // If real call stats data is provided, use it
+    if (callStats && callStats.totalCalls !== undefined) {
+      return callStats;
+    }
+    
+    // Fallback to sample data if no real data available
     switch (timeFilter) {
       case 'today':
         return {
@@ -171,7 +189,13 @@ function WidgetsDropdown({ agents, agentStatuses }) {
     labels: ['Live Calls', 'Outbound Calls', 'Inbound Calls', 'Missed Calls', 'Rejected Calls'],
     datasets: [
       {
-        data: [callData.liveCalls, callData.outboundCalls, callData.inboundCalls, callData.missedCalls, callData.rejectedCalls],
+        data: [
+          Math.max(callData.liveCalls, 0), 
+          Math.max(callData.outboundCalls, 0), 
+          Math.max(callData.inboundCalls, 0), 
+          Math.max(callData.missedCalls, 0), 
+          Math.max(callData.rejectedCalls, 0)
+        ],
         backgroundColor: [
           '#2eb85c', // Live Calls - Green
           '#f9b115', // Outbound Calls - Orange
@@ -192,8 +216,11 @@ function WidgetsDropdown({ agents, agentStatuses }) {
       legend: {
         position: 'bottom',
         labels: {
-          padding: 20,
-          usePointStyle: true
+          padding: 10,
+          usePointStyle: true,
+          font: {
+            size: 10
+          }
         }
       },
       tooltip: {
@@ -259,7 +286,10 @@ function WidgetsDropdown({ agents, agentStatuses }) {
           </CCard>
         </CCol>
         <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #ffc107' }}>
+          <CCard 
+            className="mb-4" 
+            style={{ borderLeft: '4px solid #ffc107' }}
+          >
             <CCardBody className="d-flex align-items-center">
               <div className="me-3">
                 <div className="bg-warning bg-opacity-10 p-3 rounded">
@@ -268,7 +298,9 @@ function WidgetsDropdown({ agents, agentStatuses }) {
               </div>
               <div>
                 <div className="fs-6 fw-semibold text-warning">{agentStatus.break}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Break Time Agents</div>
+                <div className="text-medium-emphasis text-uppercase fw-semibold small">
+                  Break Time Agents
+                </div>
               </div>
             </CCardBody>
           </CCard>
@@ -423,7 +455,14 @@ function WidgetsDropdown({ agents, agentStatuses }) {
                 <CCol md={3}>
                   <CFormSelect 
                     value={timeFilter} 
-                    onChange={(e) => setTimeFilter(e.target.value)}
+                    onChange={(e) => {
+                      const newFilter = e.target.value;
+                      setTimeFilter(newFilter);
+                      // Trigger fetch with the new time filter if the parent provided a handler
+                      if (typeof window.fetchCallStatistics === 'function') {
+                        window.fetchCallStatistics(newFilter);
+                      }
+                    }}
                     aria-label="Time Filter"
                   >
                     <option value="today">Current Day</option>
@@ -455,7 +494,14 @@ function WidgetsDropdown({ agents, agentStatuses }) {
                       </CInputGroup>
                     </CCol>
                     <CCol md={3}>
-                      <CButton color="primary" onClick={() => console.log('Apply custom filter')}>
+                      <CButton 
+                        color="primary" 
+                        onClick={() => {
+                          if (typeof window.fetchCallStatistics === 'function') {
+                            window.fetchCallStatistics('custom', customStartDate, customEndDate);
+                          }
+                        }}
+                      >
                         Apply
                       </CButton>
                     </CCol>
@@ -579,43 +625,128 @@ function WidgetsDropdown({ agents, agentStatuses }) {
 
                 {/* Pie Chart - Right Side */}
                 <CCol lg={5}>
-                  <div style={{ height: '400px', position: 'relative' }}>
-                    <Pie data={pieChartData} options={pieChartOptions} />
-                  </div>
+                  <CCard className="h-100">
+                    <CCardBody className="text-center">
+                      <h6 className="mb-3">Call Type Distribution</h6>
+                      <div style={{ height: '300px', position: 'relative' }}>
+                        <Pie data={pieChartData} options={pieChartOptions} />
+                      </div>
+                    </CCardBody>
+                  </CCard>
                 </CCol>
 
                 {/* Call Summary - Far Right */}
                 <CCol lg={3}>
-                  <div className="chart-summary">
-                    <h6 className="mb-3">Call Summary</h6>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Total Calls:</span> {callData.totalCalls}
-                    </div>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Live Calls:</span> {callData.liveCalls}
-                    </div>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Outbound Calls:</span> {callData.outboundCalls}
-                    </div>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Inbound Calls:</span> {callData.inboundCalls}
-                    </div>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Missed Calls:</span> {callData.missedCalls}
-                    </div>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Rejected Calls:</span> {callData.rejectedCalls}
-                    </div>
-                    <div className="mb-2">
-                      <span className="fw-semibold">Calls per Day:</span> {callData.callsPerDay}
-                    </div>
-                  </div>
+                  <CCard className="h-100">
+                    <CCardBody>
+                      <h6 className="mb-3 text-center">Call Summary</h6>
+                      <div className="chart-summary">
+                        <div className="mb-2">
+                          <span className="fw-semibold">Total Calls:</span> {callData.totalCalls}
+                        </div>
+                        <div className="mb-2">
+                          <span className="fw-semibold">Live Calls:</span> {callData.liveCalls}
+                        </div>
+                        <div className="mb-2">
+                          <span className="fw-semibold">Outbound Calls:</span> {callData.outboundCalls}
+                        </div>
+                        <div className="mb-2">
+                          <span className="fw-semibold">Inbound Calls:</span> {callData.inboundCalls}
+                        </div>
+                        <div className="mb-2">
+                          <span className="fw-semibold">Missed Calls:</span> {callData.missedCalls}
+                        </div>
+                        <div className="mb-2">
+                          <span className="fw-semibold">Rejected Calls:</span> {callData.rejectedCalls}
+                        </div>
+                        <div className="mb-2">
+                          <span className="fw-semibold">Calls per Day:</span> {callData.callsPerDay}
+                        </div>
+                      </div>
+                    </CCardBody>
+                  </CCard>
                 </CCol>
               </CRow>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
+
+      {/* Break Time Agents Section - Only show if there are agents on break */}
+      {agentStatus.break > 0 && (
+        <CRow className="mb-4">
+          <CCol lg={12}>
+            <CCard>
+              <CCardHeader>
+                <h5 className="mb-0">
+                  <CIcon icon={cilMinus} className="text-warning me-2" />
+                  Break Time Agents ({agentStatus.break})
+                </h5>
+              </CCardHeader>
+              <CCardBody>
+                <CRow>
+                  <CCol>
+                    <div className="d-flex align-items-center mb-3">
+                      <div className="bg-warning bg-opacity-10 p-2 me-3 rounded">
+                        <CIcon icon={cilMinus} size="lg" className="text-warning" />
+                      </div>
+                      <div>
+                        <h6 className="mb-0">Current agents on break</h6>
+                        <small className="text-muted">
+                          Data refreshes automatically every minute
+                        </small>
+                      </div>
+                    </div>
+                    {breakTimeAgentDetails && breakTimeAgentDetails.length > 0 ? (
+                      <CTable small hover responsive>
+                        <CTableHead>
+                          <CTableRow>
+                            <CTableHeaderCell>Agent</CTableHeaderCell>
+                            <CTableHeaderCell>Start Time</CTableHeaderCell>
+                            <CTableHeaderCell>Duration</CTableHeaderCell>
+                            <CTableHeaderCell>Status</CTableHeaderCell>
+                          </CTableRow>
+                        </CTableHead>
+                        <CTableBody>
+                          {breakTimeAgentDetails.slice(0, 5).map((agent, index) => (
+                            <CTableRow key={agent.id || index}>
+                              <CTableDataCell>{agent.name}</CTableDataCell>
+                              <CTableDataCell>
+                                {agent.startTime ? new Date(agent.startTime).toLocaleTimeString() : 'N/A'}
+                              </CTableDataCell>
+                              <CTableDataCell>
+                                {agent.duration !== undefined ? `${agent.duration} min` : 'N/A'}
+                              </CTableDataCell>
+                              <CTableDataCell>
+                                <CBadge color="warning">On Break</CBadge>
+                              </CTableDataCell>
+                            </CTableRow>
+                          ))}
+                          {breakTimeAgentDetails.length > 5 && (
+                            <CTableRow>
+                              <CTableDataCell colSpan={4} className="text-center">
+                                <small className="text-muted">
+                                  + {breakTimeAgentDetails.length - 5} more agents on break
+                                </small>
+                              </CTableDataCell>
+                            </CTableRow>
+                          )}
+                        </CTableBody>
+                      </CTable>
+                    ) : (
+                      <div className="text-center py-3">
+                        <p className="mb-0">
+                          {agentStatus.break} agent(s) currently on break
+                        </p>
+                      </div>
+                    )}
+                  </CCol>
+                </CRow>
+              </CCardBody>
+            </CCard>
+          </CCol>
+        </CRow>
+      )}
     </>
   );
 }

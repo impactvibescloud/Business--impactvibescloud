@@ -4,10 +4,10 @@ import axios from 'axios'
 
 // API Configuration with fallback support
 export const API_CONFIG = {
-  LOCAL_URL: 'http://localhost:5040/api',
+  LOCAL_URL: 'http://localhost:5040/api', // Using port 5040 for development
   PROXY_URL: '/api', // Using proxy from package.json
   PRODUCTION_URL: 'https://api-impactvibescloud.onrender.com/api',
-  AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4MzQ0OTBiZjkzMDYxNTQ1OTM4ODU4MSIsImlhdCI6MTc1MTg4MDYwMX0.tMpKo7INMcUp3u1b8NBnzRMutPCZVhNWbPxfAqFwIvc'
+  AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1NDI5OTIxNH0.FlziqjjJZCNYwkUEE3TDDmyNrjRRnhdl-kSFnhSj_cU'
 }
 
 // Use proxy URL (this will work with axios proxy configuration)
@@ -25,6 +25,12 @@ export const API_HEADERS = {
 export const ENDPOINTS = {
   // User endpoints
   USER_DETAILS: '/api/v1/user/details',
+  USER_LOGIN: '/api/v1/user/login',
+  USER_LOGOUT: '/api/v1/user/logout',
+  USER_STATUS: '/api/v1/user/status',
+  USER_CURRENT_STATUS: '/api/v1/user/status/current',
+  USER_TEAM_STATUS: '/api/v1/user/status/team',
+  
   CONFIG: '/api/config',
   
   // Billing endpoints
@@ -49,6 +55,10 @@ export const ENDPOINTS = {
   
   // Virtual Numbers endpoints
   NUMBERS: '/api/numbers',
+  
+  // Department endpoints
+  DEPARTMENTS: '/api/departments',
+  DEPARTMENT_BY_ID: (id) => `/api/departments/${id}`,
   
   // Plan endpoints
   PLANS: (planId) => `/api/plans/${planId}`,

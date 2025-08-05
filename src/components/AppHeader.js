@@ -15,7 +15,7 @@ import CIcon from "@coreui/icons-react";
 import { cilBell, cilEnvelopeOpen, cilList, cilMenu } from "@coreui/icons";
 import "./AppHeader.css";
 
-import { AppBreadcrumb } from "./index";
+import { AppBreadcrumb, UserActivityStatus } from "./index";
 import { AppHeaderDropdown } from "./header/index";
 import { logo } from "src/assets/brand/logo";
 import ConnectionStatus from "./ConnectionStatus";
@@ -30,6 +30,7 @@ const AppHeader = () => {
   const navigate = useNavigate();
   const sidebarShow = useSelector((state) => state.coreUI.sidebarShow); // Updated selector
   const [AppName, setAppName] = useState("Businesses");
+  const [userId, setUserId] = useState(null);
   const token = isAutheticated();
 
   useEffect(() => {
@@ -43,7 +44,26 @@ const AppHeader = () => {
     }
     
     getConfiguration();
-  }, []);
+    
+    // Fetch user details to get userId
+    async function getUserDetails() {
+      try {
+        const response = await axios.get(`/api/v1/user/details`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        if (response.data && response.data.user && response.data.user._id) {
+          setUserId(response.data.user._id);
+        }
+      } catch (error) {
+        console.warn("Failed to fetch user details:", error.message);
+      }
+    }
+    
+    getUserDetails();
+  }, [token]);
   return (
     <CHeader position="sticky" className="mb-4">
       <CContainer fluid>
@@ -77,6 +97,7 @@ const AppHeader = () => {
         </CHeaderNav>
         <CHeaderNav>
           <ConnectionStatus />
+          <UserActivityStatus />
         </CHeaderNav>
         <CHeaderNav className="ms-3">
           <AppHeaderDropdown />

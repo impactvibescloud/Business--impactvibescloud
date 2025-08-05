@@ -205,6 +205,9 @@ import ForgotPassword from "./views/pages/register/ForgotPassword";
 import setupAxiosInterceptors from "./utils/axiosInterceptors";
 import { setupFetchInterceptor } from "./utils/fetchInterceptor";
 
+// User activity context
+import { UserActivityProvider } from "./context/UserActivityContext";
+
 // Containers
 const DefaultLayout = React.lazy(() => import("./layout/DefaultLayout"));
 
@@ -273,13 +276,14 @@ const App = () => {
         v7_relativeSplatPath: true
       }}
     >
-      <Suspense
-        fallback={
-          <div className="pt-3 text-center">
-            <div className="sk-spinner sk-spinner-pulse"></div>
-          </div>
-        }
-      >
+      <UserActivityProvider>
+        <Suspense
+          fallback={
+            <div className="pt-3 text-center">
+              <div className="sk-spinner sk-spinner-pulse"></div>
+            </div>
+          }
+        >
         <Routes>
           {/* <Route exact path="/change-password" name="My profile" element={<ChangePassword />} /> */}
           <Route exact path="/" name="Login Page" element={<Login />} />
@@ -300,6 +304,7 @@ const App = () => {
         </Routes>
         <Toaster />
       </Suspense>
+      </UserActivityProvider>
     </HashRouter>
   );
 };

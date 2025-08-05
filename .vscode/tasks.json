@@ -4,12 +4,33 @@
 		{
 			"label": "Build and run the application",
 			"type": "shell",
-			"command": "cd \"c:/Users/User/OneDrive/Desktop/Business--impactvibescloud\" && npm start",
+			"command": "cd \"/home/soft/Desktop/Neonflake/Business--impactvibescloud\" && npm start",
 			"problemMatcher": [
 				"$eslint-stylish"
 			],
 			"group": "build",
 			"isBackground": true
+		},
+		{
+			"label": "Build (Optimized)",
+			"type": "shell",
+			"command": "cd \"/home/soft/Desktop/Neonflake/Business--impactvibescloud\" && export NODE_OPTIONS=\"--max-old-space-size=4096\" && GENERATE_SOURCEMAP=false DISABLE_ESLINT_PLUGIN=true CI=false npm run build",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "Build (Fast)",
+			"type": "shell",
+			"command": "cd \"/home/soft/Desktop/Neonflake/Business--impactvibescloud\" && npm run build:fast",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "Start Dev Server",
+			"type": "shell",
+			"command": "cd \"/home/soft/Desktop/Neonflake/Business--impactvibescloud\" && npm run dev",
+			"isBackground": true,
+			"problemMatcher": []
 		}
 	]
 }
