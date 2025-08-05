@@ -4,9 +4,10 @@
   "description": "CoreUI Free React Admin Template",
   "scripts": {
     "dev": "react-scripts --openssl-legacy-provider start",
-    "build": "cross-env NODE_OPTIONS=\"--max_old_space_size=8192\" react-scripts --openssl-legacy-provider build",
-    "build:memory": "cross-env NODE_OPTIONS=\"--max_old_space_size=8192\" npx react-scripts --openssl-legacy-provider build",
-    "build:safe": "cross-env NODE_OPTIONS=\"--max_old_space_size=12288\" react-scripts --openssl-legacy-provider build",
+    "build": "cross-env GENERATE_SOURCEMAP=false NODE_OPTIONS=\"--max_old_space_size=8192\" react-scripts --openssl-legacy-provider build",
+    "build:memory": "cross-env GENERATE_SOURCEMAP=false NODE_OPTIONS=\"--max_old_space_size=12288\" npx react-scripts --openssl-legacy-provider build",
+    "build:safe": "cross-env GENERATE_SOURCEMAP=false NODE_OPTIONS=\"--max_old_space_size=12288\" DISABLE_ESLINT_PLUGIN=true react-scripts --openssl-legacy-provider build",
+    "build:fast": "cross-env GENERATE_SOURCEMAP=false NODE_OPTIONS=\"--max_old_space_size=8192\" DISABLE_ESLINT_PLUGIN=true react-scripts --openssl-legacy-provider build",
     "changelog": "auto-changelog --starting-version 4.1.0 --commit-limit false --hide-credit",
     "eject": "react-scripts eject",
     "lint": "eslint \"src/**/*.js\"",
@@ -93,7 +94,7 @@
     "react-scripts": "^5.0.1",
     "sass": "^1.43.5"
   },
-  "proxy": "https://api-impactvibescloud.onrender.com",
+  "proxy": "http://localhost:5040",
   "engines": {
     "node": ">=18.x"
   }

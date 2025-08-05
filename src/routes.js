@@ -5,152 +5,153 @@ const Change_Password = React.lazy(() =>
   import("./views/pages/register/Change_password")
 );
 
-import EditProfile from "./views/Profile/EditProfile";
 const Dashboard = React.lazy(() => import("./views/dashboard/Dashboard"));
-import Socialmedia from "./views/configuration/Socialmedia.js";
-import Address from "./views/configuration/Address.js";
-import Logo from "./views/configuration/Logo.js";
-import Login from "./views/pages/login/Login";
+const EditProfile = React.lazy(() => import("./views/Profile/EditProfile"));
+const Socialmedia = React.lazy(() => import("./views/configuration/Socialmedia.js"));
+const Address = React.lazy(() => import("./views/configuration/Address.js"));
+const Logo = React.lazy(() => import("./views/configuration/Logo.js"));
+const Login = React.lazy(() => import("./views/pages/login/Login"));
 
-// Missing Components Imports
-import Templates from "./views/Templates/Templates";
-import UsersTeams from "./views/UsersTeams/UsersTeams";
-// Import the correct VirtualNumbers component
-import VirtualNumbers from "./views/VirtualNumbers/VirtualNumbers";
-import Billing from "./views/Billing/Billing";
-import ReportsAnalytics from "./views/ReportsAnalytics/ReportsAnalytics";
-import Payments from "./views/Payments/Payments";
-import Settings from "./views/Settings/Settings";
-import Department from "./views/Department/Department";
+// Missing Components Imports - Using lazy loading
+const Templates = React.lazy(() => import("./views/Templates/Templates"));
+const UsersTeams = React.lazy(() => import("./views/UsersTeams/UsersTeams"));
+const VirtualNumbers = React.lazy(() => import("./views/VirtualNumbers/VirtualNumbers"));
+const Billing = React.lazy(() => import("./views/Billing/Billing"));
+const ReportsAnalytics = React.lazy(() => import("./views/ReportsAnalytics/ReportsAnalytics"));
+const Payments = React.lazy(() => import("./views/Payments/Payments"));
+const Settings = React.lazy(() => import("./views/Settings/Settings"));
+const Department = React.lazy(() => import("./views/Department/Department"));
 
+// Products
+const Products = React.lazy(() => import("./views/Products/Products"));
+const AddProduct = React.lazy(() => import("./views/Products/AddProduct"));
+const EditProduct = React.lazy(() => import("./views/Products/EditProduct"));
+const ViewProduct = React.lazy(() => import("./views/Products/ViewProduct"));
+const ProductManual = React.lazy(() => import("./views/ProductManual/ProductManual"));
 
-//Businesses
+// Order Management
+const NewOrders = React.lazy(() => import("./views/orders/NewOrders.js"));
+const ProcessingOrders = React.lazy(() => import("./views/orders/ProcessingOrders.js"));
+const DispatchedOrders = React.lazy(() => import("./views/orders/DispatchedOrders.js"));
+const DeliveredOrders = React.lazy(() => import("./views/orders/DeliveredOrders.js"));
+const CancelledOrders = React.lazy(() => import("./views/orders/CancelledOrders.js"));
+const ReturnedOrders = React.lazy(() => import("./views/orders/ReturnedOrders.js"));
+const AddOrder = React.lazy(() => import("./views/orders/AddOrder"));
+const EditOrder = React.lazy(() => import("./views/orders/EditOrder"));
+const ViewOrders = React.lazy(() => import("./views/orders/ViewOrders"));
 
-import Products from "./views/Products/Products";
-//product
-import AddProduct from "./views/Products/AddProduct";
-import EditProduct from "./views/Products/EditProduct";
-import ViewProduct from "./views/Products/ViewProduct";
-//product manual
-import ProductManual from "./views/ProductManual/ProductManual";
-//Order Management
-import NewOrders from "./views/orders/NewOrders.js";
-import ProcessingOrders from "./views/orders/ProcessingOrders.js";
-import DispatchedOrders from "./views/orders/DispatchedOrders.js";
-import DeliveredOrders from "./views/orders/DeliveredOrders.js";
-import CancelledOrders from "./views/orders/CancelledOrders.js";
-import ReturnedOrders from "./views/orders/ReturnedOrders.js";
-import AddOrder from "./views/orders/AddOrder";
-import EditOrder from "./views/orders/EditOrder";
-import ViewOrders from "./views/orders/ViewOrders"; 
+// Configuration
+const ApplicationName = React.lazy(() => import("./views/configuration/ApplicationName"));
+const CopyrightMessage = React.lazy(() => import("./views/configuration/CopyrightMessage"));
 
-import ApplicationName from "./views/configuration/ApplicationName";
-import CopyrightMessage from "./views/configuration/CopyrightMessage";
+// SEO
+const AddSeoRequest = React.lazy(() => import("./views/seo/AddSeoRequest"));
 
-import AddSeoRequest from "./views/seo/AddSeoRequest";
+// Testimonials
+const Testimonials = React.lazy(() => import("./views/Testimonials/Testimonials"));
+const AddTestimonial = React.lazy(() => import("./views/Testimonials/AddTestimonial"));
+const ViewTestimonial = React.lazy(() => import("./views/Testimonials/ViewTestimonial"));
+const Policies = React.lazy(() => import("./views/configuration/Policies/Policies"));
 
-import Testimonials from "./views/Testimonials/Testimonials";
-import AddTestimonial from "./views/Testimonials/AddTestimonial";
-import ViewTestimonial from "./views/Testimonials/ViewTestimonial";
-import Policies from "./views/configuration/Policies/Policies";
-////purpose
-import Purpose from "./views/configuration/Purpose/Purpose";
-import AddPurpose from "./views/configuration/Purpose/AddPurpose";
-//language
-import Languages from "./views/configuration/Language/Languages";
-import AddLanguage from "./views/configuration/Language/AddLanguage";
-import EditLanguage from "./views/configuration/Language/EditLanguage";
-//BusinessType
-import BusinessType from "./views/configuration/Business_Type/Business";
-import AddBusinessType from "./views/configuration/Business_Type/AddBusiness";
-import EditBusinessType from "./views/configuration/Business_Type/EditLanguage";
-import EditPurpose from "./views/configuration/Purpose/EditPurpose.js";
-import ViewAppointment from "./views/Appointments/ViewAppointment";
-import EditAppointment from "./views/Appointments/EditAppointment";
-import AddNewAppointment from "./views/Appointments/AddNewAppointment";
+// Purpose
+const Purpose = React.lazy(() => import("./views/configuration/Purpose/Purpose"));
+const AddPurpose = React.lazy(() => import("./views/configuration/Purpose/AddPurpose"));
+const EditPurpose = React.lazy(() => import("./views/configuration/Purpose/EditPurpose.js"));
 
-import Campaign from "./views/Campaigns/Campaign.js";
-import AddCampaign from "./views/Campaigns/AddCampaign.js";
-import Categories from "./views/Categories/categories";
-import Brands from "./views/Brands/Brands";
-import Content from "./views/Content/content";
+// Language
+const Languages = React.lazy(() => import("./views/configuration/Language/Languages"));
+const AddLanguage = React.lazy(() => import("./views/configuration/Language/AddLanguage"));
+const EditLanguage = React.lazy(() => import("./views/configuration/Language/EditLanguage"));
 
-import EditPrivacyPolicy from "./views/Content/editPrivacyPolicy";
-import EditTermsConditions from "./views/Content/editTermsConditions";
-import EditShippingPolicy from "./views/Content/editShippingPolicy";
-import EditRefundpolicy from "./views/Content/editRefundPolicy";
-import EditAboutUs from "./views/Content/editAboutUs";
+// BusinessType
+const BusinessType = React.lazy(() => import("./views/configuration/Business_Type/Business"));
+const AddBusinessType = React.lazy(() => import("./views/configuration/Business_Type/AddBusiness"));
+const EditBusinessType = React.lazy(() => import("./views/configuration/Business_Type/EditLanguage"));
+const ViewAppointment = React.lazy(() => import("./views/Appointments/ViewAppointment"));
+const EditAppointment = React.lazy(() => import("./views/Appointments/EditAppointment"));
+const AddNewAppointment = React.lazy(() => import("./views/Appointments/AddNewAppointment"));
 
-// import editPrincipalDistributorAddress from "./views/customerDetails/editPrincipalDistributorAddress";
-// import AddUserAddress from "./views/customerDetails/addUserAddress";
-import viewDetails from "./views/Outlet/viewDetails";
-import Design from "./views/Design/design";
-import RegisterImage from "./views/Images/RegisterImage";
-import LoginImage from "./views/Images/LoginImage";
-//Affiliate
-import Coupons from "./views/Affiliate/Coupons";
-import Affiliates from "./views/Affiliate/Affiliates";
-import CreateCoupon from "./views/Affiliate/CreateCoupon";
-import CreateAffiliate from "./views/Affiliate/CreateAffiliate";
-import EditAffiliate from "./views/Affiliate/EditAffiliate";
-import EditCoupon from "./views/Affiliate/EditCoupon";
-import PayAffiliate from "./views/Affiliate/PayAffiliate";
-import AffiliateHistory from "./views/Affiliate/AffiliateHistory";
-import CouponHistory from "./views/Affiliate/CouponHistory";
-import EditTestimonial from "./views/Testimonials/EditTestimonial";
-//Blogs
-import Blogs from "./views/Blog/Blogs";
-import CreateBlog from "./views/Blog/CreateBlog";
-import users from "./views/Users/users";
-import UpdateBlog from "./views/Blog/EditBlog";
-import ViewBlog from "./views/Blog/ViewBlog";
-import principalDistributor from "./views/Outlet/principalDistributor";
-import SinglePrincipalDistributorAllDetails from "./views/Outlet/singlePrincipalDistributorAllDetails";
+// Campaigns and Categories
+const Campaign = React.lazy(() => import("./views/Campaigns/Campaign.js"));
+const AddCampaign = React.lazy(() => import("./views/Campaigns/AddCampaign.js"));
+const Categories = React.lazy(() => import("./views/Categories/categories"));
+const Brands = React.lazy(() => import("./views/Brands/Brands"));
+const Content = React.lazy(() => import("./views/Content/content"));
 
-import { element } from "prop-types";
-import addPrincipalDistributor from "./views/Outlet/addPrincipalDistributor";
-import InStoreCashOrders from "./views/orders/InStoreCashOrders";
+// Content Editing
+const EditPrivacyPolicy = React.lazy(() => import("./views/Content/editPrivacyPolicy"));
+const EditTermsConditions = React.lazy(() => import("./views/Content/editTermsConditions"));
+const EditShippingPolicy = React.lazy(() => import("./views/Content/editShippingPolicy"));
+const EditRefundpolicy = React.lazy(() => import("./views/Content/editRefundPolicy"));
+const EditAboutUs = React.lazy(() => import("./views/Content/editAboutUs"));
 
-import InStoreQRCodeOrders from "./views/orders/InStoreQRCodeOrders";
-import Employee from "./views/EmployeeAccess/Employee";
-import AddEmployee from "./views/EmployeeAccess/addEmployee";
-import EditEmployee from "./views/EmployeeAccess/editEmployee";
-import Currency from "./views/configuration/Currency";
+// Outlet
+const viewDetails = React.lazy(() => import("./views/Outlet/viewDetails"));
+const Design = React.lazy(() => import("./views/Design/design"));
+const RegisterImage = React.lazy(() => import("./views/Images/RegisterImage"));
+const LoginImage = React.lazy(() => import("./views/Images/LoginImage"));
 
-import AddMultipleProduct from "./views/Products/AddMultipleProducts";
-import AddMultiplePd from "./views/Outlet/AddMultiplePD";
+// Affiliate
+const Coupons = React.lazy(() => import("./views/Affiliate/Coupons"));
+const Affiliates = React.lazy(() => import("./views/Affiliate/Affiliates"));
+const CreateCoupon = React.lazy(() => import("./views/Affiliate/CreateCoupon"));
+const CreateAffiliate = React.lazy(() => import("./views/Affiliate/CreateAffiliate"));
+const EditAffiliate = React.lazy(() => import("./views/Affiliate/EditAffiliate"));
+const EditCoupon = React.lazy(() => import("./views/Affiliate/EditCoupon"));
+const PayAffiliate = React.lazy(() => import("./views/Affiliate/PayAffiliate"));
+const AffiliateHistory = React.lazy(() => import("./views/Affiliate/AffiliateHistory"));
+const CouponHistory = React.lazy(() => import("./views/Affiliate/CouponHistory"));
+const EditTestimonial = React.lazy(() => import("./views/Testimonials/EditTestimonial"));
 
-import ViewProductManual from "./views/ProductManual/SingleProductManual";
+// Blogs
+const Blogs = React.lazy(() => import("./views/Blog/Blogs"));
+const CreateBlog = React.lazy(() => import("./views/Blog/CreateBlog"));
+const users = React.lazy(() => import("./views/Users/users"));
+const UpdateBlog = React.lazy(() => import("./views/Blog/EditBlog"));
+const ViewBlog = React.lazy(() => import("./views/Blog/ViewBlog"));
+const principalDistributor = React.lazy(() => import("./views/Outlet/principalDistributor"));
+const SinglePrincipalDistributorAllDetails = React.lazy(() => import("./views/Outlet/singlePrincipalDistributorAllDetails"));
 
-import ViewRetailDistributorPD from "./views/Outlet/ViewRetailDistributorPD";
+const addPrincipalDistributor = React.lazy(() => import("./views/Outlet/addPrincipalDistributor"));
+const InStoreCashOrders = React.lazy(() => import("./views/orders/InStoreCashOrders"));
+const InStoreQRCodeOrders = React.lazy(() => import("./views/orders/InStoreQRCodeOrders"));
+const Employee = React.lazy(() => import("./views/EmployeeAccess/Employee"));
+const AddEmployee = React.lazy(() => import("./views/EmployeeAccess/addEmployee"));
+const EditEmployee = React.lazy(() => import("./views/EmployeeAccess/editEmployee"));
+const Currency = React.lazy(() => import("./views/configuration/Currency"));
 
-import PendingOrders from "./views/orders/pendingOrders";
-import ViewInvoices from "./views/orders/viewInoices";
+const AddMultipleProduct = React.lazy(() => import("./views/Products/AddMultipleProducts"));
+const AddMultiplePd = React.lazy(() => import("./views/Outlet/AddMultiplePD"));
+const ViewProductManual = React.lazy(() => import("./views/ProductManual/SingleProductManual"));
+const ViewRetailDistributorPD = React.lazy(() => import("./views/Outlet/ViewRetailDistributorPD"));
 
-import Announcements from "./views/Announcment/announcement";
-import CreateAnnouncement from "./views/Announcment/createAnnouncement";
-import TodayTask from "./views/Tasks/TodayTasks";
+const PendingOrders = React.lazy(() => import("./views/orders/pendingOrders"));
+const ViewInvoices = React.lazy(() => import("./views/orders/viewInoices"));
 
-import MobileApp from "./views/configuration/MobileApp";
+const Announcements = React.lazy(() => import("./views/Announcment/announcement"));
+const CreateAnnouncement = React.lazy(() => import("./views/Announcment/createAnnouncement"));
+const TodayTask = React.lazy(() => import("./views/Tasks/TodayTasks"));
 
-import OpeningInventoryReports from "./views/Reports/OpeningInventoryReports";
-import StockReports from "./views/Reports/StockReports ";
-import Transporter from "./views/Transporter/Transporter";
-import Menu from "./views/Menu/menu";
-import AddMenu from "./views/Menu/addMenu";
-import EditMenuPage from "./views/Menu/editMenu";
-import FranchiseOrders from "./views/FranchiseeOrders/franchiseOrders";
-import ViewDetails from "./views/FranchiseeOrders/viewDetails";
-import MenuCategories from "./views/Menu-Category/menu-category";
-import videos from "./views/video/Video";
-import AddProductsOutlet from "./views/Outlet/AddProductsOutlet";
-import Equipment from './views/Equipment/equipment';
-import AddEquipmentsOutlet from "./views/Outlet/AddEquipmentsOutlet";
-import Branches from "./views/Branches/Branches";
-import CallLogs from './views/CallLogs/CallLogs';
-import { ContactList, ContactLists, Contacts } from "./views/Contacts";
-import AutodialCampaigns from "./views/Campaigns/AutodialCampaigns";
-import SurveyCampaigns from "./views/Campaigns/SurveyCampaigns";
+const MobileApp = React.lazy(() => import("./views/configuration/MobileApp"));
+
+const OpeningInventoryReports = React.lazy(() => import("./views/Reports/OpeningInventoryReports"));
+const StockReports = React.lazy(() => import("./views/Reports/StockReports "));
+const Transporter = React.lazy(() => import("./views/Transporter/Transporter"));
+const Menu = React.lazy(() => import("./views/Menu/menu"));
+const AddMenu = React.lazy(() => import("./views/Menu/addMenu"));
+const EditMenuPage = React.lazy(() => import("./views/Menu/editMenu"));
+const FranchiseOrders = React.lazy(() => import("./views/FranchiseeOrders/franchiseOrders"));
+const ViewDetails = React.lazy(() => import("./views/FranchiseeOrders/viewDetails"));
+const MenuCategories = React.lazy(() => import("./views/Menu-Category/menu-category"));
+const videos = React.lazy(() => import("./views/video/Video"));
+const AddProductsOutlet = React.lazy(() => import("./views/Outlet/AddProductsOutlet"));
+const Equipment = React.lazy(() => import("./views/Equipment/equipment"));
+const AddEquipmentsOutlet = React.lazy(() => import("./views/Outlet/AddEquipmentsOutlet"));
+const Branches = React.lazy(() => import("./views/Branches/Branches"));
+const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
+const { ContactList, ContactLists, Contacts } = React.lazy(() => import("./views/Contacts"));
+const AutodialCampaigns = React.lazy(() => import("./views/Campaigns/AutodialCampaigns"));
+const SurveyCampaigns = React.lazy(() => import("./views/Campaigns/SurveyCampaigns"));
 
 const routes = [
   //dashboard
