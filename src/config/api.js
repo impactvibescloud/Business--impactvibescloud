@@ -2,18 +2,22 @@
 // This file centralizes all API endpoints and configurations to avoid CORS issues
 import axios from 'axios'
 
-// API Configuration with fallback support
+// API Configuration with environment support
 export const API_CONFIG = {
-  LOCAL_URL: 'http://localhost:5040/api', // Using port 5040 for development
-  PROXY_URL: '/api', // Using proxy from package.json
-  PRODUCTION_URL: 'https://api-impactvibescloud.onrender.com/api',
+  // Development environment
+  DEV_URL: 'http://localhost:5040',
+  // Production environment
+  PROD_URL: 'https://api-impactvibescloud.onrender.com',
+  // Base API path
+  API_PATH: '/api',
   AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1NDI5OTIxNH0.FlziqjjJZCNYwkUEE3TDDmyNrjRRnhdl-kSFnhSj_cU'
 }
 
-// Use proxy URL (this will work with axios proxy configuration)
-const getBaseURL = () => {
-  // Always use proxy URL which is handled by axios baseURL configuration
-  return API_CONFIG.PROXY_URL
+// Get the base URL based on environment
+export const getBaseURL = () => {
+  // Check if we're in development mode
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  return isDevelopment ? API_CONFIG.DEV_URL : API_CONFIG.PROD_URL;
 }
 
 export const API_HEADERS = {
