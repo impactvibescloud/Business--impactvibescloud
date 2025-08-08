@@ -3,7 +3,14 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { isAutheticated } from "../../auth.js";
 import WidgetsDropdown from "../widgets/WidgetsDropdown.js";
-import { API_CONFIG } from "../../config/api";
+import { API_CONFIG, getBaseURL } from "../../config/api";
+
+// Helper function to get API URL
+const getApiUrl = (path) => {
+  const baseUrl = getBaseURL();
+  // Remove any duplicate slashes between baseUrl and path
+  return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+};
 
 const Dashboard = () => {
   const [agents, setAgents] = useState(0);
@@ -28,9 +35,7 @@ const Dashboard = () => {
     
     const fetchUserDetails = async () => {
       try {
-        // Use LOCAL_URL for direct API calls, falling back to default port 5040
-        const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
-        const response = await axios.get(`${baseUrl}/api/v1/user/details`, {
+        const response = await axios.get(getApiUrl('/api/v1/user/details'), {
           headers: {
             'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -63,11 +68,7 @@ const Dashboard = () => {
   // Fetch business activities to calculate break time
   const fetchBusinessActivities = async (businessId) => {
     try {
-      // Use LOCAL_URL for direct API calls, falling back to default port 5040
-      const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
-      const apiUrl = `${baseUrl}/api/v1/business/${businessId}/activities`;
-      
-      const response = await axios.get(apiUrl, {
+      const response = await axios.get(getApiUrl(`/api/v1/business/${businessId}/activities`), {
         headers: {
           'Accept': '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
@@ -157,9 +158,7 @@ const Dashboard = () => {
     if (!token) return;
     
     try {
-      // Use LOCAL_URL for direct API calls, falling back to default port 5040
-      const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
-      const response = await axios.get(`${baseUrl}/api/call-logs`, {
+      const response = await axios.get(getApiUrl('/api/v1/call-logs'), {
         headers: {
           'Accept': '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
@@ -349,9 +348,7 @@ const Dashboard = () => {
     if (user?.businessId) {
       const fetchAgentsData = async () => {
         try {
-          // Use LOCAL_URL for direct API calls, falling back to default port 5040
-          const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
-          const response = await axios.get(`${baseUrl}/api/branch/${user.businessId}/branches`, {
+          const response = await axios.get(getApiUrl(`/api/branch/${user.businessId}/branches`), {
             headers: {
               'Accept': '*/*',
               'Accept-Language': 'en-US,en;q=0.9',
