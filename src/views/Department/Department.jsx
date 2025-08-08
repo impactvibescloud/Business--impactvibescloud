@@ -309,8 +309,10 @@ function Department() {
   ]
 
   useEffect(() => {
-    fetchDepartments()
-  }, [])
+    if (currentBusinessId) {
+      fetchDepartments()
+    }
+  }, [currentBusinessId])
 
   const fetchDepartments = async () => {
     setLoading(true)
@@ -319,11 +321,16 @@ function Department() {
       const token = localStorage.getItem('authToken') || localStorage.getItem('token')
       console.log('Using token:', token ? 'Token exists' : 'No token found')
       
+      if (!currentBusinessId) {
+        console.log('No business ID available yet');
+        return;
+      }
+      
       // Use direct axios call instead of going through the apiCall utility
       const axios = await import('axios');
       
-      console.log('Making direct axios call to: http://localhost:5040/api/departments');
-      const response = await axios.default.get('http://localhost:5040/api/departments', {
+      console.log(`Making direct axios call to: http://localhost:5040/api/departments/business/${currentBusinessId}`);
+      const response = await axios.default.get(`http://localhost:5040/api/departments/business/${currentBusinessId}`, {
         headers: {
           'Accept': '*/*',
           'Content-Type': 'application/json',
