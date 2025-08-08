@@ -49,7 +49,7 @@ const Branches = () => {
   const [department, setDepartment] = useState("");
   const [timeGroup, setTimeGroup] = useState("");
   const [timeCondition, setTimeCondition] = useState("");
-  const [stickyAgents, setStickyAgents] = useState("");
+  const [stickyAgents, setStickyAgents] = useState(false);
   const [managerName, setManagerName] = useState("");
   const [managerEmail, setManagerEmail] = useState("");
   const [branchStatus, setBranchStatus] = useState("Active");
@@ -57,6 +57,7 @@ const Branches = () => {
   const [user, setUser] = useState({});
   const [didNumbers, setDidNumbers] = useState([]);
   const [selectedDid, setSelectedDid] = useState("");
+  const [departments, setDepartments] = useState([]);
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [callDetails, setCallDetails] = useState({});
@@ -79,12 +80,33 @@ const Branches = () => {
       });
   }, [token]);
 
+  const fetchDepartments = async () => {
+    try {
+      const response = await axios.get(
+        `/api/departments/business/${user.businessId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      console.log('Departments API Response:', response.data);
+      // Make sure we're accessing departments from the correct path
+      const departmentsData = response.data.departments || response.data.data || [];
+      console.log('Processed Departments:', departmentsData);
+      setDepartments(departmentsData);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+    }
+  };
+
   useEffect(() => {
     if (user?.businessId) {
       fetchBranches();
       fetchDidNumbers();
+      fetchDepartments();
     }
-  }, [user]);
+  }, [user?.businessId]); // Changed dependency to specifically watch businessId changes
 
   const fetchBranches = async () => {
     try {
@@ -137,7 +159,9 @@ const Branches = () => {
           managerName,
           branchEmail: managerEmail,
           businessId: user.businessId,
-          didNumber: selectedDid, // Include DID number
+          didNumber: selectedDid,
+          department,
+          stickyAgents
         },
         {
           headers: {
@@ -205,7 +229,9 @@ const Branches = () => {
           branchName,
           managerName,
           branchEmail: managerEmail,
-          didNumber: selectedDid, // Include DID number in update
+          didNumber: selectedDid,
+          department,
+          stickyAgents
         },
         {
           headers: {
@@ -237,7 +263,7 @@ const Branches = () => {
     setDepartment("");
     setTimeGroup("");
     setTimeCondition("");
-    setStickyAgents("");
+    setStickyAgents(false);
     setManagerName("");
     setManagerEmail("");
     setBranchStatus("Active");
@@ -767,14 +793,23 @@ const Branches = () => {
             </div>
             <div className="mb-3">
               <CFormLabel htmlFor="department">Department</CFormLabel>
-              <CFormInput
-                type="text"
+              <CFormSelect
                 id="department"
                 value={department}
                 onChange={e => setDepartment(e.target.value)}
-                placeholder="Enter department"
                 required
-              />
+              >
+                <option value="">Select Department</option>
+                {departments.length === 0 ? (
+                  <option value="" disabled>Loading departments...</option>
+                ) : (
+                  departments.map((dept) => (
+                    <option key={dept._id} value={dept._id}>
+                      {dept.name || 'Unnamed Department'}
+                    </option>
+                  ))
+                )}
+              </CFormSelect>
             </div>
             <div className="mb-3">
               <CFormLabel htmlFor="timeGroup">Time Group</CFormLabel>
@@ -808,12 +843,12 @@ const Branches = () => {
               <CFormSelect
                 id="stickyAgents"
                 value={stickyAgents}
-                onChange={e => setStickyAgents(e.target.value)}
+                onChange={e => setStickyAgents(e.target.value === 'true')}
                 required
               >
                 <option value="">Select Option</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
               </CFormSelect>
             </div>
             <div className="mb-3">
