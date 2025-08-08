@@ -3,6 +3,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { isAutheticated } from "../../auth.js";
 import WidgetsDropdown from "../widgets/WidgetsDropdown.js";
+import { API_CONFIG } from "../../config/api";
 
 const Dashboard = () => {
   const [agents, setAgents] = useState(0);
@@ -27,9 +28,20 @@ const Dashboard = () => {
     
     const fetchUserDetails = async () => {
       try {
-        const response = await axios.get("http://localhost:5040/api/v1/user/details", {
+        // Use LOCAL_URL for direct API calls, falling back to default port 5040
+        const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
+        const response = await axios.get(`${baseUrl}/api/v1/user/details`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Authorization': `Bearer ${token}`,
+            'Cache-Control': 'no-cache,no-store',
+            'Connection': 'keep-alive',
+            'Expires': '0',
+            'Pragma': 'no-cache',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin'
           },
         });
         if (response.data && response.data.user) {
@@ -51,17 +63,22 @@ const Dashboard = () => {
   // Fetch business activities to calculate break time
   const fetchBusinessActivities = async (businessId) => {
     try {
-      // Direct URL with port 5040 to ensure correct port is used
-      const apiUrl = `http://localhost:5040/api/v1/business/${businessId}/activities`;
+      // Use LOCAL_URL for direct API calls, falling back to default port 5040
+      const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
+      const apiUrl = `${baseUrl}/api/v1/business/${businessId}/activities`;
       
       const response = await axios.get(apiUrl, {
         headers: {
-          Authorization: `Bearer ${token}`,
           'Accept': '*/*',
-          'Content-Type': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Authorization': `Bearer ${token}`,
           'Cache-Control': 'no-cache,no-store',
+          'Connection': 'keep-alive',
+          'Expires': '0',
           'Pragma': 'no-cache',
-          'Expires': '0'
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin'
         },
       });
       
@@ -140,9 +157,20 @@ const Dashboard = () => {
     if (!token) return;
     
     try {
-      const response = await axios.get(`http://localhost:5040/api/call-logs`, {
+      // Use LOCAL_URL for direct API calls, falling back to default port 5040
+      const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
+      const response = await axios.get(`${baseUrl}/api/call-logs`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Accept': '*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache,no-store',
+          'Connection': 'keep-alive',
+          'Expires': '0',
+          'Pragma': 'no-cache',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin'
         },
       });
       
@@ -321,9 +349,20 @@ const Dashboard = () => {
     if (user?.businessId) {
       const fetchAgentsData = async () => {
         try {
-          const response = await axios.get(`http://localhost:5040/api/branch/${user.businessId}/branches`, {
+          // Use LOCAL_URL for direct API calls, falling back to default port 5040
+          const baseUrl = API_CONFIG.LOCAL_URL?.replace('/api', '') || 'http://localhost:5040';
+          const response = await axios.get(`${baseUrl}/api/branch/${user.businessId}/branches`, {
             headers: {
-              Authorization: `Bearer ${token}`,
+              'Accept': '*/*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Authorization': `Bearer ${token}`,
+              'Cache-Control': 'no-cache,no-store',
+              'Connection': 'keep-alive',
+              'Expires': '0',
+              'Pragma': 'no-cache',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin'
             },
           });
           const branchesData = response.data.data || [];
