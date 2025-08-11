@@ -149,7 +149,8 @@ const Equipment = React.lazy(() => import("./views/Equipment/equipment"));
 const AddEquipmentsOutlet = React.lazy(() => import("./views/Outlet/AddEquipmentsOutlet"));
 const Branches = React.lazy(() => import("./views/Branches/Branches"));
 const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
-const { ContactList, ContactLists, Contacts } = React.lazy(() => import("./views/Contacts"));
+const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
+const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 const AutodialCampaigns = React.lazy(() => import("./views/Campaigns/AutodialCampaigns"));
 const SurveyCampaigns = React.lazy(() => import("./views/Campaigns/SurveyCampaigns"));
 

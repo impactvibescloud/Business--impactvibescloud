@@ -74,7 +74,9 @@ const ContactLists = () => {
       setError(null)
       
       try {
-        const response = await apiCall('/api/contact-list', 'GET')
+        // Using the business-specific endpoint with pagination
+        const businessId = '684fe39da8254e8906e99aad' // Business ID from the API endpoint
+        const response = await apiCall(`/api/contact-list/business/${businessId}?page=${currentPage}&limit=${itemsPerPage}&sortBy=createdAt&order=desc`, 'GET')
         
         if (!response) {
           throw new Error('No response received from API')

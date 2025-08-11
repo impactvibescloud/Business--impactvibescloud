@@ -42,6 +42,9 @@ const ReportsAnalytics = () => {
   const [itemsPerPage] = useState(10)
   const [reportData, setReportData] = useState([])
   const [availableResources, setAvailableResources] = useState([])
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [apiTotalPages, setApiTotalPages] = useState(1)
+  const [businessInfo, setBusinessInfo] = useState({ name: '', totalBranches: 0 })
 
   // Mock data for demonstration
   const mockCallLogsData = [
@@ -110,7 +113,7 @@ const ReportsAnalytics = () => {
     if (reportType !== 'data-access-logs') {
       setResourceFilter('all')
     }
-  }, [reportType, dateRange])
+  }, [reportType, dateRange, currentPage, itemsPerPage])
 
   const fetchReportData = async () => {
     setLoading(true)
@@ -118,11 +121,11 @@ const ReportsAnalytics = () => {
     
     try {
       if (reportType === 'data-access-logs') {
-        // Fetch business contact person related data logs
+        // Fetch business data logs with pagination
         const response = await apiCall(
-          `api/data-access-logs/user/${API_CONFIG.businessContactPersonId}`, 
-          'GET', 
-          null, 
+          `api/data-access-logs/business-logs?page=${currentPage}&limit=${itemsPerPage}&sortBy=createdAt&order=desc`,
+          'GET',
+          null,
           {
             'Authorization': API_CONFIG.authToken,
             'Content-Type': 'application/json'
@@ -139,36 +142,34 @@ const ReportsAnalytics = () => {
           }
         })
         
-        let dataArray = null
-        
-        if (response && response.data && Array.isArray(response.data)) {
-          dataArray = response.data
-        } else if (response && Array.isArray(response)) {
-          dataArray = response
-        } else if (response && response.logs && Array.isArray(response.logs)) {
-          dataArray = response.logs
-        } else if (response && response.result && Array.isArray(response.result)) {
-          dataArray = response.result
-        } else if (response && typeof response === 'object') {
-          const arrayProp = Object.entries(response).find(([_, val]) => Array.isArray(val))
-          if (arrayProp) {
-            dataArray = arrayProp[1]
-          }
-        }
-        
-        if (dataArray && dataArray.length > 0) {
-          const processedData = dataArray.map((log, index) => {
-            const userEmail = (log.user && log.user.email) || log.userEmail || log.user_email || log.email || 'N/A'
+        if (response?.data?.logs && Array.isArray(response.data.logs)) {
+          const dataArray = response.data.logs
+          
+          // Update total pages from API response
+          const totalApiRecords = response.data.pagination?.total || 0
+          const totalApiPages = response.data.pagination?.pages || 1
+          setTotalRecords(totalApiRecords)
+          setApiTotalPages(totalApiPages)
+          const processedData = dataArray.map((log) => {
             return {
-              id: String(log._id || log.id || `log-${index}-${Date.now()}`),
-              userId: String(userEmail),
-              accessType: String(log.action || log.accessType || log.access_type || log.type || 'N/A'),
-              resourceAccessed: String(log.resource || log.resourceAccessed || log.resource_accessed || 'N/A'),
-              timestamp: String(log.createdAt || log.timestamp || log.created_at || log.date || new Date().toISOString()),
-              ipAddress: String(log.ipAddress || log.ip_address || log.ip || 'N/A'),
-              status: String(log.status || 'Success')
+              id: String(log._id),
+              userId: log.user?.email || 'N/A',
+              userRole: log.user?.role || 'N/A',
+              accessType: log.action,
+              resourceAccessed: log.resource,
+              timestamp: new Date(log.createdAt).toLocaleString(),
+              ipAddress: log.ipAddress,
+              status: 'Success'
             }
           })
+          
+          // Update business info
+          if (response.data.businessName || response.data.totalBranches) {
+            setBusinessInfo({
+              name: response.data.businessName || '',
+              totalBranches: response.data.totalBranches || 0
+            })
+          }
           
           setReportData(processedData)
           
@@ -532,14 +533,19 @@ const ReportsAnalytics = () => {
             </CTableBody>
           </CTable>
 
-          {totalPages > 1 && (
+          {reportType === 'data-access-logs' && (
             <CRow className="mt-4">
               <CCol className="d-flex justify-content-between align-items-center">
                 <div className="pagination-info">
-                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} entries
-                  {filteredData.length < reportData.length && (
-                    <span className="text-muted"> (filtered from {reportData.length} total)</span>
+                  {businessInfo.name && (
+                    <span className="me-3">
+                      <strong>Business:</strong> {businessInfo.name} 
+                      {businessInfo.totalBranches > 0 && ` (${businessInfo.totalBranches} branches)`}
+                    </span>
                   )}
+                  <span>
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} entries
+                  </span>
                 </div>
                 <CPagination 
                   aria-label="Page navigation example"
@@ -552,10 +558,10 @@ const ReportsAnalytics = () => {
                     Previous
                   </CPaginationItem>
                   <CPaginationItem active>
-                    {currentPage} of {totalPages}
+                    {currentPage} of {apiTotalPages}
                   </CPaginationItem>
                   <CPaginationItem 
-                    disabled={currentPage === totalPages} 
+                    disabled={currentPage === apiTotalPages} 
                     onClick={() => handlePageChange(currentPage + 1)}
                   >
                     Next
