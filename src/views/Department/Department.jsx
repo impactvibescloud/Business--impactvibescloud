@@ -29,9 +29,16 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilSearch, cilPencil, cilTrash, cilBuilding } from '@coreui/icons'
-import { apiCall, ENDPOINTS } from '../../config/api'
+import { apiCall, ENDPOINTS, API_CONFIG, getBaseURL } from '../../config/api'
 import { errorLog } from '../../utils/logger'
 import './Department.css'
+
+// Helper function to get API URL
+const getApiUrl = () => {
+  return process.env.NODE_ENV === 'development' ? 
+    API_CONFIG.DEV_URL : 
+    API_CONFIG.PROD_URL;
+}
 
 function Department() {
   const [departments, setDepartments] = useState([])
@@ -198,7 +205,7 @@ function Department() {
         
         // Use the same API endpoint as departments but for users
         const agentResponse = await axios.default.get(
-          `http://localhost:5040/api/users`,
+          `${getApiUrl()}/api/users`,
           {
             headers: {
               'Accept': '*/*',
@@ -329,8 +336,9 @@ function Department() {
       // Use direct axios call instead of going through the apiCall utility
       const axios = await import('axios');
       
-      console.log(`Making direct axios call to: http://localhost:5040/api/departments/business/${currentBusinessId}`);
-      const response = await axios.default.get(`http://localhost:5040/api/departments/business/${currentBusinessId}`, {
+      const baseUrl = getApiUrl();
+      console.log(`Making direct axios call to: ${baseUrl}/api/departments/business/${currentBusinessId}`);
+      const response = await axios.default.get(`${baseUrl}/api/departments/business/${currentBusinessId}`, {
         headers: {
           'Accept': '*/*',
           'Content-Type': 'application/json',
@@ -396,11 +404,12 @@ function Department() {
       try {
         // Attempt a simple connection test
         const axios = await import('axios');
-        await axios.default.head('http://localhost:5040', { timeout: 2000 });
+        const baseUrl = getApiUrl();
+        await axios.default.head(baseUrl, { timeout: 2000 });
         console.log('Backend server is reachable');
       } catch (connError) {
         console.error('Backend server unreachable:', connError.message);
-        console.log('Please ensure your backend server is running at http://localhost:5040');
+        console.log(`Please ensure your backend server is running at ${baseUrl}`);
       }
       
       errorLog('Error fetching departments:', error);
@@ -471,10 +480,11 @@ function Department() {
       const token = localStorage.getItem('authToken') || localStorage.getItem('token')
       const axios = await import('axios');
       
-      console.log(`Making DELETE request to: http://localhost:5040/api/departments/${deleteId}`);
+      const baseUrl = getApiUrl();
+      console.log(`Making DELETE request to: ${baseUrl}/api/departments/${deleteId}`);
       
       const response = await axios.default.delete(
-        `http://localhost:5040/api/departments/${deleteId}`, 
+        `${baseUrl}/api/departments/${deleteId}`, 
         {
           headers: {
             'Accept': '*/*',
@@ -543,11 +553,12 @@ function Department() {
         console.log('Updating department with data:', departmentData);
         
         const departmentId = editingDepartment.id || editingDepartment._id;
-        console.log(`Making PUT request to: http://localhost:5040/api/departments/${departmentId}`);
+        const baseUrl = getApiUrl();
+        console.log(`Making PUT request to: ${baseUrl}/api/departments/${departmentId}`);
         
         // Format matching the curl command exactly
         response = await axios.default.put(
-          `http://localhost:5040/api/departments/${departmentId}`,
+          `${baseUrl}/api/departments/${departmentId}`,
           {
             name: formData.name,
             description: formData.description,
@@ -573,10 +584,11 @@ function Department() {
       } else {
         // Create new department
         console.log('Creating department with data:', departmentData);
-        console.log('Making POST request to: http://localhost:5040/api/departments');
+        const baseUrl = getApiUrl();
+        console.log(`Making POST request to: ${baseUrl}/api/departments`);
         
         response = await axios.default.post(
-          'http://localhost:5040/api/departments',
+          `${baseUrl}/api/departments`,
           departmentData,
           { headers }
         );

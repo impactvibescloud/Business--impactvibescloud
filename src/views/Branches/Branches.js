@@ -374,9 +374,9 @@ const Branches = () => {
       console.log(`Fetching call details for user ID: ${userId}`);
       
       // Construct URL using configuration from API_CONFIG
-      const baseUrl = API_CONFIG.LOCAL_URL.includes('localhost:5042') 
-        ? 'http://localhost:5040' // Use the correct port for call-uses API
-        : API_CONFIG.PRODUCTION_URL.replace('/api', ''); // For production
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5040' 
+        : 'https://api-impactvibescloud.onrender.com';
         
       const apiUrl = `${baseUrl}/api/call-uses/user/${userId}`;
       console.log('API URL being called:', apiUrl);

@@ -36,7 +36,8 @@ export function UserActivityProvider({ children }) {
   const fetchCurrentStatus = async () => {
     try {
       setLoading(true);
-      const endpoint = 'http://localhost:5040/api/v1/user/status';
+      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5040' : 'https://api-impactvibescloud.onrender.com';
+      const endpoint = `${baseUrl}/api/v1/user/status`;
       const authToken = localStorage.getItem('authToken') || API_CONFIG.AUTH_TOKEN;
       
       console.log('Fetching current status from:', endpoint);
@@ -88,7 +89,8 @@ export function UserActivityProvider({ children }) {
   const updateStatus = async (newStatus) => {
     try {
       setLoading(true);
-      const endpoint = 'http://localhost:5040/api/v1/user/status';
+      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5040' : 'https://api-impactvibescloud.onrender.com';
+      const endpoint = `${baseUrl}/api/v1/user/status`;
       const authToken = localStorage.getItem('authToken') || API_CONFIG.AUTH_TOKEN;
       
       console.log('Updating status to:', newStatus);
