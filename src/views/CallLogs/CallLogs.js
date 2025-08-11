@@ -47,14 +47,46 @@ const CallLogs = () => {
   const [itemsPerPage] = useState(10)
   const [activeFilter, setActiveFilter] = useState('All Calls')
   const [expandedRow, setExpandedRow] = useState(null)
+  const [businessId, setBusinessId] = useState(null)
 
+  // Get the business ID when component mounts
+  useEffect(() => {
+    const getBusinessId = async () => {
+      try {
+        // First try to get from user details API
+        const response = await apiCall('/api/v1/user/details', 'GET')
+        if (response?.user?.businessId) {
+          setBusinessId(response.user.businessId)
+          return
+        }
+        
+        // If not in user details, try localStorage
+        const storedBusinessId = localStorage.getItem('businessId')
+        if (storedBusinessId) {
+          setBusinessId(storedBusinessId)
+          return
+        }
+
+        throw new Error('Business ID not found')
+      } catch (err) {
+        console.error('Failed to get business ID:', err)
+        setError('Failed to get business ID. Please make sure you are properly logged in.')
+      }
+    }
+
+    getBusinessId()
+  }, [])
+
+  // Fetch call logs when we have a business ID
   useEffect(() => {
     const fetchCallLogs = async () => {
+      if (!businessId) return
+      
       setLoading(true)
       setError(null)
       
       try {
-        const data = await apiCall(ENDPOINTS.CALL_LOGS)
+        const data = await apiCall(`/api/call-logs/business/${businessId}`)
         
         if (data && data.success && Array.isArray(data.data)) {
           // Handle the specific response format where data is in data property
@@ -68,7 +100,9 @@ const CallLogs = () => {
         }
       } catch (err) {
         console.error('Failed to fetch call logs:', err)
-        setError('Failed to fetch call logs. Please try again later.')
+        setError(err.message === 'Business ID not found' 
+          ? 'Business ID not found. Please make sure you are properly logged in.' 
+          : 'Failed to fetch call logs. Please try again later.')
         setCallLogs([]) // Set empty array on error
       } finally {
         setLoading(false)
@@ -76,7 +110,7 @@ const CallLogs = () => {
     }
     
     fetchCallLogs()
-  }, [])
+  }, [businessId]) // Re-run when businessId changes
 
   // Format the call status from API data
   const formatCallStatus = (status) => {
