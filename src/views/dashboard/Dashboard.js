@@ -155,10 +155,11 @@ const Dashboard = () => {
     }
   };  // Function to fetch call statistics with optional time filter
   const fetchCallStatistics = async (timeFilter = 'today', startDate = null, endDate = null) => {
-    if (!token) return;
+    if (!token || !user?.businessId) return;
     
     try {
-      const response = await axios.get(getApiUrl('/api/v1/call-logs'), {
+      // Use the business ID from the user object
+      const response = await axios.get(getApiUrl(`/api/call-uses/business/${user.businessId}`), {
         headers: {
           'Accept': '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
@@ -173,175 +174,80 @@ const Dashboard = () => {
         },
       });
       
-      console.log('Call logs API response:', response.data);
+      console.log('Call usage API response:', response.data);
       
-      // Handle different response structures
-      let callData = [];
-      if (response.data && response.data.success && Array.isArray(response.data.data)) {
-        callData = response.data.data;
-      } else if (response.data && Array.isArray(response.data)) {
-        callData = response.data;
-      } else if (response.data && typeof response.data === 'object' && response.data.calls) {
-        callData = response.data.calls;
-      } else if (response.data && response.data.callLogs && Array.isArray(response.data.callLogs)) {
-        callData = response.data.callLogs;
-      }
-      
-      console.log('Extracted call data:', callData);
-      
-      // If no data found, provide sample data for demo purposes
-      if (!callData || callData.length === 0) {
-        console.warn('No call data found, using sample data');
-        callData = getSampleCallData(timeFilter);
-      }
-      
-      // Filter data based on time period if needed
-      if (timeFilter !== 'all') {
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      // Handle business call usage response
+      if (response.data && response.data.success && response.data.callUses && response.data.callUses.length > 0) {
+        const callUsage = response.data.callUses[0]; // Get the first call usage record
         
-        // Filter logic based on timeFilter
-        if (timeFilter === 'today') {
-          callData = callData.filter(call => {
-            const callDate = new Date(call.callDate || call.timestamp || call.startTime || call.createdAt);
-            return callDate >= today;
-          });
-        } else if (timeFilter === '7days') {
-          const lastWeek = new Date(today);
-          lastWeek.setDate(lastWeek.getDate() - 7);
-          callData = callData.filter(call => {
-            const callDate = new Date(call.callDate || call.timestamp || call.startTime || call.createdAt);
-            return callDate >= lastWeek;
-          });
-        } else if (timeFilter === 'month') {
-          const lastMonth = new Date(today);
-          lastMonth.setMonth(lastMonth.getMonth() - 1);
-          callData = callData.filter(call => {
-            const callDate = new Date(call.callDate || call.timestamp || call.startTime || call.createdAt);
-            return callDate >= lastMonth;
-          });
-        } else if (timeFilter === 'custom' && startDate && endDate) {
-          const startDateTime = new Date(startDate);
-          const endDateTime = new Date(endDate);
-          endDateTime.setHours(23, 59, 59, 999); // End of the day
-          
-          callData = callData.filter(call => {
-            const callDate = new Date(call.callDate || call.timestamp || call.startTime || call.createdAt);
-            return callDate >= startDateTime && callDate <= endDateTime;
-          });
-        }
+        // Update call stats directly from the API response
+        const stats = {
+          totalCalls: (callUsage.inboundCalls || 0) + (callUsage.outboundCalls || 0) + (callUsage.missedCalls || 0),
+          liveCalls: 0, // API doesn't provide live calls
+          outboundCalls: callUsage.outboundCalls || 0,
+          inboundCalls: callUsage.inboundCalls || 0,
+          missedCalls: callUsage.missedCalls || 0,
+          rejectedCalls: callUsage.hangCalls || 0,
+          callsPerDay: 0 // We can calculate this if needed
+        };
+        
+        setCallStats(stats);
+        return stats;
       }
       
-      // Calculate call statistics
-      const stats = calculateCallStats(callData);
+      // If no valid response, return empty stats
+      const emptyStats = {
+        totalCalls: 0,
+        liveCalls: 0,
+        outboundCalls: 0,
+        inboundCalls: 0,
+        missedCalls: 0,
+        rejectedCalls: 0,
+        callsPerDay: 0
+      };
       
-      setCallStats(stats);
-      console.log('Call statistics:', stats);
-      return stats;
+      setCallStats(emptyStats);
+      return emptyStats;
     } catch (error) {
       console.warn("Call statistics API failed:", error.message);
-      // Use sample data when the API fails
-      const sampleData = getSampleCallData(timeFilter);
-      setCallStats(calculateCallStats(sampleData));
-      return calculateCallStats(sampleData);
+      const emptyStats = {
+        totalCalls: 0,
+        liveCalls: 0,
+        outboundCalls: 0,
+        inboundCalls: 0,
+        missedCalls: 0,
+        rejectedCalls: 0,
+        callsPerDay: 0
+      };
+      setCallStats(emptyStats);
+      return emptyStats;
     }
   };
   
-  // Helper function to generate sample call data for demo purposes
-  const getSampleCallData = (timeFilter) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    // Number of calls depends on the time filter
-    const callCount = timeFilter === 'today' ? 50 :
-                     timeFilter === '7days' ? 350 :
-                     timeFilter === 'month' ? 1500 : 50;
-    
-    // Generate sample call data
-    const sampleCalls = [];
-    
-    for (let i = 0; i < callCount; i++) {
-      // Random call date within the selected time period
-      let callDate = new Date(today);
-      if (timeFilter === '7days') {
-        callDate.setDate(today.getDate() - Math.floor(Math.random() * 7));
-      } else if (timeFilter === 'month') {
-        callDate.setDate(today.getDate() - Math.floor(Math.random() * 30));
-      } else {
-        // For 'today', use random hours
-        callDate.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
-      }
-      
-      // Random call type (70% chance of being inbound)
-      const isInbound = Math.random() < 0.7;
-      
-      // Random call status (80% completed, 10% missed, 5% rejected, 5% active)
-      const statusRandom = Math.random();
-      let status;
-      if (statusRandom < 0.05) {
-        status = 'Active';
-      } else if (statusRandom < 0.15) {
-        status = 'Missed';
-      } else if (statusRandom < 0.2) {
-        status = 'Rejected';
-      } else {
-        status = 'Completed';
-      }
-      
-      sampleCalls.push({
-        id: `sample-${i}`,
-        callType: isInbound ? 'Incoming' : 'Outgoing',
-        direction: isInbound ? 'inbound' : 'outbound',
-        status: status,
-        callDate: callDate,
-        duration: Math.floor(Math.random() * 600) // Random duration up to 10 minutes
-      });
+  // Helper function to calculate call statistics from API response
+  const calculateCallStats = (response) => {
+    if (response?.data?.success && response?.data?.callUses?.[0]) {
+      const callUsage = response.data.callUses[0];
+      return {
+        totalCalls: (callUsage.inboundCalls || 0) + (callUsage.outboundCalls || 0) + (callUsage.missedCalls || 0),
+        liveCalls: 0, // API doesn't provide live calls
+        outboundCalls: callUsage.outboundCalls || 0,
+        inboundCalls: callUsage.inboundCalls || 0,
+        missedCalls: callUsage.missedCalls || 0,
+        rejectedCalls: callUsage.hangCalls || 0,
+        callsPerDay: 0
+      };
     }
     
-    return sampleCalls;
-  };
-  
-  // Helper function to calculate call statistics from call data
-  const calculateCallStats = (callData) => {
-    const stats = {
-      totalCalls: callData.length,
-      liveCalls: callData.filter(call => 
-        call.status === 'InProgress' || 
-        call.status === 'Active' || 
-        call.status === 'in-progress' || 
-        call.status === 'ongoing').length,
-      outboundCalls: callData.filter(call => 
-        call.callType === 'Outgoing' || 
-        call.callType === 'outbound' || 
-        call.direction === 'outbound').length,
-      inboundCalls: callData.filter(call => 
-        call.callType === 'Incoming' || 
-        call.callType === 'inbound' || 
-        call.direction === 'inbound').length,
-      missedCalls: callData.filter(call => 
-        call.status === 'Missed' || 
-        call.status === 'missed' || 
-        call.status === 'no-answer').length,
-      rejectedCalls: callData.filter(call => 
-        call.status === 'Rejected' || 
-        call.status === 'rejected' || 
-        call.status === 'declined').length,
+    return {
+      totalCalls: 0,
+      liveCalls: 0,
+      outboundCalls: 0,
+      inboundCalls: 0,
+      missedCalls: 0,
+      rejectedCalls: 0,
       callsPerDay: 0
     };
-    
-    // Calculate calls per day - group by date and get average
-    const callsByDate = {};
-    callData.forEach(call => {
-      const callDate = new Date(call.callDate || call.timestamp || call.startTime || call.createdAt);
-      const date = callDate.toLocaleDateString();
-      callsByDate[date] = (callsByDate[date] || 0) + 1;
-    });
-    
-    const totalDays = Object.keys(callsByDate).length || 1; // Avoid division by zero
-    const totalCallsAcrossDays = Object.values(callsByDate).reduce((sum, count) => sum + count, 0);
-    stats.callsPerDay = Math.round(totalCallsAcrossDays / totalDays);
-    
-    return stats;
   };
 
   useEffect(() => {
@@ -414,12 +320,12 @@ const Dashboard = () => {
     }
   }, [user, token]);
   
-  // Fetch call statistics immediately when the component mounts
+  // Fetch call statistics when component mounts or user/token changes
   useEffect(() => {
-    if (token) {
+    if (token && user?.businessId) {
       fetchCallStatistics('today');
     }
-  }, [token]);
+  }, [token, user?.businessId]);
   // const [Brand, setBrand] = useState(null);
   // const getAllBrands = async () => {
   //   let res = await axios.get(`/api/brand/getBrands`, {
