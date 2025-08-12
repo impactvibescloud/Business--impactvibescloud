@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import axios from 'axios'
 import {
   CButton,
   CCard,
@@ -15,18 +16,41 @@ import {
   CFormInput,
   CSpinner
 } from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilCloudDownload } from '@coreui/icons'
 import jsPDF from 'jspdf'
 import { API_CONFIG, API_HEADERS, ENDPOINTS, apiCall } from '../../config/api'
 import './payment-requests.css'
 
 function PaymentRequests() {
+  const [user, setUser] = useState({})
+  const [businessId, setBusinessId] = useState(null)
   const [paymentRequests, setPaymentRequests] = useState([])
-  const [requestPlanNames, setRequestPlanNames] = useState({}) // Store plan names for each request
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showNewRequestModal, setShowNewRequestModal] = useState(false)
+
+  const token = localStorage.getItem('authToken')
+
+  useEffect(() => {
+    if (!token) {
+      setError('Authentication token not found. Please login again.')
+      return
+    }
+
+    axios
+      .get("/api/v1/user/details", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => {
+        setUser(res.data.user)
+        setBusinessId(res.data.user.businessId)
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user details:", err)
+        setError('Could not fetch business details. Please try logging in again.')
+      })
+  }, [token])
   const [currentDate] = useState(new Date().toLocaleDateString('en-US', { 
     month: '2-digit', 
     day: '2-digit', 
@@ -36,8 +60,8 @@ function PaymentRequests() {
   // Payment processing states
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState(null)
-  const [planDetails, setPlanDetails] = useState(null)
-  const [loadingPlanDetails, setLoadingPlanDetails] = useState(false)
+  const [invoiceData, setInvoiceData] = useState(null)
+  const [loadingInvoiceData, setLoadingInvoiceData] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState('UPI')
   const [upiId, setUpiId] = useState('')
   const [processingPayment, setProcessingPayment] = useState(false)
@@ -50,13 +74,24 @@ function PaymentRequests() {
   const [loadingInvoiceDetails, setLoadingInvoiceDetails] = useState(false)
 
   useEffect(() => {
-    fetchPaymentRequests()
-  }, [])
+    if (user?.businessId) {
+      fetchPaymentRequests()
+    }
+  }, [user?.businessId])
 
   const fetchPaymentRequests = async () => {
     try {
+      // Get the current user's businessId
+      const currentBusinessId = user?.businessId
+      if (!currentBusinessId) {
+        setError('Business ID not found. Please check your authentication.')
+        setLoading(false)
+        return
+      }
+
       setLoading(true)
-      const data = await apiCall(ENDPOINTS.BILLING_BUSINESS('684fe39da8254e8906e99aad'))
+      // Use the current user's businessId for the API call
+      const data = await apiCall(ENDPOINTS.BILLING_BUSINESS(currentBusinessId))
       console.log('Payment requests data:', data)
       
       // Prioritize data.data as per the API structure shown
@@ -92,10 +127,11 @@ function PaymentRequests() {
         return request;
       });
       
-      setPaymentRequests(processedData)
-      
-      // Fetch plan names for all requests
-      await fetchPlanNamesForRequests(processedData)
+      // Set the processed payment requests directly
+      setPaymentRequests(processedData.map(request => ({
+        ...request,
+        planName: request.planId?.planName || request.planName || 'Subscription Plan'
+      })))
       
       setLoading(false)
     } catch (err) {
@@ -105,94 +141,94 @@ function PaymentRequests() {
     }
   }
 
-  const fetchPlanNamesForRequests = async (requests) => {
-    const planNamesMap = {}
-    
-    // Fetch plan names for each request concurrently
-    const planNamePromises = requests.map(async (request) => {
-      const invoiceId = request.invoiceId || request._id
-      if (invoiceId) {
-        try {
-          console.log(`Fetching plan name for invoice ID: ${invoiceId}`)
-          const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
-          console.log(`Plan name API response for ${invoiceId}:`, data)
-          
-          const responseData = data.data || data
-          
-          // Try multiple ways to extract plan name from the API response
-          let planName = 'Subscription Plan' // default fallback
-          
-          if (responseData.planId?.planName) {
-            planName = responseData.planId.planName
-          } else if (responseData.planName) {
-            planName = responseData.planName
-          } else if (responseData.plan?.name) {
-            planName = responseData.plan.name
-          } else if (responseData.plan?.planName) {
-            planName = responseData.plan.planName
-          }
-          
-          console.log(`Extracted plan name for ${invoiceId}: ${planName}`)
-          planNamesMap[request._id] = planName
-        } catch (err) {
-          console.error(`Error fetching plan name for request ${request._id}:`, err)
-          planNamesMap[request._id] = 'Subscription Plan'
-        }
-      } else {
-        planNamesMap[request._id] = 'Subscription Plan'
-      }
-    })
-    
-    await Promise.all(planNamePromises)
-    console.log('Final plan names map:', planNamesMap)
-    setRequestPlanNames(planNamesMap)
-  }
-
   const fetchPlanDetails = async (invoiceId) => {
     if (!invoiceId) return
     
-    setLoadingPlanDetails(true)
+    setLoadingInvoiceData(true)
     try {
-      const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
+      const data = await apiCall(
+        ENDPOINTS.INVOICES(invoiceId),
+        'GET',
+        null,
+        {
+          'Expires': '0',
+          'Cache-Control': 'no-cache,no-store',
+          'Pragma': 'no-cache'
+        }
+      )
       console.log('Invoice details full response:', data)
-      console.log('Invoice data structure:', data.data || data)
       
-      // Extract all fields from the invoice API response - data structure access
-      const responseData = data.data || data; // Handle both direct data and wrapped response
+      // Extract all fields from the invoice API response
+      const responseData = data.data || data
       
-      console.log('Plan ID object:', responseData.planId)
-      console.log('Plan Name from planId:', responseData.planId?.planName)
-      
-      setPlanDetails({
-        planName: responseData.planId?.planName || responseData.planName || 'Subscription Plan',
-        rental: responseData.planId?.rental || responseData.rental || responseData.amount || 0,
-        discountPercent: responseData.planId?.discountPercent || responseData.discountPercent || 0,
-        displayDiscount: responseData.planId?.displayDiscount || responseData.displayDiscount || 0,
-        totalAfterDiscount: responseData.planId?.totalAfterDiscount || responseData.totalAfterDiscount || 0,
-        duration: responseData.planId?.duration || responseData.duration || 30,
-        gracePeriod: responseData.planId?.gracePeriod || responseData.gracePeriod || 0,
-        paymentMode: responseData.paymentMode || 'Monthly',
-        totalAmount: responseData.totalAmount || 0,
-        gst: responseData.gst || 0,
-        balance: responseData.balance || 0
+      setInvoiceData({
+        invoiceNumber: responseData._id,
+        invoiceDate: responseData.createdAt,
+        startDate: responseData.startDate,
+        endDate: responseData.endDate,
+        status: responseData.status,
+        orderId: responseData.orderId,
+        businessId: responseData.businessId,
+        paymentMode: responseData.paymentMode,
+        paymentType: responseData.paymentType,
+        upgradeType: responseData.upgradeType,
+        billingDetails: {
+          channelsAdded: responseData.channelsAdded || 1,
+          usersOrChannelsCount: responseData.usersOrChannelsCount || 1,
+          totalDaysInMonth: responseData.totalDaysInMonth || 31,
+          billingDaysCount: responseData.billingDaysCount || 31,
+          dailyRate: responseData.dailyRate || 0
+        },
+        pricing: {
+          planBasePrice: responseData.planBasePrice || 0,
+          discountPercentage: responseData.discountPercentage || 0,
+          priceAfterDiscount: responseData.priceAfterDiscount || 0,
+          subtotalBeforeTax: responseData.subtotalBeforeTax || 0,
+          taxAmount: responseData.taxAmount || 0,
+          finalTotalAmount: responseData.finalTotalAmount || 0,
+          amountPaid: responseData.amountPaid || 0,
+          outstandingBalance: responseData.outstandingBalance || 0
+        },
+        plan: {
+          ...responseData.planId,
+          planName: responseData.planId?.planName || 'Subscription Plan',
+          planId: responseData.planId?.planId || '',
+          rental: responseData.planId?.rental || 0,
+          discountPercent: responseData.planId?.discountPercent || 0,
+          displayDiscount: responseData.planId?.displayDiscount || 0,
+          totalAfterDiscount: responseData.planId?.totalAfterDiscount || 0,
+          duration: responseData.planId?.duration || 30,
+          gracePeriod: responseData.planId?.gracePeriod || 0
+        }
       })
     } catch (err) {
       console.error('Error fetching plan details:', err)
-      setPlanDetails({ 
-        planName: 'Subscription Plan', 
-        rental: 0, 
-        discountPercent: 0,
-        displayDiscount: 0,
-        totalAfterDiscount: 0,
-        duration: 30,
-        gracePeriod: 0,
-        paymentMode: 'Monthly',
-        totalAmount: 0, 
-        balance: 0, 
-        gst: 0 
+      setInvoiceData({
+        invoiceNumber: '',
+        invoiceDate: new Date(),
+        status: 'pending',
+        paymentStatus: 'unpaid',
+        amount: 0,
+        tax: 0,
+        subTotal: 0,
+        total: 0,
+        balance: 0,
+        description: '',
+        customer: {
+          name: '',
+          email: '',
+          phone: '',
+          address: ''
+        },
+        items: [{
+          name: 'Subscription Plan',
+          quantity: 1,
+          price: 0,
+          total: 0
+        }]
       })
     } finally {
-      setLoadingPlanDetails(false)
+      setLoadingInvoiceData(false)
     }
   }
 
@@ -205,35 +241,104 @@ function PaymentRequests() {
   }
 
   const handleCardClick = async (request) => {
-    if (!request || !request._id) return
+    if (!request || !request._id) return;
     
     try {
-      setLoadingInvoiceDetails(true)
-      setSelectedInvoice(request)
+      setLoadingInvoiceDetails(true);
+      setSelectedInvoice(request);
       
-      const invoiceId = request.invoiceId || request._id
-      const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
+      const invoiceId = request.invoiceId || request._id;
+      const token = localStorage.getItem('authToken');
       
-      console.log('Invoice details response:', data)
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
       
-      const invoiceInfo = data.data || data
-      setInvoiceDetails(invoiceInfo)
-      setShowInvoiceModal(true)
+      // Add debug logging
+      console.log('Fetching invoice details:', {
+        invoiceId,
+        endpoint: `http://localhost:5040/api/invoices/${invoiceId}`
+      });
+      
+      const response = await fetch(`http://localhost:5040/api/invoices/${invoiceId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache,no-store',
+          'Referer': 'http://192.168.31.135:5137/?tab=payment-requests',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch invoice details. Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Invoice details response:', data);
+      
+      if (data.success && data.data) {
+        const invoiceInfo = data.data;
+        const transformedInvoiceDetails = {
+          // Basic Invoice Information
+          invoiceNumber: invoiceInfo._id,
+          id: invoiceInfo._id,
+          invoiceDate: invoiceInfo.createdAt,
+          date: invoiceInfo.createdAt,
+          startDate: invoiceInfo.startDate,
+          endDate: invoiceInfo.endDate,
+          status: invoiceInfo.status,
+          businessId: invoiceInfo.businessId,
+          orderId: invoiceInfo.orderId,
+          
+          // Payment Related Information
+          paymentMode: invoiceInfo.paymentMode,
+          paymentType: invoiceInfo.paymentType,
+          upgradeType: invoiceInfo.upgradeType,
+          paymentStatus: invoiceInfo.paymentStatus || 'pending',
+          
+          // Plan Information
+          planName: invoiceInfo.planId?.planName || 'Subscription Plan',
+          planDetails: {
+            planId: invoiceInfo.planId?._id,
+            planName: invoiceInfo.planId?.planName,
+            duration: invoiceInfo.planId?.duration || 30,
+            gracePeriod: invoiceInfo.planId?.gracePeriod || 0,
+            features: invoiceInfo.planId?.features || [],
+            type: invoiceInfo.planId?.type
+          },
+          
+          // Financial Details
+          financialDetails: {
+            basePrice: invoiceInfo.planBasePrice || 0,
+            discountPercentage: invoiceInfo.discountPercentage || 0,
+            discountAmount: invoiceInfo.discountAmount || 0,
+            priceAfterDiscount: invoiceInfo.priceAfterDiscount || 0,
+            subtotalBeforeTax: invoiceInfo.subtotalBeforeTax || 0,
+            taxPercentage: invoiceInfo.taxPercentage || 18,
+            taxAmount: invoiceInfo.taxAmount || 0,
+            finalTotalAmount: invoiceInfo.finalTotalAmount || 0,
+            amountPaid: invoiceInfo.amountPaid || 0,
+            outstandingBalance: invoiceInfo.outstandingBalance || 0
+          },
+          
+          // Summary Amounts
+          amount: invoiceInfo.finalTotalAmount || 0,
+          subTotal: invoiceInfo.subtotalBeforeTax || 0,
+          tax: invoiceInfo.taxAmount || 0,
+          totalAmount: invoiceInfo.finalTotalAmount || 0,
+          gst: invoiceInfo.taxAmount || 0,
+          balance: invoiceInfo.outstandingBalance || 0,
+          description: invoiceInfo.disputeNotes || request.template || request.description || ''
+        };
+        setInvoiceDetails(transformedInvoiceDetails);
+      }
+      setShowInvoiceModal(true);
     } catch (error) {
-      console.error('Error fetching invoice details:', error)
-      // Show basic details if API fails
-      setInvoiceDetails({
-        id: request._id,
-        planName: requestPlanNames[request._id] || request.planName || 'Plan Details',
-        status: request.status,
-        paymentStatus: request.paymentStatus,
-        date: request.date || request.requestedAt,
-        details: request.template || request.details || request.description,
-        amount: request.amount || 0
-      })
-      setShowInvoiceModal(true)
+      console.error('Error fetching invoice details:', error);
+      setInvoiceDetails(null);
     } finally {
-      setLoadingInvoiceDetails(false)
+      setLoadingInvoiceDetails(false);
     }
   }
 
@@ -245,7 +350,7 @@ function PaymentRequests() {
     const invoiceData = {
       id: invoice.id || invoice._id || 'N/A',
       date: invoice.date || (invoice.requestedAt ? new Date(invoice.requestedAt).toLocaleDateString() : new Date().toLocaleDateString()),
-      planName: invoice.planName || requestPlanNames[invoice._id] || 'N/A',
+      planName: invoice.planName || 'N/A',
       status: invoice.status || 'N/A',
       paymentStatus: invoice.paymentStatus || 'pending',
       amount: invoice.amount || invoice.totalAmount || 0,
@@ -414,7 +519,7 @@ function PaymentRequests() {
         {
           status: "approved",
           paymentStatus: "paid",
-          template: selectedRequest.template || `An order request generated for plan ${planDetails?.planName || 'Subscription Plan'}, Business ID: ${selectedRequest.businessId || '123'}, Plan ID: ${selectedRequest.planId || '456'}, Status: approved, Payment Status: paid`
+          template: selectedRequest.template || `An order request generated for plan ${invoiceData?.items?.[0]?.name || 'Subscription Plan'}, Business ID: ${selectedRequest.businessId || '123'}, Plan ID: ${selectedRequest.planId || '456'}, Status: approved, Payment Status: paid`
         }
       )
       
@@ -487,7 +592,20 @@ function PaymentRequests() {
 
       {/* Pending Payment Requests Section */}
       <div className="pending-requests-section mb-4">
-        <h3 className="section-title">Pending Payment Requests</h3>
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h3 className="section-title mb-0">Pending Payment Requests</h3>
+          <CButton 
+            color="primary" 
+            size="sm"
+            onClick={() => {
+              setError(null)
+              fetchPaymentRequests()
+            }}
+          >
+            <i className="bi bi-arrow-clockwise me-2"></i>
+            Refresh
+          </CButton>
+        </div>
         
         {loading ? (
           <div className="loading-spinner d-flex align-items-center justify-content-center py-5">
@@ -518,86 +636,98 @@ function PaymentRequests() {
             </CCardBody>
           </CCard>
         ) : (
-          <CRow className="payment-request-cards">
+          <div className="payment-notifications">
             {paymentRequests.length > 0 ? (
               paymentRequests.map((request) => (
-                <CCol xs={12} sm={6} md={4} xl={3} key={request.id || request._id} className="mb-4">
-                  <CCard 
-                    className="h-100 payment-request-card" 
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => handleCardClick(request)}
-                  >
-                    <CCardBody>
-                      <div className="mb-2 d-flex justify-content-between">
-                        <div className="request-date">{request.date || (request.requestedAt ? new Date(request.requestedAt).toLocaleDateString('en-US', { 
-                          month: '2-digit', 
-                          day: '2-digit', 
-                          year: 'numeric' 
-                        }) : currentDate)}</div>
-                        {getStatusBadge(request.status)}
-                      </div>
-                      <h4 className="request-plan">
-                        {requestPlanNames[request._id] || request.planName || 'Loading...'}
-                      </h4>
-                      <p className="request-details">{request.template || request.details || request.description}</p>
-                      <div className="payment-status mb-3">
-                        Payment Status: <span className={`status-${(request.paymentStatus || 'pending').toLowerCase()}`}>{request.paymentStatus || 'Pending'}</span>
-                      </div>
-                      
-                      {(request.status === 'Pending' || request.status === 'pending') && (
-                        <div className="action-buttons">
-                          <CButton 
-                            color="success" 
-                            size="sm" 
-                            className="me-2"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleAccept(request)
-                            }}
-                          >
-                            Accept
-                          </CButton>
-                          <CButton 
-                            color="danger" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleReject(request.id || request._id)
-                            }}
-                          >
-                            Reject
-                          </CButton>
-                        </div>
-                      )}
-                    </CCardBody>
-                  </CCard>
-                </CCol>
-              ))
-            ) : (
-              <CCol xs={12}>
-                <CCard className="text-center py-5">
+                <CCard 
+                  key={request.id || request._id} 
+                  className="notification-card mb-3 border-start border-4 border-primary shadow-sm"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => handleCardClick(request)}
+                >
                   <CCardBody>
-                    <div className="empty-state">
-                      <div className="empty-icon mb-3">
-                        <i className="bi bi-file-earmark-text" style={{ fontSize: '48px', opacity: '0.5' }}></i>
+                    <div className="row align-items-center">
+                      <div className="col">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <div className="d-flex align-items-center">
+                            <div className="notification-icon me-3">
+                              <i className="bi bi-bell-fill text-primary" style={{ fontSize: '24px' }}></i>
+                            </div>
+                            <div>
+                              <h5 className="mb-0">{request.planName || 'New Payment Request'}</h5>
+                              <small className="text-muted">
+                                {request.requestedAt ? new Date(request.requestedAt).toLocaleString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: 'numeric',
+                                  minute: 'numeric',
+                                  hour12: true
+                                }) : currentDate}
+                              </small>
+                            </div>
+                          </div>
+                          <div className="d-flex align-items-center">
+                            {getStatusBadge(request.status)}
+                          </div>
+                        </div>
+                        <p className="mb-3">{request.template || request.details || request.description}</p>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div>
+                            <span className="text-muted me-3">Payment Status:</span>
+                            <span className={`badge bg-${(request.paymentStatus === 'paid' ? 'success' : 'warning')}-subtle text-${request.paymentStatus === 'paid' ? 'success' : 'warning'}`}>
+                              {request.paymentStatus || 'Pending'}
+                            </span>
+                          </div>
+                          {(request.status === 'Pending' || request.status === 'pending') && (
+                            <div className="action-buttons">
+                              <CButton 
+                                color="success" 
+                                size="sm" 
+                                variant="outline"
+                                className="me-2"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleAccept(request)
+                                }}
+                              >
+                                <i className="bi bi-check-lg me-1"></i>
+                                Accept
+                              </CButton>
+                              <CButton 
+                                color="danger" 
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleReject(request.id || request._id)
+                                }}
+                              >
+                                <i className="bi bi-x-lg me-1"></i>
+                                Reject
+                              </CButton>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <h4>No Payment Requests Found</h4>
-                      <p className="text-muted">There are no payment requests available at this time.</p>
-                      <CButton 
-                        color="primary" 
-                        onClick={() => {
-                          setError(null)
-                          fetchPaymentRequests()
-                        }}
-                      >
-                        Refresh
-                      </CButton>
                     </div>
                   </CCardBody>
                 </CCard>
-              </CCol>
+              ))
+            ) : (
+              <CCard className="text-center py-5">
+                <CCardBody>
+                  <div className="empty-state">
+                    <div className="empty-icon mb-3">
+                      <i className="bi bi-inbox text-muted" style={{ fontSize: '48px' }}></i>
+                    </div>
+                    <h4>No Payment Requests</h4>
+                    <p className="text-muted">Your payment requests inbox is empty.</p>
+                  </div>
+                </CCardBody>
+              </CCard>
             )}
-          </CRow>
+          </div>
         )}
       </div>
 
@@ -644,88 +774,201 @@ function PaymentRequests() {
               <h5 className="mb-3">Payment Successful!</h5>
               <p className="mb-0">Your payment has been processed successfully.</p>
             </div>
-          ) : loadingPlanDetails ? (
+          ) : loadingInvoiceData ? (
             <div className="text-center py-3">
               <CSpinner color="primary" />
-              <p className="mt-3 mb-0">Loading plan details...</p>
+              <p className="mt-3 mb-0">Loading invoice details...</p>
             </div>
           ) : (
             <>
-              <div className="plan-details mb-4">
-                <h5>{planDetails?.planName || selectedRequest?.planName || 'Subscription Plan'}</h5>
-                
-                {/* Plan Details Section */}
-                <div className="plan-info mb-4">
-                  <h6 className="text-primary mb-3">Plan Details</h6>
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Rental:</span>
-                        <span className="fw-bold">₹{(planDetails?.rental || 0).toLocaleString('en-IN')}</span>
-                      </div>
+              <div className="invoice-content mb-4">
+                {/* Invoice Header */}
+                <div className="invoice-header mb-4">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h5 className="mb-1">Invoice #{invoiceData?.invoiceNumber}</h5>
+                      <p className="text-muted mb-0">
+                        Generated on: {new Date(invoiceData?.invoiceDate).toLocaleDateString()}
+                      </p>
+                      {invoiceData?.dueDate && (
+                        <p className="text-danger mb-0">
+                          Due by: {new Date(invoiceData.dueDate).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Discount Percent:</span>
-                        <span className="fw-bold text-success">{planDetails?.discountPercent || 0}%</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Display Discount:</span>
-                        <span className="fw-bold text-success">₹{(planDetails?.displayDiscount || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Total After Discount:</span>
-                        <span className="fw-bold">₹{(planDetails?.totalAfterDiscount || 0).toLocaleString('en-IN')}</span>
-                      </div>
+                    <div className="text-end">
+                      <span className={`badge bg-${invoiceData?.status === 'paid' ? 'success' : 'warning'}`}>
+                        {invoiceData?.status}
+                      </span>
                     </div>
                   </div>
-                  
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Duration:</span>
-                        <span className="fw-bold">{planDetails?.duration || 0} days</span>
-                      </div>
+                </div>
+
+                {/* Customer Information */}
+                <div className="customer-info mb-4">
+                  <h6 className="text-primary mb-3">Customer Details</h6>
+                  <div className="card bg-light">
+                    <div className="card-body">
+                      <h6 className="mb-2">{invoiceData?.customer?.name}</h6>
+                      <p className="mb-1">{invoiceData?.customer?.email}</p>
+                      <p className="mb-1">{invoiceData?.customer?.phone}</p>
+                      <p className="mb-0">{invoiceData?.customer?.address}</p>
                     </div>
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Grace Period:</span>
-                        <span className="fw-bold">{planDetails?.gracePeriod || 0} days</span>
+                  </div>
+                </div>
+
+                {/* Billing Details */}
+                <div className="billing-details mb-4">
+                  <h6 className="text-primary mb-3">Billing Period & Usage</h6>
+                  <div className="card">
+                    <div className="card-body">
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Start Date:</span>
+                            <span>{new Date(invoiceData?.startDate).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">End Date:</span>
+                            <span>{new Date(invoiceData?.endDate).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Billing Days:</span>
+                            <span>{invoiceData?.billingDetails?.billingDaysCount} / {invoiceData?.billingDetails?.totalDaysInMonth} days</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Daily Rate:</span>
+                            <span>₹{invoiceData?.billingDetails?.dailyRate.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Channels Added:</span>
+                            <span>{invoiceData?.billingDetails?.channelsAdded}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Total Users/Channels:</span>
+                            <span>{invoiceData?.billingDetails?.usersOrChannelsCount}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                
-                {/* Invoice Details Section */}
-                <div className="invoice-details mb-4">
-                  <h6 className="text-primary mb-3">Invoice Details</h6>
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Total Amount:</span>
-                        <span className="fw-bold">₹{(planDetails?.totalAmount || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">GST:</span>
-                        <span className="fw-bold">₹{(planDetails?.gst || 0).toLocaleString('en-IN')}</span>
+
+                {/* Plan Details */}
+                <div className="plan-details mb-4">
+                  <h6 className="text-primary mb-3">Plan Information</h6>
+                  <div className="card">
+                    <div className="card-body">
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Plan Name:</span>
+                            <span className="fw-bold">{invoiceData?.plan?.planName}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Plan ID:</span>
+                            <span>{invoiceData?.plan?.planId}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Base Price:</span>
+                            <span>₹{invoiceData?.pricing?.planBasePrice.toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Discount:</span>
+                            <span className="text-success">{invoiceData?.pricing?.discountPercentage}%</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="row g-2 mb-3">
-                    <div className="col-6">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-muted small">Balance:</span>
-                        <span className="fw-bold text-danger">₹{(planDetails?.balance || 0).toLocaleString('en-IN')}</span>
+                </div>
+
+                {/* Cost Breakdown */}
+                <div className="cost-breakdown mb-4">
+                  <h6 className="text-primary mb-3">Cost Breakdown</h6>
+                  <div className="card">
+                    <div className="card-body">
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Base Price:</span>
+                          <span>₹{invoiceData?.pricing?.planBasePrice.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Price After Discount:</span>
+                          <span>₹{invoiceData?.pricing?.priceAfterDiscount.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Subtotal Before Tax:</span>
+                          <span>₹{invoiceData?.pricing?.subtotalBeforeTax.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted">Tax Amount:</span>
+                          <span>₹{invoiceData?.pricing?.taxAmount.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                      <hr />
+                      <div className="d-flex justify-content-between fw-bold">
+                        <span>Final Total Amount:</span>
+                        <span>₹{invoiceData?.pricing?.finalTotalAmount.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mt-2">
+                        <span className="text-muted">Amount Paid:</span>
+                        <span className="text-success">₹{invoiceData?.pricing?.amountPaid.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mt-2">
+                        <span className="text-muted">Outstanding Balance:</span>
+                        <span className="text-danger">₹{invoiceData?.pricing?.outstandingBalance.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Information */}
+                <div className="payment-info mb-4">
+                  <h6 className="text-primary mb-3">Payment Information</h6>
+                  <div className="card">
+                    <div className="card-body">
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Payment Mode:</span>
+                            <span>{invoiceData?.paymentMode}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Payment Type:</span>
+                            <span>{invoiceData?.paymentType}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Upgrade Type:</span>
+                            <span>{invoiceData?.upgradeType}</span>
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          <div className="d-flex justify-content-between">
+                            <span className="text-muted">Order ID:</span>
+                            <span>{invoiceData?.orderId}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -859,7 +1102,7 @@ function PaymentRequests() {
             <CButton 
               color="primary" 
               onClick={processPayment}
-              disabled={processingPayment || loadingPlanDetails}
+              disabled={processingPayment || loadingInvoiceData}
             >
               {processingPayment ? (
                 <>
@@ -891,76 +1134,227 @@ function PaymentRequests() {
             </div>
           ) : invoiceDetails ? (
             <div className="invoice-details">
-              <div className="row mb-3">
-                <div className="col-md-6">
-                  <strong>Invoice ID:</strong> {invoiceDetails.id || selectedInvoice?._id}
-                </div>
-                <div className="col-md-6">
-                  <strong>Date:</strong> {invoiceDetails.date || (selectedInvoice?.requestedAt ? new Date(selectedInvoice.requestedAt).toLocaleDateString() : 'N/A')}
+              {/* Invoice Header */}
+              <div className="invoice-header mb-4">
+                <div className="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h5 className="mb-1">Invoice #{invoiceDetails.invoiceNumber || invoiceDetails.id || selectedInvoice?._id}</h5>
+                    <p className="text-muted mb-0">
+                      Generated: {new Date(invoiceDetails.invoiceDate || invoiceDetails.date || selectedInvoice?.requestedAt).toLocaleDateString()}
+                    </p>
+                    {invoiceDetails.endDate && (
+                      <p className="text-muted mb-0">
+                        Valid Until: {new Date(invoiceDetails.endDate).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-end">
+                    {getStatusBadge(invoiceDetails.status || selectedInvoice?.status)}
+                    <div className="mt-2">
+                      <span className={`badge bg-${invoiceDetails.paymentStatus === 'paid' ? 'success' : 'warning'}-subtle text-${invoiceDetails.paymentStatus === 'paid' ? 'success' : 'warning'} ms-2`}>
+                        {invoiceDetails.paymentStatus}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="row mb-3">
-                <div className="col-md-6">
-                  <strong>Plan Name:</strong> {invoiceDetails.planName || requestPlanNames[selectedInvoice?._id] || 'N/A'}
-                </div>
-                <div className="col-md-6">
-                  <strong>Status:</strong> {getStatusBadge(invoiceDetails.status || selectedInvoice?.status)}
+              
+              {/* Plan Details Section */}
+              <div className="plan-details-section mb-4">
+                <h6 className="text-primary mb-3">Plan Details</h6>
+                <div className="card">
+                  <div className="card-body">
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Plan Name:</span>
+                          <span className="fw-semibold">{invoiceDetails.planDetails?.planName || invoiceDetails.planName}</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Plan ID:</span>
+                          <span>{invoiceDetails.planDetails?.planId || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Duration:</span>
+                          <span>{invoiceDetails.planDetails?.duration || 30} days</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Grace Period:</span>
+                          <span>{invoiceDetails.planDetails?.gracePeriod || 0} days</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Plan Type:</span>
+                          <span>{invoiceDetails.planDetails?.type || 'Standard'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="row mb-3">
-                <div className="col-md-6">
-                  <strong>Payment Status:</strong> 
-                  <span className={`ms-2 status-${(invoiceDetails.paymentStatus || selectedInvoice?.paymentStatus || 'pending').toLowerCase()}`}>
-                    {invoiceDetails.paymentStatus || selectedInvoice?.paymentStatus || 'Pending'}
-                  </span>
-                </div>
-                <div className="col-md-6">
-                  <strong>Amount:</strong> ₹{invoiceDetails.amount || invoiceDetails.totalAmount || selectedInvoice?.amount || 0}
+
+            
+              {/* Financial Details Section */}
+              <div className="financial-details-section mb-4">
+                <h6 className="text-primary mb-3">Financial Details</h6>
+                <div className="card">
+                  <div className="card-body">
+                    <div className="table-responsive">
+                      <table className="table table-borderless mb-0">
+                        <tbody>
+                          <tr>
+                            <td className="text-muted">Base Price:</td>
+                            <td className="text-end">₹{invoiceDetails.financialDetails?.basePrice.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-muted">Discount ({invoiceDetails.financialDetails?.discountPercentage || 0}%):</td>
+                            <td className="text-end text-success">-₹{invoiceDetails.financialDetails?.discountAmount.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-muted">Price After Discount:</td>
+                            <td className="text-end">₹{invoiceDetails.financialDetails?.priceAfterDiscount.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-muted">GST ({invoiceDetails.financialDetails?.taxPercentage || 18}%):</td>
+                            <td className="text-end">₹{invoiceDetails.financialDetails?.taxAmount.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                          <tr className="border-top">
+                            <td className="fw-bold">Final Total Amount:</td>
+                            <td className="text-end fw-bold">₹{invoiceDetails.financialDetails?.finalTotalAmount.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-muted">Amount Paid:</td>
+                            <td className="text-end text-success">₹{invoiceDetails.financialDetails?.amountPaid.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                          <tr>
+                            <td className="text-muted">Outstanding Balance:</td>
+                            <td className="text-end text-danger">₹{invoiceDetails.financialDetails?.outstandingBalance.toLocaleString('en-IN') || '0'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="row mb-3">
-                <div className="col-md-6">
-                  <strong>GST:</strong> ₹{invoiceDetails.gst || invoiceDetails.tax || selectedInvoice?.gst || 0}
-                </div>
-                <div className="col-md-6">
-                  <strong>Balance:</strong> ₹{invoiceDetails.balance || invoiceDetails.remainingAmount || selectedInvoice?.balance || 0}
+
+              {/* Payment Information */}
+              <div className="payment-info-section mb-4">
+                <h6 className="text-primary mb-3">Payment Information</h6>
+                <div className="card">
+                  <div className="card-body">
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Payment Mode:</span>
+                          <span>{invoiceDetails.paymentMode || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Payment Type:</span>
+                          <span>{invoiceDetails.paymentType || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Order ID:</span>
+                          <span>{invoiceDetails.orderId || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Business ID:</span>
+                          <span>{invoiceDetails.businessId || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Upgrade Type:</span>
+                          <span>{invoiceDetails.upgradeType || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              {(invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details) && (
-                <div className="row mb-3">
-                  <div className="col-12">
-                    <strong>Description:</strong>
-                    <p className="mt-1">{invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details}</p>
+
+              {/* Invoice Items */}
+              <div className="invoice-items mb-4">
+                <h6 className="text-primary mb-3">Invoice Items</h6>
+                <div className="table-responsive">
+                  <table className="table table-bordered">
+                    <thead className="bg-light">
+                      <tr>
+                        <th>Item</th>
+                        <th className="text-end">Quantity</th>
+                        <th className="text-end">Price</th>
+                        <th className="text-end">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(invoiceDetails.items || [{
+                        name: invoiceDetails.planName || requestPlanNames[selectedInvoice?._id] || 'Subscription Plan',
+                        quantity: 1,
+                        price: invoiceDetails.amount || 0,
+                        total: invoiceDetails.totalAmount || invoiceDetails.amount || 0
+                      }]).map((item, index) => (
+                        <tr key={index}>
+                          <td>{item.name}</td>
+                          <td className="text-end">{item.quantity}</td>
+                          <td className="text-end">₹{item.price.toLocaleString('en-IN')}</td>
+                          <td className="text-end">₹{item.total.toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Invoice Summary */}
+              <div className="invoice-summary">
+                <h6 className="text-primary mb-3">Invoice Summary</h6>
+                <div className="card">
+                  <div className="card-body">
+                    <div className="d-flex justify-content-between mb-2">
+                      <span>Subtotal:</span>
+                      <span>₹{(invoiceDetails.subTotal || invoiceDetails.amount || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span>Tax:</span>
+                      <span>₹{(invoiceDetails.tax || invoiceDetails.gst || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    <hr />
+                    <div className="d-flex justify-content-between fw-bold">
+                      <span>Total Amount:</span>
+                      <span>₹{(invoiceDetails.total || invoiceDetails.totalAmount || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    {(invoiceDetails.balance || invoiceDetails.remainingAmount) > 0 && (
+                      <div className="d-flex justify-content-between text-danger mt-2">
+                        <span>Balance Due:</span>
+                        <span>₹{(invoiceDetails.balance || invoiceDetails.remainingAmount || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-              {invoiceDetails.rental && (
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Rental:</strong> ₹{invoiceDetails.rental}
-                  </div>
-                  <div className="col-md-6">
-                    <strong>GST:</strong> ₹{invoiceDetails.gst || 0}
-                  </div>
-                </div>
-              )}
-              {invoiceDetails.discountPercent && (
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Discount:</strong> {invoiceDetails.discountPercent}%
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Total After Discount:</strong> ₹{invoiceDetails.totalAfterDiscount || 0}
-                  </div>
-                </div>
-              )}
-              {invoiceDetails.duration && (
-                <div className="row mb-3">
-                  <div className="col-md-6">
-                    <strong>Duration:</strong> {invoiceDetails.duration} days
-                  </div>
-                  <div className="col-md-6">
-                    <strong>Payment Mode:</strong> {invoiceDetails.paymentMode || 'Monthly'}
+              </div>
+
+              {/* Additional Information */}
+              {(invoiceDetails.description || invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details) && (
+                <div className="additional-info mt-4">
+                  <h6 className="text-primary mb-3">Additional Information</h6>
+                  <div className="card">
+                    <div className="card-body">
+                      <p className="mb-0">
+                        {invoiceDetails.description || invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -978,8 +1372,7 @@ function PaymentRequests() {
             onClick={handleDownloadInvoice}
             className="me-2"
           >
-            <CIcon icon={cilCloudDownload} className="me-1" />
-            Download
+            Download PDF
           </CButton>
           <CButton color="secondary" onClick={() => setShowInvoiceModal(false)}>
             Close
