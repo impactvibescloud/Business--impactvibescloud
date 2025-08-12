@@ -37,7 +37,30 @@ function VirtualNumbers() {
   const [releasingNumber, setReleasingNumber] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+  const [user, setUser] = useState(null)
   const token = isAutheticated()
+
+  // Fetch user details first
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      try {
+        const response = await apiCall('/api/v1/user/details', 'GET', null, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        setUser(response.user);
+      } catch (err) {
+        console.error('Error fetching user details:', err);
+        setError('Failed to fetch user details');
+      }
+    };
+
+    if (token) {
+      fetchUserDetails();
+    }
+  }, [token]);
   
   // Fetch assigned numbers
   useEffect(() => {
@@ -50,10 +73,19 @@ function VirtualNumbers() {
       setIsLoading(true)
       setError(null)
       
+      if (!user?.businessId) {
+        setError("Business ID not found. Please try again later.")
+        return
+      }
+
       try {
-        console.log('Fetching virtual numbers from proxy API')
+        console.log('Fetching virtual numbers for business:', user.businessId)
         
-        const response = await apiCall('/api/numbers', 'GET', null, {
+        const baseUrl = process.env.NODE_ENV === 'development' 
+          ? 'http://localhost:5040' 
+          : 'https://api-impactvibescloud.onrender.com'
+        
+        const response = await apiCall(`${baseUrl}/api/numbers/assigned-to/${user.businessId}`, 'GET', null, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -175,8 +207,10 @@ function VirtualNumbers() {
       }
     }
     
-    fetchAssignedNumbers(0)
-  }, [token])
+    if (user?.businessId) {
+      fetchAssignedNumbers(0)
+    }
+  }, [token, user?.businessId])
   
   // Filter assigned numbers by search term and active filter
   const filteredAssignedNumbers = Array.isArray(assignedNumbers) ? assignedNumbers.filter(num => {
