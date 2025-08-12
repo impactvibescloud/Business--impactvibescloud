@@ -91,10 +91,20 @@ const Branches = () => {
         }
       );
       console.log('Departments API Response:', response.data);
-      // Make sure we're accessing departments from the correct path
+      // Make sure we're accessing departments from the correct path and they're properly formatted
       const departmentsData = response.data.departments || response.data.data || [];
-      console.log('Processed Departments:', departmentsData);
-      setDepartments(departmentsData);
+      const processedDepartments = departmentsData.map(dept => {
+        if (typeof dept === 'object') {
+          return {
+            _id: dept._id || dept.id,
+            name: dept.name || 'Unnamed Department',
+            status: dept.status
+          };
+        }
+        return { _id: dept, name: String(dept) };
+      });
+      console.log('Processed Departments:', processedDepartments);
+      setDepartments(processedDepartments);
     } catch (error) {
       console.error("Error fetching departments:", error);
     }
@@ -110,15 +120,46 @@ const Branches = () => {
 
   const fetchBranches = async () => {
     try {
-      const response = await axios.get(`/api/branch/${user.businessId}/branches`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5040' 
+        : 'https://api-impactvibescloud.onrender.com';
+
+      const response = await axios.get(
+        `${baseUrl}/api/branch/${user.businessId}/branches`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+      
+      // Get the branches array from the response
+      const branchesData = response.data.data || [];
+      
+      // Map the data to match our component's expected structure
+      const formattedBranches = branchesData.map(branch => ({
+        ...branch,
+        manager: {
+          name: branch.user?.name || '',
+          email: branch.user?.email || '',
+          userId: branch.user?._id || ''
         },
-      });
-      setBranches(response.data.data || []);
+        id: branch._id,
+        didNumber: branch.didNumbers?.[0] || '',
+      }));
+
+      setBranches(formattedBranches);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching branches:", error);
+      setLoading(false);
+      // Show error message to user
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error?.response?.data?.message || 'Failed to fetch agents',
+      });
     }
   };
 
@@ -152,20 +193,29 @@ const Branches = () => {
 
   const handleSaveBranch = async () => {
     try {
+      // Construct the request body according to the API specification
+      const requestBody = {
+        branchName,
+        branchEmail: managerEmail,
+        businessId: user.businessId,
+        didNumbers: selectedDid ? [selectedDid] : [], // Convert single DID to array
+        department,
+        stickyBranch: stickyAgents, // Renamed from stickyAgents to stickyBranch
+        timeGroup,
+        timeCondition
+      };
+
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5040' 
+        : 'https://api-impactvibescloud.onrender.com';
+
       await axios.post(
-        "/api/branch/create/new",
-        {
-          branchName,
-          managerName,
-          branchEmail: managerEmail,
-          businessId: user.businessId,
-          didNumber: selectedDid,
-          department,
-          stickyAgents
-        },
+        `${baseUrl}/api/branch/create/new`,
+        requestBody,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
         }
       );
@@ -208,10 +258,14 @@ const Branches = () => {
   const handleEditBranch = (branch) => {
     setSelectedBranch(branch);
     setBranchName(branch.branchName || "");
-    setManagerName(branch.manager?.name || "");
-    setManagerEmail(branch.manager?.email || "");
-    setBranchStatus(branch.status || "Active");
-    setSelectedDid(branch.didNumber || ""); // Set DID number for editing
+    setManagerName(branch.user?.name || branch.manager?.name || "");
+    setManagerEmail(branch.user?.email || branch.manager?.email || "");
+    setDepartment(branch.department?._id || "");
+    setTimeGroup(branch.timeGroup || "");
+    setTimeCondition(branch.timeCondition || "");
+    setStickyAgents(branch.stickyBranch || false);
+    setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
+    setSelectedDid(branch.didNumbers?.[0] || branch.didNumber || "");
     setOpenEditBranch(true);
   };
 
@@ -223,19 +277,27 @@ const Branches = () => {
 
   const handleUpdateBranch = async () => {
     try {
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5040' 
+        : 'https://api-impactvibescloud.onrender.com';
+
       await axios.patch(
-        `/api/branch/edit/${selectedBranch._id}`,
+        `${baseUrl}/api/branch/edit/${selectedBranch._id}`,
         {
           branchName,
-          managerName,
-          branchEmail: managerEmail,
-          didNumber: selectedDid,
+          userEmail: managerEmail,
+          userName: managerName,
+          businessId: user.businessId,
+          didNumbers: selectedDid ? [selectedDid] : [],
           department,
-          stickyAgents
+          stickyBranch: stickyAgents,
+          timeGroup,
+          timeCondition
         },
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
         }
       );
@@ -263,10 +325,11 @@ const Branches = () => {
     setDepartment("");
     setTimeGroup("");
     setTimeCondition("");
-    setStickyAgents(false);
+    setStickyAgents(false); // This will be sent as stickyBranch
     setManagerName("");
     setManagerEmail("");
     setBranchStatus("Active");
+    setSelectedDid(""); // Reset DID selection
   };
 
   const handleSuspendBranch = async (branchId) => {
@@ -532,7 +595,13 @@ const Branches = () => {
                         <div className="manager-email">{branch.manager?.email || "-"}</div>
                       </CTableDataCell>
                       <CTableDataCell>
-                        <div className="department-name">{branch.department || ""}</div>
+                        <div className="department-name">
+                          {branch.department 
+                            ? (typeof branch.department === 'object' 
+                               ? (branch.department.name || "No Name") 
+                               : String(branch.department))
+                            : "Not Assigned"}
+                        </div>
                       </CTableDataCell>
                       <CTableDataCell>
                         <CBadge 
@@ -804,8 +873,8 @@ const Branches = () => {
                   <option value="" disabled>Loading departments...</option>
                 ) : (
                   departments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
-                      {dept.name || 'Unnamed Department'}
+                    <option key={dept._id} value={dept._id || dept.id}>
+                      {typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}
                     </option>
                   ))
                 )}
@@ -898,13 +967,13 @@ const Branches = () => {
               />
             </div>
             <div className="mb-3">
-              <CFormLabel htmlFor="editManagerName">Manager Name</CFormLabel>
+              <CFormLabel htmlFor="editAgentName2">Agent Name</CFormLabel>
               <CFormInput
                 type="text"
-                id="editManagerName"
+                id="editAgentName2"
                 value={managerName}
                 onChange={(e) => setManagerName(e.target.value)}
-                placeholder="Enter manager name"
+                placeholder="Enter agent name"
               />
             </div>
             <div className="mb-3">
@@ -917,6 +986,62 @@ const Branches = () => {
                 placeholder="Enter email address"
                 required
               />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editDepartment">Department</CFormLabel>
+              <CFormSelect
+                id="editDepartment"
+                value={department}
+                onChange={e => setDepartment(e.target.value)}
+                required
+              >
+                <option value="">Select Department</option>
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id || dept.id}>
+                    {typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editTimeGroup">Time Group</CFormLabel>
+              <CFormSelect
+                id="editTimeGroup"
+                value={timeGroup}
+                onChange={e => setTimeGroup(e.target.value)}
+                required
+              >
+                <option value="">Select Shifts</option>
+                <option value="morning">Morning Shift (8 AM - 4 PM)</option>
+                <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
+                <option value="evening">Evening Shift (4 PM - 12 AM)</option>
+                <option value="night">Night Shift (10 PM - 6 AM)</option>
+                <option value="24hours">24 Hours</option>
+              </CFormSelect>
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editTimeCondition">Time Condition</CFormLabel>
+              <CFormInput
+                type="text"
+                id="editTimeCondition"
+                value={timeCondition}
+                onChange={e => setTimeCondition(e.target.value)}
+                placeholder="Enter time condition"
+                required
+              />
+            </div>
+            <div className="mb-3">
+              <CFormLabel htmlFor="editStickyAgents">Sticky Agents</CFormLabel>
+              <CFormSelect
+                id="editStickyAgents"
+                value={stickyAgents}
+                onChange={e => setStickyAgents(e.target.value === 'true')}
+                required
+              >
+                <option value="">Select Option</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </CFormSelect>
             </div>
             <div className="mb-3">
               <CFormLabel htmlFor="editAssignDid">Assign DID</CFormLabel>
