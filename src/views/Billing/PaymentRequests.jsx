@@ -17,7 +17,7 @@ import {
   CSpinner
 } from '@coreui/react'
 import jsPDF from 'jspdf'
-import { API_CONFIG, API_HEADERS, ENDPOINTS, apiCall } from '../../config/api'
+import { API_CONFIG, API_HEADERS, ENDPOINTS, apiCall, getBaseURL, getHeaders } from '../../config/api'
 import './payment-requests.css'
 
 function PaymentRequests() {
@@ -37,7 +37,7 @@ function PaymentRequests() {
     }
 
     axios
-      .get(`${getBaseURL()}${API_CONFIG.API_PATH}/v1/user/details`, {
+      .get(`${getBaseURL()}/v1/user/details`, {
         headers: {
           ...getHeaders(),
         },
@@ -255,7 +255,7 @@ function PaymentRequests() {
       }
       
       // Add debug logging
-      const apiUrl = `${getBaseURL()}${API_CONFIG.API_PATH}/invoices/${invoiceId}`;
+      const apiUrl = `${getBaseURL()}/invoices/${invoiceId}`;
       console.log('Fetching invoice details:', {
         invoiceId,
         endpoint: apiUrl

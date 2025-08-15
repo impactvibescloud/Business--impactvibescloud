@@ -5,11 +5,11 @@ import axios from 'axios'
 // API Configuration with environment support
 export const API_CONFIG = {
   // Development environment
-  DEV_URL: process.env.REACT_APP_API_URL || 'http://localhost:5040',
+  DEV_URL: process.env.REACT_APP_API_URL || 'http://localhost:5040/api',
   // Production environment
-  PROD_URL: process.env.REACT_APP_PROD_API_URL || 'https://api-impactvibescloud.onrender.com',
-  // Base API path
-  API_PATH: '/api'
+  PROD_URL: process.env.REACT_APP_PROD_API_URL || 'https://api-impactvibescloud.onrender.com/api',
+  // Base API path - no longer needed as it's included in the URLs
+  API_PATH: ''
 }
 
 // Get authentication token
