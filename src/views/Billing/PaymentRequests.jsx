@@ -37,9 +37,9 @@ function PaymentRequests() {
     }
 
     axios
-      .get("/api/v1/user/details", {
+      .get(`${getBaseURL()}${API_CONFIG.API_PATH}/v1/user/details`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...getHeaders(),
         },
       })
       .then((res) => {
@@ -255,17 +255,17 @@ function PaymentRequests() {
       }
       
       // Add debug logging
+      const apiUrl = `${getBaseURL()}${API_CONFIG.API_PATH}/invoices/${invoiceId}`;
       console.log('Fetching invoice details:', {
         invoiceId,
-        endpoint: `http://localhost:5040/api/invoices/${invoiceId}`
+        endpoint: apiUrl
       });
       
-      const response = await fetch(`http://localhost:5040/api/invoices/${invoiceId}`, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...getHeaders(),
           'Cache-Control': 'no-cache,no-store',
-          'Referer': 'http://192.168.31.135:5137/?tab=payment-requests',
           'Pragma': 'no-cache'
         }
       });
