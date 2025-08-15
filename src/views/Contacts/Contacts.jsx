@@ -19,7 +19,9 @@ import {
 } from "@coreui/react";
 
 export default function Contacts() {
-  const API_BASE = "http://localhost:5040/api/contacts";
+  const API_BASE = process.env.REACT_APP_API_URL 
+    ? `${process.env.REACT_APP_API_URL}/contacts`
+    : 'https://api.impactvibescloud.com/api/contacts'; // Your production URL here
   
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -93,12 +95,15 @@ export default function Contacts() {
         const data = await response.json();
         if (data.success && data.data) {
           setContacts(data.data);
-          // You might want to add pagination state here
-          const { total, pages } = data.pagination;
+          // Safely handle pagination data with fallbacks
+          const total = data.pagination?.total ?? data.data.length;
+          const pages = data.pagination?.pages ?? 1;
           setTotalPages(pages);
           setTotalContacts(total);
         } else {
           setContacts([]);
+          setTotalPages(1);
+          setTotalContacts(0);
         }
         setError("");
       } catch (err) {
