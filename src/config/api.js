@@ -5,12 +5,16 @@ import axios from 'axios'
 // API Configuration with environment support
 export const API_CONFIG = {
   // Development environment
-  DEV_URL: 'http://localhost:5040',
+  DEV_URL: process.env.REACT_APP_API_URL || 'http://localhost:5040',
   // Production environment
-  PROD_URL: 'https://api-impactvibescloud.onrender.com',
+  PROD_URL: process.env.REACT_APP_PROD_API_URL || 'https://api-impactvibescloud.onrender.com',
   // Base API path
-  API_PATH: '/api',
-  AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4NGZlMzljYTgyNTRlODkwNmU5OWFhYiIsImlhdCI6MTc1NDI5OTIxNH0.FlziqjjJZCNYwkUEE3TDDmyNrjRRnhdl-kSFnhSj_cU'
+  API_PATH: '/api'
+}
+
+// Get authentication token
+export const getAuthToken = () => {
+  return localStorage.getItem('authToken') || '';
 }
 
 // Get the base URL based on environment
@@ -20,10 +24,10 @@ export const getBaseURL = () => {
   return isDevelopment ? API_CONFIG.DEV_URL : API_CONFIG.PROD_URL;
 }
 
-export const API_HEADERS = {
+export const getHeaders = () => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${API_CONFIG.AUTH_TOKEN}`
-}
+  'Authorization': `Bearer ${getAuthToken()}`
+});
 
 // API Endpoints
 export const ENDPOINTS = {
@@ -77,15 +81,11 @@ export const ENDPOINTS = {
 export const apiCall = async (endpoint, method = 'GET', data = null, options = {}) => {
   // Internal function to make the actual request
   const makeRequest = async () => {
-    // Get the actual auth token from localStorage if available
-    const authToken = localStorage.getItem('authToken') || API_CONFIG.AUTH_TOKEN
-    
     const config = {
       url: endpoint, // Use endpoint directly since axios baseURL is already configured
       method: method.toUpperCase(),
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        ...getHeaders(),
         ...(options.headers || {})
       },
       ...options
