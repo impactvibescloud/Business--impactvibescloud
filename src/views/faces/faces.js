@@ -56,8 +56,8 @@ const FacesTable = () => {
   const fetchBranches = async () => {
     if (!businessId) return;
     try {
-      const response = await axios.get(`/api/branch/${businessId}/branches`, { // Use businessId
-        headers: { Authorization: `Bearer ${token}` }, // Add token
+      const response = await axios.get(`/api/branches/business/${businessId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       setBranches(response.data.data || []); // Assuming branches are in response.data.data
     } catch (error) {

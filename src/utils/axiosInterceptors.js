@@ -120,18 +120,17 @@ export const setupAxiosInterceptors = () => {
         }
       }
       
-      // Rewrite any direct production API URLs to use proxy
-      if (config.url && config.url.includes('https://api-impactvibescloud.onrender.com')) {
-        const originalUrl = config.url
-        config.url = config.url.replace('https://api-impactvibescloud.onrender.com', '')
-        // Remove console log for URL redirection
-      }
-      
-      // Also handle URLs that start with the production API without https
-      if (config.url && config.url.includes('api-impactvibescloud.onrender.com')) {
-        const originalUrl = config.url
-        config.url = config.url.replace(/.*api-impactvibescloud\.onrender\.com/, '')
-        // Remove console log for URL redirection
+      // Clean up any URLs to prevent double api paths
+      if (config.url) {
+        // Clean up any double api in the path
+        config.url = config.url.replace(/\/api\/api\//g, '/api/')
+        
+        // Handle all variations of production URLs
+        if (config.url.includes('https://api-impactvibescloud.onrender.com')) {
+          config.url = config.url.replace('https://api-impactvibescloud.onrender.com', '')
+        } else if (config.url.includes('api-impactvibescloud.onrender.com')) {
+          config.url = config.url.replace(/.*api-impactvibescloud\.onrender\.com/, '')
+        }
       }
       
       return config
