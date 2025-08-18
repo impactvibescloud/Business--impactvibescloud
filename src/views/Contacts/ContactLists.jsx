@@ -76,7 +76,22 @@ const ContactLists = () => {
       try {
         // Using the business-specific endpoint with pagination
         const businessId = '684fe39da8254e8906e99aad' // Business ID from the API endpoint
-        const response = await apiCall(`/api/contact-list/business/${businessId}?page=${currentPage}&limit=${itemsPerPage}&sortBy=createdAt&order=desc`, 'GET')
+        const url = `/contact-list/business/${businessId}?page=${currentPage}&limit=${itemsPerPage}&sortBy=createdAt&order=desc`
+        console.log('Fetching contact lists with URL:', url)
+        
+        // Get the token from localStorage
+        const token = localStorage.getItem('authToken') // Changed to match getAuthToken() in api.js
+        console.log('Using auth token:', token ? 'Token exists' : 'No token found')
+        
+        const response = await apiCall(url, 'GET', null, {
+          params: {
+            page: currentPage,
+            limit: itemsPerPage,
+            sortBy: 'createdAt',
+            order: 'desc'
+          }
+        })
+        console.log('API Response:', response)
         
         if (!response) {
           throw new Error('No response received from API')
@@ -382,7 +397,7 @@ const ContactLists = () => {
         const contactIds = uploadedContacts.map(contact => contact.id)
         
         // Update existing list via API
-        const response = await apiCall(`/api/contact-list/${editingList.id}`, 'PUT', {
+        const response = await apiCall(`/contact-list/${editingList.id}`, 'PUT', {
           name: newList.name,
           businessId,
           branchId,
@@ -425,7 +440,7 @@ const ContactLists = () => {
         // For uploaded contacts, we need to create them first or use their IDs
         const contactIds = uploadedContacts.map(contact => contact.id)
         
-        const response = await apiCall('/api/contact-list', 'POST', {
+        const response = await apiCall('/contact-list', 'POST', {
           name: newList.name,
           businessId,
           branchId,
@@ -499,7 +514,7 @@ const ContactLists = () => {
         setContacts(allContacts)
         
         // Now fetch the specific list to get its contacts
-        const listData = await apiCall(`/api/contact-list/${list.id}`)
+        const listData = await apiCall(`/contact-list/${list.id}`)
         
         if (listData && listData.success && listData.data && Array.isArray(listData.data.contacts)) {
           // Find the contacts that are in this list
@@ -543,7 +558,7 @@ const ContactLists = () => {
     
     try {
       // Send delete request to the API
-      const response = await apiCall(`/api/contact-list/${deleteId}`, 'DELETE')
+      const response = await apiCall(`/contact-list/${deleteId}`, 'DELETE')
       
       if (!response || !response.success) {
         throw new Error('Error deleting contact list')
