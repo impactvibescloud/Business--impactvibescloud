@@ -9,7 +9,7 @@ export const API_CONFIG = {
   // Production environment
   PROD_URL: process.env.REACT_APP_PROD_API_URL || 'https://api-impactvibescloud.onrender.com',
   // Base API path for all endpoints
-  API_PATH: '/api'
+  API_PATH: ''
 }
 
 // Get authentication token

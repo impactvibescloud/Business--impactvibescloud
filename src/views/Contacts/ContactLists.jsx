@@ -31,8 +31,9 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilPencil, cilTrash, cilUser, cilEnvelopeClosed, cilSearch, cilX } from '@coreui/icons'
-import { apiCall } from '../../config/api'
+import { getHeaders } from '../../config/api'
 import { ENDPOINTS } from '../../config/api'
+import axiosInstance from '../../config/axiosConfig'
 import './ContactList.css'
 
 const ContactLists = () => {
@@ -76,7 +77,16 @@ const ContactLists = () => {
       try {
         // Using the business-specific endpoint with pagination
         const businessId = '684fe39da8254e8906e99aad' // Business ID from the API endpoint
-        const response = await apiCall(`/api/contact-list/business/${businessId}?page=${currentPage}&limit=${itemsPerPage}&sortBy=createdAt&order=desc`, 'GET')
+        
+        const response = await axiosInstance.get(`/contact-list/business/${businessId}`, {
+          params: {
+            page: currentPage,
+            limit: itemsPerPage,
+            sortBy: 'createdAt',
+            order: 'desc'
+          }
+        })
+        console.log('API Response:', response)
         
         if (!response) {
           throw new Error('No response received from API')
@@ -124,7 +134,7 @@ const ContactLists = () => {
       setContactsLoading(true)
       
       try {
-        const data = await apiCall(ENDPOINTS.CONTACTS)
+        const { data } = await axiosInstance.get('/api/contacts')
         
         // Handle different response formats
         let contactsData = []
@@ -382,7 +392,7 @@ const ContactLists = () => {
         const contactIds = uploadedContacts.map(contact => contact.id)
         
         // Update existing list via API
-        const response = await apiCall(`/api/contact-list/${editingList.id}`, 'PUT', {
+        const response = await axiosInstance.put(`/api/contact-list/${editingList.id}`, {
           name: newList.name,
           businessId,
           branchId,
@@ -425,7 +435,7 @@ const ContactLists = () => {
         // For uploaded contacts, we need to create them first or use their IDs
         const contactIds = uploadedContacts.map(contact => contact.id)
         
-        const response = await apiCall('/api/contact-list', 'POST', {
+        const response = await axiosInstance.post('/api/contact-list', {
           name: newList.name,
           businessId,
           branchId,
@@ -485,7 +495,7 @@ const ContactLists = () => {
     
     try {
       // First fetch all contacts
-      const contactsData = await apiCall(ENDPOINTS.CONTACTS)
+      const { data: contactsData } = await axiosInstance.get('/contacts')
       
       if (contactsData && contactsData.success && Array.isArray(contactsData.data)) {
         const allContacts = contactsData.data.map(contact => ({
@@ -499,7 +509,7 @@ const ContactLists = () => {
         setContacts(allContacts)
         
         // Now fetch the specific list to get its contacts
-        const listData = await apiCall(`/api/contact-list/${list.id}`)
+        const { data: listData } = await axiosInstance.get(`/api/contact-list/${list.id}`)
         
         if (listData && listData.success && listData.data && Array.isArray(listData.data.contacts)) {
           // Find the contacts that are in this list
@@ -543,7 +553,7 @@ const ContactLists = () => {
     
     try {
       // Send delete request to the API
-      const response = await apiCall(`/api/contact-list/${deleteId}`, 'DELETE')
+      const response = await axiosInstance.delete(`/api/contact-list/${deleteId}`)
       
       if (!response || !response.success) {
         throw new Error('Error deleting contact list')
