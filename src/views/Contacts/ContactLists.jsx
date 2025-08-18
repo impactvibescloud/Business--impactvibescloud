@@ -37,6 +37,45 @@ import axiosInstance from '../../config/axiosConfig'
 import './ContactList.css'
 
 const ContactLists = () => {
+  const downloadTemplate = () => {
+    // Define the template headers based on your contact fields
+    const headers = [
+      'Name*',
+      'Email*',
+      'Phone*',
+      'Company',
+      'Position',
+      'Location',
+      'Tags (comma-separated)',
+      'Notes'
+    ];
+
+    // Create a worksheet with headers
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+
+    // Add some sample data
+    const sampleData = [
+      [
+        'John Doe',
+        'john.doe@example.com',
+        '+91 9876543210',
+        'ABC Company',
+        'Manager',
+        'Mumbai',
+        'client,vip',
+        'Key decision maker'
+      ]
+    ];
+    XLSX.utils.sheet_add_aoa(ws, sampleData, { origin: 'A2' });
+
+    // Create workbook and add the worksheet
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Contact Template');
+
+    // Generate and download the file
+    XLSX.writeFile(wb, 'contact_upload_template.xlsx');
+  };
+
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -613,7 +652,11 @@ const ContactLists = () => {
             <CCol md={6}>
               <h1 className="contact-list-title">Contact Lists</h1>
             </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
+            <CCol md={6} className="d-flex justify-content-end gap-2">
+              <CButton color="info" onClick={downloadTemplate}>
+                <CIcon icon={cilUser} className="me-2" />
+                Download Template
+              </CButton>
               <CButton color="primary" className="add-contact-btn" onClick={handleNewList}>
                 <CIcon icon={cilPlus} className="me-2" />
                 New List
