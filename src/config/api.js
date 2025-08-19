@@ -47,8 +47,8 @@ export const ENDPOINTS = {
   CONFIG: '/config',
   
   // Billing endpoints
-  BILLING_BUSINESS: (businessId) => `/billing/business/${businessId}`,
-  BILLING_UPDATE: (id) => `/billing/${id}`,
+  BILLING_BUSINESS: (businessId) => `/api/billing/business/${businessId}`,
+  BILLING_UPDATE: (id) => `/api/billing/${id}`,
   
   // Business endpoints
   BUSINESS_DETAILS: (businessId) => `/business/get_one/${businessId}`,

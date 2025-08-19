@@ -17,7 +17,7 @@ import {
   CSpinner
 } from '@coreui/react'
 import jsPDF from 'jspdf'
-import { API_CONFIG, API_HEADERS, ENDPOINTS, apiCall, getBaseURL, getHeaders } from '../../config/api'
+import axiosInstance from '../../config/axiosConfig'
 import './payment-requests.css'
 
 function PaymentRequests() {
@@ -36,12 +36,8 @@ function PaymentRequests() {
       return
     }
 
-    axios
-      .get(`${getBaseURL()}/v1/user/details`, {
-        headers: {
-          ...getHeaders(),
-        },
-      })
+    axiosInstance
+      .get('/v1/user/details')
       .then((res) => {
         setUser(res.data.user)
         setBusinessId(res.data.user.businessId)
@@ -91,7 +87,7 @@ function PaymentRequests() {
 
       setLoading(true)
       // Use the current user's businessId for the API call
-      const data = await apiCall(ENDPOINTS.BILLING_BUSINESS(currentBusinessId))
+      const { data } = await axiosInstance.get(`/billing/business/${currentBusinessId}`)
       console.log('Payment requests data:', data)
       
       // Prioritize data.data as per the API structure shown
@@ -146,16 +142,13 @@ function PaymentRequests() {
     
     setLoadingInvoiceData(true)
     try {
-      const data = await apiCall(
-        ENDPOINTS.INVOICES(invoiceId),
-        'GET',
-        null,
-        {
+      const { data } = await axiosInstance.get(`/invoices/${invoiceId}`, {
+        headers: {
           'Expires': '0',
           'Cache-Control': 'no-cache,no-store',
           'Pragma': 'no-cache'
         }
-      )
+      })
       console.log('Invoice details full response:', data)
       
       // Extract all fields from the invoice API response
@@ -475,14 +468,10 @@ function PaymentRequests() {
     if (!id) return
     
     try {
-      await apiCall(
-        ENDPOINTS.BILLING_UPDATE(id), 
-        'PUT',
-        {
-          status: "rejected",
-          paymentStatus: "unpaid"
-        }
-      )
+      await axiosInstance.put(`/billing/${id}`, {
+        status: "rejected",
+        paymentStatus: "unpaid"
+      })
       
       // Update the local state to reflect the change
       setPaymentRequests(prevRequests => 
@@ -513,15 +502,11 @@ function PaymentRequests() {
     setProcessingPayment(true)
     try {
       // Update the payment request status using the provided API
-      const data = await apiCall(
-        ENDPOINTS.BILLING_UPDATE(selectedRequest._id), 
-        'PUT',
-        {
-          status: "approved",
-          paymentStatus: "paid",
-          template: selectedRequest.template || `An order request generated for plan ${invoiceData?.items?.[0]?.name || 'Subscription Plan'}, Business ID: ${selectedRequest.businessId || '123'}, Plan ID: ${selectedRequest.planId || '456'}, Status: approved, Payment Status: paid`
-        }
-      )
+      const { data } = await axiosInstance.put(`/billing/${selectedRequest._id}`, {
+        status: "approved",
+        paymentStatus: "paid",
+        template: selectedRequest.template || `An order request generated for plan ${invoiceData?.items?.[0]?.name || 'Subscription Plan'}, Business ID: ${selectedRequest.businessId || '123'}, Plan ID: ${selectedRequest.planId || '456'}, Status: approved, Payment Status: paid`
+      })
       
       console.log('Payment processed:', data)
       
