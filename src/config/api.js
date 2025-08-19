@@ -26,7 +26,9 @@ export const sanitizeUrl = (url) => {
 export const getBaseURL = () => {
   // Check if we're in development mode
   const isDevelopment = process.env.NODE_ENV === 'development';
-  return isDevelopment ? API_CONFIG.DEV_URL : API_CONFIG.PROD_URL;
+  const baseUrl = isDevelopment ? API_CONFIG.DEV_URL : API_CONFIG.PROD_URL;
+  // In production, we need to append /api
+  return isDevelopment ? baseUrl : `${baseUrl}/api`;
 }
 
 export const getHeaders = () => ({
