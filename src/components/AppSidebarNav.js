@@ -24,19 +24,17 @@ export const AppSidebarNav = ({ items }) => {
     const { component, name, badge, icon, ...rest } = item;
     const Component = component;
     return (
-      <>
-        <Component
-          {...(rest.to &&
-            !rest.items && {
-              component: NavLink,
-              activeclassname: "active",
-            })}
-          key={index}
-          {...rest}
-        >
-          {navLink(name, icon, badge)}
-        </Component>
-      </>
+      <Component
+        {...(rest.to &&
+          !rest.items && {
+            component: NavLink,
+            activeclassname: "active",
+          })}
+        key={`navitem-${index}`}
+        {...rest}
+      >
+        {navLink(name, icon, badge)}
+      </Component>
     );
   };
   const navGroup = (item, index) => {
