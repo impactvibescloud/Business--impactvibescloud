@@ -5,6 +5,11 @@ const Change_Password = React.lazy(() =>
   import("./views/pages/register/Change_password")
 );
 
+// Tickets
+const TicketDashboard = React.lazy(() =>
+  import("./components/Ticket/TicketDashboard")
+);
+
 const Dashboard = React.lazy(() => import("./views/dashboard/Dashboard"));
 const EditProfile = React.lazy(() => import("./views/Profile/EditProfile"));
 const Socialmedia = React.lazy(() => import("./views/configuration/Socialmedia.js"));
@@ -872,6 +877,12 @@ const routes = [
     name: "Settings",
     element: Settings,
     navName: "Settings",
+  },
+  {
+    path: "/tickets",
+    name: "Support Tickets",
+    element: TicketDashboard,
+    navName: "Support Tickets",
   },
 ];
 
