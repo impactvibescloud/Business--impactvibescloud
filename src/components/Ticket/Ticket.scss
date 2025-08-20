@@ -1,0 +1,91 @@
+.ticket-form {
+  max-width: 800px;
+  margin: 2rem auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+
+    h3 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #212529;
+    }
+  }
+
+  .card-body {
+    padding: 2rem;
+  }
+
+  .form-label {
+    font-weight: 500;
+    color: #495057;
+  }
+
+  .form-control, .form-select {
+    border-radius: 0.25rem;
+    border: 1px solid #ced4da;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+    &:focus {
+      border-color: #86b7fe;
+      box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+  }
+
+  .form-text {
+    color: #6c757d;
+    font-size: 0.875rem;
+  }
+
+  .btn-primary {
+    min-width: 150px;
+    
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+  }
+
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.2em;
+  }
+
+  .alert {
+    margin-bottom: 1.5rem;
+  }
+
+  // File input styling
+  input[type="file"] {
+    padding: 0.375rem 0.75rem;
+    line-height: 1.5;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+    &::-webkit-file-upload-button {
+      padding: 0.375rem 0.75rem;
+      margin: -0.375rem -0.75rem;
+      margin-inline-end: 0.75rem;
+      color: #212529;
+      background-color: #e9ecef;
+      border-inline-end: 1px solid #ced4da;
+      border-radius: 0.25rem 0 0 0.25rem;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .ticket-form {
+    margin: 1rem;
+    
+    .card-body {
+      padding: 1rem;
+    }
+  }
+}
