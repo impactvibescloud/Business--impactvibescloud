@@ -61,7 +61,7 @@ function UserActivityStatus() {
                 Last seen: {new Date(userData.lastSeen).toLocaleString()}
               </small>
             </CDropdownItem>
-            <CDropdownItem divider />
+            <CDropdownItem divider="true" />
           </>
         )}
         <CDropdownItem 

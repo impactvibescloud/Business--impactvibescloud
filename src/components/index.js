@@ -7,6 +7,7 @@ import AppSidebar from './AppSidebar'
 import DocsCallout from './DocsCallout'
 import DocsLink from './DocsLink'
 import DocsExample from './DocsExample'
+import MaintenanceAlert from './MaintenanceAlert'
 import UserActivityStatus from './UserActivityStatus/UserActivityStatus'
 
 export {
@@ -18,6 +19,7 @@ export {
   AppSidebar,
   DocsCallout,
   DocsLink,
+  MaintenanceAlert,
   DocsExample,
   UserActivityStatus,
 }
