@@ -207,6 +207,7 @@ import { setupFetchInterceptor } from "./utils/fetchInterceptor";
 
 // User activity context
 import { UserActivityProvider } from "./context/UserActivityContext";
+import { AuthProvider } from "./context/authContext";
 
 // Containers
 const DefaultLayout = React.lazy(() => import("./layout/DefaultLayout"));
@@ -277,13 +278,14 @@ const App = () => {
       }}
     >
       <UserActivityProvider>
-        <Suspense
-          fallback={
-            <div className="pt-3 text-center">
-              <div className="sk-spinner sk-spinner-pulse"></div>
-            </div>
-          }
-        >
+        <AuthProvider>
+          <Suspense
+            fallback={
+              <div className="pt-3 text-center">
+                <div className="sk-spinner sk-spinner-pulse"></div>
+              </div>
+            }
+          >
         <Routes>
           {/* <Route exact path="/change-password" name="My profile" element={<ChangePassword />} /> */}
           <Route exact path="/" name="Login Page" element={<Login />} />
@@ -304,6 +306,7 @@ const App = () => {
         </Routes>
         <Toaster />
       </Suspense>
+        </AuthProvider>
       </UserActivityProvider>
     </HashRouter>
   );
