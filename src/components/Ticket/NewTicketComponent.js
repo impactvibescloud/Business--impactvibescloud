@@ -41,13 +41,53 @@ import './scrollbar.css';
 import './modern-chat.css';
 
 const NewTicketComponent = () => {
-  const { businessId, userId } = useAuth();
+  // State for user and business details
+  const [businessId, setBusinessId] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [userDetails, setUserDetails] = useState(null);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [formError, setFormError] = useState(null);
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+
+  // Fetch user details on component mount
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          throw new Error("Authentication token not found");
+        }
+
+        console.log('Fetching user details...');
+        const response = await axiosInstance.get('/v1/user/details');
+        console.log('User details response:', response.data);
+
+        if (response.data && response.data.user) {
+          setUserDetails(response.data.user);
+          if (response.data.user.businessId) {
+            console.log('Setting business ID:', response.data.user.businessId);
+            setBusinessId(response.data.user.businessId);
+          } else {
+            console.warn('Business ID not found in user object');
+          }
+          if (response.data.user._id) {
+            console.log('Setting user ID:', response.data.user._id);
+            setUserId(response.data.user._id);
+          }
+        } else {
+          console.error('User object not found in response:', response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching user details:', error);
+        setFormError('Failed to load user details. Please refresh the page.');
+      }
+    };
+
+    fetchUserDetails();
+  }, []);
   const [priority, setPriority] = useState("High");
   const [category, setCategory] = useState("Technical");
   const [submitting, setSubmitting] = useState(false);
@@ -55,9 +95,52 @@ const NewTicketComponent = () => {
   // Function to create a new ticket
   const createTicket = async (e) => {
     e.preventDefault();
+    console.log('Create ticket function called');
+    
     try {
       setSubmitting(true);
       setFormError(null);
+
+      // Check form data
+      console.log('Form Data:', {
+        subject,
+        description,
+        priority,
+        category
+      });
+
+      // Check auth token
+      const token = localStorage.getItem('authToken');
+      console.log('Auth Token exists:', !!token);
+
+      // Log user details for debugging
+      console.log('User Details State:', {
+        userDetails,
+        businessId,
+        userId
+      });
+
+      if (!subject || !description) {
+        throw new Error("Subject and description are required");
+      }
+
+      if (!businessId) {
+        console.error('Business ID missing during ticket creation. Current state:', {
+          userDetails,
+          businessId,
+          userId
+        });
+        throw new Error("Business information not available");
+      }
+
+      if (!userId) {
+        console.error('User ID missing during ticket creation. Current state:', {
+          userDetails,
+          businessId,
+          userId
+        });
+        throw new Error("User information not available");
+      }
 
       const ticketData = {
         subject,
@@ -68,23 +151,68 @@ const NewTicketComponent = () => {
         createdBy: userId
       };
 
-      const response = await axiosInstance.post('/tickets', ticketData);
+      // Log the request data
+      console.log('Creating ticket with data:', ticketData);
 
-      if (response.data) {
-        // Reset form
-        setSubject("");
-        setDescription("");
-        setPriority("High");
-        setCategory("Technical");
-        setShowForm(false);
+      try {
+        // Log the full request URL and headers
+        console.log('Making API request to:', `${axiosInstance.defaults.baseURL}/api/tickets`);
+        console.log('Request headers:', axiosInstance.defaults.headers);
+        
+        const response = await axiosInstance.post('/tickets', ticketData);
+        // Log the successful response
+        console.log('Ticket creation response:', response.data);
 
-        // Refresh ticket list
-        await fetchTickets();
+        if (response.data) {
+          // Reset form
+          setSubject("");
+          setDescription("");
+          setPriority("High");
+          setCategory("Technical");
+          setShowForm(false);
+
+          // Refresh ticket list
+          await fetchTickets();
+        }
+      } catch (apiError) {
+        // Log detailed API error
+        console.error('API Error:', {
+          status: apiError.response?.status,
+          statusText: apiError.response?.statusText,
+          data: apiError.response?.data,
+          headers: apiError.response?.headers
+        });
+        throw apiError;
       }
     } catch (err) {
-      setFormError(err?.response?.data?.message || "Failed to create ticket");
+      console.error('Error Details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        config: {
+          url: err.config?.url,
+          method: err.config?.method,
+          headers: err.config?.headers,
+          data: err.config?.data
+        }
+      });
+
+      // Set appropriate error message
+      if (!userDetails) {
+        setFormError("User details not loaded. Please refresh the page.");
+      } else if (!userDetails.business?._id) {
+        setFormError("Business information not available. Please refresh the page.");
+      } else if (err.response?.status === 401) {
+        setFormError("Authentication failed. Please log in again.");
+      } else if (err.response?.status === 400) {
+        setFormError(err.response.data.message || "Invalid ticket data.");
+      } else {
+        setFormError(err.response?.data?.message || "Failed to create ticket. Please try again.");
+      }
     } finally {
       setSubmitting(false);
+      console.log('Create ticket operation completed');
     }
   };
 
