@@ -432,7 +432,7 @@ const NewTicketComponent = () => {
                         size="sm"
                         className="min-w-[100px]"
                         onClick={() => {
-                          setSelectedTicket(ticket.id);
+                          setSelectedTicket(ticket);
                           fetchTicketMessages(ticket.id);
                         }}
                       >
@@ -477,7 +477,10 @@ const NewTicketComponent = () => {
             className="modern-chat-modal"
           >
             <CModalHeader className="chat-header">
-              <CModalTitle className="text-lg font-semibold">Chat</CModalTitle>
+              <CModalTitle className="chat-modal-title">
+                <div className="ticket-subject">{selectedTicket?.subject}</div>
+                <div className="ticket-id">Ticket #{selectedTicket?.ticketNo || selectedTicket?.id?.slice(-6)}</div>
+              </CModalTitle>
             </CModalHeader>
             <CModalBody className="p-0">
               <div className="chat-body">
