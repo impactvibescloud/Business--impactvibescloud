@@ -6,9 +6,7 @@ const Change_Password = React.lazy(() =>
 );
 
 // Tickets
-const TicketDashboard = React.lazy(() =>
-  import("./components/Ticket/TicketDashboard")
-);
+const NewTicketComponent = React.lazy(() => import("./components/Ticket/NewTicketComponent"));
 
 const Dashboard = React.lazy(() => import("./views/dashboard/Dashboard"));
 const EditProfile = React.lazy(() => import("./views/Profile/EditProfile"));
@@ -163,6 +161,7 @@ const routes = [
   //dashboard
 
   { path: "/dashboard", name: "Dashboard", element: Dashboard, navName: "" },
+  { path: "/tickets", name: "Support Tickets", element: NewTicketComponent, navName: "Support" },
   {
     path: "/change_password",
     name: "Change Password",
@@ -877,12 +876,6 @@ const routes = [
     name: "Settings",
     element: Settings,
     navName: "Settings",
-  },
-  {
-    path: "/tickets",
-    name: "Support Tickets",
-    element: TicketDashboard,
-    navName: "Support Tickets",
   },
 ];
 
