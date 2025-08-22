@@ -68,12 +68,53 @@ function PaymentRequests() {
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [invoiceDetails, setInvoiceDetails] = useState(null)
   const [loadingInvoiceDetails, setLoadingInvoiceDetails] = useState(false)
+  
+  // Dispute states
+  const [showDisputeModal, setShowDisputeModal] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [creatingDispute, setCreatingDispute] = useState(false)
+  const [disputeError, setDisputeError] = useState(null)
 
   useEffect(() => {
     if (user?.businessId) {
       fetchPaymentRequests()
     }
   }, [user?.businessId])
+
+  // Function to handle dispute creation
+  const handleCreateDispute = async () => {
+    if (!selectedInvoice || !disputeReason.trim()) {
+      setDisputeError('Please provide a reason for the dispute')
+      return
+    }
+
+    try {
+      setCreatingDispute(true)
+      setDisputeError(null)
+
+      const response = await axiosInstance.post('/disputes', {
+        invoiceId: selectedInvoice._id,
+        businessId: user.businessId,
+        reason: disputeReason
+      })
+
+      if (response.data.success) {
+        // Close the dispute modal
+        setShowDisputeModal(false)
+        // Reset the form
+        setDisputeReason('')
+        // Refresh the payment requests to show updated status
+        fetchPaymentRequests()
+        // Show success message (you can implement a toast notification here)
+        alert('Dispute created successfully')
+      }
+    } catch (error) {
+      console.error('Error creating dispute:', error)
+      setDisputeError(error.response?.data?.message || 'Failed to create dispute. Please try again.')
+    } finally {
+      setCreatingDispute(false)
+    }
+  }
 
   const fetchPaymentRequests = async () => {
     try {
@@ -135,6 +176,14 @@ function PaymentRequests() {
       setError(err.message || 'Failed to fetch payment requests')
       setLoading(false)
     }
+  }
+
+  // Function to open dispute modal
+  const handleOpenDisputeModal = (invoice) => {
+    setSelectedInvoice(invoice)
+    setShowDisputeModal(true)
+    setDisputeError(null)
+    setDisputeReason('')
   }
 
   const fetchPlanDetails = async (invoiceId) => {
@@ -692,6 +741,22 @@ function PaymentRequests() {
                                 Reject
                               </CButton>
                             </div>
+                          )}
+                          {/* Dispute button - always visible */}
+                          {request.status !== 'disputed' && (
+                            <CButton 
+                              color="warning" 
+                              size="sm"
+                              variant="outline"
+                              className="ms-2"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenDisputeModal(request)
+                              }}
+                            >
+                              <i className="bi bi-exclamation-triangle me-1"></i>
+                              Dispute
+                            </CButton>
                           )}
                         </div>
                       </div>
@@ -1363,16 +1428,90 @@ function PaymentRequests() {
             Close
           </CButton>
           {selectedInvoice && (selectedInvoice.status === 'Pending' || selectedInvoice.status === 'pending') && (
-            <CButton 
-              color="success" 
-              onClick={() => {
-                setShowInvoiceModal(false)
-                handleAccept(selectedInvoice)
-              }}
-            >
-              Accept & Pay
-            </CButton>
+            <>
+              <CButton 
+                color="success" 
+                onClick={() => {
+                  setShowInvoiceModal(false)
+                  handleAccept(selectedInvoice)
+                }}
+                className="me-2"
+              >
+                Accept & Pay
+              </CButton>
+              <CButton 
+                color="danger" 
+                variant="outline"
+                onClick={() => {
+                  setShowInvoiceModal(false)
+                  handleOpenDisputeModal(selectedInvoice)
+                }}
+              >
+                Dispute Invoice
+              </CButton>
+            </>
           )}
+        </CModalFooter>
+      </CModal>
+
+      {/* Dispute Modal */}
+      <CModal
+        visible={showDisputeModal}
+        onClose={() => setShowDisputeModal(false)}
+        backdrop="static"
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>Dispute Invoice</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {selectedInvoice && (
+            <div>
+              <div className="mb-3">
+                <h6>Invoice Number: {selectedInvoice._id}</h6>
+                <p className="text-muted">
+                  Amount: {selectedInvoice.amount || selectedInvoice.totalAmount}
+                </p>
+              </div>
+              <div className="mb-3">
+                <label htmlFor="disputeReason" className="form-label">Reason for Dispute</label>
+                <textarea
+                  id="disputeReason"
+                  className="form-control"
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  rows="4"
+                  placeholder="Please provide detailed reason for the dispute..."
+                />
+              </div>
+              {disputeError && (
+                <div className="alert alert-danger" role="alert">
+                  {disputeError}
+                </div>
+              )}
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton 
+            color="secondary" 
+            onClick={() => setShowDisputeModal(false)}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleCreateDispute}
+            disabled={creatingDispute || !disputeReason.trim()}
+          >
+            {creatingDispute ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Creating Dispute...
+              </>
+            ) : (
+              'Submit Dispute'
+            )}
+          </CButton>
         </CModalFooter>
       </CModal>
     </div>
