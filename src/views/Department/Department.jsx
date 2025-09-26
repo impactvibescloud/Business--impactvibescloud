@@ -71,58 +71,60 @@ function Department() {
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        const token = localStorage.getItem('authToken')
+        const token = localStorage.getItem('authToken');
         if (token) {
-          const response = await apiCall('/api/v1/user/details', 'GET')
-          if (response?.user?.businessId) {
-            setCurrentBusinessId(response.user.businessId)
+          const userResponse = await fetch('/api/v1/user/details', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await userResponse.json();
+          if (data?.user?.businessId) {
+            setCurrentBusinessId(data.user.businessId);
             setFormData(prev => ({
               ...prev,
-              businessId: response.user.businessId
-            }))
-            
+              businessId: data.user.businessId
+            }));
             // Fetch business details to get business name
-            await fetchBusinessDetails(response.user.businessId)
+            await fetchBusinessDetails(data.user.businessId);
             // Fetch available agents/branches
-            await fetchAvailableAgents(response.user.businessId)
+            await fetchAvailableAgents(data.user.businessId);
           } else {
             // If user details don't have businessId, try to get it from localStorage
-            const storedBusinessId = localStorage.getItem('businessId')
+            const storedBusinessId = localStorage.getItem('businessId');
             if (storedBusinessId) {
-              setCurrentBusinessId(storedBusinessId)
+              setCurrentBusinessId(storedBusinessId);
               setFormData(prev => ({
                 ...prev,
                 businessId: storedBusinessId
-              }))
-              await fetchBusinessDetails(storedBusinessId)
-              await fetchAvailableAgents(storedBusinessId)
+              }));
+              await fetchBusinessDetails(storedBusinessId);
+              await fetchAvailableAgents(storedBusinessId);
             } else {
               // Use fallback ID if nothing else works
-              const fallbackId = '64f7b1234567890abcdef123'
-              setCurrentBusinessId(fallbackId)
+              const fallbackId = '64f7b1234567890abcdef123';
+              setCurrentBusinessId(fallbackId);
               setFormData(prev => ({
                 ...prev,
                 businessId: fallbackId
-              }))
-              await fetchBusinessDetails(fallbackId)
-              await fetchAvailableAgents(fallbackId)
+              }));
+              await fetchBusinessDetails(fallbackId);
+              await fetchAvailableAgents(fallbackId);
             }
           }
         }
       } catch (error) {
-        errorLog('Error fetching user details:', error)
+        errorLog('Error fetching user details:', error);
         // Fallback to default businessId
-        const fallbackId = '64f7b1234567890abcdef123'
-        setCurrentBusinessId(fallbackId)
-        setBusinessName('My Business')
+        const fallbackId = '64f7b1234567890abcdef123';
+        setCurrentBusinessId(fallbackId);
+        setBusinessName('My Business');
         setFormData(prev => ({
           ...prev,
           businessId: fallbackId
-        }))
-        await fetchAvailableAgents(fallbackId)
+        }));
+        await fetchAvailableAgents(fallbackId);
       }
-    }
-    getCurrentUser()
+    };
+    getCurrentUser();
   }, [])
 
   const fetchBusinessDetails = async (businessId) => {
@@ -164,29 +166,34 @@ function Department() {
 
   const fetchAvailableAgents = async (businessId) => {
     try {
-      // Fetch branches using the API endpoint that other components are using
-      const branchResponse = await apiCall(`/api/branch/${businessId}/branches`, 'GET')
-      console.log('Branch Response:', branchResponse)
-      
-      // Handle different response formats
-      let branchData = []
+      // Use the correct API URL for branches (production or development)
+      const baseUrl = process.env.NODE_ENV === 'development'
+        ? 'http://localhost:5040'
+        : 'https://api-impactvibescloud.onrender.com';
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const axios = await import('axios');
+      const branchResponse = await axios.default.get(
+        `${baseUrl}/api/branch/${businessId}/branches`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      let branchData = [];
       if (branchResponse?.data?.data) {
-        branchData = branchResponse.data.data
+        branchData = branchResponse.data.data;
       } else if (branchResponse?.data) {
-        branchData = branchResponse.data
+        branchData = branchResponse.data;
       } else if (Array.isArray(branchResponse)) {
-        branchData = branchResponse
+        branchData = branchResponse;
       }
-      
-      // If no branches found, set as empty array instead of mock data
       if (!branchData || branchData.length === 0) {
         branchData = [];
         console.log('No branch data found, using empty array');
       }
-      
-      // Only map branch data if there's something to map
       if (branchData.length > 0) {
-        // Ensure all branch records have required fields
         branchData = branchData.map(branch => ({
           _id: branch._id || branch.id || `branch-${Math.random().toString(36).substring(2, 9)}`,
           id: branch.id || branch._id || `branch-${Math.random().toString(36).substring(2, 9)}`,
@@ -194,8 +201,7 @@ function Department() {
           name: branch.name || branch.branchName || 'Unnamed Branch'
         }));
       }
-      
-      setAvailableBranches(branchData)
+      setAvailableBranches(branchData);
 
       try {
         // Fetch users/agents with the correct endpoint
@@ -261,59 +267,6 @@ function Department() {
     }
   }
 
-  // Mock department data (fallback)
-  const mockDepartments = [
-    {
-      id: 1,
-      businessId: '64f7b1234567890abcdef123',
-      name: 'Human Resources',
-      description: 'Managing employee relations and policies',
-      agents: ['64f7b1234567890abcdef124', '64f7b1234567890abcdef125'],
-      departmentHead: '64f7b1234567890abcdef124',
-      status: 'active',
-      createdDate: '2024-01-15'
-    },
-    {
-      id: 2,
-      businessId: '64f7b1234567890abcdef123',
-      name: 'Information Technology',
-      description: 'Technology infrastructure and support',
-      agents: ['64f7b1234567890abcdef126', '64f7b1234567890abcdef127'],
-      departmentHead: '64f7b1234567890abcdef126',
-      status: 'active',
-      createdDate: '2024-02-01'
-    },
-    {
-      id: 3,
-      businessId: '64f7b1234567890abcdef123',
-      name: 'Sales & Marketing',
-      description: 'Revenue generation and brand promotion',
-      agents: ['64f7b1234567890abcdef128', '64f7b1234567890abcdef129'],
-      departmentHead: '64f7b1234567890abcdef128',
-      status: 'active',
-      createdDate: '2024-01-20'
-    },
-    {
-      id: 4,
-      businessId: '64f7b1234567890abcdef123',
-      name: 'Finance & Accounting',
-      description: 'Financial planning and accounting operations',
-      agents: ['64f7b1234567890abcdef130'],
-      departmentHead: '64f7b1234567890abcdef130',
-      status: 'active',
-      createdDate: '2024-01-10'
-    },
-    {
-      id: 5,
-      businessId: '64f7b1234567890abcdef123',
-      name: 'Customer Support',
-      description: 'Customer service and technical support',
-      agents: ['64f7b1234567890abcdef131', '64f7b1234567890abcdef132'],
-      departmentHead: '64f7b1234567890abcdef131',
-      status: 'inactive',
-      createdDate: '2024-03-01'
-    }
-  ]
 
   useEffect(() => {
     if (currentBusinessId) {
