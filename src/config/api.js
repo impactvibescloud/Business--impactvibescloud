@@ -19,6 +19,7 @@ export const getAuthToken = () => {
 
 // Sanitize URL to prevent double /api
 export const sanitizeUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
   return url.replace(/\/api\/api\//, '/api/').replace(/^\/api\//, '/');
 }
 
@@ -39,7 +40,7 @@ export const getHeaders = () => ({
 // API Endpoints
 export const ENDPOINTS = {
   // User endpoints
-  USER_DETAILS: '/v1/user/details',
+  USER_DETAILS: '/api/v1/user/details',
   USER_LOGIN: '/v1/user/login',
   USER_LOGOUT: '/v1/user/logout',
   USER_STATUS: '/v1/user/status',
