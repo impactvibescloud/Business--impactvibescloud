@@ -44,19 +44,29 @@ function VirtualNumbers() {
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
-        const response = await apiCall('/api/v1/user/details', 'GET', null, {
+        const authToken = token || localStorage.getItem('authToken');
+        if (!authToken) {
+          setError('Authentication required. Please login again.');
+          return;
+        }
+        const userResponse = await fetch('/api/v1/user/details', {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Authorization': `Bearer ${authToken}`
           }
         });
-        setUser(response.user);
+        const userData = await userResponse.json();
+        // Get businessId from API response or fall back to localStorage
+        const businessId = userData?.user?.businessId || localStorage.getItem('businessId');
+        if (!businessId) {
+          setError('Business ID not found. Please login again.');
+          return;
+        }
+        setUser({ ...userData.user, businessId });
       } catch (err) {
         console.error('Error fetching user details:', err);
         setError('Failed to fetch user details');
       }
     };
-
     if (token) {
       fetchUserDetails();
     }

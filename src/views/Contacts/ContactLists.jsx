@@ -108,23 +108,32 @@ const ContactLists = () => {
     setDataRefreshCounter(prev => prev + 1)
   }
   
-  useEffect(() => {
-    const fetchContactLists = async () => {
-      setLoading(true)
-      setError(null)
-      
-      try {
-        // Using the business-specific endpoint with pagination
-        const businessId = '684fe39da8254e8906e99aad' // Business ID from the API endpoint
-        
-        const response = await axiosInstance.get(`/contact-list/business/${businessId}`, {
-          params: {
-            page: currentPage,
-            limit: itemsPerPage,
-            sortBy: 'createdAt',
-            order: 'desc'
+    useEffect(() => {
+      const fetchContactLists = async () => {
+        setLoading(true)
+        setError(null)
+        try {
+          // Get businessId dynamically from user details API or localStorage
+          let businessId = '';
+          const authToken = localStorage.getItem('authToken');
+          if (authToken) {
+            const userResponse = await fetch('/api/v1/user/details', {
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const userData = await userResponse.json();
+            businessId = userData?.user?.businessId || localStorage.getItem('businessId');
+          } else {
+            businessId = localStorage.getItem('businessId');
           }
-        })
+          if (!businessId) throw new Error('Business ID not found. Please login again.');
+          const response = await axiosInstance.get(`/contact-list/business/${businessId}`, {
+            params: {
+              page: currentPage,
+              limit: itemsPerPage,
+              sortBy: 'createdAt',
+              order: 'desc'
+            }
+          })
         console.log('API Response:', response)
         
         if (!response) {
@@ -423,13 +432,24 @@ const ContactLists = () => {
     
     try {
       if (editingList) {
-        // Use hardcoded business and branch IDs
-        const businessId = '684fe39ca8254e8906e99aab'
-        const branchId = '684fe39ca8254e8906e99aab'
-        
+        // Get businessId and branchId dynamically
+        let businessId = '';
+        let branchId = '';
+        const authToken = localStorage.getItem('authToken');
+        if (authToken) {
+          const userResponse = await fetch('/api/v1/user/details', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+          const userData = await userResponse.json();
+          businessId = userData?.user?.businessId || localStorage.getItem('businessId');
+          branchId = userData?.user?.branchId || localStorage.getItem('branchId');
+        } else {
+          businessId = localStorage.getItem('businessId');
+          branchId = localStorage.getItem('branchId');
+        }
+        if (!businessId) throw new Error('Business ID not found. Please login again.');
         // For uploaded contacts, we need to create them first or use their IDs
         const contactIds = uploadedContacts.map(contact => contact.id)
-        
         // Update existing list via API
         const response = await axiosInstance.put(`/api/contact-list/${editingList.id}`, {
           name: newList.name,
@@ -467,13 +487,24 @@ const ContactLists = () => {
         }
       } else {
         // Create new list via API
-        // Use hardcoded business and branch IDs
-        const businessId = '684fe39ca8254e8906e99aab'
-        const branchId = '684fe39ca8254e8906e99aab'
-        
+        // Get businessId and branchId dynamically
+        let businessId = '';
+        let branchId = '';
+        const authToken = localStorage.getItem('authToken');
+        if (authToken) {
+          const userResponse = await fetch('/api/v1/user/details', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+          const userData = await userResponse.json();
+          businessId = userData?.user?.businessId || localStorage.getItem('businessId');
+          branchId = userData?.user?.branchId || localStorage.getItem('branchId');
+        } else {
+          businessId = localStorage.getItem('businessId');
+          branchId = localStorage.getItem('branchId');
+        }
+        if (!businessId) throw new Error('Business ID not found. Please login again.');
         // For uploaded contacts, we need to create them first or use their IDs
         const contactIds = uploadedContacts.map(contact => contact.id)
-        
         const response = await axiosInstance.post('/api/contact-list', {
           name: newList.name,
           businessId,

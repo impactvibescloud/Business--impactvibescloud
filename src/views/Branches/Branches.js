@@ -163,10 +163,12 @@ const Branches = () => {
     }
   };
 
+  // Fetch assigned DID numbers for the dropdown
   const fetchDidNumbers = async () => {
     try {
+      // Use the provided API for assigned numbers
       const response = await axios.get(
-        `/api/trial-orders/business/${user.businessId}`,
+        `http://localhost:5040/api/numbers/assigned-to/${user.businessId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -175,8 +177,11 @@ const Branches = () => {
           },
         }
       );
-      const didNumbers = response.data.data[0]?.didNumbers || [];
-      setDidNumbers(didNumbers.map((did) => ({ id: did, number: did }))); // Format DID numbers
+      // The API returns an array of objects with number and _id
+      const didNumbers = response.data.data || [];
+      setDidNumbers(
+        didNumbers.map((did) => ({ id: did._id, number: did.number }))
+      );
     } catch (error) {
       console.error("Error fetching DID numbers:", error);
     }
@@ -193,12 +198,18 @@ const Branches = () => {
 
   const handleSaveBranch = async () => {
     try {
+      // Find the DID number value from the selectedDid (which may be an id)
+      let didNumberValue = selectedDid;
+      const foundDid = didNumbers.find((did) => did.id === selectedDid);
+      if (foundDid) {
+        didNumberValue = foundDid.number;
+      }
       // Construct the request body according to the API specification
       const requestBody = {
         branchName,
         branchEmail: managerEmail,
         businessId: user.businessId,
-        didNumbers: selectedDid ? [selectedDid] : [], // Convert single DID to array
+        didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
         department,
         stickyBranch: stickyAgents, // Renamed from stickyAgents to stickyBranch
         timeGroup,
@@ -277,6 +288,12 @@ const Branches = () => {
 
   const handleUpdateBranch = async () => {
     try {
+      // Find the DID number value from the selectedDid (which may be an id)
+      let didNumberValue = selectedDid;
+      const foundDid = didNumbers.find((did) => did.id === selectedDid);
+      if (foundDid) {
+        didNumberValue = foundDid.number;
+      }
       const baseUrl = process.env.NODE_ENV === 'development' 
         ? 'http://localhost:5040' 
         : 'https://api-impactvibescloud.onrender.com';
@@ -288,7 +305,7 @@ const Branches = () => {
           userEmail: managerEmail,
           userName: managerName,
           businessId: user.businessId,
-          didNumbers: selectedDid ? [selectedDid] : [],
+          didNumbers: didNumberValue ? [didNumberValue] : [],
           department,
           stickyBranch: stickyAgents,
           timeGroup,
@@ -1050,6 +1067,12 @@ const Branches = () => {
                 value={selectedDid}
                 onChange={(e) => setSelectedDid(e.target.value)}
               >
+                {/* Show the currently assigned DID as the first option if it exists and is not in the didNumbers list */}
+                {selectedDid && !didNumbers.some((did) => did.id === selectedDid) && (
+                  <option value={selectedDid}>
+                    {selectedDid} (currently assigned)
+                  </option>
+                )}
                 <option value="">Select DID Number</option>
                 {didNumbers.map((did) => (
                   <option key={did.id} value={did.id}>
