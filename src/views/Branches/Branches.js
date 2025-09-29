@@ -56,6 +56,32 @@ const Branches = () => {
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [user, setUser] = useState({});
   const [didNumbers, setDidNumbers] = useState([]);
+  // For dropdowns: only show DIDs not assigned to any branch, or the one assigned to the current agent (for edit)
+  const getAvailableDidNumbers = (currentBranchId = null) => {
+    // Find all assigned DIDs from all branches (except the current branch if editing)
+    const assignedDidNumbers = new Set();
+    branches.forEach(branch => {
+      // Exclude current branch if editing
+      if (!currentBranchId || branch._id !== currentBranchId) {
+        if (Array.isArray(branch.didNumbers)) {
+          branch.didNumbers.forEach(num => assignedDidNumbers.add(num));
+        } else if (branch.didNumber) {
+          assignedDidNumbers.add(branch.didNumber);
+        }
+      }
+    });
+    // Only return DIDs not assigned, or the one assigned to the current branch (for edit)
+    return didNumbers.filter(did => {
+      // If editing, allow the currently assigned DID
+      if (currentBranchId) {
+        const currentBranch = branches.find(b => b._id === currentBranchId);
+        const currentAssigned = currentBranch && (Array.isArray(currentBranch.didNumbers) ? currentBranch.didNumbers[0] : currentBranch.didNumber);
+        if (did.id === selectedDid || did.number === currentAssigned) return true;
+      }
+      // Otherwise, only show if not assigned
+      return !assignedDidNumbers.has(did.number);
+    });
+  };
   const [selectedDid, setSelectedDid] = useState("");
   const [departments, setDepartments] = useState([]);
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
@@ -210,17 +236,20 @@ const Branches = () => {
         branchEmail: managerEmail,
         businessId: user.businessId,
         didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
-        department,
         stickyBranch: stickyAgents, // Renamed from stickyAgents to stickyBranch
         timeGroup,
         timeCondition
       };
+      if (department) {
+        requestBody.department = department;
+      }
 
       const baseUrl = process.env.NODE_ENV === 'development' 
         ? 'http://localhost:5040' 
         : 'https://api-impactvibescloud.onrender.com';
 
-      await axios.post(
+      // Create the branch first
+      const res = await axios.post(
         `${baseUrl}/api/branch/create/new`,
         requestBody,
         {
@@ -230,6 +259,28 @@ const Branches = () => {
           },
         }
       );
+
+      // Assign DID to branch if selectedDid is present
+      if (selectedDid && res.data && (res.data.branch?._id || res.data.data?._id)) {
+        const branchId = res.data.branch?._id || res.data.data?._id;
+        const didId = selectedDid;
+        const apiDomain = baseUrl.replace(/\/$/, '');
+        try {
+          await axios.put(
+            `${apiDomain}/api/numbers/${didId}`,
+            { assigned_to_branch: branchId },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+            }
+          );
+        } catch (err) {
+          console.error('Error assigning DID to branch:', err);
+        }
+      }
+
       fetchBranches();
       handleCloseAddBranch();
       setSuccessAlert({
@@ -276,7 +327,17 @@ const Branches = () => {
     setTimeCondition(branch.timeCondition || "");
     setStickyAgents(branch.stickyBranch || false);
     setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
-    setSelectedDid(branch.didNumbers?.[0] || branch.didNumber || "");
+    // Find the DID id from didNumbers list that matches the assigned number
+    let assignedDidId = "";
+    if (Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0) {
+      const assignedNumber = branch.didNumbers[0];
+      const foundDid = didNumbers.find(did => did.number === assignedNumber);
+      assignedDidId = foundDid ? foundDid.id : "";
+    } else if (branch.didNumber) {
+      const foundDid = didNumbers.find(did => did.number === branch.didNumber);
+      assignedDidId = foundDid ? foundDid.id : "";
+    }
+    setSelectedDid(assignedDidId);
     setOpenEditBranch(true);
   };
 
@@ -298,7 +359,8 @@ const Branches = () => {
         ? 'http://localhost:5040' 
         : 'https://api-impactvibescloud.onrender.com';
 
-      await axios.patch(
+      // Update the branch first
+      const res = await axios.patch(
         `${baseUrl}/api/branch/edit/${selectedBranch._id}`,
         {
           branchName,
@@ -306,10 +368,10 @@ const Branches = () => {
           userName: managerName,
           businessId: user.businessId,
           didNumbers: didNumberValue ? [didNumberValue] : [],
-          department,
           stickyBranch: stickyAgents,
           timeGroup,
-          timeCondition
+          timeCondition,
+          ...(department ? { department } : {})
         },
         {
           headers: {
@@ -318,6 +380,28 @@ const Branches = () => {
           },
         }
       );
+
+      // Assign DID to branch if selectedDid is present
+      if (selectedDid && (selectedBranch._id || (res.data && (res.data.branch?._id || res.data.data?._id)))) {
+        const branchId = selectedBranch._id || res.data.branch?._id || res.data.data?._id;
+        const didId = selectedDid;
+        const apiDomain = baseUrl.replace(/\/$/, '');
+        try {
+          await axios.put(
+            `${apiDomain}/api/numbers/${didId}`,
+            { assigned_to_branch: branchId },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+            }
+          );
+        } catch (err) {
+          console.error('Error assigning DID to branch:', err);
+        }
+      }
+
       fetchBranches();
       handleCloseEditBranch();
       setSuccessAlert({
@@ -946,7 +1030,7 @@ const Branches = () => {
                 required
               >
                 <option value="">Select DID Number</option>
-                {didNumbers.map((did) => (
+                {getAvailableDidNumbers().map((did) => (
                   <option key={did.id} value={did.id}>
                     {did.number}
                   </option>
@@ -1067,14 +1151,8 @@ const Branches = () => {
                 value={selectedDid}
                 onChange={(e) => setSelectedDid(e.target.value)}
               >
-                {/* Show the currently assigned DID as the first option if it exists and is not in the didNumbers list */}
-                {selectedDid && !didNumbers.some((did) => did.id === selectedDid) && (
-                  <option value={selectedDid}>
-                    {selectedDid} (currently assigned)
-                  </option>
-                )}
                 <option value="">Select DID Number</option>
-                {didNumbers.map((did) => (
+                {getAvailableDidNumbers(selectedBranch?._id).map((did) => (
                   <option key={did.id} value={did.id}>
                     {did.number}
                   </option>
