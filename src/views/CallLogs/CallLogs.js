@@ -36,7 +36,7 @@ import {
   cilCloudDownload as cilDownload
 } from '@coreui/icons'
 import './CallLogs.css'
-import { ENDPOINTS, apiCall } from '../../config/api'
+import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
 
 const CallLogs = () => {
   const [callLogs, setCallLogs] = useState([])
@@ -44,7 +44,8 @@ const CallLogs = () => {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
   const [activeFilter, setActiveFilter] = useState('All Calls')
   const [expandedRow, setExpandedRow] = useState(null)
   const [businessId, setBusinessId] = useState(null)
@@ -54,20 +55,19 @@ const CallLogs = () => {
     const getBusinessId = async () => {
       try {
         // First try to get from user details API
-        const response = await apiCall('/api/v1/user/details', 'GET')
+        const userDetailsUrl = `${getBaseURL()}/v1/user/details`;
+        const response = await apiCall(userDetailsUrl, 'GET');
         if (response?.user?.businessId) {
-          setBusinessId(response.user.businessId)
-          return
+          setBusinessId(response.user.businessId);
+          return;
         }
-        
         // If not in user details, try localStorage
-        const storedBusinessId = localStorage.getItem('businessId')
+        const storedBusinessId = localStorage.getItem('businessId');
         if (storedBusinessId) {
-          setBusinessId(storedBusinessId)
-          return
+          setBusinessId(storedBusinessId);
+          return;
         }
-
-        throw new Error('Business ID not found')
+        throw new Error('Business ID not found');
       } catch (err) {
         console.error('Failed to get business ID:', err)
         setError('Failed to get business ID. Please make sure you are properly logged in.')
@@ -77,40 +77,42 @@ const CallLogs = () => {
     getBusinessId()
   }, [])
 
-  // Fetch call logs when we have a business ID
+  // Fetch call logs with server-side pagination
   useEffect(() => {
     const fetchCallLogs = async () => {
-      if (!businessId) return
-      
-      setLoading(true)
-      setError(null)
-      
+      if (!businessId) return;
+      setLoading(true);
+      setError(null);
       try {
-        const data = await apiCall(`/api/call-logs/business/${businessId}`)
-        
+        // Build query string for pagination and search
+  let query = `/api/call-logs/business/${businessId}?page=${currentPage}`;
+  if (searchTerm) query += `&search=${encodeURIComponent(searchTerm)}`;
+  // Optionally add filter to query string if needed
+  // (not implemented in backend, but you can add if supported)
+  const callLogsUrl = `${getBaseURL()}${query}`;
+  const data = await apiCall(callLogsUrl);
         if (data && data.success && Array.isArray(data.data)) {
-          // Handle the specific response format where data is in data property
-          console.log('API Response:', data)
-          setCallLogs(data.data)
-        } else if (Array.isArray(data)) {
-          setCallLogs(data)
+          setCallLogs(data.data);
+          setTotalPages(data.pagination?.totalPages || 1);
+          setTotalRecords(data.pagination?.totalRecords || data.data.length);
         } else {
-          // Handle fallback case
-          setCallLogs([])
+          setCallLogs([]);
+          setTotalPages(1);
+          setTotalRecords(0);
         }
       } catch (err) {
-        console.error('Failed to fetch call logs:', err)
-        setError(err.message === 'Business ID not found' 
-          ? 'Business ID not found. Please make sure you are properly logged in.' 
-          : 'Failed to fetch call logs. Please try again later.')
-        setCallLogs([]) // Set empty array on error
+        setError(err.message === 'Business ID not found'
+          ? 'Business ID not found. Please make sure you are properly logged in.'
+          : 'Failed to fetch call logs. Please try again later.');
+        setCallLogs([]);
+        setTotalPages(1);
+        setTotalRecords(0);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    
-    fetchCallLogs()
-  }, [businessId]) // Re-run when businessId changes
+    };
+    fetchCallLogs();
+  }, [businessId, currentPage, searchTerm]);
 
   // Format the call status from API data
   const formatCallStatus = (status) => {
@@ -140,52 +142,30 @@ const CallLogs = () => {
     }
   }
 
-  // Filter call logs by search term and status filter
+  // Filter call logs by status filter only (search is now server-side)
   const filteredCallLogs = callLogs.filter(log => {
-    // Safely access properties based on the response format
-    const contact = String(log.contact || '')
-    const callType = String(log.callType || '')
-    const callDate = log.callDate || log.createdAt || ''
-    const status = String(log.status || '')
-    
-    // Convert to lowercase for case-insensitive search
-    const searchLower = searchTerm.toLowerCase()
-    
-    // Apply search filter
-    const matchesSearch = 
-      contact.toLowerCase().includes(searchLower) ||
-      callType.toLowerCase().includes(searchLower) ||
-      new Date(callDate).toLocaleDateString().toLowerCase().includes(searchLower) ||
-      status.toLowerCase().includes(searchLower)
-    
-    // Apply status filter
-    let matchesFilter = true
+    const callType = String(log.callType || '');
+    const status = String(log.status || '');
+    let matchesFilter = true;
     if (activeFilter !== 'All Calls') {
       if (activeFilter === 'Success') {
-        matchesFilter = status.toLowerCase() === 'success' || status.toLowerCase() === 'completed'
+        matchesFilter = status.toLowerCase() === 'success' || status.toLowerCase() === 'completed';
       } else if (activeFilter === 'Failed') {
-        matchesFilter = status.toLowerCase().includes('fail') || status.toLowerCase().includes('error')
+        matchesFilter = status.toLowerCase().includes('fail') || status.toLowerCase().includes('error');
       } else if (activeFilter === 'Outgoing') {
-        matchesFilter = callType.toLowerCase() === 'outgoing'
+        matchesFilter = callType.toLowerCase() === 'outgoing';
       } else if (activeFilter === 'Incoming') {
-        matchesFilter = callType.toLowerCase() === 'incoming'
+        matchesFilter = callType.toLowerCase() === 'incoming';
       }
     }
-    
-    return matchesSearch && matchesFilter
-  })
-  
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentCallLogs = filteredCallLogs.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(filteredCallLogs.length / itemsPerPage)
+    return matchesFilter;
+  });
   
   // Handle search
   const handleSearch = (e) => {
-    setSearchTerm(e.target.value)
-    setCurrentPage(1)
-  }
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
   
   const handleFilterChange = (filter) => {
     setActiveFilter(filter)
@@ -282,7 +262,6 @@ const CallLogs = () => {
               </CDropdown>
             </CCol>
           </CRow>
-          
           <CRow className="mb-4">
             <CCol md={6}>
               <CInputGroup>
@@ -297,12 +276,12 @@ const CallLogs = () => {
               </CInputGroup>
             </CCol>
           </CRow>
-
           <CTable hover responsive className="call-logs-table">
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
                 <CTableHeaderCell>CONTACT</CTableHeaderCell>
+                <CTableHeaderCell>VIRTUAL NUMBER</CTableHeaderCell>
                 <CTableHeaderCell>CALL TYPE</CTableHeaderCell>
                 <CTableHeaderCell>CALL DATE</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
@@ -324,7 +303,7 @@ const CallLogs = () => {
                     </CAlert>
                   </CTableDataCell>
                 </CTableRow>
-              ) : currentCallLogs.length === 0 ? (
+              ) : filteredCallLogs.length === 0 ? (
                 <CTableRow>
                   <CTableDataCell colSpan="5" className="text-center py-5">
                     <div className="empty-state">
@@ -337,26 +316,25 @@ const CallLogs = () => {
                   </CTableDataCell>
                 </CTableRow>
               ) : (
-                currentCallLogs.map((log, index) => {
-                  const contact = log.contact || 'Unknown'
-                  const callType = log.callType || 'Unknown'
-                  const callDate = formatDate(log.callDate || log.createdAt)
-                  const status = formatCallStatus(log.status)
-                  const isExpanded = expandedRow === log._id
-                  
+                filteredCallLogs.map((log, index) => {
+                  const contact = log.contact || 'Unknown';
+                  const callType = log.callType || 'Unknown';
+                  const callDate = formatDate(log.callDate || log.createdAt);
+                  const status = formatCallStatus(log.status);
+                  const isExpanded = expandedRow === log._id;
                   return (
                     <React.Fragment key={log._id}>
-                      <CTableRow 
+                      <CTableRow
                         style={{ cursor: 'pointer' }}
                         onClick={() => handleRowClick(log._id)}
                         className={isExpanded ? 'table-row-expanded' : ''}
                       >
                         <CTableDataCell>
                           <div className="d-flex align-items-center">
-                            <span className="log-number me-2">{indexOfFirstItem + index + 1}</span>
-                            <CIcon 
-                              icon={isExpanded ? cilChevronTop : cilChevronBottom} 
-                              size="sm" 
+                            <span className="log-number me-2">{(currentPage - 1) * 10 + index + 1}</span>
+                            <CIcon
+                              icon={isExpanded ? cilChevronTop : cilChevronBottom}
+                              size="sm"
                               className="text-muted"
                             />
                           </div>
@@ -365,23 +343,25 @@ const CallLogs = () => {
                           <div className="log-contact">{contact}</div>
                         </CTableDataCell>
                         <CTableDataCell>
+                          <div className="log-virtual-number">{log.virtualNumber || 'N/A'}</div>
+                        </CTableDataCell>
+                        <CTableDataCell>
                           <div className="log-type text-capitalize">{callType}</div>
                         </CTableDataCell>
                         <CTableDataCell>
                           <div className="log-date">{callDate}</div>
                         </CTableDataCell>
                         <CTableDataCell>
-                          <CBadge 
-                            color={status.toLowerCase() === 'success' || status.toLowerCase() === 'completed' ? 'success' : 
-                                   status.toLowerCase().includes('fail') ? 'danger' : 
-                                   status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
+                          <CBadge
+                            color={status.toLowerCase() === 'success' || status.toLowerCase() === 'completed' ? 'success'
+                              : status.toLowerCase().includes('fail') ? 'danger'
+                              : status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
                             className="status-badge"
                           >
                             {status}
                           </CBadge>
                         </CTableDataCell>
                       </CTableRow>
-                      
                       {/* Expanded Row Details */}
                       <CTableRow>
                         <CTableDataCell colSpan="5" className="p-0">
@@ -432,28 +412,28 @@ const CallLogs = () => {
                                     <div className="ms-2 d-flex gap-2">
                                       {log.callRecording ? (
                                         <>
-                                          <CButton 
-                                            size="sm" 
-                                            color="primary" 
+                                          <CButton
+                                            size="sm"
+                                            color="primary"
                                             variant="outline"
                                             onClick={(e) => {
-                                              e.stopPropagation()
-                                              handlePlayRecording(log.callRecording)
+                                              e.stopPropagation();
+                                              handlePlayRecording(log.callRecording);
                                             }}
                                           >
                                             <CIcon icon={cilMediaPlay} className="me-1" />
                                             Play
                                           </CButton>
-                                          <CButton 
-                                            size="sm" 
-                                            color="success" 
+                                          <CButton
+                                            size="sm"
+                                            color="success"
                                             variant="outline"
                                             onClick={(e) => {
-                                              e.stopPropagation()
+                                              e.stopPropagation();
                                               handleDownloadRecording(
-                                                log.callRecording, 
+                                                log.callRecording,
                                                 `call-recording-${log._id}.mp3`
-                                              )
+                                              );
                                             }}
                                           >
                                             <CIcon icon={cilCloudDownload} className="me-1" />
@@ -488,34 +468,33 @@ const CallLogs = () => {
                         </CTableDataCell>
                       </CTableRow>
                     </React.Fragment>
-                  )
+                  );
                 })
               )}
             </CTableBody>
           </CTable>
-
           {totalPages > 1 && (
-            <CPagination 
+            <CPagination
               aria-label="Page navigation example"
               className="justify-content-center mt-4"
             >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
+              <CPaginationItem
+                disabled={currentPage === 1}
                 onClick={() => setCurrentPage(currentPage - 1)}
               >
                 Previous
               </CPaginationItem>
               {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
+                <CPaginationItem
+                  key={i}
+                  active={i + 1 === currentPage}
                   onClick={() => setCurrentPage(i + 1)}
                 >
                   {i + 1}
                 </CPaginationItem>
               ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
+              <CPaginationItem
+                disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(currentPage + 1)}
               >
                 Next
