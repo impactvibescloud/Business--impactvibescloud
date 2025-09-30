@@ -12,23 +12,140 @@ const getApiUrl = (path) => {
   return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
 };
 
+const token = isAutheticated();
+
 const Dashboard = () => {
+  const [user, setUser] = useState({});
   const [agents, setAgents] = useState(0);
   const [agentStatuses, setAgentStatuses] = useState({ active: 0, deactive: 0, break: 0 });
-  const [user, setUser] = useState({});
+  // Fetch agent/branch list and update agent stats
+  useEffect(() => {
+    if (!token || !user?.businessId) return;
+    const fetchAgents = async () => {
+      try {
+        // Try to fetch branches (agents) for the business
+        const response = await axios.get(getApiUrl(`/api/branch/${user.businessId}/branches`), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          const agentList = response.data.data;
+          console.log('Fetched agent list:', agentList);
+          setAgents(agentList.length);
+          // Count statuses using agent.user.status
+          let active = 0, deactive = 0;
+          agentList.forEach(agent => {
+            const status = agent.user && agent.user.status ? agent.user.status.toLowerCase() : '';
+            if (status === 'active') {
+              active++;
+            } else if (status === 'inactive') {
+              deactive++;
+            }
+            // All other statuses are ignored for these counts
+          });
+          setAgentStatuses(prev => ({ ...prev, active, deactive }));
+        } else {
+          setAgents(0);
+          setAgentStatuses(prev => ({ ...prev, active: 0, deactive: 0 }));
+        }
+      } catch (err) {
+        setAgents(0);
+        setAgentStatuses(prev => ({ ...prev, active: 0, deactive: 0 }));
+      }
+    };
+    fetchAgents();
+  }, [token, user?.businessId]);
   const [callStats, setCallStats] = useState({
-    totalCalls: 250,
-    liveCalls: 8,
-    outboundCalls: 120,
-    callsPerDay: 80,
-    inboundCalls: 130,
-    missedCalls: 15,
-    rejectedCalls: 5
+    totalCalls: 0,
+    liveCalls: 0,
+    outboundCalls: 0,
+    callsPerDay: 0,
+    inboundCalls: 0,
+    missedCalls: 0,
+    rejectedCalls: 0
   });
+  const [callLogs, setCallLogs] = useState([]);
+  // Fetch call logs for the business and calculate stats
+  useEffect(() => {
+    const fetchCallLogsAndStats = async () => {
+      if (!token || !user?.businessId) return;
+      try {
+        const response = await axios.get(getApiUrl(`/api/call-logs/business/${user.businessId}?page=1&limit=1000`), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          setCallLogs(response.data.data);
+          // Use statistics from API if available
+          const stats = response.data.statistics || {};
+          setCallStats({
+            totalCalls: stats.totalCalls || response.data.data.length,
+            liveCalls: 0, // Not provided by API
+            outboundCalls: (stats.callsByType && stats.callsByType.outbound) || 0,
+            callsPerDay: 0, // Not provided by API
+            inboundCalls: (stats.callsByType && stats.callsByType.inbound) || 0,
+            missedCalls: (stats.callsByStatus && stats.callsByStatus.missed) || 0,
+            rejectedCalls: (stats.callsByStatus && stats.callsByStatus.rejected) || 0
+          });
+        } else {
+          setCallLogs([]);
+          setCallStats({
+            totalCalls: 0,
+            liveCalls: 0,
+            outboundCalls: 0,
+            callsPerDay: 0,
+            inboundCalls: 0,
+            missedCalls: 0,
+            rejectedCalls: 0
+          });
+        }
+      } catch (err) {
+        setCallLogs([]);
+        setCallStats({
+          totalCalls: 0,
+          liveCalls: 0,
+          outboundCalls: 0,
+          callsPerDay: 0,
+          inboundCalls: 0,
+          missedCalls: 0,
+          rejectedCalls: 0
+        });
+      }
+    };
+    fetchCallLogsAndStats();
+  }, [token, user?.businessId]);
   const [breakTimeAgents, setBreakTimeAgents] = useState(0);
   const [breakTimeAgentDetails, setBreakTimeAgentDetails] = useState([]);
   const [totalBreakTime, setTotalBreakTime] = useState(0);
-  const token = isAutheticated();
+  const [callUses, setCallUses] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.ceil(callUses.length / pageSize);
+  const paginatedCallUses = callUses.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // (token already declared above)
+  // Fetch call uses for the business
+  useEffect(() => {
+    const fetchCallUses = async () => {
+      if (!token || !user?.businessId) return;
+      try {
+        const response = await axios.get(getApiUrl(`/api/call-uses/business/${user.businessId}`), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.data && response.data.success && Array.isArray(response.data.callUses)) {
+          setCallUses(response.data.callUses);
+        } else {
+          setCallUses([]);
+        }
+      } catch (err) {
+        setCallUses([]);
+      }
+    };
+    fetchCallUses();
+  }, [token, user?.businessId]);
 
   useEffect(() => {
     if (!token) return;
@@ -84,6 +201,9 @@ const Dashboard = () => {
       });
       
       console.log('Activities API response:', response.data);
+      if (response.data && Array.isArray(response.data.data)) {
+        console.log('Fetched activity user list:', response.data.data);
+      }
       
       // Initialize variables
       let breakCount = 0;
@@ -154,272 +274,7 @@ const Dashboard = () => {
       // Don't update break time agents on error to preserve previous value
     }
   };  // Function to fetch call statistics with optional time filter
-  const fetchCallStatistics = async (timeFilter = 'today', startDate = null, endDate = null) => {
-    if (!token || !user?.businessId) return;
-    
-    try {
-      // Use the business ID from the user object
-      const response = await axios.get(getApiUrl(`/api/call-uses/business/${user.businessId}`), {
-        headers: {
-          'Accept': '*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache,no-store',
-          'Connection': 'keep-alive',
-          'Expires': '0',
-          'Pragma': 'no-cache',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'same-origin'
-        },
-      });
-      
-      console.log('Call usage API response:', response.data);
-      
-      // Handle business call usage response
-      if (response.data && response.data.success && response.data.callUses && response.data.callUses.length > 0) {
-        const callUsage = response.data.callUses[0]; // Get the first call usage record
-        
-        // Update call stats directly from the API response
-        const stats = {
-          totalCalls: (callUsage.inboundCalls || 0) + (callUsage.outboundCalls || 0) + (callUsage.missedCalls || 0),
-          liveCalls: 0, // API doesn't provide live calls
-          outboundCalls: callUsage.outboundCalls || 0,
-          inboundCalls: callUsage.inboundCalls || 0,
-          missedCalls: callUsage.missedCalls || 0,
-          rejectedCalls: callUsage.hangCalls || 0,
-          callsPerDay: 0 // We can calculate this if needed
-        };
-        
-        setCallStats(stats);
-        return stats;
-      }
-      
-      // If no valid response, return empty stats
-      const emptyStats = {
-        totalCalls: 0,
-        liveCalls: 0,
-        outboundCalls: 0,
-        inboundCalls: 0,
-        missedCalls: 0,
-        rejectedCalls: 0,
-        callsPerDay: 0
-      };
-      
-      setCallStats(emptyStats);
-      return emptyStats;
-    } catch (error) {
-      console.warn("Call statistics API failed:", error.message);
-      const emptyStats = {
-        totalCalls: 0,
-        liveCalls: 0,
-        outboundCalls: 0,
-        inboundCalls: 0,
-        missedCalls: 0,
-        rejectedCalls: 0,
-        callsPerDay: 0
-      };
-      setCallStats(emptyStats);
-      return emptyStats;
-    }
-  };
-  
-  // Helper function to calculate call statistics from API response
-  const calculateCallStats = (response) => {
-    if (response?.data?.success && response?.data?.callUses?.[0]) {
-      const callUsage = response.data.callUses[0];
-      return {
-        totalCalls: (callUsage.inboundCalls || 0) + (callUsage.outboundCalls || 0) + (callUsage.missedCalls || 0),
-        liveCalls: 0, // API doesn't provide live calls
-        outboundCalls: callUsage.outboundCalls || 0,
-        inboundCalls: callUsage.inboundCalls || 0,
-        missedCalls: callUsage.missedCalls || 0,
-        rejectedCalls: callUsage.hangCalls || 0,
-        callsPerDay: 0
-      };
-    }
-    
-    return {
-      totalCalls: 0,
-      liveCalls: 0,
-      outboundCalls: 0,
-      inboundCalls: 0,
-      missedCalls: 0,
-      rejectedCalls: 0,
-      callsPerDay: 0
-    };
-  };
 
-  useEffect(() => {
-    if (user?.businessId) {
-      const fetchAgentsData = async () => {
-        try {
-          const response = await axios.get(getApiUrl(`/api/branch/${user.businessId}/branches`), {
-            headers: {
-              'Accept': '*/*',
-              'Accept-Language': 'en-US,en;q=0.9',
-              'Authorization': `Bearer ${token}`,
-              'Cache-Control': 'no-cache,no-store',
-              'Connection': 'keep-alive',
-              'Expires': '0',
-              'Pragma': 'no-cache',
-              'Sec-Fetch-Dest': 'empty',
-              'Sec-Fetch-Mode': 'cors',
-              'Sec-Fetch-Site': 'same-origin'
-            },
-          });
-          const branchesData = response.data.data || [];
-          setAgents(branchesData.length);
-          
-          // Calculate agent statuses
-          const statusCounts = { active: 0, deactive: 0, break: 0 };
-          branchesData.forEach(branch => {
-            if (branch.isSuspended) {
-              statusCounts.deactive++;
-            } else {
-              // Check call status or other indicators for break/active
-              const callStatus = branch.callStatus || 'active';
-              if (callStatus.toLowerCase().includes('break') || callStatus.toLowerCase().includes('pause')) {
-                statusCounts.break++;
-              } else {
-                statusCounts.active++;
-              }
-            }
-          });
-          
-          // Set initial agent statuses (will be updated by activities API)
-          setAgentStatuses(statusCounts);
-          
-          // Fetch business activities to get users on break
-          const businessId = user.businessId;
-          if (businessId) {
-            fetchBusinessActivities(businessId);
-          }
-        } catch (error) {
-          console.warn("Agents API failed:", error.message);
-          setAgents(0);
-          setAgentStatuses({ active: 0, deactive: 0, break: 0 });
-        }
-      };
-
-      fetchAgentsData();
-      
-      // Set up interval to refresh break time data every minute
-      const businessId = user.businessId;
-      if (businessId) {
-        // Initial fetch is done in fetchAgentsData, this is just for the interval
-        const intervalId = setInterval(() => {
-          fetchBusinessActivities(businessId);
-        }, 60000); // every minute
-        
-        return () => clearInterval(intervalId);
-      }
-      
-      // Fetch initial call statistics (default to 'today')
-      fetchCallStatistics('today');
-    }
-  }, [user, token]);
-  
-  // Fetch call statistics when component mounts or user/token changes
-  useEffect(() => {
-    if (token && user?.businessId) {
-      fetchCallStatistics('today');
-    }
-  }, [token, user?.businessId]);
-  // const [Brand, setBrand] = useState(null);
-  // const getAllBrands = async () => {
-  //   let res = await axios.get(`/api/brand/getBrands`, {
-  //     headers: {
-  //       Authorization: `Bearer ${token}`,
-  //     },
-  //   });
-  //   // console.log(res.data);
-  //   setBrand(res?.data?.total_data);
-  // };
-  // // 3rd
-  // const [Requests, setRequests] = useState([]);
-  // const getAllRequests = async () => {
-  //   let res = await axios.get(`/api/contact/request/getAll/`, {
-  //     headers: {
-  //       Authorization: `Bearer ${token}`,
-  //     },
-  //   });
-  //   // console.log(res.data);
-  //   setRequests(res.data.contactRequest);
-  // };
-
-  // //3 requiment
-  // const [requirement, setRequirement] = useState([])
-  // // console.log(token)
-  // const getRequirement = useCallback(async () => {
-  //   let res = await axios.get(
-  //     `/api/requirement/getAll`,
-  //     {
-  //       headers: {
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     }
-  //   );
-
-  //   setRequirement(res.data.Requirement)
-
-  // }, [token]);
-  // //4 news
-  // const [news, setNews] = useState([])
-
-  // const getNews = useCallback(async () => {
-  //   let res = await axios.get(
-  //     `/api/news/getAll`,
-  //     {
-  //       headers: {
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     }
-  //   );
-
-  //   setNews(res.data.news)
-
-  // }, [token]);
-  // //5 offers
-  // const [offer, setOffer] = useState([])
-
-  // const getOffer = useCallback(async () => {
-  //   let res = await axios.get(
-  //     `/api/offer/getAll`,
-  //     {
-  //       headers: {
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     }
-  //   );
-  //   // console.log(res.data)
-  //   setOffer(res.data.offer)
-
-  // }, [token]);
-  // //6 event
-  // const [event, setEvent] = useState([])
-  // const getEvent = useCallback(async () => {
-  //   let res = await axios.get(
-  //     `/api/event/getAll`,
-  //     {
-  //       headers: {
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     }
-  //   );
-  //   // console.log(res.data)
-  //   setEvent(res.data.Event)
-
-  // }, [token]);
-  useEffect(() => {
-    // Expose fetchCallStatistics to window object for the WidgetsDropdown component
-    window.fetchCallStatistics = fetchCallStatistics;
-    
-    // Cleanup function to remove the reference when component unmounts
-    return () => {
-      delete window.fetchCallStatistics;
-    };
-  }, [token]); // Re-expose when token changes
 
   return (
     <>
@@ -430,6 +285,78 @@ const Dashboard = () => {
         breakTimeAgentDetails={breakTimeAgentDetails}
         totalBreakTime={totalBreakTime}
       />
+      {/* Call Uses Table */}
+      <div style={{ margin: '2rem 0' }}>
+        <h4>Call Uses</h4>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e5e7eb' }}>
+            <thead style={{ background: '#f3f4f6' }}>
+              <tr>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>User Email</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Number</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Outbound</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Inbound</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Missed</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Hang</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedCallUses.length === 0 ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>No call usage data found.</td></tr>
+              ) : (
+                paginatedCallUses.map((item) => (
+                  <tr key={item._id}>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.userId?.email || '-'}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.numberId?.number || '-'}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.outboundCalls}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.inboundCalls}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.missedCalls}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.hangCalls}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 16, gap: 8 }}>
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: '6px 14px', borderRadius: 4, border: '1px solid #e5e7eb', background: currentPage === 1 ? '#f3f4f6' : '#fff', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i + 1}
+                onClick={() => setCurrentPage(i + 1)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 4,
+                  border: '1px solid #e5e7eb',
+                  background: currentPage === i + 1 ? '#2563eb' : '#fff',
+                  color: currentPage === i + 1 ? '#fff' : '#222',
+                  fontWeight: currentPage === i + 1 ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              style={{ padding: '6px 14px', borderRadius: 4, border: '1px solid #e5e7eb', background: currentPage === totalPages ? '#f3f4f6' : '#fff', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
     </>
   );
 };
