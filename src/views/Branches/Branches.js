@@ -30,6 +30,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilPencil, cilTrash, cilSearch } from '@coreui/icons'
 import axios from "axios";
+import { apiCall } from '../../config/api';
 import Swal from "sweetalert2";
 import './Branches.css'
 import { API_CONFIG } from '../../config/api';
@@ -92,14 +93,10 @@ const Branches = () => {
 
   useEffect(() => {
     if (!token) return;
-    axios
-      .get("/api/v1/user/details", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+  apiCall('/v1/user/details', 'GET')
       .then((res) => {
-        setUser(res.data.user);
+        // apiCall returns response.data from axios, which should contain user
+        setUser(res.user || res.data?.user || res.user?.user || res.user?.data || res.data);
       })
       .catch((err) => {
         console.error("Failed to fetch user details:", err);
@@ -108,17 +105,9 @@ const Branches = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get(
-        `/api/departments/business/${user.businessId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      console.log('Departments API Response:', response.data);
-      // Make sure we're accessing departments from the correct path and they're properly formatted
-      const departmentsData = response.data.departments || response.data.data || [];
+  const response = await apiCall(`/departments/business/${user.businessId}`, 'GET');
+      console.log('Departments API Response:', response);
+      const departmentsData = response.departments || response.data || response.data?.departments || [];
       const processedDepartments = departmentsData.map(dept => {
         if (typeof dept === 'object') {
           return {
@@ -146,22 +135,8 @@ const Branches = () => {
 
   const fetchBranches = async () => {
     try {
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5040' 
-        : 'https://api-impactvibescloud.onrender.com';
-
-      const response = await axios.get(
-        `${baseUrl}/api/branch/${user.businessId}/branches`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        }
-      );
-      
-      // Get the branches array from the response
-      const branchesData = response.data.data || [];
+  const response = await apiCall(`/branch/${user.businessId}/branches`, 'GET');
+      const branchesData = response.data || response.branches || [];
       
       // Map the data to match our component's expected structure
       const formattedBranches = branchesData.map(branch => ({
@@ -193,18 +168,8 @@ const Branches = () => {
   const fetchDidNumbers = async () => {
     try {
       // Use the provided API for assigned numbers
-      const response = await axios.get(
-        `http://localhost:5040/api/numbers/assigned-to/${user.businessId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      // The API returns an array of objects with number and _id
-      const didNumbers = response.data.data || [];
+  const response = await apiCall(`/numbers/assigned-to/${user.businessId}`, 'GET');
+      const didNumbers = response.data || response.numbers || response || [];
       setDidNumbers(
         didNumbers.map((did) => ({ id: did._id, number: did.number }))
       );
@@ -244,38 +209,15 @@ const Branches = () => {
         requestBody.department = department;
       }
 
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5040' 
-        : 'https://api-impactvibescloud.onrender.com';
-
-      // Create the branch first
-      const res = await axios.post(
-        `${baseUrl}/api/branch/create/new`,
-        requestBody,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        }
-      );
+      // Create the branch first using apiCall
+  const res = await apiCall('/branch/create/new', 'POST', requestBody);
 
       // Assign DID to branch if selectedDid is present
       if (selectedDid && res.data && (res.data.branch?._id || res.data.data?._id)) {
         const branchId = res.data.branch?._id || res.data.data?._id;
         const didId = selectedDid;
-        const apiDomain = baseUrl.replace(/\/$/, '');
         try {
-          await axios.put(
-            `${apiDomain}/api/numbers/${didId}`,
-            { assigned_to_branch: branchId },
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-            }
-          );
+          await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
         } catch (err) {
           console.error('Error assigning DID to branch:', err);
         }
@@ -355,48 +297,24 @@ const Branches = () => {
       if (foundDid) {
         didNumberValue = foundDid.number;
       }
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5040' 
-        : 'https://api-impactvibescloud.onrender.com';
-
-      // Update the branch first
-      const res = await axios.patch(
-        `${baseUrl}/api/branch/edit/${selectedBranch._id}`,
-        {
-          branchName,
-          userEmail: managerEmail,
-          userName: managerName,
-          businessId: user.businessId,
-          didNumbers: didNumberValue ? [didNumberValue] : [],
-          stickyBranch: stickyAgents,
-          timeGroup,
-          timeCondition,
-          ...(department ? { department } : {})
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-        }
-      );
+  const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', {
+        branchName,
+        userEmail: managerEmail,
+        userName: managerName,
+        businessId: user.businessId,
+        didNumbers: didNumberValue ? [didNumberValue] : [],
+        stickyBranch: stickyAgents,
+        timeGroup,
+        timeCondition,
+        ...(department ? { department } : {})
+      });
 
       // Assign DID to branch if selectedDid is present
       if (selectedDid && (selectedBranch._id || (res.data && (res.data.branch?._id || res.data.data?._id)))) {
         const branchId = selectedBranch._id || res.data.branch?._id || res.data.data?._id;
         const didId = selectedDid;
-        const apiDomain = baseUrl.replace(/\/$/, '');
         try {
-          await axios.put(
-            `${apiDomain}/api/numbers/${didId}`,
-            { assigned_to_branch: branchId },
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-            }
-          );
+          await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
         } catch (err) {
           console.error('Error assigning DID to branch:', err);
         }
@@ -538,25 +456,10 @@ const Branches = () => {
       console.log(`Fetching call details for user ID: ${userId}`);
       
       // Construct URL using configuration from API_CONFIG
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5040' 
-        : 'https://api-impactvibescloud.onrender.com';
-        
-      const apiUrl = `${baseUrl}/api/call-uses/user/${userId}`;
-      console.log('API URL being called:', apiUrl);
+  const response = await apiCall(`/call-uses/user/${userId}`, 'GET');
+      console.log('API URL being called: /api/call-uses/user/' + userId);
       
-      // Using the API endpoint with full URL as shown in the curl command
-      const response = await axios.get(
-        apiUrl,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache,no-store'
-          },
-        }
-      );
+      // apiCall returns normalized response data
       
       console.log('Call details response:', response.data);
       console.log('Response structure:', JSON.stringify(response.data, null, 2));
@@ -564,15 +467,14 @@ const Branches = () => {
       // Check if we need to access data through a nested property
       let callDetailsData = {};
       
-      if (response.data && response.data.callUses && response.data.callUses.length > 0) {
-        // Extract the first call use object from the array
-        callDetailsData = response.data.callUses[0];
+      if (response && response.callUses && response.callUses.length > 0) {
+        callDetailsData = response.callUses[0];
         console.log('Found call data in callUses array:', callDetailsData);
-      } else if (response.data && response.data.data) {
-        callDetailsData = response.data.data;
+      } else if (response && response.data) {
+        callDetailsData = response.data;
         console.log('Using nested data property');
       } else {
-        callDetailsData = response.data;
+        callDetailsData = response;
         console.log('Using response data directly');
       }
       

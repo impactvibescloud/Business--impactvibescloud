@@ -1,10 +1,10 @@
-import axios from "axios";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Pagination from "./Pagination";
 import { Link } from "react-router-dom";
 import swal from "sweetalert";
 // import { API } from "../../data";
 import { isAutheticated } from "../../auth";
+import { apiCall } from "../../config/api";
 import './Users.css';
 
 function users() {
@@ -15,13 +15,13 @@ function users() {
   const token = isAutheticated();
 
   const getAllUsers = useCallback(async () => {
-    let res = await axios.get(`/api/v1/admin/users`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    // console.log(res.data)
-    setUsers(res.data.users);
+    try {
+      const res = await apiCall('/v1/admin/users', 'GET')
+      setUsers(res?.users || [])
+    } catch (err) {
+      console.error('Failed to fetch users', err)
+      setUsers([])
+    }
   }, [token]);
 
   useEffect(() => {

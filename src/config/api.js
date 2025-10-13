@@ -3,14 +3,23 @@
 import axios from 'axios'
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         // API Configuration with environment support
-export const API_CONFIG = {
-  // Development environment
-  DEV_URL: process.env.REACT_APP_API_URL || 'http://localhost:5040',
-  // Production environment
-  PROD_URL: process.env.REACT_APP_PROD_API_URL || 'https://api-impactvibescloud.onrender.com',
-  // Base API path for all endpoints
-  API_PATH: ''
+// Helper to normalize env URLs (remove trailing slashes)
+const normalizeUrl = (url = '') => {
+  if (!url || typeof url !== 'string') return '';
+  return url.replace(/\/$/, '');
 }
+
+export const API_CONFIG = {
+  // Development environment (can be set via REACT_APP_API_URL)
+  DEV_URL: normalizeUrl(process.env.REACT_APP_API_URL) || 'http://localhost:5040',
+  // Production environment: prefer explicit PRODUCTION var, then a generic BASE URL
+  PROD_URL: normalizeUrl(process.env.REACT_APP_PROD_API_URL) || normalizeUrl(process.env.REACT_APP_BASE_URL) || 'https://api-impactvibescloud.onrender.com',
+  // Base API path appended to the host (we will prefix '/api' centrally)
+  API_PATH: '/api'
+}
+
+// Ensure PROD_URL does not accidentally include a trailing /api
+API_CONFIG.PROD_URL = API_CONFIG.PROD_URL.replace(/\/api$/, '');
 
 // Get authentication token
 export const getAuthToken = () => {
@@ -20,16 +29,22 @@ export const getAuthToken = () => {
 // Sanitize URL to prevent double /api
 export const sanitizeUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
-  return url.replace(/\/api\/api\//, '/api/').replace(/^\/api\//, '/');
+  // If it's an absolute URL (http(s)://), return as-is
+  if (/^https?:\/\//i.test(url)) return url;
+  // Collapse duplicate /api/api/ to single /api/
+  let out = url.replace(/\/api\/api\//g, '/api/');
+  // Collapse multiple slashes to a single slash
+  out = out.replace(/\/\/+/g, '/');
+  return out;
 }
 
 // Get the base URL based on environment
 export const getBaseURL = () => {
-  // Check if we're in development mode
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const baseUrl = isDevelopment ? API_CONFIG.DEV_URL : API_CONFIG.PROD_URL;
-  // In production, we need to append /api
-  return isDevelopment ? baseUrl : `${baseUrl}/api`;
+  if (isDevelopment) return API_CONFIG.DEV_URL;
+  // In production ensure we have a single /api suffix
+  if (API_CONFIG.PROD_URL.endsWith('/api')) return API_CONFIG.PROD_URL;
+  return `${API_CONFIG.PROD_URL}/api`;
 }
 
 export const getHeaders = () => ({
@@ -40,7 +55,7 @@ export const getHeaders = () => ({
 // API Endpoints
 export const ENDPOINTS = {
   // User endpoints
-  USER_DETAILS: '/api/v1/user/details',
+  USER_DETAILS: '/v1/user/details',
   USER_LOGIN: '/v1/user/login',
   USER_LOGOUT: '/v1/user/logout',
   USER_STATUS: '/v1/user/status',
@@ -50,8 +65,8 @@ export const ENDPOINTS = {
   CONFIG: '/config',
   
   // Billing endpoints
-  BILLING_BUSINESS: (businessId) => `/api/billing/business/${businessId}`,
-  BILLING_UPDATE: (id) => `/api/billing/${id}`,
+  BILLING_BUSINESS: (businessId) => `/billing/business/${businessId}`,
+  BILLING_UPDATE: (id) => `/billing/${id}`,
   
   // Business endpoints
   BUSINESS_DETAILS: (businessId) => `/business/get_one/${businessId}`,
@@ -86,14 +101,25 @@ export const ENDPOINTS = {
 }
 
 // Utility function to make API calls using axios (which supports proxy)
-// Configure axios defaults
-axios.defaults.baseURL = getBaseURL() + API_CONFIG.API_PATH;
+// Configure axios defaults: baseURL is the host only (no /api). apiCall will
+// prefix API_PATH ('/api') for relative endpoints.
+axios.defaults.baseURL = getBaseURL();
 
 export const apiCall = async (endpoint, method = 'GET', data = null, options = {}) => {
   // Internal function to make the actual request
   const makeRequest = async () => {
-    // Sanitize the endpoint and ensure it's clean
-    const cleanEndpoint = sanitizeUrl(endpoint);
+      // Build endpoint: if absolute URL, leave as-is. Otherwise ensure it has a
+      // leading slash and prefix API_PATH ('/api') if not already present. This
+      // centralizes the '/api' prefix so callers don't need to manage it.
+      let cleanEndpoint = endpoint || '';
+      if (!/^https?:\/\//i.test(cleanEndpoint)) {
+        if (!cleanEndpoint.startsWith('/')) cleanEndpoint = `/${cleanEndpoint}`;
+        if (!cleanEndpoint.startsWith(API_CONFIG.API_PATH)) {
+          cleanEndpoint = `${API_CONFIG.API_PATH}${cleanEndpoint}`;
+        }
+      }
+      // Sanitize duplicates and normalize
+      cleanEndpoint = sanitizeUrl(cleanEndpoint);
     
     const config = {
       url: cleanEndpoint, // Use sanitized endpoint

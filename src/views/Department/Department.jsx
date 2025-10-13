@@ -167,27 +167,17 @@ function Department() {
   const fetchAvailableAgents = async (businessId) => {
     try {
       // Use the correct API URL for branches (production or development)
-      const baseUrl = process.env.NODE_ENV === 'development'
-        ? 'http://localhost:5040'
-        : 'https://api-impactvibescloud.onrender.com';
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-      const axios = await import('axios');
-      const branchResponse = await axios.default.get(
-        `${baseUrl}/api/branch/${businessId}/branches`,
-        {
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        }
-      );
+      // Fetch branches using centralized apiCall (handles baseURL and headers)
+  const branchResponse = await apiCall(`/branch/${businessId}/branches`, 'GET');
       let branchData = [];
-      if (branchResponse?.data?.data) {
-        branchData = branchResponse.data.data;
-      } else if (branchResponse?.data) {
-        branchData = branchResponse.data;
-      } else if (Array.isArray(branchResponse)) {
+      if (Array.isArray(branchResponse)) {
         branchData = branchResponse;
+      } else if (branchResponse?.data && Array.isArray(branchResponse.data)) {
+        branchData = branchResponse.data;
+      } else if (branchResponse?.data?.data && Array.isArray(branchResponse.data.data)) {
+        branchData = branchResponse.data.data;
+      } else if (branchResponse?.branches && Array.isArray(branchResponse.branches)) {
+        branchData = branchResponse.branches;
       }
       if (!branchData || branchData.length === 0) {
         branchData = [];
@@ -204,37 +194,19 @@ function Department() {
       setAvailableBranches(branchData);
 
       try {
-        // Fetch users/agents with the correct endpoint
-        // Using direct axios call to avoid potential issues with the apiCall utility
-        const axios = await import('axios');
-        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
-        
-        // Use the same API endpoint as departments but for users
-        const agentResponse = await axios.default.get(
-          `${getApiUrl()}/api/users`,
-          {
-            headers: {
-              'Accept': '*/*',
-              'Content-Type': 'application/json',
-              'Authorization': token ? `Bearer ${token}` : ''
-            },
-            params: {
-              businessId: businessId
-            }
-          }
-        );
-        
-        console.log('Agent Response:', agentResponse.data);
-        
+        // Fetch users/agents using apiCall and query param for businessId
+  const agentResponse = await apiCall(`/users?businessId=${encodeURIComponent(businessId)}`, 'GET');
+        console.log('Agent Response:', agentResponse);
         // Handle different response formats
         let agentData = [];
-        if (agentResponse.data?.data) {
-          agentData = agentResponse.data.data;
-        } else if (Array.isArray(agentResponse.data)) {
+        if (Array.isArray(agentResponse)) {
+          agentData = agentResponse;
+        } else if (agentResponse?.data && Array.isArray(agentResponse.data)) {
           agentData = agentResponse.data;
-        } else if (typeof agentResponse.data === 'object' && agentResponse.data !== null) {
-          // If it's a single object
-          agentData = [agentResponse.data];
+        } else if (agentResponse?.data?.data && Array.isArray(agentResponse.data.data)) {
+          agentData = agentResponse.data.data;
+        } else if (agentResponse && typeof agentResponse === 'object') {
+          agentData = [agentResponse];
         }
         
         // If still no agents found, use empty array

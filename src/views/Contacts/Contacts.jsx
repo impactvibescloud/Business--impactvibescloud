@@ -18,10 +18,9 @@ import {
   CSpinner,
 } from "@coreui/react";
 
+import { apiCall } from '../../config/api'
+
 export default function Contacts() {
-  const API_BASE = process.env.REACT_APP_API_URL 
-    ? `${process.env.REACT_APP_API_URL}/contacts`
-    : 'https://api.impactvibescloud.com/api/contacts'; // Your production URL here
   
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,18 +80,7 @@ export default function Contacts() {
           queryParams.append('searchField', searchField);
         }
 
-        const response = await fetch(
-          `${API_BASE}/business/${businessId}?${queryParams}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${authToken}`
-            }
-          }
-        );
-
-        if (!response.ok) throw new Error("Failed to load contacts");
-        
-        const data = await response.json();
+  const data = await apiCall(`/contacts/business/${businessId}?${queryParams}`, 'GET');
         if (data.success && data.data) {
           setContacts(data.data);
           // Safely handle pagination data with fallbacks
@@ -152,12 +140,7 @@ export default function Contacts() {
     }
     
     try {
-      const userResponse = await fetch('/api/v1/user/details', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
-      const userData = await userResponse.json();
+  const userData = await apiCall('/v1/user/details', 'GET');
       const businessId = userData?.user?.businessId || localStorage.getItem('businessId');
 
       if (!businessId) {
@@ -165,24 +148,11 @@ export default function Contacts() {
         return;
       }
 
-      const url = isEditMode 
-        ? `${API_BASE}/business/${businessId}/${contactForm._id}` 
-        : `${API_BASE}/business/${businessId}`;
+      const endpoint = isEditMode
+        ? `/api/contacts/business/${businessId}/${contactForm._id}`
+        : `/api/contacts/business/${businessId}`;
 
-      const response = await fetch(url, {
-        method,
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          ...contactForm,
-          businessId
-        }),
-      });
-
-      if (!response.ok) throw new Error("Save failed");
-      const savedContact = await response.json();
+      const savedContact = await apiCall(endpoint, method, { ...contactForm, businessId });
 
       if (isEditMode) {
         setContacts((prev) =>
@@ -199,24 +169,14 @@ export default function Contacts() {
       alert(err.message);
     }
 
-    const url = isEditMode 
-      ? `${API_BASE}/business/${businessId}/${contactForm._id}` 
-      : `${API_BASE}/business/${businessId}`;
+    const endpoint = isEditMode
+      ? `/api/contacts/business/${businessId}/${contactForm._id}`
+      : `/api/contacts/business/${businessId}`;
 
-    fetch(url, {
-      method,
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        ...contactForm,
-        businessId
-      }),
-    })
+    apiCall(endpoint, method, { ...contactForm, businessId })
       .then((res) => {
-        if (!res.ok) throw new Error("Save failed");
-        return res.json();
+        // apiCall returns parsed response data
+        return res;
       })
       .then((savedContact) => {
         if (isEditMode) {

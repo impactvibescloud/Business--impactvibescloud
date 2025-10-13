@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { apiCall, ENDPOINTS, API_CONFIG } from '../config/api';
+import { apiCall, ENDPOINTS, API_CONFIG, getBaseURL } from '../config/api';
 import axios from 'axios';
 
 // Create the context
@@ -36,29 +36,15 @@ export function UserActivityProvider({ children }) {
   const fetchCurrentStatus = async () => {
     try {
       setLoading(true);
-      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5040' : 'https://api-impactvibescloud.onrender.com';
-      const endpoint = `${baseUrl}/api/v1/user/status`;
-      const authToken = localStorage.getItem('authToken') || API_CONFIG.AUTH_TOKEN;
-      
-      console.log('Fetching current status from:', endpoint);
-      
-      const response = await axios.get(
-        endpoint,
-        {
-          headers: {
-            'Accept': '*/*',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
-        }
-      );
-      
-      console.log('Response:', response.data);
-      
-      if (response.status === 200 && response.data.success) {
-        // Parse the response according to the format provided
-        const { data } = response.data;
-        
+      // Use centralized apiCall which uses axios with configured baseURL
+  const response = await apiCall('/v1/user/status', 'GET');
+
+      // apiCall returns response.data (axios response.data), so we expect the API
+      // to return an object containing success and data fields.
+      console.log('Response:', response);
+
+      if (response && response.success) {
+        const { data } = response;
         if (data && data.current_status) {
           setUserStatus(data.current_status);
           setUserData({
@@ -73,7 +59,7 @@ export function UserActivityProvider({ children }) {
           setUserStatus(STATUS_OPTIONS.ONLINE);
         }
       } else {
-        console.warn('Unexpected API response:', response.data);
+        console.warn('Unexpected API response:', response);
         setUserStatus(STATUS_OPTIONS.ONLINE);
       }
     } catch (error) {
@@ -89,33 +75,16 @@ export function UserActivityProvider({ children }) {
   const updateStatus = async (newStatus) => {
     try {
       setLoading(true);
-      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5040' : 'https://api-impactvibescloud.onrender.com';
-      const endpoint = `${baseUrl}/api/v1/user/status`;
-      const authToken = localStorage.getItem('authToken') || API_CONFIG.AUTH_TOKEN;
-      
       console.log('Updating status to:', newStatus);
-      
-      const response = await axios.post(
-        endpoint, 
-        { status: newStatus }, // Sending status in the request body
-        {
-          headers: {
-            'Accept': '*/*',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
-        }
-      );
-      
-      console.log('Update response:', response.data);
-      
-      if (response.status === 200 && response.data.success) {
-        // If the update was successful, update the local state
+
+  const response = await apiCall('/v1/user/status', 'POST', { status: newStatus });
+
+      console.log('Update response:', response);
+
+      if (response && response.success) {
         setUserStatus(newStatus);
-        
-        // If the response includes the updated user data, update that as well
-        if (response.data.data) {
-          const { data } = response.data;
+        if (response.data) {
+          const { data } = response;
           setUserData({
             id: data._id,
             name: data.name,
@@ -123,10 +92,9 @@ export function UserActivityProvider({ children }) {
             lastSeen: data.last_seen
           });
         }
-        
         console.log('Status updated successfully to:', newStatus);
       } else {
-        console.warn('Status update failed:', response.data);
+        console.warn('Status update failed:', response);
       }
     } catch (error) {
       console.error('Error updating user status:', error);
