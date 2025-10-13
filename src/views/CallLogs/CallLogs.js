@@ -40,6 +40,7 @@ import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
 
 const CallLogs = () => {
   const [callLogs, setCallLogs] = useState([])
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -85,12 +86,12 @@ const CallLogs = () => {
       setError(null);
       try {
         // Build query string for pagination and search
-  let query = `/api/call-logs/business/${businessId}?page=${currentPage}`;
-  if (searchTerm) query += `&search=${encodeURIComponent(searchTerm)}`;
-  // Optionally add filter to query string if needed
-  // (not implemented in backend, but you can add if supported)
-  const callLogsUrl = `${getBaseURL()}${query}`;
-  const data = await apiCall(callLogsUrl);
+        let query = `/api/call-logs/business/${businessId}?page=${currentPage}&pageSize=${pageSize}`;
+        if (searchTerm) query += `&search=${encodeURIComponent(searchTerm)}`;
+        // Optionally add filter to query string if needed
+        // (not implemented in backend, but you can add if supported)
+        const callLogsUrl = `${getBaseURL()}${query}`;
+        const data = await apiCall(callLogsUrl);
         if (data && data.success && Array.isArray(data.data)) {
           setCallLogs(data.data);
           setTotalPages(data.pagination?.totalPages || 1);
@@ -112,7 +113,7 @@ const CallLogs = () => {
       }
     };
     fetchCallLogs();
-  }, [businessId, currentPage, searchTerm]);
+  }, [businessId, currentPage, searchTerm, pageSize]);
 
   // Format the call status from API data
   const formatCallStatus = (status) => {
@@ -160,6 +161,12 @@ const CallLogs = () => {
     }
     return matchesFilter;
   });
+
+  // Client-side pagination fallback: slice filteredCallLogs for current page
+  const paginatedCallLogs = filteredCallLogs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
   
   // Handle search
   const handleSearch = (e) => {
@@ -275,6 +282,24 @@ const CallLogs = () => {
                 </CButton>
               </CInputGroup>
             </CCol>
+            <CCol md={6} className="d-flex justify-content-end">
+              <CInputGroup style={{ maxWidth: 180 }}>
+                <CFormInput
+                  type="number"
+                  min={5}
+                  max={100}
+                  value={pageSize}
+                  onChange={e => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Rows per page"
+                />
+                <CButton type="button" color="secondary" variant="outline" disabled>
+                  Rows/Page
+                </CButton>
+              </CInputGroup>
+            </CCol>
           </CRow>
           <CTable hover responsive className="call-logs-table">
             <CTableHead>
@@ -316,7 +341,7 @@ const CallLogs = () => {
                   </CTableDataCell>
                 </CTableRow>
               ) : (
-                filteredCallLogs.map((log, index) => {
+                paginatedCallLogs.map((log, index) => {
                   const contact = log.contact || 'Unknown';
                   const callType = log.callType || 'Unknown';
                   const callDate = formatDate(log.callDate || log.createdAt);
@@ -331,7 +356,7 @@ const CallLogs = () => {
                       >
                         <CTableDataCell>
                           <div className="d-flex align-items-center">
-                            <span className="log-number me-2">{(currentPage - 1) * 10 + index + 1}</span>
+                            <span className="log-number me-2">{(currentPage - 1) * pageSize + index + 1}</span>
                             <CIcon
                               icon={isExpanded ? cilChevronTop : cilChevronBottom}
                               size="sm"
@@ -474,32 +499,75 @@ const CallLogs = () => {
             </CTableBody>
           </CTable>
           {totalPages > 1 && (
-            <CPagination
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(currentPage - 1)}
-              >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
+            <div style={{ overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+              <CPagination aria-label="Page navigation" className="justify-content-center mt-4" style={{ display: 'inline-flex', flexWrap: 'nowrap' }}>
                 <CPaginationItem
-                  key={i}
-                  active={i + 1 === currentPage}
-                  onClick={() => setCurrentPage(i + 1)}
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
                 >
-                  {i + 1}
+                  Previous
                 </CPaginationItem>
-              ))}
-              <CPaginationItem
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
+                {/* Compact pagination: max 5 page buttons */}
+                {(() => {
+                  const pages = [];
+                  const showFirst = 1;
+                  const showLast = totalPages;
+                  // Always show first page
+                  pages.push(
+                    <CPaginationItem key={showFirst} active={currentPage === showFirst} onClick={() => setCurrentPage(showFirst)}>
+                      {showFirst}
+                    </CPaginationItem>
+                  );
+                  // Show ellipsis if needed
+                  if (currentPage > 3) {
+                    pages.push(<CPaginationItem key="start-ellipsis" disabled>...</CPaginationItem>);
+                  }
+                  // Show previous page if not near start
+                  if (currentPage > 2 && currentPage !== showLast) {
+                    pages.push(
+                      <CPaginationItem key={currentPage - 1} onClick={() => setCurrentPage(currentPage - 1)}>
+                        {currentPage - 1}
+                      </CPaginationItem>
+                    );
+                  }
+                  // Show current page (if not first/last)
+                  if (currentPage !== showFirst && currentPage !== showLast) {
+                    pages.push(
+                      <CPaginationItem key={currentPage} active onClick={() => setCurrentPage(currentPage)}>
+                        {currentPage}
+                      </CPaginationItem>
+                    );
+                  }
+                  // Show next page if not near end
+                  if (currentPage < showLast - 1 && currentPage !== showFirst) {
+                    pages.push(
+                      <CPaginationItem key={currentPage + 1} onClick={() => setCurrentPage(currentPage + 1)}>
+                        {currentPage + 1}
+                      </CPaginationItem>
+                    );
+                  }
+                  // Show ellipsis if needed
+                  if (currentPage < showLast - 2) {
+                    pages.push(<CPaginationItem key="end-ellipsis" disabled>...</CPaginationItem>);
+                  }
+                  // Always show last page (if not already shown)
+                  if (showLast !== showFirst) {
+                    pages.push(
+                      <CPaginationItem key={showLast} active={currentPage === showLast} onClick={() => setCurrentPage(showLast)}>
+                        {showLast}
+                      </CPaginationItem>
+                    );
+                  }
+                  return pages;
+                })()}
+                <CPaginationItem
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next
+                </CPaginationItem>
+              </CPagination>
+            </div>
           )}
         </CCardBody>
       </CCard>
