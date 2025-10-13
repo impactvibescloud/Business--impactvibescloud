@@ -44,17 +44,11 @@ function VirtualNumbers() {
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
-        const authToken = token || localStorage.getItem('authToken');
-        if (!authToken) {
+        if (!token && !localStorage.getItem('authToken')) {
           setError('Authentication required. Please login again.');
           return;
         }
-        const userResponse = await fetch('/api/v1/user/details', {
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          }
-        });
-        const userData = await userResponse.json();
+        const userData = await apiCall('/v1/user/details', 'GET');
         // Get businessId from API response or fall back to localStorage
         const businessId = userData?.user?.businessId || localStorage.getItem('businessId');
         if (!businessId) {
@@ -91,11 +85,9 @@ function VirtualNumbers() {
       try {
         console.log('Fetching virtual numbers for business:', user.businessId)
         
-        const baseUrl = process.env.NODE_ENV === 'development' 
-          ? 'http://localhost:5040' 
-          : 'https://api-impactvibescloud.onrender.com'
-        
-        const response = await apiCall(`${baseUrl}/api/numbers/assigned-to/${user.businessId}`, 'GET', null, {
+        // Use centralized apiCall with a relative endpoint so axios uses the
+        // configured baseURL from src/config/api.js (which handles dev/prod)
+  const response = await apiCall(`/numbers/assigned-to/${user.businessId}`, 'GET', null, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -328,7 +320,7 @@ function VirtualNumbers() {
     try {
       console.log('Releasing number via proxy API')
       
-      const response = await apiCall(`/api/numbers/${numberId}`, 'PUT', { status: 'available' }, {
+  const response = await apiCall(`/numbers/${numberId}`, 'PUT', { status: 'available' }, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
