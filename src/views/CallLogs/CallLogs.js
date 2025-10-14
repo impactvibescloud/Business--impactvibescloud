@@ -47,6 +47,7 @@ const CallLogs = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
+  const [serverPaginated, setServerPaginated] = useState(false)
   const [activeFilter, setActiveFilter] = useState('All Calls')
   const [expandedRow, setExpandedRow] = useState(null)
   const [businessId, setBusinessId] = useState(null)
@@ -55,9 +56,8 @@ const CallLogs = () => {
   useEffect(() => {
     const getBusinessId = async () => {
       try {
-        // First try to get from user details API
-        const userDetailsUrl = `${getBaseURL()}/v1/user/details`;
-        const response = await apiCall(userDetailsUrl, 'GET');
+        // First try to get from user details API using centralized apiCall (relative endpoint)
+        const response = await apiCall('/v1/user/details', 'GET');
         if (response?.user?.businessId) {
           setBusinessId(response.user.businessId);
           return;
@@ -85,21 +85,41 @@ const CallLogs = () => {
       setLoading(true);
       setError(null);
       try {
-        // Build query string for pagination and search
-        let query = `/api/call-logs/business/${businessId}?page=${currentPage}&pageSize=${pageSize}`;
-        if (searchTerm) query += `&search=${encodeURIComponent(searchTerm)}`;
-        // Optionally add filter to query string if needed
-        // (not implemented in backend, but you can add if supported)
-        const callLogsUrl = `${getBaseURL()}${query}`;
-        const data = await apiCall(callLogsUrl);
-        if (data && data.success && Array.isArray(data.data)) {
-          setCallLogs(data.data);
-          setTotalPages(data.pagination?.totalPages || 1);
-          setTotalRecords(data.pagination?.totalRecords || data.data.length);
+        // Build query string for pagination and search. Use 'limit' (server expects limit) and relative endpoint.
+        let endpoint = `/call-logs/business/${businessId}?page=${currentPage}&limit=${pageSize}`;
+        if (searchTerm) endpoint += `&search=${encodeURIComponent(searchTerm)}`;
+        const res = await apiCall(endpoint, 'GET');
+
+        // Normalize response shape. API may return:
+        //  - { success: true, data: [...], pagination: { totalPages, totalRecords, page, limit } }
+        //  - or a raw array [...]
+        let logs = [];
+        let pagination = null;
+        if (Array.isArray(res)) {
+          logs = res;
+        } else if (res && Array.isArray(res.data)) {
+          logs = res.data;
+          pagination = res.pagination || null;
+        } else if (res && Array.isArray(res.callLogs)) {
+          // fallback key
+          logs = res.callLogs;
+          pagination = res.pagination || null;
         } else {
-          setCallLogs([]);
-          setTotalPages(1);
-          setTotalRecords(0);
+          // Unknown shape, try to be defensive
+          logs = [];
+          pagination = res?.pagination || null;
+        }
+
+        setCallLogs(logs);
+        if (pagination) {
+          setServerPaginated(true);
+          setTotalPages(pagination.totalPages || Math.max(1, Math.ceil((pagination.totalRecords || logs.length) / pageSize)));
+          setTotalRecords(pagination.totalRecords || logs.length);
+        } else {
+          // Server didn't paginate: compute from full array
+          setServerPaginated(false);
+          setTotalRecords(logs.length);
+          setTotalPages(Math.max(1, Math.ceil(logs.length / pageSize)));
         }
       } catch (err) {
         setError(err.message === 'Business ID not found'
@@ -162,11 +182,10 @@ const CallLogs = () => {
     return matchesFilter;
   });
 
-  // Client-side pagination fallback: slice filteredCallLogs for current page
-  const paginatedCallLogs = filteredCallLogs.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  // Determine paginated list: if server returned paginated data use it as-is; otherwise slice client-side
+  const paginatedCallLogs = serverPaginated
+    ? filteredCallLogs
+    : filteredCallLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   
   // Handle search
   const handleSearch = (e) => {
