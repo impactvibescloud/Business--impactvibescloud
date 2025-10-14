@@ -234,17 +234,16 @@ const CallLogs = () => {
   }
 
   const handlePlayRecording = (recordingUrl) => {
-    if (recordingUrl) {
-      // Create an audio element and play the recording
-      const audio = new Audio(recordingUrl)
-      audio.play().catch(err => {
-        console.error('Error playing audio:', err)
-        alert('Unable to play recording')
-      })
-    } else {
+    if (!recordingUrl) {
       alert('No recording available for this call')
+      return
     }
+    // Set inline player URL (component will render <audio> for this)
+    setAudioPlayerUrl(recordingUrl)
   }
+
+  // Inline audio player URL
+  const [audioPlayerUrl, setAudioPlayerUrl] = useState('')
 
   const handleDownloadRecording = (recordingUrl, fileName) => {
     // Use authenticated download endpoint to include Authorization header and stream the file
@@ -630,6 +629,16 @@ const CallLogs = () => {
                                       )}
                                     </div>
                                   </div>
+                                  <CCol md={6}>
+                                    {audioPlayerUrl && (
+                                      <div className="p-3">
+                                        <strong>Player:</strong>
+                                        <div className="mt-2">
+                                          <audio controls src={audioPlayerUrl} style={{ width: '100%' }} />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </CCol>
                                 </CCol>
                               </CRow>
                               {log.tags && log.tags.length > 0 && (
