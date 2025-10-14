@@ -48,6 +48,9 @@ const CallLogs = () => {
   const [totalPages, setTotalPages] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
   const [serverPaginated, setServerPaginated] = useState(false)
+  const [audioFiles, setAudioFiles] = useState([])
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [audioError, setAudioError] = useState(null)
   const [activeFilter, setActiveFilter] = useState('All Calls')
   const [expandedRow, setExpandedRow] = useState(null)
   const [businessId, setBusinessId] = useState(null)
@@ -135,6 +138,34 @@ const CallLogs = () => {
     fetchCallLogs();
   }, [businessId, currentPage, searchTerm, pageSize]);
 
+  // Fetch available audio recordings once businessId is known
+  useEffect(() => {
+    const fetchAudioFiles = async () => {
+      if (!businessId) return;
+      setAudioLoading(true)
+      setAudioError(null)
+      try {
+        // Centralized apiCall will prefix /api
+  const res = await apiCall('/v1/audio-recordings', 'GET')
+        if (Array.isArray(res?.files)) {
+          setAudioFiles(res.files)
+        } else if (Array.isArray(res)) {
+          setAudioFiles(res)
+        } else {
+          setAudioFiles([])
+        }
+      } catch (err) {
+        console.error('Failed to fetch audio recordings', err)
+        setAudioError('Failed to load audio recordings')
+        setAudioFiles([])
+      } finally {
+        setAudioLoading(false)
+      }
+    }
+
+    fetchAudioFiles()
+  }, [businessId])
+
   // Format the call status from API data
   const formatCallStatus = (status) => {
     if (!status) return 'Unknown'
@@ -216,17 +247,56 @@ const CallLogs = () => {
   }
 
   const handleDownloadRecording = (recordingUrl, fileName) => {
-    if (recordingUrl) {
-      // Create a temporary link and trigger download
-      const link = document.createElement('a')
-      link.href = recordingUrl
-      link.download = fileName || 'call-recording.mp3'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    } else {
-      alert('No recording available for download')
+    // Use authenticated download endpoint to include Authorization header and stream the file
+    const download = async (urlOrName, providedName) => {
+      try {
+        let filename = providedName || ''
+        // If passed a full URL, extract filename from pathname
+        try {
+          const maybeUrl = new URL(urlOrName)
+          const parts = maybeUrl.pathname.split('/')
+          filename = filename || decodeURIComponent(parts.pop() || parts.pop())
+        } catch (e) {
+          // not a full URL, treat urlOrName as filename if filename still empty
+          if (!filename) filename = urlOrName
+        }
+
+        if (!filename) {
+          alert('No recording available for download')
+          return
+        }
+
+        const token = localStorage.getItem('authToken') || ''
+  const downloadUrl = `${getBaseURL()}/api/v1/audio-recordings/download/${encodeURIComponent(filename)}`
+
+        const resp = await fetch(downloadUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: token ? `Bearer ${token}` : '',
+          },
+        })
+
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => '')
+          throw new Error(`Download failed: ${resp.status} ${text}`)
+        }
+
+        const blob = await resp.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = blobUrl
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(blobUrl)
+      } catch (err) {
+        console.error('Download failed', err)
+        alert('Download failed')
+      }
     }
+
+    download(recordingUrl, fileName)
   }
 
   const formatDuration = (duration) => {
@@ -454,6 +524,7 @@ const CallLogs = () => {
                                   <div className="call-detail-item mb-3">
                                     <strong>Call Recording:</strong>
                                     <div className="ms-2 d-flex gap-2">
+                                      {/** Prefer call-specific URL if present, otherwise match available files by virtual number */}
                                       {log.callRecording ? (
                                         <>
                                           <CButton
@@ -485,7 +556,77 @@ const CallLogs = () => {
                                           </CButton>
                                         </>
                                       ) : (
-                                        <span className="text-muted">No recording available</span>
+                                        (() => {
+                                          // Strict match: require filename to contain both virtual number and contact digits
+                                          const vn = String(log.virtualNumber || '').replace(/[^0-9]/g, '')
+                                          const contact = String(log.contact || '').replace(/[^0-9]/g, '')
+                                          if ((!vn || !contact) || audioFiles.length === 0) return <span className="text-muted">No recording available</span>
+
+                                          const makeVariants = (s) => {
+                                            const v = []
+                                            if (!s) return v
+                                            v.push(s)
+                                            if (s.length > 10) v.push(s.slice(-10))
+                                            if (s.length > 8) v.push(s.slice(-8))
+                                            if (s.length > 6) v.push(s.slice(-6))
+                                            return v
+                                          }
+
+                                          const vnVariants = makeVariants(vn)
+                                          const contactVariants = makeVariants(contact)
+
+                                          // Find files that include any vn variant AND any contact variant
+                                          const strictMatches = audioFiles.filter(f => {
+                                            return vnVariants.some(v => v && f.includes(v)) && contactVariants.some(c => c && f.includes(c))
+                                          })
+
+                                          if (strictMatches.length === 0) return <span className="text-muted">No recording available</span>
+
+                                          // Dedupe and render
+                                          const seen = new Set()
+                                          const dedup = strictMatches.filter(fname => {
+                                            if (seen.has(fname)) return false
+                                            seen.add(fname)
+                                            return true
+                                          })
+
+                                          return (
+                                            <div className="d-flex flex-column">
+                                              {dedup.map((fname, i) => {
+                                                const fileUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(fname)}`;
+                                                return (
+                                                  <div key={i} className="d-flex align-items-center gap-2 mb-2">
+                                                    <CButton
+                                                      size="sm"
+                                                      color="primary"
+                                                      variant="outline"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handlePlayRecording(fileUrl);
+                                                      }}
+                                                    >
+                                                      <CIcon icon={cilMediaPlay} className="me-1" />
+                                                      Play
+                                                    </CButton>
+                                                    <CButton
+                                                      size="sm"
+                                                      color="success"
+                                                      variant="outline"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDownloadRecording(fileUrl, fname);
+                                                      }}
+                                                    >
+                                                      <CIcon icon={cilCloudDownload} className="me-1" />
+                                                      Download
+                                                    </CButton>
+                                                    <small className="text-muted">{fname}</small>
+                                                  </div>
+                                                )
+                                              })}
+                                            </div>
+                                          )
+                                        })()
                                       )}
                                     </div>
                                   </div>
