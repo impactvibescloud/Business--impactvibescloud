@@ -40,11 +40,12 @@ export const sanitizeUrl = (url) => {
 
 // Get the base URL based on environment
 export const getBaseURL = () => {
+  // Always return the host-only base URL (no '/api' suffix).
+  // apiCall() prefixes API_CONFIG.API_PATH ('/api') for relative endpoints,
+  // so including '/api' in the base URL leads to double '/api/api' in requests.
   const isDevelopment = process.env.NODE_ENV === 'development';
   if (isDevelopment) return API_CONFIG.DEV_URL;
-  // In production ensure we have a single /api suffix
-  if (API_CONFIG.PROD_URL.endsWith('/api')) return API_CONFIG.PROD_URL;
-  return `${API_CONFIG.PROD_URL}/api`;
+  return API_CONFIG.PROD_URL;
 }
 
 export const getHeaders = () => ({
