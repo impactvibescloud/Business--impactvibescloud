@@ -32,7 +32,7 @@ import {
   CInputGroup,
   CInputGroupText,
 } from '@coreui/react';
-import axiosInstance from '../../config/axiosConfig';
+import { apiCall, ENDPOINTS, getBaseURL, getHeaders } from '../../config/api';
 import { useAuth } from '../../context/authContext';
 import { statusMap, reverseStatusMap, PAGE_SIZE } from './types';
 // Scrollbar and other styles
@@ -62,11 +62,11 @@ const NewTicketComponent = () => {
         }
 
         console.log('Fetching user details...');
-        const response = await axiosInstance.get('/v1/user/details');
-        console.log('User details response:', response.data);
+        const response = await apiCall(ENDPOINTS.USER_DETAILS);
+        console.log('User details response:', response);
 
-        if (response.data && response.data.user) {
-          setUserDetails(response.data.user);
+        if (response && response.user) {
+          setUserDetails(response.user);
           if (response.data.user.businessId) {
             console.log('Setting business ID:', response.data.user.businessId);
             setBusinessId(response.data.user.businessId);
@@ -156,14 +156,14 @@ const NewTicketComponent = () => {
 
       try {
         // Log the full request URL and headers
-        console.log('Making API request to:', `${axiosInstance.defaults.baseURL}/api/tickets`);
-        console.log('Request headers:', axiosInstance.defaults.headers);
+        console.log('Making API request to:', `${getBaseURL()}/api/tickets`);
+        console.log('Request headers:', getHeaders());
         
-        const response = await axiosInstance.post('/tickets', ticketData);
+        const response = await apiCall(ENDPOINTS.TICKETS, 'POST', ticketData);
         // Log the successful response
-        console.log('Ticket creation response:', response.data);
+        console.log('Ticket creation response:', response);
 
-        if (response.data) {
+        if (response) {
           // Reset form
           setSubject("");
           setDescription("");
@@ -261,9 +261,8 @@ const NewTicketComponent = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axiosInstance.get('/tickets');
-      const { tickets: ticketData } = response.data;
-      const formattedTickets = ticketData.map((t) => ({
+      const ticketData = await apiCall(ENDPOINTS.TICKETS);
+      const formattedTickets = ticketData.tickets.map((t) => ({
         id: t._id,
         subject: t.subject,
         description: t.description,
@@ -300,7 +299,7 @@ const NewTicketComponent = () => {
   const sendMessage = async (ticketId, message) => {
     try {
       setSendingMessage(true);
-      await axiosInstance.post(`/tickets/${ticketId}/messages`, {
+      await apiCall(ENDPOINTS.TICKET_MESSAGES(ticketId), 'POST', {
         message,
         statusUpdate: messageStatus
       });
@@ -327,9 +326,9 @@ const NewTicketComponent = () => {
   // Fetch ticket messages
   const fetchTicketMessages = async (ticketId) => {
     try {
-      const response = await axiosInstance.get(`/tickets/${ticketId}/messages`);
-      if (response.data?.success) {
-        setTicketMessages(response.data.messages);
+      const response = await apiCall(ENDPOINTS.TICKET_MESSAGES(ticketId));
+      if (response?.success) {
+        setTicketMessages(response.messages);
       }
     } catch (err) {
       console.error('Failed to fetch ticket messages:', err);
@@ -346,7 +345,7 @@ const NewTicketComponent = () => {
         ...(newStatus === "Resolved" ? { resolvedAt: new Date().toISOString() } : {})
       };
 
-      await axiosInstance.put(`/api/tickets/${ticketId}`, payload);
+      await apiCall(ENDPOINTS.TICKET_UPDATE(ticketId), 'PUT', payload);
 
       setTickets(prev =>
         prev.map(t =>
