@@ -38,6 +38,7 @@ const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState('today')
   const [searchTerm, setSearchTerm] = useState('')
   const [resourceFilter, setResourceFilter] = useState('all')
+  const [roleFilter, setRoleFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [reportData, setReportData] = useState([])
@@ -109,9 +110,10 @@ const ReportsAnalytics = () => {
 
   useEffect(() => {
     fetchReportData()
-    // Reset resource filter when report type changes
+    // Reset filters when report type changes
     if (reportType !== 'data-access-logs') {
       setResourceFilter('all')
+      setRoleFilter('all')
     }
   }, [reportType, dateRange, currentPage, itemsPerPage])
 
@@ -122,8 +124,18 @@ const ReportsAnalytics = () => {
     try {
       if (reportType === 'data-access-logs') {
         // Fetch business data logs with pagination
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: itemsPerPage,
+          sortBy: 'createdAt',
+          order: 'desc',
+          ...(dateRange !== 'all' && { dateRange }),
+          ...(resourceFilter !== 'all' && { resource: resourceFilter }),
+          ...(roleFilter !== 'all' && { role: roleFilter }),
+          ...(searchTerm && { search: searchTerm })
+        })
         const response = await apiCall(
-          `api/data-access-logs/business-logs?page=${currentPage}&limit=${itemsPerPage}&sortBy=createdAt&order=desc`,
+          `api/data-access-logs/business-logs?${params.toString()}`,
           'GET',
           null,
           {
@@ -157,7 +169,17 @@ const ReportsAnalytics = () => {
               userRole: log.user?.role || 'N/A',
               accessType: log.action,
               resourceAccessed: log.resource,
-              timestamp: new Date(log.createdAt).toLocaleString(),
+              timestamp: (() => {
+                try {
+                  const dateStr = log.createdAt;
+                  if (!dateStr) return 'N/A';
+                  const date = new Date(dateStr);
+                  if (isNaN(date.getTime())) return 'N/A';
+                  return date.toLocaleString();
+                } catch (e) {
+                  return 'N/A';
+                }
+              })(),
               ipAddress: log.ipAddress,
               status: 'Success'
             }
@@ -237,26 +259,8 @@ const ReportsAnalytics = () => {
     window.URL.revokeObjectURL(url)
   }
 
-  const filteredData = reportData.filter(item => {
-    if (reportType === 'data-access-logs') {
-      const userId = String(item.userId || '').toLowerCase()
-      const accessType = String(item.accessType || '').toLowerCase()
-      const resourceAccessed = String(item.resourceAccessed || '').toLowerCase()
-      const status = String(item.status || '').toLowerCase()
-      const searchLower = searchTerm.toLowerCase()
-      
-      // Apply search filter
-      const matchesSearch = userId.includes(searchLower) ||
-                           accessType.includes(searchLower) ||
-                           resourceAccessed.includes(searchLower) ||
-                           status.includes(searchLower)
-      
-      // Apply resource filter
-      const matchesResource = resourceFilter === 'all' || 
-                             item.resourceAccessed === resourceFilter
-      
-      return matchesSearch && matchesResource
-    } else if (reportType === 'call-logs') {
+  const filteredData = reportType === 'data-access-logs' ? reportData : reportData.filter(item => {
+    if (reportType === 'call-logs') {
       const caller = String(item.caller || '').toLowerCase()
       const receiver = String(item.receiver || '').toLowerCase()
       const status = String(item.status || '').toLowerCase()
@@ -279,13 +283,21 @@ const ReportsAnalytics = () => {
   // Reset current page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, resourceFilter])
+  }, [searchTerm, resourceFilter, roleFilter])
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
+  let currentItems, totalPages
+  if (reportType === 'data-access-logs') {
+    // Server-side pagination
+    currentItems = reportData
+    totalPages = apiTotalPages
+  } else {
+    // Client-side pagination
+    currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem)
+    totalPages = Math.ceil(filteredData.length / itemsPerPage)
+  }
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber)
@@ -354,7 +366,7 @@ const ReportsAnalytics = () => {
               <div className="contact-phone">{String(item.resourceAccessed || 'N/A')}</div>
             </CTableDataCell>
             <CTableDataCell>
-              <div className="contact-phone">{new Date(item.timestamp).toLocaleString()}</div>
+              <div className="contact-phone">{item.timestamp}</div>
             </CTableDataCell>
             <CTableDataCell>
               <div className="contact-phone">{String(item.ipAddress || 'N/A')}</div>
@@ -444,21 +456,33 @@ const ReportsAnalytics = () => {
               </CFormSelect>
             </CCol>
             {reportType === 'data-access-logs' && (
-              <CCol md={2}>
-                <CFormSelect
-                  value={resourceFilter}
-                  onChange={(e) => setResourceFilter(e.target.value)}
-                >
-                  <option value="all">All Resources</option>
-                  {availableResources.map((resource, index) => (
-                    <option key={index} value={resource}>
-                      {resource}
-                    </option>
-                  ))}
-                </CFormSelect>
-              </CCol>
+              <>
+                <CCol md={2}>
+                  <CFormSelect
+                    value={resourceFilter}
+                    onChange={(e) => setResourceFilter(e.target.value)}
+                  >
+                    <option value="all">All Resources</option>
+                    {availableResources.map((resource, index) => (
+                      <option key={index} value={resource}>
+                        {resource}
+                      </option>
+                    ))}
+                  </CFormSelect>
+                </CCol>
+                <CCol md={2}>
+                  <CFormSelect
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="business">Business</option>
+                    <option value="agent(branch_manager)">Agent (Branch Manager)</option>
+                  </CFormSelect>
+                </CCol>
+              </>
             )}
-            <CCol md={reportType === 'data-access-logs' ? 6 : 8}>
+            <CCol md={reportType === 'data-access-logs' ? 6 : 10}>
               <CInputGroup>
                 <CFormInput
                   placeholder="Search reports..."
@@ -473,24 +497,41 @@ const ReportsAnalytics = () => {
           </CRow>
 
           {/* Active Filters Display */}
-          {reportType === 'data-access-logs' && resourceFilter !== 'all' && (
+          {reportType === 'data-access-logs' && (resourceFilter !== 'all' || roleFilter !== 'all') && (
             <CRow className="mb-3">
               <CCol>
                 <div className="d-flex align-items-center">
                   <small className="text-muted me-2">Active filters:</small>
-                  <CBadge color="info" className="me-2">
-                    Resource: {resourceFilter}
-                    <CButton
-                      size="sm"
-                      color="info"
-                      variant="ghost"
-                      className="ms-1 p-0"
-                      style={{ fontSize: '10px', lineHeight: '1' }}
-                      onClick={() => setResourceFilter('all')}
-                    >
-                      ×
-                    </CButton>
-                  </CBadge>
+                  {resourceFilter !== 'all' && (
+                    <CBadge color="info" className="me-2">
+                      Resource: {resourceFilter}
+                      <CButton
+                        size="sm"
+                        color="info"
+                        variant="ghost"
+                        className="ms-1 p-0"
+                        style={{ fontSize: '10px', lineHeight: '1' }}
+                        onClick={() => setResourceFilter('all')}
+                      >
+                        ×
+                      </CButton>
+                    </CBadge>
+                  )}
+                  {roleFilter !== 'all' && (
+                    <CBadge color="info" className="me-2">
+                      Role: {roleFilter}
+                      <CButton
+                        size="sm"
+                        color="info"
+                        variant="ghost"
+                        className="ms-1 p-0"
+                        style={{ fontSize: '10px', lineHeight: '1' }}
+                        onClick={() => setRoleFilter('all')}
+                      >
+                        ×
+                      </CButton>
+                    </CBadge>
+                  )}
                 </div>
               </CCol>
             </CRow>
