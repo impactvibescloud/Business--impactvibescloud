@@ -22,18 +22,17 @@ import {
   CPaginationItem,
   CAlert,
   CBadge,
-  CCollapse
+  CModal,
+  CModalHeader,
+  CModalBody,
+  CModalFooter
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { 
-  cilTrash, 
   cilSearch, 
   cilFilter, 
-  cilCloudDownload,
-  cilChevronTop,
-  cilChevronBottom,
   cilMediaPlay,
-  cilCloudDownload as cilDownload
+  cilCloudDownload
 } from '@coreui/icons'
 import './CallLogs.css'
 import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
@@ -52,8 +51,9 @@ const CallLogs = () => {
   const [audioLoading, setAudioLoading] = useState(false)
   const [audioError, setAudioError] = useState(null)
   const [activeFilter, setActiveFilter] = useState('All Calls')
-  const [expandedRow, setExpandedRow] = useState(null)
   const [businessId, setBusinessId] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [selectedLog, setSelectedLog] = useState(null)
 
   // Get the business ID when component mounts
   useEffect(() => {
@@ -229,21 +229,14 @@ const CallLogs = () => {
     setCurrentPage(1) // Reset to first page when filter changes
   }
 
-  const handleRowClick = (logId) => {
-    setExpandedRow(expandedRow === logId ? null : logId)
-  }
-
   const handlePlayRecording = (recordingUrl) => {
     if (!recordingUrl) {
       alert('No recording available for this call')
       return
     }
-    // Set inline player URL (component will render <audio> for this)
-    setAudioPlayerUrl(recordingUrl)
+    // Open audio in new tab or play inline
+    window.open(recordingUrl, '_blank')
   }
-
-  // Inline audio player URL
-  const [audioPlayerUrl, setAudioPlayerUrl] = useState('')
 
   const handleDownloadRecording = (recordingUrl, fileName) => {
     // Use authenticated download endpoint to include Authorization header and stream the file
@@ -393,24 +386,30 @@ const CallLogs = () => {
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>CONTACT</CTableHeaderCell>
-                <CTableHeaderCell>VIRTUAL NUMBER</CTableHeaderCell>
                 <CTableHeaderCell>CALL TYPE</CTableHeaderCell>
                 <CTableHeaderCell>CALL DATE</CTableHeaderCell>
+                <CTableHeaderCell>CALL INITIATED BY</CTableHeaderCell>
+                <CTableHeaderCell>CALL RECEIVED BY</CTableHeaderCell>
+                <CTableHeaderCell>CALL REJECTED BY</CTableHeaderCell>
+                <CTableHeaderCell>TEAM</CTableHeaderCell>
+                <CTableHeaderCell>HANG UP BY</CTableHeaderCell>
+                <CTableHeaderCell>DURATION</CTableHeaderCell>
+                <CTableHeaderCell>COST</CTableHeaderCell>
+                <CTableHeaderCell>NOTES</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
               {loading ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="5" className="text-center py-5">
+                  <CTableDataCell colSpan="12" className="text-center py-5">
                     <CSpinner color="primary" />
                     <div className="mt-3">Loading call logs...</div>
                   </CTableDataCell>
                 </CTableRow>
               ) : error ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="5" className="text-center py-5">
+                  <CTableDataCell colSpan="12" className="text-center py-5">
                     <CAlert color="danger" className="mb-0">
                       {error}
                     </CAlert>
@@ -418,7 +417,7 @@ const CallLogs = () => {
                 </CTableRow>
               ) : filteredCallLogs.length === 0 ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="5" className="text-center py-5">
+                  <CTableDataCell colSpan="12" className="text-center py-5">
                     <div className="empty-state">
                       <div className="empty-state-icon">
                         <CIcon icon={cilSearch} size="xl" />
@@ -430,238 +429,64 @@ const CallLogs = () => {
                 </CTableRow>
               ) : (
                 paginatedCallLogs.map((log, index) => {
-                  const contact = log.contact || 'Unknown';
                   const callType = log.callType || 'Unknown';
                   const callDate = formatDate(log.callDate || log.createdAt);
                   const status = formatCallStatus(log.status);
-                  const isExpanded = expandedRow === log._id;
                   return (
-                    <React.Fragment key={log._id}>
-                      <CTableRow
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleRowClick(log._id)}
-                        className={isExpanded ? 'table-row-expanded' : ''}
-                      >
-                        <CTableDataCell>
-                          <div className="d-flex align-items-center">
-                            <span className="log-number me-2">{(currentPage - 1) * pageSize + index + 1}</span>
-                            <CIcon
-                              icon={isExpanded ? cilChevronTop : cilChevronBottom}
-                              size="sm"
-                              className="text-muted"
-                            />
-                          </div>
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          <div className="log-contact">{contact}</div>
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          <div className="log-virtual-number">{log.virtualNumber || 'N/A'}</div>
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          <div className="log-type text-capitalize">{callType}</div>
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          <div className="log-date">{callDate}</div>
-                        </CTableDataCell>
-                        <CTableDataCell>
-                          <CBadge
-                            color={status.toLowerCase() === 'success' || status.toLowerCase() === 'completed' ? 'success'
-                              : status.toLowerCase().includes('fail') ? 'danger'
-                              : status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
-                            className="status-badge"
-                          >
-                            {status}
-                          </CBadge>
-                        </CTableDataCell>
-                      </CTableRow>
-                      {/* Expanded Row Details */}
-                      <CTableRow>
-                        <CTableDataCell colSpan="5" className="p-0">
-                          <CCollapse visible={isExpanded}>
-                            <div className="call-details-container p-4 bg-light border-top">
-                              <CRow>
-                                <CCol md={6}>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Call Initiated By:</strong>
-                                    <span className="ms-2">{log.callInitiatedBy || 'Unknown'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Call Received By:</strong>
-                                    <span className="ms-2">{log.callReceivedBy || 'N/A'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Call Rejected By:</strong>
-                                    <span className="ms-2">{log.callRejectedBy || 'N/A'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Virtual Number:</strong>
-                                    <span className="ms-2">{log.virtualNumber || 'N/A'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Team:</strong>
-                                    <span className="ms-2">{log.team || 'N/A'}</span>
-                                  </div>
-                                </CCol>
-                                <CCol md={6}>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Hang Up By:</strong>
-                                    <span className="ms-2">{log.hangUpBy || 'Unknown'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Call Duration:</strong>
-                                    <span className="ms-2">{formatDuration(log.callDuration || log.duration)}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Call Cost:</strong>
-                                    <span className="ms-2">${log.cost ? log.cost.toFixed(2) : 'N/A'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Notes:</strong>
-                                    <span className="ms-2">{log.notes || 'No notes available'}</span>
-                                  </div>
-                                  <div className="call-detail-item mb-3">
-                                    <strong>Call Recording:</strong>
-                                    <div className="ms-2 d-flex gap-2">
-                                      {/** Prefer call-specific URL if present, otherwise match available files by virtual number */}
-                                      {log.callRecording ? (
-                                        <>
-                                          <CButton
-                                            size="sm"
-                                            color="primary"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handlePlayRecording(log.callRecording);
-                                            }}
-                                          >
-                                            <CIcon icon={cilMediaPlay} className="me-1" />
-                                            Play
-                                          </CButton>
-                                          <CButton
-                                            size="sm"
-                                            color="success"
-                                            variant="outline"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDownloadRecording(
-                                                log.callRecording,
-                                                `call-recording-${log._id}.mp3`
-                                              );
-                                            }}
-                                          >
-                                            <CIcon icon={cilCloudDownload} className="me-1" />
-                                            Download
-                                          </CButton>
-                                        </>
-                                      ) : (
-                                        (() => {
-                                          // Strict match: require filename to contain both virtual number and contact digits
-                                          const vn = String(log.virtualNumber || '').replace(/[^0-9]/g, '')
-                                          const contact = String(log.contact || '').replace(/[^0-9]/g, '')
-                                          if ((!vn || !contact) || audioFiles.length === 0) return <span className="text-muted">No recording available</span>
-
-                                          const makeVariants = (s) => {
-                                            const v = []
-                                            if (!s) return v
-                                            v.push(s)
-                                            if (s.length > 10) v.push(s.slice(-10))
-                                            if (s.length > 8) v.push(s.slice(-8))
-                                            if (s.length > 6) v.push(s.slice(-6))
-                                            return v
-                                          }
-
-                                          const vnVariants = makeVariants(vn)
-                                          const contactVariants = makeVariants(contact)
-
-                                          // Find files that include any vn variant AND any contact variant
-                                          const strictMatches = audioFiles.filter(f => {
-                                            return vnVariants.some(v => v && f.includes(v)) && contactVariants.some(c => c && f.includes(c))
-                                          })
-
-                                          if (strictMatches.length === 0) return <span className="text-muted">No recording available</span>
-
-                                          // Dedupe and render
-                                          const seen = new Set()
-                                          const dedup = strictMatches.filter(fname => {
-                                            if (seen.has(fname)) return false
-                                            seen.add(fname)
-                                            return true
-                                          })
-
-                                          return (
-                                            <div className="d-flex flex-column">
-                                              {dedup.map((fname, i) => {
-                                                const fileUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(fname)}`;
-                                                return (
-                                                  <div key={i} className="d-flex align-items-center gap-2 mb-2">
-                                                    <CButton
-                                                      size="sm"
-                                                      color="primary"
-                                                      variant="outline"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handlePlayRecording(fileUrl);
-                                                      }}
-                                                    >
-                                                      <CIcon icon={cilMediaPlay} className="me-1" />
-                                                      Play
-                                                    </CButton>
-                                                    <CButton
-                                                      size="sm"
-                                                      color="success"
-                                                      variant="outline"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDownloadRecording(fileUrl, fname);
-                                                      }}
-                                                    >
-                                                      <CIcon icon={cilCloudDownload} className="me-1" />
-                                                      Download
-                                                    </CButton>
-                                                    <small className="text-muted">{fname}</small>
-                                                  </div>
-                                                )
-                                              })}
-                                            </div>
-                                          )
-                                        })()
-                                      )}
-                                    </div>
-                                  </div>
-                                  <CCol md={6}>
-                                    {audioPlayerUrl && (
-                                      <div className="p-3">
-                                        <strong>Player:</strong>
-                                        <div className="mt-2">
-                                          <audio controls src={audioPlayerUrl} style={{ width: '100%' }} />
-                                        </div>
-                                      </div>
-                                    )}
-                                  </CCol>
-                                </CCol>
-                              </CRow>
-                              {log.tags && log.tags.length > 0 && (
-                                <CRow className="mt-3">
-                                  <CCol md={12}>
-                                    <div className="call-detail-item">
-                                      <strong>Tags:</strong>
-                                      <div className="ms-2 mt-2 d-flex flex-wrap gap-2">
-                                        {log.tags.map((tag, i) => (
-                                          <CBadge key={i} color="info" className="py-2 px-3">
-                                            {tag}
-                                          </CBadge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </CCol>
-                                </CRow>
-                              )}
-                            </div>
-                          </CCollapse>
-                        </CTableDataCell>
-                      </CTableRow>
-                    </React.Fragment>
+                    <CTableRow 
+                      key={log._id} 
+                      onClick={() => {
+                        setSelectedLog(log);
+                        setShowModal(true);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <CTableDataCell>
+                        <span className="log-number">{(currentPage - 1) * pageSize + index + 1}</span>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="log-type text-capitalize">{callType}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="log-date">{callDate}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{log.callInitiatedBy || 'Unknown'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{log.callReceivedBy || 'N/A'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{log.callRejectedBy || 'N/A'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{log.team || 'N/A'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{log.hangUpBy || 'Unknown'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>{formatDuration(log.callDuration || log.duration)}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div>${log.cost ? log.cost.toFixed(2) : 'N/A'}</div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <div className="text-truncate" style={{maxWidth: '200px'}} title={log.notes || 'No notes available'}>
+                          {log.notes || 'No notes available'}
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge
+                          color={status.toLowerCase() === 'success' || status.toLowerCase() === 'completed' ? 'success'
+                            : status.toLowerCase().includes('fail') ? 'danger'
+                            : status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
+                          className="status-badge"
+                        >
+                          {status}
+                        </CBadge>
+                      </CTableDataCell>
+                    </CTableRow>
                   );
                 })
               )}
@@ -740,6 +565,123 @@ const CallLogs = () => {
           )}
         </CCardBody>
       </CCard>
+
+      {/* Recording Modal */}
+      <CModal visible={showModal} onClose={() => setShowModal(false)} size="lg">
+        <CModalHeader>
+          <h5>Call Recording - {selectedLog ? formatDate(selectedLog.callDate || selectedLog.createdAt) : ''}</h5>
+        </CModalHeader>
+        <CModalBody>
+          {selectedLog && (
+            <div>
+              <div className="mb-3">
+                <strong>Call Details:</strong>
+                <p>Type: {selectedLog.callType || 'Unknown'}</p>
+                <p>Initiated By: {selectedLog.callInitiatedBy || 'Unknown'}</p>
+                <p>Received By: {selectedLog.callReceivedBy || 'N/A'}</p>
+                <p>Duration: {formatDuration(selectedLog.callDuration || selectedLog.duration)}</p>
+                <p>Status: {formatCallStatus(selectedLog.status)}</p>
+              </div>
+              
+              <div className="mb-3">
+                <strong>Recording Options:</strong>
+                <div className="d-flex gap-2 flex-wrap mt-2">
+                  {selectedLog.callRecording ? (
+                    <>
+                      <CButton
+                        color="primary"
+                        onClick={() => handlePlayRecording(selectedLog.callRecording)}
+                      >
+                        <CIcon icon={cilMediaPlay} className="me-2" />
+                        Play Recording
+                      </CButton>
+                      <CButton
+                        color="success"
+                        onClick={() => handleDownloadRecording(
+                          selectedLog.callRecording,
+                          `call-recording-${selectedLog._id}.mp3`
+                        )}
+                      >
+                        <CIcon icon={cilCloudDownload} className="me-2" />
+                        Download Recording
+                      </CButton>
+                    </>
+                  ) : (
+                    (() => {
+                      const vn = String(selectedLog.virtualNumber || '').replace(/[^0-9]/g, '')
+                      const contactNum = String(selectedLog.contact || '').replace(/[^0-9]/g, '')
+                      if ((!vn || !contactNum) || audioFiles.length === 0) return <p className="text-muted">No recording available for this call.</p>
+
+                      const makeVariants = (s) => {
+                        const v = []
+                        if (!s) return v
+                        v.push(s)
+                        if (s.length > 10) v.push(s.slice(-10))
+                        if (s.length > 8) v.push(s.slice(-8))
+                        if (s.length > 6) v.push(s.slice(-6))
+                        return v
+                      }
+
+                      const vnVariants = makeVariants(vn)
+                      const contactVariants = makeVariants(contactNum)
+
+                      const strictMatches = audioFiles.filter(f => {
+                        return vnVariants.some(v => v && f.includes(v)) && contactVariants.some(c => c && f.includes(c))
+                      })
+
+                      if (strictMatches.length === 0) return <p className="text-muted">No recording available for this call.</p>
+
+                      const seen = new Set()
+                      const dedup = strictMatches.filter(fname => {
+                        if (seen.has(fname)) return false
+                        seen.add(fname)
+                        return true
+                      })
+
+                      return (
+                        <div>
+                          <p className="mb-2">Available recordings:</p>
+                          <div className="d-flex flex-column gap-2">
+                            {dedup.map((fname, i) => {
+                              const fileUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(fname)}`;
+                              return (
+                                <div key={i} className="d-flex align-items-center gap-2 p-2 border rounded">
+                                  <span className="flex-grow-1 text-truncate" title={fname}>{fname}</span>
+                                  <CButton
+                                    size="sm"
+                                    color="primary"
+                                    variant="outline"
+                                    onClick={() => handlePlayRecording(fileUrl)}
+                                  >
+                                    <CIcon icon={cilMediaPlay} size="sm" />
+                                  </CButton>
+                                  <CButton
+                                    size="sm"
+                                    color="success"
+                                    variant="outline"
+                                    onClick={() => handleDownloadRecording(fileUrl, fname)}
+                                  >
+                                    <CIcon icon={cilCloudDownload} size="sm" />
+                                  </CButton>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setShowModal(false)}>
+            Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
     </div>
   )
 }
