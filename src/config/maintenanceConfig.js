@@ -1,4 +1,4 @@
-import axiosInstance from './axiosConfig';
+import { apiCall, ENDPOINTS } from './api';
 
 // Default configuration
 const defaultConfig = {
@@ -12,7 +12,7 @@ const defaultConfig = {
 
 export const getMaintenanceConfig = async () => {
   try {
-    const { data } = await axiosInstance.get('/maintenance');
+    const data = await apiCall(ENDPOINTS.MAINTENANCE, 'GET');
     
     if (data.success && data.maintenances && data.maintenances.length > 0) {
       // Filter active maintenance alerts for business platform
