@@ -98,7 +98,12 @@ export const ENDPOINTS = {
   // Other common endpoints
   REPORTS: '/reports',
   SETTINGS: '/settings',
-  DASHBOARD: '/dashboard'
+  DASHBOARD: '/dashboard',
+  
+  // Ticket endpoints
+  TICKETS: '/tickets',
+  TICKET_MESSAGES: (ticketId) => `/tickets/${ticketId}/messages`,
+  TICKET_UPDATE: (ticketId) => `/tickets/${ticketId}`
 }
 
 // Utility function to make API calls using axios (which supports proxy)
