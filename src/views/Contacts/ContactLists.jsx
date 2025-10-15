@@ -33,7 +33,7 @@ import CIcon from '@coreui/icons-react'
 import { cilPlus, cilPencil, cilTrash, cilUser, cilEnvelopeClosed, cilSearch, cilX } from '@coreui/icons'
 import { getHeaders } from '../../config/api'
 import { ENDPOINTS } from '../../config/api'
-import axiosInstance from '../../config/axiosConfig'
+import { apiCall } from '../../config/api'
 import './ContactList.css'
 
 const ContactLists = () => {
@@ -126,7 +126,7 @@ const ContactLists = () => {
             businessId = localStorage.getItem('businessId');
           }
           if (!businessId) throw new Error('Business ID not found. Please login again.');
-          const response = await axiosInstance.get(`/contact-list/business/${businessId}`, {
+          const response = await apiCall(`contact-list/business/${businessId}`, 'GET', null, {
             params: {
               page: currentPage,
               limit: itemsPerPage,
@@ -182,7 +182,7 @@ const ContactLists = () => {
       setContactsLoading(true)
       
       try {
-        const { data } = await axiosInstance.get('/api/contacts')
+        const { data } = await apiCall('contacts', 'GET')
         
         // Handle different response formats
         let contactsData = []
@@ -451,7 +451,7 @@ const ContactLists = () => {
         // For uploaded contacts, we need to create them first or use their IDs
         const contactIds = uploadedContacts.map(contact => contact.id)
         // Update existing list via API
-        const response = await axiosInstance.put(`/api/contact-list/${editingList.id}`, {
+        const response = await apiCall(`contact-list/${editingList.id}`, 'PUT', {
           name: newList.name,
           businessId,
           branchId,
@@ -505,7 +505,7 @@ const ContactLists = () => {
         if (!businessId) throw new Error('Business ID not found. Please login again.');
         // For uploaded contacts, we need to create them first or use their IDs
         const contactIds = uploadedContacts.map(contact => contact.id)
-        const response = await axiosInstance.post('/api/contact-list', {
+        const response = await apiCall('contact-list', 'POST', {
           name: newList.name,
           businessId,
           branchId,
@@ -565,7 +565,7 @@ const ContactLists = () => {
     
     try {
       // First fetch all contacts
-      const { data: contactsData } = await axiosInstance.get('/contacts')
+      const { data: contactsData } = await apiCall('contacts', 'GET')
       
       if (contactsData && contactsData.success && Array.isArray(contactsData.data)) {
         const allContacts = contactsData.data.map(contact => ({
@@ -579,7 +579,7 @@ const ContactLists = () => {
         setContacts(allContacts)
         
         // Now fetch the specific list to get its contacts
-        const { data: listData } = await axiosInstance.get(`/api/contact-list/${list.id}`)
+        const { data: listData } = await apiCall(`contact-list/${list.id}`, 'GET')
         
         if (listData && listData.success && listData.data && Array.isArray(listData.data.contacts)) {
           // Find the contacts that are in this list
@@ -623,7 +623,7 @@ const ContactLists = () => {
     
     try {
       // Send delete request to the API
-      const response = await axiosInstance.delete(`/api/contact-list/${deleteId}`)
+      const response = await apiCall(`contact-list/${deleteId}`, 'DELETE')
       
       if (!response || !response.success) {
         throw new Error('Error deleting contact list')

@@ -17,7 +17,7 @@ import {
   CSpinner
 } from '@coreui/react'
 import jsPDF from 'jspdf'
-import axiosInstance from '../../config/axiosConfig'
+import { apiCall, ENDPOINTS } from '../../config/api'
 import './payment-requests.css'
 
 function PaymentRequests() {
@@ -36,11 +36,10 @@ function PaymentRequests() {
       return
     }
 
-    axiosInstance
-      .get('/v1/user/details')
+    apiCall(ENDPOINTS.USER_DETAILS)
       .then((res) => {
-        setUser(res.data.user)
-        setBusinessId(res.data.user.businessId)
+        setUser(res.user)
+        setBusinessId(res.user.businessId)
       })
       .catch((err) => {
         console.error("Failed to fetch user details:", err)
@@ -92,13 +91,13 @@ function PaymentRequests() {
       setCreatingDispute(true)
       setDisputeError(null)
 
-      const response = await axiosInstance.post('/disputes', {
+      const response = await apiCall(ENDPOINTS.DISPUTES, 'POST', {
         invoiceId: selectedInvoice._id,
         businessId: user.businessId,
         reason: disputeReason
       })
 
-      if (response.data.success) {
+      if (response.success) {
         // Close the dispute modal
         setShowDisputeModal(false)
         // Reset the form
@@ -128,7 +127,7 @@ function PaymentRequests() {
 
       setLoading(true)
       // Use the current user's businessId for the API call
-      const { data } = await axiosInstance.get(`/billing/business/${currentBusinessId}`)
+      const data = await apiCall(ENDPOINTS.BILLING_BUSINESS(currentBusinessId))
       console.log('Payment requests data:', data)
       
       // Prioritize data.data as per the API structure shown
@@ -191,13 +190,7 @@ function PaymentRequests() {
     
     setLoadingInvoiceData(true)
     try {
-      const { data } = await axiosInstance.get(`/invoices/${invoiceId}`, {
-        headers: {
-          'Expires': '0',
-          'Cache-Control': 'no-cache,no-store',
-          'Pragma': 'no-cache'
-        }
-      })
+      const data = await apiCall(ENDPOINTS.INVOICES(invoiceId))
       console.log('Invoice details full response:', data)
       
       // Extract all fields from the invoice API response
@@ -517,7 +510,7 @@ function PaymentRequests() {
     if (!id) return
     
     try {
-      await axiosInstance.put(`/billing/${id}`, {
+      await apiCall(ENDPOINTS.BILLING_UPDATE(id), 'PUT', {
         status: "rejected",
         paymentStatus: "unpaid"
       })
@@ -551,7 +544,7 @@ function PaymentRequests() {
     setProcessingPayment(true)
     try {
       // Update the payment request status using the provided API
-      const { data } = await axiosInstance.put(`/billing/${selectedRequest._id}`, {
+      const data = await apiCall(ENDPOINTS.BILLING_UPDATE(selectedRequest._id), 'PUT', {
         status: "approved",
         paymentStatus: "paid",
         template: selectedRequest.template || `An order request generated for plan ${invoiceData?.items?.[0]?.name || 'Subscription Plan'}, Business ID: ${selectedRequest.businessId || '123'}, Plan ID: ${selectedRequest.planId || '456'}, Status: approved, Payment Status: paid`
