@@ -234,8 +234,15 @@ const Login = () => {
     }}
   >
         <div className="w-100" style={{ textAlign: 'left' }}>
-          <img src="/favicon.ico" alt="Brand Logo" style={{ width: 80, height: 80, marginBottom: 32 }} />
-          <h1 className="fw-bold mb-3" style={{ letterSpacing: 1, fontSize: 38 }}>Impactvibescloud</h1>
+          <div style={{ width: '100%', marginBottom: 32, textAlign: 'left' }}>
+            <div style={{ position: 'relative', width: '100%', height: '220px', marginBottom: 0 }}>
+              <img
+                src={process.env.PUBLIC_URL + "/logos/sidebar_head.png"}
+                alt="Just Connect Logo"
+                style={{ position: 'absolute', top: '10px', left: '24px', height: '220px', width: 'auto', maxWidth: 'none', display: 'block', zIndex: 2 }}
+              />
+            </div>
+          </div>
           <p className="fs-4 mb-4" style={{ opacity: 0.97, fontWeight: 400 }}>
             Empowering Business Communication<br />
             <span style={{ fontSize: 18, opacity: 0.85 }}>Cloud Telephony for Modern Enterprises</span>
