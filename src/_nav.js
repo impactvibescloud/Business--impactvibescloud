@@ -82,13 +82,13 @@ const _nav = [
   //     },
   //   ],
   // },
-  {
-    component: CNavItem,
-    name: "Users & Teams",
-    icon: <CIcon icon={cilGroup} customClassName="nav-icon" />,
-    to: "/users-teams",
-    group: "Users & Teams",
-  },
+  // {
+  //   component: CNavItem,
+  //   name: "Users & Teams",
+  //   icon: <CIcon icon={cilGroup} customClassName="nav-icon" />,
+  //   to: "/users-teams",
+  //   group: "Users & Teams",
+  // },
   {
     component: CNavItem,
     name: "Templates",
