@@ -13,6 +13,7 @@ import {
   CSpinner,
   CInputGroup,
   CFormInput,
+  CFormSelect,
   CButton,
   CDropdown,
   CDropdownToggle,
@@ -52,6 +53,9 @@ const CallLogs = () => {
   const [audioError, setAudioError] = useState(null)
   const [activeFilter, setActiveFilter] = useState('All Calls')
   const [businessId, setBusinessId] = useState(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [callTypeFilter, setCallTypeFilter] = useState('All')
   const [showModal, setShowModal] = useState(false)
   const [selectedLog, setSelectedLog] = useState(null)
   const [audioBlobUrl, setAudioBlobUrl] = useState(null)
@@ -65,6 +69,7 @@ const CallLogs = () => {
   const [audioCtxPlaying, setAudioCtxPlaying] = useState(false)
   const [recordingInfo, setRecordingInfo] = useState(null)
   const [downloadLoading, setDownloadLoading] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   // Get the business ID when component mounts
   useEffect(() => {
@@ -92,6 +97,32 @@ const CallLogs = () => {
     getBusinessId()
   }, [])
 
+  // Build endpoint helper with applied filters
+  const buildLogsEndpoint = (page = 1, limit = pageSize) => {
+    let endpoint = `/call-logs/business/${businessId}?page=${page}&limit=${limit}`
+    if (searchTerm) endpoint += `&search=${encodeURIComponent(searchTerm)}`
+    if (dateFrom) endpoint += `&from=${encodeURIComponent(dateFrom)}`
+    if (dateTo) endpoint += `&to=${encodeURIComponent(dateTo)}`
+
+  // Normalize call type filter to backend values
+    if (callTypeFilter && callTypeFilter !== 'All') {
+      const ct = String(callTypeFilter)
+      let mapped = ct.toLowerCase()
+      if (ct === 'Outgoing') mapped = 'outbound'
+      else if (ct === 'Incoming') mapped = 'inbound'
+      endpoint += `&callType=${encodeURIComponent(mapped)}`
+    }
+
+    // Normalize active filter to backend parameters (status / callType)
+    if (activeFilter && activeFilter !== 'All Calls') {
+      if (activeFilter === 'Completed') endpoint += `&status=completed`
+      else if (activeFilter === 'Failed') endpoint += `&status=failed`
+      else if (activeFilter === 'Outgoing') endpoint += `&callType=outbound`
+      else if (activeFilter === 'Incoming') endpoint += `&callType=inbound`
+    }
+    return endpoint
+  }
+
   // Fetch call logs with server-side pagination
   useEffect(() => {
     const fetchCallLogs = async () => {
@@ -99,9 +130,8 @@ const CallLogs = () => {
       setLoading(true);
       setError(null);
       try {
-        // Build query string for pagination and search. Use 'limit' (server expects limit) and relative endpoint.
-        let endpoint = `/call-logs/business/${businessId}?page=${currentPage}&limit=${pageSize}`;
-        if (searchTerm) endpoint += `&search=${encodeURIComponent(searchTerm)}`;
+        // Build endpoint from current filters
+        const endpoint = buildLogsEndpoint(currentPage, pageSize)
         const res = await apiCall(endpoint, 'GET');
 
         // Normalize response shape. API may return:
@@ -146,8 +176,8 @@ const CallLogs = () => {
         setLoading(false);
       }
     };
-    fetchCallLogs();
-  }, [businessId, currentPage, searchTerm, pageSize]);
+      fetchCallLogs();
+    }, [businessId, currentPage, searchTerm, pageSize, dateFrom, dateTo, callTypeFilter, activeFilter]);
 
   // Fetch available audio recordings once businessId is known
   useEffect(() => {
@@ -205,29 +235,59 @@ const CallLogs = () => {
     }
   }
 
-  // Filter call logs by status filter only (search is now server-side)
-  const filteredCallLogs = callLogs.filter(log => {
-    const callType = String(log.callType || '');
-    const status = String(log.status || '');
-    let matchesFilter = true;
-    if (activeFilter !== 'All Calls') {
-      if (activeFilter === 'Success') {
-        matchesFilter = status.toLowerCase() === 'success' || status.toLowerCase() === 'completed';
+  // When server provides paginated results, the server is expected to apply filters.
+  // Only apply client-side filtering when server did NOT paginate (we have the full list).
+  const clientFilteredCallLogs = serverPaginated ? callLogs : callLogs.filter(log => {
+    const callType = String(log.callType || '').toLowerCase();
+    const status = String(log.status || '').toLowerCase();
+    let matches = true;
+
+    // activeFilter can be: All Calls, Completed, Failed, Outgoing, Incoming
+    if (activeFilter && activeFilter !== 'All Calls') {
+      if (activeFilter === 'Completed') {
+        matches = status === 'completed' || status === 'success'
       } else if (activeFilter === 'Failed') {
-        matchesFilter = status.toLowerCase().includes('fail') || status.toLowerCase().includes('error');
+        matches = status.includes('fail') || status.includes('error')
       } else if (activeFilter === 'Outgoing') {
-        matchesFilter = callType.toLowerCase() === 'outgoing';
+        matches = callType === 'outbound' || callType === 'outgoing'
       } else if (activeFilter === 'Incoming') {
-        matchesFilter = callType.toLowerCase() === 'incoming';
+        matches = callType === 'inbound' || callType === 'incoming'
       }
     }
-    return matchesFilter;
-  });
+
+    // callTypeFilter UI select (All, Incoming, Outgoing)
+    if (matches && callTypeFilter && callTypeFilter !== 'All') {
+      const ctVal = callTypeFilter.toLowerCase()
+      if (ctVal === 'outgoing') {
+        matches = callType === 'outbound' || callType === 'outgoing'
+      } else if (ctVal === 'incoming') {
+        matches = callType === 'inbound' || callType === 'incoming'
+      }
+    }
+
+    // dateFrom / dateTo client-side filtering when server didn't paginate
+    if (matches && (dateFrom || dateTo)) {
+      const t = log.callDate || log.createdAt
+      if (t) {
+        const callTs = new Date(t).setHours(0,0,0,0)
+        if (dateFrom) {
+          const fromTs = new Date(dateFrom).setHours(0,0,0,0)
+          if (callTs < fromTs) matches = false
+        }
+        if (matches && dateTo) {
+          const toTs = new Date(dateTo).setHours(0,0,0,0)
+          if (callTs > toTs) matches = false
+        }
+      }
+    }
+
+    return matches
+  })
 
   // Determine paginated list: if server returned paginated data use it as-is; otherwise slice client-side
   const paginatedCallLogs = serverPaginated
-    ? filteredCallLogs
-    : filteredCallLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    ? clientFilteredCallLogs
+    : clientFilteredCallLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   
   // Handle search
   const handleSearch = (e) => {
@@ -463,6 +523,113 @@ const CallLogs = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
+  // Export all call logs as CSV (spreadsheet-friendly)
+  const exportAllCallLogs = async () => {
+    if (!businessId) {
+      alert('Business ID not available yet. Please try again.')
+      return
+    }
+    setExporting(true)
+    try {
+  // Try to request logs; handle both non-paginated and paginated responses
+  const first = await apiCall(buildLogsEndpoint(1, 1000), 'GET')
+      let logs = []
+      let pagination = null
+      if (Array.isArray(first)) {
+        logs = first
+      } else if (first && Array.isArray(first.data)) {
+        logs = first.data
+        pagination = first.pagination || null
+      } else if (first && Array.isArray(first.callLogs)) {
+        logs = first.callLogs
+        pagination = first.pagination || null
+      } else {
+        logs = []
+        pagination = first?.pagination || null
+      }
+
+      // If server returned pagination, fetch remaining pages
+      if (pagination && pagination.totalPages && pagination.totalPages > 1) {
+        const totalPages = pagination.totalPages
+        const limit = pagination.limit || 1000
+        const promises = []
+        for (let p = 2; p <= totalPages; p++) {
+          promises.push(apiCall(buildLogsEndpoint(p, limit), 'GET'))
+        }
+        const rest = await Promise.all(promises)
+        rest.forEach(r => {
+          if (Array.isArray(r)) logs = logs.concat(r)
+          else if (r && Array.isArray(r.data)) logs = logs.concat(r.data)
+          else if (r && Array.isArray(r.callLogs)) logs = logs.concat(r.callLogs)
+        })
+      }
+
+      if (!logs || logs.length === 0) {
+        alert('No call logs available to export')
+        return
+      }
+
+      // Prepare CSV headers and rows
+      const headers = [
+        'S.NO', 'CALL TYPE', 'CALL DATE', 'CALL INITIATED BY', 'CALL RECEIVED BY', 'CALL REJECTED BY', 'TEAM', 'HANG UP BY', 'DURATION', 'COST', 'NOTES', 'STATUS', 'VIRTUAL NUMBER', 'CONTACT'
+      ]
+
+      const csvRows = []
+      csvRows.push(headers.join(','))
+
+      logs.forEach((log, idx) => {
+        const callDate = formatDate(log.callDate || log.createdAt)
+        const duration = formatDuration(log.callDuration || log.duration)
+        const cost = log.cost != null ? Number(log.cost).toFixed(2) : ''
+        const row = [
+          idx + 1,
+          csvEscape(log.callType || ''),
+          csvEscape(callDate),
+          csvEscape(log.callInitiatedBy || ''),
+          csvEscape(log.callReceivedBy || ''),
+          csvEscape(log.callRejectedBy || ''),
+          csvEscape(log.team || ''),
+          csvEscape(log.hangUpBy || ''),
+          csvEscape(duration),
+          csvEscape(cost),
+          csvEscape(log.notes || ''),
+          csvEscape(formatCallStatus(log.status)),
+          csvEscape(log.virtualNumber || ''),
+          csvEscape(log.contact || ''),
+        ]
+        csvRows.push(row.join(','))
+      })
+
+      const csvContent = csvRows.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const now = new Date()
+      const fname = `call-logs-${businessId}-${now.toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`
+      a.download = fname
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Export failed', err)
+      alert('Export failed. Check console for details.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const csvEscape = (val) => {
+    if (val == null) return ''
+    const s = String(val)
+    // Escape double quotes
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"'
+    }
+    return s
+  }
+
   return (
     <div className="call-logs-container">
       <CCard className="mb-4">
@@ -485,10 +652,10 @@ const CallLogs = () => {
                     All Calls {activeFilter === 'All Calls' && '✓'}
                   </CDropdownItem>
                   <CDropdownItem 
-                    onClick={() => handleFilterChange('Success')} 
-                    active={activeFilter === 'Success'}
+                    onClick={() => handleFilterChange('Completed')} 
+                    active={activeFilter === 'Completed'}
                   >
-                    Success {activeFilter === 'Success' && '✓'}
+                    Completed {activeFilter === 'Completed' && '✓'}
                   </CDropdownItem>
                   <CDropdownItem 
                     onClick={() => handleFilterChange('Outgoing')} 
@@ -526,7 +693,17 @@ const CallLogs = () => {
               </CInputGroup>
             </CCol>
             <CCol md={6} className="d-flex justify-content-end">
-              <CInputGroup style={{ maxWidth: 180 }}>
+              <div className="d-flex align-items-center">
+                <CButton color="info" className="me-2" onClick={() => exportAllCallLogs()} disabled={!businessId || exporting}>
+                  {exporting ? (
+                    <>
+                      <CSpinner size="sm" className="me-2" /> Exporting...
+                    </>
+                  ) : (
+                    <>Export All</>
+                  )}
+                </CButton>
+                <CInputGroup style={{ maxWidth: 180 }}>
                 <CFormInput
                   type="number"
                   min={5}
@@ -541,7 +718,24 @@ const CallLogs = () => {
                 <CButton type="button" color="secondary" variant="outline" disabled>
                   Rows/Page
                 </CButton>
-              </CInputGroup>
+                </CInputGroup>
+              </div>
+            </CCol>
+          </CRow>
+          <CRow className="mb-3">
+            <CCol md={12}>
+              <div className="d-flex flex-wrap gap-2 align-items-center">
+                <CFormSelect value={callTypeFilter} onChange={e => { setCallTypeFilter(e.target.value); setCurrentPage(1); }} style={{ width: 160 }}>
+                  <option value="All">All Call Types</option>
+                  <option value="Incoming">Incoming</option>
+                  <option value="Outgoing">Outgoing</option>
+                </CFormSelect>
+                <CFormInput type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }} style={{ width: 180 }} />
+                <CFormInput type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }} style={{ width: 180 }} />
+                <CButton color="light" onClick={() => { setDateFrom(''); setDateTo(''); setCallTypeFilter('All'); setSearchTerm(''); setActiveFilter('All Calls'); setCurrentPage(1); }}>
+                  Clear Filters
+                </CButton>
+              </div>
             </CCol>
           </CRow>
           <CTable hover responsive className="call-logs-table">
@@ -577,7 +771,7 @@ const CallLogs = () => {
                     </CAlert>
                   </CTableDataCell>
                 </CTableRow>
-              ) : filteredCallLogs.length === 0 ? (
+              ) : clientFilteredCallLogs.length === 0 ? (
                 <CTableRow>
                   <CTableDataCell colSpan="12" className="text-center py-5">
                     <div className="empty-state">

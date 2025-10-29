@@ -65,23 +65,23 @@ const _nav = [
     to: "/department",
     group: "Department",
   },
-  {
-    component: CNavGroup,
-    name: "Campaigns",
-    icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: "Autodial",
-        to: "/campaigns/autodial",
-      },
-      {
-        component: CNavItem,
-        name: "Surveys",
-        to: "/campaigns/surveys",
-      },
-    ],
-  },
+  // {
+  //   component: CNavGroup,
+  //   name: "Campaigns",
+  //   icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
+  //   items: [
+  //     {
+  //       component: CNavItem,
+  //       name: "Autodial",
+  //       to: "/campaigns/autodial",
+  //     },
+  //     {
+  //       component: CNavItem,
+  //       name: "Surveys",
+  //       to: "/campaigns/surveys",
+  //     },
+  //   ],
+  // },
   {
     component: CNavItem,
     name: "Users & Teams",
@@ -117,13 +117,13 @@ const _nav = [
     to: "/reports-analytics",
     group: "Reports & Analytics",
   },
-  {
-    component: CNavItem,
-    name: "Settings",
-    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
-    to: "/settings",
-    group: "Settings",
-  },
+  // {
+  //   component: CNavItem,
+  //   name: "Settings",
+  //   icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+  //   to: "/settings",
+  //   group: "Settings",
+  // },
   {
     component: CNavItem,
     name: "Support Tickets",
