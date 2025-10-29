@@ -129,17 +129,35 @@ const AppHeaderDropdown = () => {
           </CBadge> */}
         </CDropdownItem>
         {/* <CDropdownDivider /> */}
-        <CDropdownItem href="#" onClick={() => history('/profile/edit')}>
+        <CDropdownItem
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            history("/profile/edit");
+          }}
+        >
           <CIcon icon={cilUser} className="me-2" />
           Edit Profile
         </CDropdownItem>
-        <CDropdownItem href="#" onClick={() => history('/change_password')}>
+        <CDropdownItem
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            history("/change_password");
+          }}
+        >
           <CIcon icon={cilPencil} className="me-2" />
           Change Password
         </CDropdownItem>
-        <CDropdownItem href="#">
+        <CDropdownItem
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            signout();
+          }}
+        >
           <CIcon icon={cilLockLocked} className="me-2" />
-          <span onClick={signout} >Log Out</span>
+          Log Out
         </CDropdownItem>
       </CDropdownMenu>
     </CDropdown>

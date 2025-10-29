@@ -192,7 +192,7 @@
 // export default App;
 
 import React, { Suspense, useEffect, useState } from "react";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Toaster } from "react-hot-toast";
 import { isAutheticated } from "./auth";
@@ -271,12 +271,7 @@ const App = () => {
     getUser();
   }, [token]);
   return (
-    <HashRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true
-      }}
-    >
+    <Router>
       <UserActivityProvider>
         <AuthProvider>
           <Suspense
@@ -308,7 +303,7 @@ const App = () => {
       </Suspense>
         </AuthProvider>
       </UserActivityProvider>
-    </HashRouter>
+  </Router>
   );
 };
 
