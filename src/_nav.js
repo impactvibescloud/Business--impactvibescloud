@@ -89,13 +89,13 @@ const _nav = [
   //   to: "/users-teams",
   //   group: "Users & Teams",
   // },
-  {
-    component: CNavItem,
-    name: "Templates",
-    icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
-    to: "/templates",
-    group: "Templates",
-  },
+  // {
+  //   component: CNavItem,
+  //   name: "Templates",
+  //   icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
+  //   to: "/templates",
+  //   group: "Templates",
+  // },
   {
     component: CNavItem,
     name: "Virtual Numbers",
