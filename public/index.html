@@ -15,7 +15,8 @@
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
     <meta http-equiv="Permissions-Policy" content="web-share=self">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: localhost:* data: 'unsafe-inline' 'unsafe-eval';">
+  <!-- Allow blob: for media playback (audio/video) used by the app when creating object URLs -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: localhost:* data: 'unsafe-inline' 'unsafe-eval'; media-src 'self' blob: data: https: localhost:*;">
     
     <meta
       name="description"
@@ -26,7 +27,7 @@
       name="keyword"
       content="Bootstrap,Admin,Template,Open,Source,CSS,SCSS,HTML,RWD,Dashboard,React"
     />
-  <title>Just Connect</title>
+  <title>Business - Just Connect</title>
     <!--
       manifest.json provides metadata used when your web app is added to the
       homescreen on Android. See https://developers.google.com/web/fundamentals/engage-and-retain/web-app-manifest/

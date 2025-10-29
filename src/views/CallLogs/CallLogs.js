@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   CRow,
   CCol,
@@ -54,6 +54,17 @@ const CallLogs = () => {
   const [businessId, setBusinessId] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [selectedLog, setSelectedLog] = useState(null)
+  const [audioBlobUrl, setAudioBlobUrl] = useState(null)
+  const [recordingLoading, setRecordingLoading] = useState(false)
+  const [recordingError, setRecordingError] = useState(null)
+  const audioRef = useRef(null)
+  const [recordingMimeType, setRecordingMimeType] = useState(null)
+  const audioContextRef = useRef(null)
+  const audioBufferRef = useRef(null)
+  const audioSourceRef = useRef(null)
+  const [audioCtxPlaying, setAudioCtxPlaying] = useState(false)
+  const [recordingInfo, setRecordingInfo] = useState(null)
+  const [downloadLoading, setDownloadLoading] = useState(null)
 
   // Get the business ID when component mounts
   useEffect(() => {
@@ -229,16 +240,161 @@ const CallLogs = () => {
     setCurrentPage(1) // Reset to first page when filter changes
   }
 
-  const handlePlayRecording = (recordingUrl) => {
+  const handlePlayRecording = async (recordingUrl) => {
     if (!recordingUrl) {
-      alert('No recording available for this call')
-      return
+      alert('No recording available for this call');
+      return;
     }
-    // Open audio in new tab or play inline
-    window.open(recordingUrl, '_blank')
+    setRecordingError(null)
+    setRecordingLoading(true)
+    try {
+      const token = localStorage.getItem('authToken') || '';
+      // Normalize recording URL: if it's just a filename, build full download path
+      let fetchUrl = recordingUrl
+      try {
+        const u = new URL(recordingUrl)
+        fetchUrl = u.href
+      } catch (e) {
+        // not a full URL — build from filename
+        if (!recordingUrl.startsWith('/')) {
+          fetchUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(recordingUrl)}`
+        }
+      }
+
+      const response = await fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+        },
+      });
+
+      console.debug('Recording fetch response', { url: recordingUrl, ok: response.ok, status: response.status, headers: Array.from(response.headers.entries()) })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Failed to fetch recording: ${response.status} ${text}`);
+      }
+
+      // Determine MIME type
+      let contentType = response.headers.get('Content-Type') || ''
+      if (!contentType || contentType === 'application/octet-stream') {
+        contentType = recordingUrl.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg'
+      }
+
+      // Use arrayBuffer to ensure we can set the correct type on the resulting blob
+      const arrayBuffer = await response.arrayBuffer()
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        throw new Error('Empty audio file received')
+      }
+
+      const blob = new Blob([arrayBuffer], { type: contentType })
+      const blobUrl = URL.createObjectURL(blob)
+
+      // Clean up previous blob if any
+      if (audioBlobUrl) {
+        try { URL.revokeObjectURL(audioBlobUrl) } catch (e) { /* ignore */ }
+      }
+
+  setAudioBlobUrl(blobUrl)
+  setRecordingMimeType(contentType)
+  setRecordingInfo({ status: response.status, contentType, size: blob.size })
+
+      // Try to play via <audio>. If that fails, fallback to WebAudio API.
+      setTimeout(async () => {
+        try {
+          if (audioRef.current) {
+            // clear previous handlers
+            audioRef.current.onerror = null
+            // set src and try play
+            audioRef.current.src = blobUrl
+            audioRef.current.load()
+            const playPromise = audioRef.current.play()
+            if (playPromise && typeof playPromise.then === 'function') {
+              playPromise.catch((err) => {
+                console.warn('Autoplay prevented or playback failed on audio element, will try WebAudio fallback', err)
+                // fallback: decode and play via AudioContext
+                fallbackPlayViaWebAudio(arrayBuffer, contentType)
+              })
+            }
+            // also listen for immediate decode errors
+            audioRef.current.onerror = (ev) => {
+              console.warn('Audio element error, attempting WebAudio fallback', ev)
+              fallbackPlayViaWebAudio(arrayBuffer, contentType)
+            }
+          }
+        } catch (e) {
+          console.warn('Error attempting to play audio element, trying WebAudio fallback', e)
+          try { fallbackPlayViaWebAudio(arrayBuffer, contentType) } catch(err) { console.warn(err) }
+        }
+      }, 50)
+    } catch (err) {
+      console.error('Failed to play recording', err);
+      setRecordingError(err.message || 'Failed to play recording')
+    } finally {
+      setRecordingLoading(false)
+    }
+  };
+
+  // WebAudio fallback: decode arrayBuffer and play using AudioContext
+  const fallbackPlayViaWebAudio = async (arrayBuffer, contentType) => {
+    try {
+      // create audio context if not present
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        audioContextRef.current = new AudioCtx()
+      }
+      const ctx = audioContextRef.current
+
+      // stop previous source if playing
+      if (audioSourceRef.current) {
+        try { audioSourceRef.current.stop(0) } catch (e) {}
+        audioSourceRef.current.disconnect()
+        audioSourceRef.current = null
+      }
+
+      // decode audio data
+      let decoded
+      if (ctx.decodeAudioData.length === 1) {
+        // modern browsers return a Promise
+        decoded = await ctx.decodeAudioData(arrayBuffer.slice(0))
+      } else {
+        // older callback style
+        decoded = await new Promise((resolve, reject) => {
+          ctx.decodeAudioData(arrayBuffer.slice(0), resolve, reject)
+        })
+      }
+      audioBufferRef.current = decoded
+
+      // create buffer source
+      const source = ctx.createBufferSource()
+      source.buffer = decoded
+      source.connect(ctx.destination)
+      audioSourceRef.current = source
+      source.onended = () => {
+        setAudioCtxPlaying(false)
+      }
+      source.start(0)
+      setAudioCtxPlaying(true)
+    } catch (err) {
+      console.error('WebAudio fallback failed', err)
+      setRecordingError('Playback failed (decoder error)')
+    }
   }
 
-  const handleDownloadRecording = (recordingUrl, fileName) => {
+  const stopWebAudio = () => {
+    try {
+      if (audioSourceRef.current) {
+        try { audioSourceRef.current.stop(0) } catch(e){}
+        audioSourceRef.current.disconnect()
+        audioSourceRef.current = null
+      }
+      setAudioCtxPlaying(false)
+    } catch (e) {
+      console.warn('Error stopping WebAudio', e)
+    }
+  }
+
+  const handleDownloadRecording = async (recordingUrl, fileName) => {
     // Use authenticated download endpoint to include Authorization header and stream the file
     const download = async (urlOrName, providedName) => {
       try {
@@ -287,8 +443,14 @@ const CallLogs = () => {
         alert('Download failed')
       }
     }
-
-    download(recordingUrl, fileName)
+    // set download loading indicator for this filename
+    const loadingKey = fileName || recordingUrl
+    try {
+      setDownloadLoading(loadingKey)
+      await download(recordingUrl, fileName)
+    } finally {
+      setDownloadLoading(null)
+    }
   }
 
   const formatDuration = (duration) => {
@@ -567,7 +729,16 @@ const CallLogs = () => {
       </CCard>
 
       {/* Recording Modal */}
-      <CModal visible={showModal} onClose={() => setShowModal(false)} size="lg">
+      <CModal visible={showModal} onClose={() => {
+        setShowModal(false);
+        if (audioBlobUrl) { try { URL.revokeObjectURL(audioBlobUrl); } catch(e){}; setAudioBlobUrl(null); }
+        setRecordingMimeType(null);
+        setRecordingError(null);
+        setRecordingLoading(false);
+        setRecordingInfo(null);
+        try { stopWebAudio() } catch(e){}
+        try { if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null } } catch(e){}
+      }} size="lg">
         <CModalHeader>
           <h5>Call Recording - {selectedLog ? formatDate(selectedLog.callDate || selectedLog.createdAt) : ''}</h5>
         </CModalHeader>
@@ -601,12 +772,23 @@ const CallLogs = () => {
                           selectedLog.callRecording,
                           `call-recording-${selectedLog._id}.mp3`
                         )}
+                        disabled={downloadLoading !== null}
                       >
-                        <CIcon icon={cilCloudDownload} className="me-2" />
-                        Download Recording
+                        {downloadLoading === `call-recording-${selectedLog._id}.mp3` ? (
+                          <>
+                            <CSpinner size="sm" className="me-2" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <CIcon icon={cilCloudDownload} className="me-2" />
+                            Download Recording
+                          </>
+                        )}
                       </CButton>
                     </>
                   ) : (
+                    // ...existing code for alternate recordings...
                     (() => {
                       const vn = String(selectedLog.virtualNumber || '').replace(/[^0-9]/g, '')
                       const contactNum = String(selectedLog.contact || '').replace(/[^0-9]/g, '')
@@ -660,8 +842,16 @@ const CallLogs = () => {
                                     color="success"
                                     variant="outline"
                                     onClick={() => handleDownloadRecording(fileUrl, fname)}
+                                    disabled={downloadLoading !== null}
                                   >
-                                    <CIcon icon={cilCloudDownload} size="sm" />
+                                    {downloadLoading === fname ? (
+                                      <>
+                                        <CSpinner size="sm" className="me-1" />
+                                        DL
+                                      </>
+                                    ) : (
+                                      <CIcon icon={cilCloudDownload} size="sm" />
+                                    )}
                                   </CButton>
                                 </div>
                               )
@@ -672,12 +862,54 @@ const CallLogs = () => {
                     })()
                   )}
                 </div>
+                {recordingLoading && (
+                  <div className="mt-3">Loading recording...</div>
+                )}
+                {recordingError && (
+                  <div className="mt-3 text-danger">{recordingError}</div>
+                )}
+                  {recordingInfo && (
+                    <div className="mt-2 small text-muted">
+                      Response: {recordingInfo.status} • Type: {recordingInfo.contentType} • Size: {Math.round((recordingInfo.size||0)/1024)} KB
+                    </div>
+                  )}
+                {audioBlobUrl && (
+                  <div className="mt-3">
+                    <div className="d-flex gap-2 mb-2">
+                      <CButton size="sm" color="info" variant="outline" onClick={() => window.open(audioBlobUrl, '_blank')}>Open in new tab</CButton>
+                      <CButton size="sm" color="secondary" variant="outline" onClick={() => {
+                        const a = document.createElement('a')
+                        a.href = audioBlobUrl
+                        a.download = `recording.${(recordingMimeType && recordingMimeType.includes('wav')) ? 'wav' : 'mp3'}`
+                        document.body.appendChild(a)
+                        a.click()
+                        a.remove()
+                      }}>Download (debug)</CButton>
+                      {audioCtxPlaying ? (
+                        <CButton size="sm" color="danger" variant="outline" onClick={() => stopWebAudio()}>Stop WebAudio</CButton>
+                      ) : null}
+                    </div>
+                    <audio controls ref={audioRef} autoPlay style={{ width: '100%' }}>
+                      <source src={audioBlobUrl} type={recordingMimeType || 'audio/mpeg'} />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </CModalBody>
         <CModalFooter>
-          <CButton color="secondary" onClick={() => setShowModal(false)}>
+          <CButton color="secondary" onClick={() => {
+            setShowModal(false);
+            if (audioBlobUrl) { try { URL.revokeObjectURL(audioBlobUrl); } catch(e){}; setAudioBlobUrl(null); }
+            setRecordingMimeType(null);
+            setRecordingError(null);
+            setRecordingLoading(false);
+            setRecordingInfo(null);
+            try { stopWebAudio() } catch(e){}
+            try { if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null } } catch(e){}
+          }}>
             Close
           </CButton>
         </CModalFooter>
