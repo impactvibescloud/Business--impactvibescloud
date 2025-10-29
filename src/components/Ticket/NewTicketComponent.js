@@ -65,20 +65,28 @@ const NewTicketComponent = () => {
         const response = await apiCall(ENDPOINTS.USER_DETAILS);
         console.log('User details response:', response);
 
-        if (response && response.user) {
-          setUserDetails(response.user);
-          if (response.data.user.businessId) {
-            console.log('Setting business ID:', response.data.user.businessId);
-            setBusinessId(response.data.user.businessId);
+        // Normalize user object from different possible API shapes
+        const userObj = response?.user ?? response?.data?.user ?? response?.data ?? null;
+
+        if (userObj) {
+          setUserDetails(userObj);
+
+          // businessId may be present as user.businessId or user.business._id or user.businessId
+          const resolvedBusinessId = userObj.businessId ?? userObj.business?._id ?? userObj.business?.id ?? null;
+          if (resolvedBusinessId) {
+            console.log('Setting business ID:', resolvedBusinessId);
+            setBusinessId(resolvedBusinessId);
           } else {
-            console.warn('Business ID not found in user object');
+            console.warn('Business ID not found in user object', userObj);
           }
-          if (response.data.user._id) {
-            console.log('Setting user ID:', response.data.user._id);
-            setUserId(response.data.user._id);
+
+          const resolvedUserId = userObj._id ?? userObj.id ?? null;
+          if (resolvedUserId) {
+            console.log('Setting user ID:', resolvedUserId);
+            setUserId(resolvedUserId);
           }
         } else {
-          console.error('User object not found in response:', response.data);
+          console.error('User object not found in response:', response);
         }
       } catch (error) {
         console.error('Error fetching user details:', error);
