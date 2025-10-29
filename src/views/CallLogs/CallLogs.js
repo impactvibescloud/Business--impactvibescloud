@@ -634,49 +634,12 @@ const CallLogs = () => {
     <div className="call-logs-container">
       <CCard className="mb-4">
         <CCardBody>
-          <CRow className="mb-4 align-items-center">
+          <CRow className="mb-3 align-items-center">
             <CCol md={6}>
               <h1 className="call-logs-title">Call Logs</h1>
             </CCol>
             <CCol md={6} className="d-flex justify-content-end">
-              <CDropdown>
-                <CDropdownToggle color="primary" variant="outline" className="filter-btn">
-                  <CIcon icon={cilFilter} className="me-2" />
-                  {activeFilter}
-                </CDropdownToggle>
-                <CDropdownMenu>
-                  <CDropdownItem 
-                    onClick={() => handleFilterChange('All Calls')} 
-                    active={activeFilter === 'All Calls'}
-                  >
-                    All Calls {activeFilter === 'All Calls' && '✓'}
-                  </CDropdownItem>
-                  <CDropdownItem 
-                    onClick={() => handleFilterChange('Completed')} 
-                    active={activeFilter === 'Completed'}
-                  >
-                    Completed {activeFilter === 'Completed' && '✓'}
-                  </CDropdownItem>
-                  <CDropdownItem 
-                    onClick={() => handleFilterChange('Outgoing')} 
-                    active={activeFilter === 'Outgoing'}
-                  >
-                    Outgoing {activeFilter === 'Outgoing' && '✓'}
-                  </CDropdownItem>
-                  <CDropdownItem 
-                    onClick={() => handleFilterChange('Incoming')} 
-                    active={activeFilter === 'Incoming'}
-                  >
-                    Incoming {activeFilter === 'Incoming' && '✓'}
-                  </CDropdownItem>
-                  <CDropdownItem 
-                    onClick={() => handleFilterChange('Failed')} 
-                    active={activeFilter === 'Failed'}
-                  >
-                    Failed {activeFilter === 'Failed' && '✓'}
-                  </CDropdownItem>
-                </CDropdownMenu>
-              </CDropdown>
+              {/* kept intentionally minimal: filters moved below for better grouping */}
             </CCol>
           </CRow>
           <CRow className="mb-4">
@@ -694,30 +657,21 @@ const CallLogs = () => {
             </CCol>
             <CCol md={6} className="d-flex justify-content-end">
               <div className="d-flex align-items-center">
-                <CButton color="info" className="me-2" onClick={() => exportAllCallLogs()} disabled={!businessId || exporting}>
-                  {exporting ? (
-                    <>
-                      <CSpinner size="sm" className="me-2" /> Exporting...
-                    </>
-                  ) : (
-                    <>Export All</>
-                  )}
-                </CButton>
                 <CInputGroup style={{ maxWidth: 180 }}>
-                <CFormInput
-                  type="number"
-                  min={5}
-                  max={100}
-                  value={pageSize}
-                  onChange={e => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Rows per page"
-                />
-                <CButton type="button" color="secondary" variant="outline" disabled>
-                  Rows/Page
-                </CButton>
+                  <CFormInput
+                    type="number"
+                    min={5}
+                    max={100}
+                    value={pageSize}
+                    onChange={e => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Rows per page"
+                  />
+                  <CButton type="button" color="secondary" variant="outline" disabled>
+                    Rows/Page
+                  </CButton>
                 </CInputGroup>
               </div>
             </CCol>
@@ -732,9 +686,70 @@ const CallLogs = () => {
                 </CFormSelect>
                 <CFormInput type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }} style={{ width: 180 }} />
                 <CFormInput type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }} style={{ width: 180 }} />
+
+                {/* Status filter dropdown moved here to group with other filters */}
+                <CDropdown>
+                  <CDropdownToggle color="secondary" variant="outline" style={{ minWidth: 150 }}>
+                    <CIcon icon={cilFilter} className="me-2" />
+                    {activeFilter}
+                  </CDropdownToggle>
+                  <CDropdownMenu>
+                    <CDropdownItem 
+                      onClick={() => handleFilterChange('All Calls')} 
+                      active={activeFilter === 'All Calls'}
+                    >
+                      All Calls {activeFilter === 'All Calls' && '✓'}
+                    </CDropdownItem>
+                    <CDropdownItem 
+                      onClick={() => handleFilterChange('Completed')} 
+                      active={activeFilter === 'Completed'}
+                    >
+                      Completed {activeFilter === 'Completed' && '✓'}
+                    </CDropdownItem>
+                    <CDropdownItem 
+                      onClick={() => handleFilterChange('Outgoing')} 
+                      active={activeFilter === 'Outgoing'}
+                    >
+                      Outgoing {activeFilter === 'Outgoing' && '✓'}
+                    </CDropdownItem>
+                    <CDropdownItem 
+                      onClick={() => handleFilterChange('Incoming')} 
+                      active={activeFilter === 'Incoming'}
+                    >
+                      Incoming {activeFilter === 'Incoming' && '✓'}
+                    </CDropdownItem>
+                    <CDropdownItem 
+                      onClick={() => handleFilterChange('Failed')} 
+                      active={activeFilter === 'Failed'}
+                    >
+                      Failed {activeFilter === 'Failed' && '✓'}
+                    </CDropdownItem>
+                  </CDropdownMenu>
+                </CDropdown>
+
                 <CButton color="light" onClick={() => { setDateFrom(''); setDateTo(''); setCallTypeFilter('All'); setSearchTerm(''); setActiveFilter('All Calls'); setCurrentPage(1); }}>
                   Clear Filters
                 </CButton>
+
+                {/* Improved Export button grouped with filters */}
+                <div style={{ marginLeft: 'auto' }}>
+                  {(() => {
+                    const exportCount = serverPaginated ? totalRecords : clientFilteredCallLogs.length
+                    return (
+                      <CButton color="info" onClick={() => exportAllCallLogs()} disabled={!businessId || exporting}>
+                        {exporting ? (
+                          <>
+                            <CSpinner size="sm" className="me-2" /> Exporting...
+                          </>
+                        ) : (
+                          <>
+                            <CIcon icon={cilCloudDownload} className="me-2" /> Export All ({exportCount})
+                          </>
+                        )}
+                      </CButton>
+                    )
+                  })()}
+                </div>
               </div>
             </CCol>
           </CRow>

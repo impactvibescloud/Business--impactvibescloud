@@ -554,7 +554,7 @@ const Branches = () => {
                 <CTableHeaderCell>EMAIL ADDRESS</CTableHeaderCell>
                 <CTableHeaderCell>DEPARTMENT</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
-                <CTableHeaderCell>ASSIGNED NUMBER</CTableHeaderCell>
+                <CTableHeaderCell>CALL STATUS</CTableHeaderCell>
                 <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
@@ -615,11 +615,12 @@ const Branches = () => {
                         </CBadge>
                       </CTableDataCell>
                       <CTableDataCell>
-                        <div className="assigned-number">
-                          {Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0
-                            ? branch.didNumbers[0]
-                            : "Not Assigned"}
-                        </div>
+                        <CBadge 
+                          color="info"
+                          className="call-status-badge"
+                        >
+                          Available
+                        </CBadge>
                       </CTableDataCell>
                       <CTableDataCell className="text-center">
                         <CButton 

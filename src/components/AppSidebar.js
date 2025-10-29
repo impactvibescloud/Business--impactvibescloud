@@ -132,17 +132,23 @@ const AppSidebar = () => {
       }}
     >
       <CSidebarBrand
-        className="d-none d-md-flex"
-        style={{ background: "rgb(140, 213, 213)", height: "56px", position: "relative", overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+        className="d-none  d-md-flex"
+        style={{ background: "rgb(140, 213, 213)" }}
         to="/"
       >
-        <Link to="/dashboard" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-          <img
-            src={process.env.PUBLIC_URL + "/logos/sidebar_head.png"}
-            alt="Sidebar Heading"
-            style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: "100px", width: "auto", maxWidth: "150%", zIndex: 2, pointerEvents: "none" }}
-          />
-        </Link>
+        {/* <CIcon className="sidebar-brand-full" icon={logoNegative} height={35} /> */}
+
+        {AdminlogoUrl ? (
+          <Link to="/dashboard">
+            <img src={AdminlogoUrl} alt="" width="100%" />
+          </Link>
+        ) : { AppName } ? (
+          <h3>ImpactVibes</h3>
+        ) : (
+          ""
+        )}
+        {/* <CIcon className="sidebar-brand-narrow"  height={35} /> */}
+        <CIcon className="sidebar-brand-narrow" icon={sygnet} height={35} />
       </CSidebarBrand>
       <CSidebarNav>
         <SimpleBar>
