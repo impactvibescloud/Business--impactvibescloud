@@ -152,6 +152,7 @@ const Equipment = React.lazy(() => import("./views/Equipment/equipment"));
 const AddEquipmentsOutlet = React.lazy(() => import("./views/Outlet/AddEquipmentsOutlet"));
 const Branches = React.lazy(() => import("./views/Branches/Branches"));
 const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
+const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 const AutodialCampaigns = React.lazy(() => import("./views/Campaigns/AutodialCampaigns"));
@@ -828,6 +829,12 @@ const routes = [
     name: 'Call Logs',
     element: CallLogs,
     navName: "Call Logs",
+  },
+  {
+    path: '/call-settings',
+    name: 'Call Settings',
+    element: CallSettings,
+    navName: "Settings",
   },
   {
     path: '/department',

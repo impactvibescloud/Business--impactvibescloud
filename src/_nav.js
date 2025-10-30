@@ -39,6 +39,13 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "Call Settings",
+    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+    to: "/call-settings",
+    group: "Settings",
+  },
+  {
+    component: CNavItem,
     name: "Contacts",
     icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
     to: "/contacts",

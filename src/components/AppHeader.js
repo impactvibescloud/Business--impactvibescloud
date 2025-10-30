@@ -66,9 +66,9 @@ const AppHeader = () => {
   }, [token]);
   return (
     <CHeader position="sticky" className="mb-4">
-      <CContainer fluid>
+    <CContainer fluid className="d-flex align-items-center">
         <CHeaderToggler
-          className="ps-1"
+          className="ps-1 d-flex align-items-center"
           onClick={() =>
             dispatch({ type: "set", payload: { sidebarShow: !sidebarShow } }) // Updated dispatch action
           }
@@ -76,16 +76,16 @@ const AppHeader = () => {
           <CIcon icon={cilMenu} size="lg" />
         </CHeaderToggler>
         <CHeaderBrand className="mx-auto d-md-none" to="/">
-          <h3>{AppName}</h3>
+          <h5 className="m-0">{AppName}</h5>
         </CHeaderBrand>
-        <CHeaderNav className="d-none d-md-flex me-auto">
+        <CHeaderNav className="d-none d-md-flex me-auto align-items-center">
           <CNavItem>
             <CNavLink
               to="/dashboard"
               component={NavLink}
               activeclassname="active"
             >
-              <h3>{AppName}</h3>
+              <h5 className="m-0">{AppName}</h5>
             </CNavLink>
           </CNavItem>
           {/* <CNavItem>
@@ -95,16 +95,15 @@ const AppHeader = () => {
             <CNavLink href="#">Settings</CNavLink>
           </CNavItem> */}
         </CHeaderNav>
-        <CHeaderNav>
+        <CHeaderNav className="d-flex align-items-center">
           <ConnectionStatus />
           <UserActivityStatus />
         </CHeaderNav>
-        <CHeaderNav className="ms-3">
+        <CHeaderNav className="d-flex align-items-center ms-3">
           <AppHeaderDropdown />
         </CHeaderNav>
       </CContainer>
-      <CHeaderDivider />
-      <CContainer fluid>{/* <AppBreadcrumb /> */}</CContainer>
+      
     </CHeader>
   );
 };
