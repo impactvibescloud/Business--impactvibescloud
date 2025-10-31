@@ -44,7 +44,7 @@ const DefaultLayout = () => {
   }, []);
 
   return (
-    <div>
+    <div className="main-layout">
       <AppSidebar />
       <div className="wrapper d-flex flex-column min-vh-100 bg-light">
         <AppHeader />

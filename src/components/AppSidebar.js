@@ -136,12 +136,26 @@ const AppSidebar = () => {
         style={{ background: "rgb(140, 213, 213)", height: "56px", position: "relative", overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
         to="/"
       >
-        <Link to="/dashboard" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-          <img
-            src={process.env.PUBLIC_URL + "/logos/sidebar_head.png"}
-            alt="Sidebar Heading"
-            style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", height: "100px", width: "auto", maxWidth: "150%", zIndex: 2, pointerEvents: "none" }}
-          />
+        {/* Custom header: logo + title */}
+        <Link to="/dashboard" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "flex-start", position: "relative", padding: '8px 12px' }}>
+          {/**
+           * Use AdminlogoUrl if available. Determine dark mode by checking body class (fallback false).
+           */}
+          {typeof document !== 'undefined' && document && !document.__sidebar_dark_checked && (document.__sidebar_dark_checked = true)}
+          <div className="d-flex align-items-center" style={{ gap: 10, justifyContent: 'flex-start' }}>
+            <img
+              src={AdminlogoUrl ? `${AdminlogoUrl}` : '/Logos/sidebarlogo.ico'}
+              alt="Just Connect"
+              style={{ width: 44, height: 44, objectFit: 'contain' }}
+            />
+            <div style={{ lineHeight: 1, textAlign: 'left' }}>
+              <div style={{ fontSize: '1.15rem', fontWeight: 650 }}>
+                <span style={{ color: '#0760c7ff' /* blue */ }}>just</span>
+                <span style={{ marginLeft: 6, color: '#f97316' /* orange */ }}>Connect</span>
+              </div>
+              <div style={{ fontSize: '9px', color: (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('c-dark-theme')) ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)', marginTop: 6 }}>Enterprise Conversations Simplified</div>
+            </div>
+          </div>
         </Link>
       </CSidebarBrand>
       <CSidebarNav>

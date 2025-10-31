@@ -1,3 +1,54 @@
+.c-header {
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.06);
+  height: 64px;
+  z-index: 1030;
+  padding: 0;
+}
+
+.c-header .c-container {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.c-header .c-header-brand h5 {
+  font-weight: 600;
+  margin: 0;
+  color: #0b5ed7;
+}
+
+.c-header .c-header-nav .m-0 {
+  font-weight: 600;
+  color: #0b5ed7;
+}
+
+/* When sidebar is present, shift main wrapper to the right so content does not sit under the sidebar */
+.c-sidebar + .wrapper {
+  margin-left: 250px;
+  transition: margin-left 0.2s ease;
+}
+
+/* Mobile / small screens: sidebar overlays content, remove left margin */
+@media (max-width: 991px) {
+  .c-sidebar + .wrapper {
+    margin-left: 0;
+  }
+  .c-sidebar {
+    position: fixed;
+    z-index: 1050;
+  }
+}
+
+.wrapper .body {
+  padding-top: 16px;
+  padding-bottom: 24px;
+}
+
+.wrapper .body .c-container {
+  max-width: 1200px;
+}
+
+/* Retain and improve credits display styles */
 .credits-display {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 0.875rem;

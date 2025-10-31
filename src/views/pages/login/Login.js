@@ -122,6 +122,10 @@ const Login = () => {
     /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[^\w\s]).{7,}$/
   );
   const history = useNavigate();
+  // Use the public Logos sidebar icon from the `public/Logos` folder
+  const adminLogo = process.env.PUBLIC_URL + "/Logos/sidebarlogo.ico";
+  const publicLogoPath = process.env.PUBLIC_URL + "/Logos/sidebarlogo.ico";
+  const dark = typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('c-dark-theme');
   // const handleChange = (e) => (event) => {
 
   //   setAuth({ ...auth, [e]: event.target.value });
@@ -235,18 +239,24 @@ const Login = () => {
   >
         <div className="w-100" style={{ textAlign: 'left' }}>
           <div style={{ width: '100%', marginBottom: 32, textAlign: 'left' }}>
-            <div style={{ position: 'relative', width: '100%', height: '220px', marginBottom: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
               <img
-                src={process.env.PUBLIC_URL + "/logos/sidebar_head.png"}
-                alt="Just Connect Logo"
-                style={{ position: 'absolute', top: '10px', left: '24px', height: '220px', width: 'auto', maxWidth: 'none', display: 'block', zIndex: 2 }}
+                src={adminLogo ? adminLogo : publicLogoPath}
+                alt="Just Connect"
+                style={{ width: 140, height: 140, objectFit: 'contain' }}
               />
+              <div style={{ lineHeight: 1 }}>
+                <div style={{ fontSize: 36, fontWeight: 800 }}>
+                  <span style={{ color: '#0760c7ff' }}>just</span>
+                  <span style={{ marginLeft: 8, color: '#f97316' }}>Connect</span>
+                </div>
+                <div style={{ fontSize: 16, color: dark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.75)', marginTop: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Enterprise Conversations Simplified</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 14, color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.65)', marginTop: 12, maxWidth: 420 }}>
+              Secure, scalable cloud telephony for enterprises — omnichannel voice, IVR, call analytics and integrations to keep customer conversations flowing.
             </div>
           </div>
-          <p className="fs-4 mb-4" style={{ opacity: 0.97, fontWeight: 400 }}>
-            Empowering Business Communication<br />
-            <span style={{ fontSize: 18, opacity: 0.85 }}>Cloud Telephony for Modern Enterprises</span>
-          </p>
         </div>
       </div>
       {/* Right Side: Login Form */}

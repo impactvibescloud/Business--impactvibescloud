@@ -1,0 +1,41 @@
+/* Sidebar layout and visual improvements */
+.c-sidebar {
+	width: 250px;
+	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	border-right: 1px solid rgba(0, 0, 0, 0.04);
+	transition: width 0.2s ease, transform 0.2s ease;
+	box-shadow: none;
+}
+
+.c-sidebar .c-sidebar-brand {
+	height: 64px;
+	display: flex;
+	align-items: center;
+	padding: 8px 12px;
+}
+
+.c-sidebar .c-sidebar-nav {
+	padding-top: 8px;
+}
+
+.c-sidebar .simplebar-content {
+	padding: 8px 0;
+}
+
+/* When collapsed/unfoldable the coreui sidebar may use a modifier class; make it compact */
+.c-sidebar.c-sidebar-minimized,
+.c-sidebar.c-sidebar-unfoldable {
+	width: 72px;
+}
+
+@media (max-width: 991px) {
+	.c-sidebar {
+		width: 220px;
+		transform: translateX(0);
+	}
+}
+
+/* Toggler placement */
+.c-sidebar .c-sidebar-toggler {
+	margin: 12px;
+}
