@@ -59,12 +59,16 @@ function Department() {
   const [businessName, setBusinessName] = useState('')
   const [availableAgents, setAvailableAgents] = useState([])
   const [availableBranches, setAvailableBranches] = useState([])
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]) // For multi-select UI
+  const [selectedDepartmentHeadBranchId, setSelectedDepartmentHeadBranchId] = useState('') // For department head dropdown UI
   const [formData, setFormData] = useState({
     businessId: '',
     name: '',
     description: '',
     status: 'active', // Changed from 'Active' to 'active' to match API
-    departmentHead: '' // User ID of department head
+    departmentHead: '', // User ID of department head
+    didNumber: '', // didNumber of department head
+    members: [] // Array of member objects {userId, phone, role}
   })
 
   // Get current user's business ID and fetch business details
@@ -188,8 +192,14 @@ function Department() {
           _id: branch._id || branch.id || `branch-${Math.random().toString(36).substring(2, 9)}`,
           id: branch.id || branch._id || `branch-${Math.random().toString(36).substring(2, 9)}`,
           branchName: branch.branchName || branch.name || 'Unnamed Branch',
-          name: branch.name || branch.branchName || 'Unnamed Branch'
+          name: branch.name || branch.branchName || 'Unnamed Branch',
+          // didNumbers is an array, so we take the first one or empty string
+          didNumber: (branch.didNumbers && branch.didNumbers.length > 0) ? branch.didNumbers[0] : (branch.didNumber || branch.did || ''),
+          userId: branch.user?._id || branch.user?.id || branch.userId || '',
+          phone: branch.user?.phone || branch.phone || '',
+          role: 'branch' // Default role for branch members
         }));
+        console.log('Processed branch data with user info:', branchData);
       }
       setAvailableBranches(branchData);
 
@@ -348,12 +358,16 @@ function Department() {
 
   const handleNewDepartment = () => {
     setEditingDepartment(null)
+    setSelectedMemberIds([])
+    setSelectedDepartmentHeadBranchId('')
     setFormData({
       businessId: currentBusinessId || '64f7b1234567890abcdef123',
       name: '',
       description: '',
       status: 'active', // Default to active for new departments
-      departmentHead: ''
+      departmentHead: '',
+      didNumber: '',
+      members: []
     })
     setShowDepartmentModal(true)
   }
@@ -365,20 +379,106 @@ function Department() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
+    
+    // If department head is being changed, also capture the didNumber and userId
+    if (name === 'departmentHead') {
+      const selectedBranch = availableBranches.find(
+        branch => (branch._id === value || branch.id === value)
+      )
+      console.log('Selected branch for department head:', selectedBranch)
+      console.log('Branch userId:', selectedBranch?.userId)
+      console.log('Branch didNumber:', selectedBranch?.didNumber)
+      
+      setSelectedDepartmentHeadBranchId(value) // Store branch ID for dropdown
+      setFormData(prev => ({
+        ...prev,
+        [name]: selectedBranch?.userId || value, // Store userId, NOT branch ID
+        didNumber: selectedBranch?.didNumber || ''
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }))
+    }
+  }
+
+  // Handle multiple members selection
+  const handleMembersChange = (e) => {
+    const options = e.target.options
+    const selectedMembers = []
+    const selectedIds = []
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        const branchId = options[i].value
+        selectedIds.push(branchId)
+        // Find the full branch object to get userId, phone, and role
+        const branch = availableBranches.find(b => (b._id === branchId || b.id === branchId))
+        if (branch) {
+          selectedMembers.push({
+            userId: branch.userId || branch._id || branch.id,
+            phone: branch.phone || branch.didNumber || '',
+            role: branch.role || 'branch'
+          })
+        }
+      }
+    }
+    console.log('Selected members:', selectedMembers)
+    setSelectedMemberIds(selectedIds)
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      members: selectedMembers
     }))
   }
 
   const handleEdit = (department) => {
     setEditingDepartment(department)
+    
+    // Extract userId from departmentHead (can be object or string)
+    const departmentHeadUserId = typeof department.departmentHead === 'object' 
+      ? (department.departmentHead?._id || department.departmentHead?.id)
+      : department.departmentHead
+    
+    console.log('Editing department:', department)
+    console.log('Department head object:', department.departmentHead)
+    console.log('Extracted department head userId:', departmentHeadUserId)
+    
+    // Find the branch that matches the departmentHead userId
+    const departmentHeadBranch = availableBranches.find(b => 
+      b.userId === departmentHeadUserId
+    )
+    
+    console.log('Available branches:', availableBranches)
+    console.log('Matched branch for dropdown:', departmentHeadBranch)
+    
+    // Set the branch ID for the dropdown
+    const departmentHeadBranchId = departmentHeadBranch ? (departmentHeadBranch._id || departmentHeadBranch.id) : ''
+    setSelectedDepartmentHeadBranchId(departmentHeadBranchId)
+    
+    // Extract member IDs for the multi-select UI
+    const memberIds = []
+    if (department.members && Array.isArray(department.members)) {
+      department.members.forEach(member => {
+        // Try to match member userId with branch IDs
+        const matchingBranch = availableBranches.find(b => 
+          b.userId === member.userId || b._id === member.userId || b.id === member.userId
+        )
+        if (matchingBranch) {
+          memberIds.push(matchingBranch._id || matchingBranch.id)
+        }
+      })
+    }
+    
+    setSelectedMemberIds(memberIds)
     setFormData({
       businessId: department.businessId || currentBusinessId || '64f7b1234567890abcdef123',
       name: department.name,
       description: department.description,
       status: department.status || 'active',
-      departmentHead: department.departmentHead || ''
+      // Keep the userId in formData for API
+      departmentHead: departmentHeadUserId || '',
+      didNumber: department.didNumber || '',
+      members: department.members || []
     })
     setShowDepartmentModal(true)
   }
@@ -468,8 +568,12 @@ function Department() {
         name: formData.name,
         description: formData.description,
         status: formData.status,
-        departmentHead: formData.departmentHead
+        departmentHead: formData.departmentHead,
+        didNumber: formData.didNumber,
+        members: formData.members // Array of {userId, phone, role} objects
       };
+      
+      console.log('Department data being sent:', JSON.stringify(departmentData, null, 2));
       
       let response;
       
@@ -488,7 +592,9 @@ function Department() {
             name: formData.name,
             description: formData.description,
             status: formData.status,
-            departmentHead: formData.departmentHead
+            departmentHead: formData.departmentHead,
+            didNumber: formData.didNumber,
+            members: formData.members
           },
           { headers }
         );
@@ -591,6 +697,18 @@ function Department() {
     return <CBadge color={color}>{displayStatus}</CBadge>
   }
 
+  // Helper function to get department head name from branches
+  const getDepartmentHeadName = (department) => {
+    if (!department.departmentHead) return 'Not assigned'
+    
+    const departmentHeadUserId = typeof department.departmentHead === 'object' 
+      ? (department.departmentHead._id || department.departmentHead.id)
+      : department.departmentHead
+    
+    const branch = availableBranches.find(b => b.userId === departmentHeadUserId)
+    return branch ? (branch.branchName || branch.name) : (department.departmentHead.email || 'Unknown')
+  }
+
   return (
     <div className="contact-list-container">
       {successAlert.show && (
@@ -634,6 +752,8 @@ function Department() {
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
                 <CTableHeaderCell>DEPARTMENT NAME</CTableHeaderCell>
                 <CTableHeaderCell>DESCRIPTION</CTableHeaderCell>
+                <CTableHeaderCell>DEPARTMENT HEAD</CTableHeaderCell>
+                <CTableHeaderCell>MEMBERS</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
                 <CTableHeaderCell>ACTIONS</CTableHeaderCell>
               </CTableRow>
@@ -641,14 +761,14 @@ function Department() {
             <CTableBody>
               {loading ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="5" className="text-center py-5">
+                  <CTableDataCell colSpan="7" className="text-center py-5">
                     <CSpinner color="primary" />
                     <div className="mt-3">Loading departments...</div>
                   </CTableDataCell>
                 </CTableRow>
               ) : currentDepartments.length === 0 ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="5" className="text-center py-5">
+                  <CTableDataCell colSpan="7" className="text-center py-5">
                     <div className="empty-state">
                       <div className="empty-state-icon">
                         <CIcon icon={cilBuilding} size="xl" />
@@ -672,6 +792,16 @@ function Department() {
                     </CTableDataCell>
                     <CTableDataCell>
                       <div className="contact-phone">{department.description || 'No description'}</div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="contact-name">
+                        {getDepartmentHeadName(department)}
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge color="info">
+                        {department.members && Array.isArray(department.members) ? department.members.length : 0} Members
+                      </CBadge>
                     </CTableDataCell>
                     <CTableDataCell>{getStatusBadge(department.status)}</CTableDataCell>
                     <CTableDataCell>
@@ -776,7 +906,7 @@ function Department() {
               {availableBranches.length > 0 ? (
                 <CFormSelect
                   name="departmentHead"
-                  value={formData.departmentHead}
+                  value={selectedDepartmentHeadBranchId}
                   onChange={handleInputChange}
                 >
                   <option value="">Select Department Head</option>
@@ -790,6 +920,27 @@ function Department() {
                 <CFormInput value="Loading branches..." disabled />
               )}
               <small className="text-muted">Select the branch that will head this department</small>
+            </div>
+            <div className="mb-3">
+              <CFormLabel>Department Members</CFormLabel>
+              {availableBranches.length > 0 ? (
+                <select
+                  multiple
+                  className="form-select"
+                  value={selectedMemberIds}
+                  onChange={handleMembersChange}
+                  style={{ minHeight: '150px' }}
+                >
+                  {availableBranches.map(branch => (
+                    <option key={branch._id || branch.id} value={branch._id || branch.id}>
+                      {branch.branchName || branch.name} {branch.didNumber ? `(${branch.didNumber})` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <CFormInput value="Loading branches..." disabled />
+              )}
+              <small className="text-muted">Hold Ctrl (Cmd on Mac) to select multiple members</small>
             </div>
             {editingDepartment && (
               <div className="mb-3">
