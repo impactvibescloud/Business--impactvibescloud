@@ -199,6 +199,7 @@ const Branches = () => {
       const requestBody = {
         branchName,
         branchEmail: managerEmail,
+        phone: agentPhone, // Include phone field
         businessId: user.businessId,
         didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
         stickyBranch: stickyAgents, // Renamed from stickyAgents to stickyBranch
