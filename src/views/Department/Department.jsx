@@ -709,6 +709,22 @@ function Department() {
     return branch ? (branch.branchName || branch.name) : (department.departmentHead.email || 'Unknown')
   }
 
+  // Helper function to get department head's DID number
+  const getDepartmentHeadDidNumber = (department) => {
+    if (!department.departmentHead) return 'Not assigned'
+    
+    // First check if didNumber is directly on the department
+    if (department.didNumber) return department.didNumber
+    
+    // Otherwise, find it from the branches
+    const departmentHeadUserId = typeof department.departmentHead === 'object' 
+      ? (department.departmentHead._id || department.departmentHead.id)
+      : department.departmentHead
+    
+    const branch = availableBranches.find(b => b.userId === departmentHeadUserId)
+    return branch?.didNumber || 'Not assigned'
+  }
+
   return (
     <div className="contact-list-container">
       {successAlert.show && (
@@ -753,6 +769,7 @@ function Department() {
                 <CTableHeaderCell>DEPARTMENT NAME</CTableHeaderCell>
                 <CTableHeaderCell>DESCRIPTION</CTableHeaderCell>
                 <CTableHeaderCell>DEPARTMENT HEAD</CTableHeaderCell>
+                <CTableHeaderCell>DID NUMBER</CTableHeaderCell>
                 <CTableHeaderCell>MEMBERS</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
                 <CTableHeaderCell>ACTIONS</CTableHeaderCell>
@@ -761,14 +778,14 @@ function Department() {
             <CTableBody>
               {loading ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="7" className="text-center py-5">
+                  <CTableDataCell colSpan="8" className="text-center py-5">
                     <CSpinner color="primary" />
                     <div className="mt-3">Loading departments...</div>
                   </CTableDataCell>
                 </CTableRow>
               ) : currentDepartments.length === 0 ? (
                 <CTableRow>
-                  <CTableDataCell colSpan="7" className="text-center py-5">
+                  <CTableDataCell colSpan="8" className="text-center py-5">
                     <div className="empty-state">
                       <div className="empty-state-icon">
                         <CIcon icon={cilBuilding} size="xl" />
@@ -796,6 +813,11 @@ function Department() {
                     <CTableDataCell>
                       <div className="contact-name">
                         {getDepartmentHeadName(department)}
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="contact-phone">
+                        {getDepartmentHeadDidNumber(department)}
                       </div>
                     </CTableDataCell>
                     <CTableDataCell>
