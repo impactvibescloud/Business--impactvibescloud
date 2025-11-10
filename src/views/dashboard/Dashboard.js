@@ -71,26 +71,26 @@ const Dashboard = () => {
     const fetchCallLogsAndStats = async () => {
       if (!token || !user?.businessId) return;
       try {
-        const response = await axios.get(getApiUrl(`/api/call-logs/business/${user.businessId}?page=1&limit=1000`), {
+        // Use the dedicated today endpoint to fetch daily statistics from the server
+        const response = await axios.get(getApiUrl(`/api/call-logs/today?businessId=${user.businessId}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
-        if (response.data && response.data.success && Array.isArray(response.data.data)) {
-          setCallLogs(response.data.data);
-          // Use statistics from API if available
-          const stats = response.data.statistics || {};
+        if (response.data && response.data.success && response.data.statistics) {
+          const stats = response.data.statistics || {}
+          setCallLogs([]) // dashboard widgets derive numbers from stats, not full logs
           setCallStats({
-            totalCalls: stats.totalCalls || response.data.data.length,
-            liveCalls: 0, // Not provided by API
+            totalCalls: stats.totalCalls || 0,
+            liveCalls: 0,
             outboundCalls: (stats.callsByType && stats.callsByType.outbound) || 0,
-            callsPerDay: 0, // Not provided by API
+            callsPerDay: stats.totalCalls || 0,
             inboundCalls: (stats.callsByType && stats.callsByType.inbound) || 0,
             missedCalls: (stats.callsByStatus && stats.callsByStatus.missed) || 0,
             rejectedCalls: (stats.callsByStatus && stats.callsByStatus.rejected) || 0
-          });
+          })
         } else {
-          setCallLogs([]);
+          setCallLogs([])
           setCallStats({
             totalCalls: 0,
             liveCalls: 0,
@@ -99,7 +99,7 @@ const Dashboard = () => {
             inboundCalls: 0,
             missedCalls: 0,
             rejectedCalls: 0
-          });
+          })
         }
       } catch (err) {
         setCallLogs([]);
@@ -130,13 +130,18 @@ const Dashboard = () => {
     const fetchCallUses = async () => {
       if (!token || !user?.businessId) return;
       try {
-        const response = await axios.get(getApiUrl(`/api/call-uses/business/${user.businessId}`), {
+        // Use the dedicated today endpoint to get daily call uses
+        const response = await axios.get(getApiUrl(`/api/call-uses/today?businessId=${user.businessId}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
-        if (response.data && response.data.success && Array.isArray(response.data.callUses)) {
-          setCallUses(response.data.callUses);
+        // Expecting response.perUserNumber as an array (per-day usage per virtual number/user)
+        if (response.data && response.data.success && Array.isArray(response.data.perUserNumber)) {
+          // keep the raw perUserNumber list; add response date for display if present
+          const date = response.data.date || null;
+          const list = response.data.perUserNumber.map(item => ({ ...item, apiDate: date }));
+          setCallUses(list);
         } else {
           setCallUses([]);
         }
@@ -291,8 +296,8 @@ const Dashboard = () => {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e5e7eb' }}>
             <thead style={{ background: '#f3f4f6' }}>
-              <tr>
-                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>User Email</th>
+                <tr>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Agent</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Number</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Outbound</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Inbound</th>
@@ -305,15 +310,15 @@ const Dashboard = () => {
               {paginatedCallUses.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>No call usage data found.</td></tr>
               ) : (
-                paginatedCallUses.map((item) => (
-                  <tr key={item._id}>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.userId?.email || '-'}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.numberId?.number || '-'}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.outboundCalls}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.inboundCalls}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.missedCalls}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.hangCalls}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-'}</td>
+                paginatedCallUses.map((item, idx) => (
+                  <tr key={item.numberId?.toString() || item.userId || idx}>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.name || item.userEmail || item.userId || '-'}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.virtualNumber || (item.numberId && item.numberId.number) || '-'}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{(item.callsByType && item.callsByType.outbound) ?? item.totalCalls ?? 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{(item.callsByType && item.callsByType.inbound) ?? 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{/* not provided per user in this endpoint */ 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{/* hang calls not provided */ 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.apiDate ? new Date(item.apiDate).toLocaleString() : '-'}</td>
                   </tr>
                 ))
               )}
