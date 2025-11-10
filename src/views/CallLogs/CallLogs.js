@@ -70,6 +70,7 @@ const CallLogs = () => {
   const [recordingInfo, setRecordingInfo] = useState(null)
   const [downloadLoading, setDownloadLoading] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const lastDateFilterKeyRef = useRef('')
 
   // Get the business ID when component mounts
   useEffect(() => {
@@ -101,8 +102,41 @@ const CallLogs = () => {
   const buildLogsEndpoint = (page = 1, limit = pageSize) => {
     let endpoint = `/call-logs/business/${businessId}?page=${page}&limit=${limit}`
     if (searchTerm) endpoint += `&search=${encodeURIComponent(searchTerm)}`
-    if (dateFrom) endpoint += `&from=${encodeURIComponent(dateFrom)}`
-    if (dateTo) endpoint += `&to=${encodeURIComponent(dateTo)}`
+    // Send unambiguous ISO timestamps to the backend to avoid UTC/local-date mixups.
+    if (dateFrom) {
+      try {
+        const parts = String(dateFrom).split('-')
+        if (parts.length === 3) {
+          const y = Number(parts[0])
+          const m = Number(parts[1]) - 1
+          const d = Number(parts[2])
+          const fromIso = new Date(y, m, d)
+          fromIso.setHours(0, 0, 0, 0)
+          endpoint += `&from=${encodeURIComponent(fromIso.toISOString())}`
+        } else {
+          endpoint += `&from=${encodeURIComponent(dateFrom)}`
+        }
+      } catch (e) {
+        endpoint += `&from=${encodeURIComponent(dateFrom)}`
+      }
+    }
+    if (dateTo) {
+      try {
+        const parts = String(dateTo).split('-')
+        if (parts.length === 3) {
+          const y = Number(parts[0])
+          const m = Number(parts[1]) - 1
+          const d = Number(parts[2])
+          const toIso = new Date(y, m, d)
+          toIso.setHours(23, 59, 59, 999)
+          endpoint += `&to=${encodeURIComponent(toIso.toISOString())}`
+        } else {
+          endpoint += `&to=${encodeURIComponent(dateTo)}`
+        }
+      } catch (e) {
+        endpoint += `&to=${encodeURIComponent(dateTo)}`
+      }
+    }
 
   // Normalize call type filter to backend values
     if (callTypeFilter && callTypeFilter !== 'All') {
@@ -130,40 +164,78 @@ const CallLogs = () => {
       setLoading(true);
       setError(null);
       try {
-        // Build endpoint from current filters
-        const endpoint = buildLogsEndpoint(currentPage, pageSize)
-        const res = await apiCall(endpoint, 'GET');
+        // If user has active date filters, request a larger page size and fetch page 1
+        // so we can perform client-side pagination. This is a fallback for backends
+        // that return incorrect pagination totals when filters are applied.
+        const requestingAllFiltered = Boolean(dateFrom || dateTo)
+        const requestLimit = requestingAllFiltered ? 1000 : pageSize
+        const requestPage = requestingAllFiltered ? 1 : currentPage
+        const endpoint = buildLogsEndpoint(requestPage, requestLimit)
 
-        // Normalize response shape. API may return:
+        // Build a simple key for the current date filters so we can cache the
+        // filtered dataset and avoid refetching when the user only changes page.
+        const dateFilterKey = `${dateFrom || ''}|${dateTo || ''}|${businessId || ''}`
+
+        let res = null
+        let logs = []
+        let pagination = null
+
+        if (requestingAllFiltered && lastDateFilterKeyRef.current === dateFilterKey && callLogs && callLogs.length > 0) {
+          // Use cached callLogs already stored in state; avoid network roundtrip.
+          console.debug('Using cached filtered call logs for', dateFilterKey)
+          logs = callLogs
+        } else {
+          // Log the endpoint for debugging (inspect in browser console/network tab)
+          console.debug('Fetching call logs from endpoint:', endpoint)
+          res = await apiCall(endpoint, 'GET');
+
+          // Normalize response shape. API may return:
         //  - { success: true, data: [...], pagination: { totalPages, totalRecords, page, limit } }
         //  - or a raw array [...]
-        let logs = [];
-        let pagination = null;
-        if (Array.isArray(res)) {
-          logs = res;
-        } else if (res && Array.isArray(res.data)) {
-          logs = res.data;
-          pagination = res.pagination || null;
-        } else if (res && Array.isArray(res.callLogs)) {
-          // fallback key
-          logs = res.callLogs;
-          pagination = res.pagination || null;
-        } else {
-          // Unknown shape, try to be defensive
-          logs = [];
-          pagination = res?.pagination || null;
+          if (Array.isArray(res)) {
+            logs = res;
+          } else if (res && Array.isArray(res.data)) {
+            logs = res.data;
+            pagination = res.pagination || null;
+          } else if (res && Array.isArray(res.callLogs)) {
+            // fallback key
+            logs = res.callLogs;
+            pagination = res.pagination || null;
+          } else {
+            // Unknown shape, try to be defensive
+            logs = [];
+            pagination = res?.pagination || null;
+          }
         }
 
-        setCallLogs(logs);
-        if (pagination) {
-          setServerPaginated(true);
-          setTotalPages(pagination.totalPages || Math.max(1, Math.ceil((pagination.totalRecords || logs.length) / pageSize)));
-          setTotalRecords(pagination.totalRecords || logs.length);
+        // If we intentionally requested a large page because date filters are active,
+        // treat results as non-paginated and do client-side pagination to avoid
+        // relying on potentially incorrect server totals.
+        if (requestingAllFiltered) {
+          // determine whether filters changed compared to last cached key
+          const filtersChanged = lastDateFilterKeyRef.current !== dateFilterKey
+          // store key so subsequent page changes don't refetch
+          lastDateFilterKeyRef.current = dateFilterKey
+          setServerPaginated(false)
+          setCallLogs(logs)
+          setTotalRecords(logs.length)
+          setTotalPages(Math.max(1, Math.ceil(logs.length / pageSize)))
+          // reset to page 1 only when filters changed
+          if (filtersChanged) {
+            setCurrentPage(1)
+          }
         } else {
-          // Server didn't paginate: compute from full array
-          setServerPaginated(false);
-          setTotalRecords(logs.length);
-          setTotalPages(Math.max(1, Math.ceil(logs.length / pageSize)));
+          setCallLogs(logs);
+          if (pagination) {
+            setServerPaginated(true);
+            setTotalPages(pagination.totalPages || Math.max(1, Math.ceil((pagination.totalRecords || logs.length) / pageSize)));
+            setTotalRecords(pagination.totalRecords || logs.length);
+          } else {
+            // Server didn't paginate: compute from full array
+            setServerPaginated(false);
+            setTotalRecords(logs.length);
+            setTotalPages(Math.max(1, Math.ceil(logs.length / pageSize)));
+          }
         }
       } catch (err) {
         setError(err.message === 'Business ID not found'
@@ -235,6 +307,24 @@ const CallLogs = () => {
     }
   }
 
+  // Parse a YYYY-MM-DD date string into a local timestamp.
+  // Using string-based Date parsing can be inconsistent across browsers
+  // (some treat 'YYYY-MM-DD' as UTC). So we parse components to ensure
+  // we get a local Date at midnight (or end of day when requested).
+  const parseLocalDate = (dateStr, endOfDay = false) => {
+    if (!dateStr) return null
+    const parts = String(dateStr).split('-')
+    if (parts.length !== 3) return null
+    const y = Number(parts[0])
+    const m = Number(parts[1]) - 1
+    const d = Number(parts[2])
+    if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null
+    const dt = new Date(y, m, d)
+    if (endOfDay) dt.setHours(23, 59, 59, 999)
+    else dt.setHours(0, 0, 0, 0)
+    return dt.getTime()
+  }
+
   // When server provides paginated results, the server is expected to apply filters.
   // Only apply client-side filtering when server did NOT paginate (we have the full list).
   const clientFilteredCallLogs = serverPaginated ? callLogs : callLogs.filter(log => {
@@ -269,14 +359,18 @@ const CallLogs = () => {
     if (matches && (dateFrom || dateTo)) {
       const t = log.callDate || log.createdAt
       if (t) {
-        const callTs = new Date(t).setHours(0,0,0,0)
+        // call timestamp in ms
+        const callTs = new Date(t).getTime()
+
         if (dateFrom) {
-          const fromTs = new Date(dateFrom).setHours(0,0,0,0)
-          if (callTs < fromTs) matches = false
+          const fromTs = parseLocalDate(dateFrom, false)
+          if (fromTs !== null && callTs < fromTs) matches = false
         }
+
         if (matches && dateTo) {
-          const toTs = new Date(dateTo).setHours(0,0,0,0)
-          if (callTs > toTs) matches = false
+          // For inclusive behaviour, treat dateTo as end of that day
+          const toTs = parseLocalDate(dateTo, true)
+          if (toTs !== null && callTs > toTs) matches = false
         }
       }
     }
@@ -288,6 +382,10 @@ const CallLogs = () => {
   const paginatedCallLogs = serverPaginated
     ? clientFilteredCallLogs
     : clientFilteredCallLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Compute effective totals based on whether server provided pagination or we're using client-side filtering
+  const effectiveTotalRecords = serverPaginated ? totalRecords : clientFilteredCallLogs.length
+  const effectiveTotalPages = serverPaginated ? totalPages : Math.max(1, Math.ceil(clientFilteredCallLogs.length / pageSize))
   
   // Handle search
   const handleSearch = (e) => {
@@ -531,37 +629,101 @@ const CallLogs = () => {
     }
     setExporting(true)
     try {
-  // Try to request logs; handle both non-paginated and paginated responses
-  const first = await apiCall(buildLogsEndpoint(1, 1000), 'GET')
+      // Try to request logs; handle both non-paginated and paginated responses
+      const requestingAllFiltered = Boolean(dateFrom || dateTo)
+      const limit = 1000
       let logs = []
-      let pagination = null
-      if (Array.isArray(first)) {
-        logs = first
-      } else if (first && Array.isArray(first.data)) {
-        logs = first.data
-        pagination = first.pagination || null
-      } else if (first && Array.isArray(first.callLogs)) {
-        logs = first.callLogs
-        pagination = first.pagination || null
-      } else {
-        logs = []
-        pagination = first?.pagination || null
-      }
 
-      // If server returned pagination, fetch remaining pages
-      if (pagination && pagination.totalPages && pagination.totalPages > 1) {
-        const totalPages = pagination.totalPages
-        const limit = pagination.limit || 1000
-        const promises = []
-        for (let p = 2; p <= totalPages; p++) {
-          promises.push(apiCall(buildLogsEndpoint(p, limit), 'GET'))
+      // Fetch pages sequentially when date filters are active to ensure we
+      // respect the server's filtered responses while avoiding relying on
+      // server-reported totalPages (which may be incorrect).
+      if (requestingAllFiltered) {
+        let page = 1
+        const maxRecordsCap = 5000 // safety cap to avoid huge downloads
+        const maxPages = Math.ceil(maxRecordsCap / limit)
+        const fromTs = dateFrom ? parseLocalDate(dateFrom, false) : null
+        const toTs = dateTo ? parseLocalDate(dateTo, true) : null
+        while (true) {
+          const pageEndpoint = buildLogsEndpoint(page, limit)
+          console.debug(`Export (filtered) fetching page ${page}:`, pageEndpoint)
+          const res = await apiCall(pageEndpoint, 'GET')
+          let pageLogs = []
+          if (Array.isArray(res)) pageLogs = res
+          else if (res && Array.isArray(res.data)) pageLogs = res.data
+          else if (res && Array.isArray(res.callLogs)) pageLogs = res.callLogs
+          else pageLogs = []
+
+          if (pageLogs.length > 0) {
+            // Filter page logs by selected date range (client-side safeguard)
+            const pageTimestamps = pageLogs.map(l => new Date(l.callDate || l.createdAt).getTime()).filter(Boolean)
+            const maxPageTs = pageTimestamps.length ? Math.max(...pageTimestamps) : null
+            const minPageTs = pageTimestamps.length ? Math.min(...pageTimestamps) : null
+
+            const matched = pageLogs.filter(l => {
+              const t = new Date(l.callDate || l.createdAt).getTime()
+              if (Number.isNaN(t)) return false
+              if (fromTs !== null && t < fromTs) return false
+              if (toTs !== null && t > toTs) return false
+              return true
+            })
+            logs = logs.concat(matched)
+
+            console.debug(`Export (filtered) page ${page} returned ${pageLogs.length} records, matched ${matched.length}`,
+              matched.length ? { firstMatched: matched[0]?.callDate, lastMatched: matched[matched.length - 1]?.callDate } : null,
+              { maxPageTs: maxPageTs ? new Date(maxPageTs).toISOString() : null, minPageTs: minPageTs ? new Date(minPageTs).toISOString() : null })
+
+            // Heuristic early-stop: if server returns pages in descending date order and
+            // the newest timestamp on this page is older than fromTs, further pages
+            // will be older as well — we can stop early.
+            if (fromTs !== null && maxPageTs !== null && maxPageTs < fromTs) {
+              console.debug('Export (filtered) early stop: page max timestamp is older than fromTs')
+              break
+            }
+          }
+
+          // Stop when this page returned fewer than limit records (last page)
+          if (pageLogs.length < limit) break
+          page += 1
+          if (page > maxPages) {
+            console.warn('Reached export max pages cap; stopping further fetches')
+            break
+          }
         }
-        const rest = await Promise.all(promises)
-        rest.forEach(r => {
-          if (Array.isArray(r)) logs = logs.concat(r)
-          else if (r && Array.isArray(r.data)) logs = logs.concat(r.data)
-          else if (r && Array.isArray(r.callLogs)) logs = logs.concat(r.callLogs)
-        })
+      } else {
+        // No date filters: use existing pagination meta to fetch remaining pages in parallel
+  const firstEndpoint = buildLogsEndpoint(1, limit)
+  console.debug('Export (unfiltered) fetching first page:', firstEndpoint)
+  const first = await apiCall(firstEndpoint, 'GET')
+        let pagination = null
+        if (Array.isArray(first)) {
+          logs = first
+        } else if (first && Array.isArray(first.data)) {
+          logs = first.data
+          pagination = first.pagination || null
+        } else if (first && Array.isArray(first.callLogs)) {
+          logs = first.callLogs
+          pagination = first.pagination || null
+        } else {
+          logs = []
+          pagination = first?.pagination || null
+        }
+
+        if (pagination && pagination.totalPages && pagination.totalPages > 1) {
+          const totalPages = pagination.totalPages
+          const lim = pagination.limit || limit
+          const promises = []
+          for (let p = 2; p <= totalPages; p++) {
+            const e = buildLogsEndpoint(p, lim)
+            console.debug('Export (unfiltered) will fetch page', p, e)
+            promises.push(apiCall(e, 'GET'))
+          }
+          const rest = await Promise.all(promises)
+          rest.forEach(r => {
+            if (Array.isArray(r)) logs = logs.concat(r)
+            else if (r && Array.isArray(r.data)) logs = logs.concat(r.data)
+            else if (r && Array.isArray(r.callLogs)) logs = logs.concat(r.callLogs)
+          })
+        }
       }
 
       if (!logs || logs.length === 0) {
@@ -863,7 +1025,7 @@ const CallLogs = () => {
               )}
             </CTableBody>
           </CTable>
-          {totalPages > 1 && (
+          {effectiveTotalPages > 1 && (
             <div style={{ overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: '100%' }}>
               <CPagination aria-label="Page navigation" className="justify-content-center mt-4" style={{ display: 'inline-flex', flexWrap: 'nowrap' }}>
                 <CPaginationItem
@@ -876,7 +1038,7 @@ const CallLogs = () => {
                 {(() => {
                   const pages = [];
                   const showFirst = 1;
-                  const showLast = totalPages;
+                  const showLast = effectiveTotalPages;
                   // Always show first page
                   pages.push(
                     <CPaginationItem key={showFirst} active={currentPage === showFirst} onClick={() => setCurrentPage(showFirst)}>
@@ -926,7 +1088,7 @@ const CallLogs = () => {
                   return pages;
                 })()}
                 <CPaginationItem
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === effectiveTotalPages}
                   onClick={() => setCurrentPage(currentPage + 1)}
                 >
                   Next
