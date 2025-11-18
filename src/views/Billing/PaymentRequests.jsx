@@ -13,6 +13,7 @@ import {
   CModalFooter,
   CModalTitle,
   CFormCheck,
+  CFormTextarea,
   CFormInput,
   CSpinner
 } from '@coreui/react'
@@ -505,28 +506,54 @@ function PaymentRequests() {
     // Download PDF
     doc.save(`Invoice_${invoiceData.id}_${new Date().toISOString().split('T')[0]}.pdf`)
   }
+  // Rejection modal states and helpers
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [rejecting, setRejecting] = useState(false)
 
-  const handleReject = async (id) => {
+  const generateRejectionCode = () => `RJ-${Date.now().toString(36).toUpperCase().slice(-8)}`
+
+  const openRejectModal = (request) => {
+    setSelectedRequest(request)
+    setRejectionReason('')
+    setShowRejectModal(true)
+  }
+
+  const submitReject = async () => {
+    const request = selectedRequest
+    if (!request) return
+
+    const id = request.id || request._id
     if (!id) return
-    
+
+    setRejecting(true)
     try {
+      const rejectionCode = generateRejectionCode()
+      const rejectedAt = new Date().toISOString()
+
       await apiCall(ENDPOINTS.BILLING_UPDATE(id), 'PUT', {
-        status: "rejected",
-        paymentStatus: "unpaid"
+        status: 'rejected',
+        paymentStatus: 'unpaid',
+        rejectionReason: rejectionReason || 'Not provided',
+        rejectionCode,
+        rejectedAt
       })
-      
+
       // Update the local state to reflect the change
       setPaymentRequests(prevRequests => 
         prevRequests.map(req => 
-          req._id === id 
-            ? { ...req, status: 'rejected', paymentStatus: 'unpaid' } 
+          (req._id === id || req.id === id)
+            ? { ...req, status: 'rejected', paymentStatus: 'unpaid', rejectionReason: rejectionReason || 'Not provided', rejectionCode, rejectedAt }
             : req
         )
       )
-      
+
+      setShowRejectModal(false)
     } catch (err) {
       console.error('Error rejecting payment:', err)
       alert('Failed to reject payment request. Please try again.')
+    } finally {
+      setRejecting(false)
     }
   }
   
@@ -727,7 +754,7 @@ function PaymentRequests() {
                                 variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleReject(request.id || request._id)
+                                  openRejectModal(request)
                                 }}
                               >
                                 <i className="bi bi-x-lg me-1"></i>
@@ -793,6 +820,50 @@ function PaymentRequests() {
           </CButton>
           <CButton color="primary" onClick={handleSubmitRequest}>
             Create Request
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Reject Payment Modal */}
+      <CModal
+        visible={showRejectModal}
+        onClose={() => !rejecting && setShowRejectModal(false)}
+        backdrop="static"
+        size="lg"
+      >
+        <CModalHeader closeButton>
+          <CModalTitle>Reject Payment Request</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <p>
+            You are rejecting payment request <strong>{selectedRequest?._id || selectedRequest?.id}</strong>
+            {selectedRequest?.planName ? ` for ${selectedRequest.planName}` : ''}.
+          </p>
+          <div className="mb-3">
+            <label htmlFor="rejectionReason" className="form-label">Rejection Reason</label>
+            <CFormTextarea
+              id="rejectionReason"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows="4"
+              placeholder="Enter reason for rejection (required)"
+              disabled={rejecting}
+            />
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setShowRejectModal(false)} disabled={rejecting}>
+            Cancel
+          </CButton>
+          <CButton color="danger" onClick={submitReject} disabled={rejecting || !rejectionReason.trim()}>
+            {rejecting ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Rejecting...
+              </>
+            ) : (
+              'Reject Payment'
+            )}
           </CButton>
         </CModalFooter>
       </CModal>

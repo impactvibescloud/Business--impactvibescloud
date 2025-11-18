@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   CRow,
   CCol,
@@ -30,7 +30,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilPencil, cilTrash, cilSearch } from '@coreui/icons'
 import axios from "axios";
-import { apiCall } from '../../config/api';
+import { apiCall, getBaseURL } from '../../config/api';
 import Swal from "sweetalert2";
 import './Branches.css'
 import { API_CONFIG } from '../../config/api';
@@ -86,6 +86,10 @@ const Branches = () => {
   const [selectedDid, setSelectedDid] = useState("");
   const [departments, setDepartments] = useState([]);
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef(null)
+  const [uploadResultMessage, setUploadResultMessage] = useState('')
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [callDetails, setCallDetails] = useState({});
   const [loadingCallDetails, setLoadingCallDetails] = useState({});
@@ -423,6 +427,59 @@ const Branches = () => {
     }
   };
 
+  // Bulk upload handlers
+  const handleFileSelect = async (e) => {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    // Reset input so same file can be selected again if needed
+    e.target.value = ''
+    await uploadBranchesFile(file)
+  }
+
+  const uploadBranchesFile = async (file) => {
+    if (!user?.businessId) {
+      Swal.fire({ icon: 'error', title: 'Missing Business', text: 'Business ID not found. Please login again.' })
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('businessId', user.businessId)
+
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadResultMessage('')
+
+    try {
+      const url = `${getBaseURL()}/api/branch/upload`
+      const res = await axios.post(url, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            setUploadProgress(percentCompleted)
+          }
+        }
+      })
+
+      console.log('Bulk upload response:', res.data)
+      setUploadResultMessage(res.data?.message || 'Upload successful')
+      Swal.fire({ icon: 'success', title: 'Upload Complete', text: res.data?.message || 'Branches uploaded successfully.' })
+      fetchBranches()
+    } catch (err) {
+      console.error('Bulk upload error:', err)
+      const message = err?.response?.data?.message || err.message || 'Upload failed'
+      setUploadResultMessage(message)
+      Swal.fire({ icon: 'error', title: 'Upload Failed', text: message })
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
   const fetchCallDetails = async (branch) => {
     // Extract user ID from the branch - prioritize manager's userId
     const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
@@ -525,10 +582,22 @@ const Branches = () => {
               <h1 className="branches-title">Agents</h1>
             </CCol>
             <CCol md={6} className="d-flex justify-content-end">
-              <CButton color="primary" className="add-agent-btn" onClick={handleAddBranch}>
-                <CIcon icon={cilPlus} className="me-2" />
-                Add Agent
-              </CButton>
+                <div className="d-flex gap-2">
+                  <CButton color="secondary" className="add-agent-btn" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                    Bulk Upload
+                  </CButton>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => handleFileSelect(e)}
+                  />
+                  <CButton color="primary" className="add-agent-btn" onClick={handleAddBranch}>
+                    <CIcon icon={cilPlus} className="me-2" />
+                    Add Agent
+                  </CButton>
+                </div>
             </CCol>
           </CRow>
           
