@@ -96,6 +96,28 @@ const _nav = [
   //     },
   //   ],
   // },
+  {
+    component: CNavGroup,
+    name: "Campaigns",
+    icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: "Autodial",
+        to: "/campaigns/autodial",
+      },
+      {
+        component: CNavItem,
+        name: "Surveys",
+        to: "/campaigns/surveys",
+      },
+      {
+        component: CNavItem,
+        name: "Audio",
+        to: "/campaigns/audio",
+      },
+    ],
+  },
   // {
   //   component: CNavItem,
   //   name: "Users & Teams",

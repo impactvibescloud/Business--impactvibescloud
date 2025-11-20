@@ -158,6 +158,7 @@ const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 const AutodialCampaigns = React.lazy(() => import("./views/Campaigns/AutodialCampaigns"));
 const SurveyCampaigns = React.lazy(() => import("./views/Campaigns/SurveyCampaigns"));
+const AudioCampaign = React.lazy(() => import("./views/Campaigns/AudioCampaign"));
 
 const routes = [
   //dashboard
@@ -440,11 +441,24 @@ const routes = [
   //   name: "Edit healthcare providers",
   //   element: EditBusiness,
   // },
-  // {
-  //   path: "/campaigns/view/:id",
-  //   name: "view healthcare providers",
-  //   element: ViewHealthCareProvider,
-  // },
+  {
+    path: "/campaigns/autodial",
+    name: "Autodial Campaigns",
+    element: AutodialCampaigns,
+    navName: "Campaigns",
+  },
+  {
+    path: "/campaigns/surveys",
+    name: "Survey Campaigns",
+    element: SurveyCampaigns,
+    navName: "Campaigns",
+  },
+  {
+    path: "/campaigns/audio",
+    name: "Audio Campaigns",
+    element: AudioCampaign,
+    navName: "Campaigns",
+  },
 
   // { path: '/franchisee/view/:id', name: 'view franchisee', element: ViewFra },
 
