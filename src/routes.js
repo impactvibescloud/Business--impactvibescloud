@@ -156,8 +156,6 @@ const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
-const AutodialCampaigns = React.lazy(() => import("./views/Campaigns/AutodialCampaigns"));
-const SurveyCampaigns = React.lazy(() => import("./views/Campaigns/SurveyCampaigns"));
 const AudioCampaign = React.lazy(() => import("./views/Campaigns/AudioCampaign"));
 
 const routes = [
@@ -441,18 +439,6 @@ const routes = [
   //   name: "Edit healthcare providers",
   //   element: EditBusiness,
   // },
-  {
-    path: "/campaigns/autodial",
-    name: "Autodial Campaigns",
-    element: AutodialCampaigns,
-    navName: "Campaigns",
-  },
-  {
-    path: "/campaigns/surveys",
-    name: "Survey Campaigns",
-    element: SurveyCampaigns,
-    navName: "Campaigns",
-  },
   {
     path: "/campaigns/audio",
     name: "Audio Campaigns",
@@ -862,18 +848,6 @@ const routes = [
     name: 'Department',
     element: Department,
     navName: "Department",
-  },
-  {
-    path: "/campaigns/autodial",
-    name: "Autodial Campaigns",
-    element: AutodialCampaigns,
-    navName: "Campaigns",
-  },
-  {
-    path: "/campaigns/surveys",
-    name: "Survey Campaigns",
-    element: SurveyCampaigns,
-    navName: "Campaigns",
   },
   {
     path: "/users-teams",
