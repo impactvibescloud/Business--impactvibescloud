@@ -156,7 +156,7 @@ const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
-const AudioCampaign = React.lazy(() => import("./views/Campaigns/AudioCampaign"));
+import AudioCampaign from "./views/Campaigns/AudioCampaign";
 
 const routes = [
   //dashboard
