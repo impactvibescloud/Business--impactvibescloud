@@ -9,7 +9,7 @@ yarn.lock
 /coverage
 
 # production
-/build
+# /build (removed to allow build folder tracking)
 
 # misc
 .eslintcache
