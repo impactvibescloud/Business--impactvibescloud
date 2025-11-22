@@ -106,6 +106,36 @@ const AudioCampaign = () => {
     }
   }
 
+  const handleDelete = async (campaign) => {
+    const id = campaign._id || campaign.id
+    if (!id) {
+      Swal.fire({ icon: 'error', title: 'Delete Failed', text: 'Invalid campaign id' })
+      return
+    }
+
+    const result = await Swal.fire({
+      title: 'Delete campaign?',
+      text: `Are you sure you want to delete "${campaign.name || campaign.title || 'this campaign'}"? This cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete it',
+      cancelButtonText: 'Cancel'
+    })
+
+    if (!result.isConfirmed) return
+
+    try {
+      await apiCall(`/campaigns/${id}`, 'DELETE')
+      Swal.fire({ icon: 'success', title: 'Deleted', text: 'Campaign deleted successfully' })
+      // refresh list
+      await fetchCampaigns()
+    } catch (err) {
+      console.error('Delete failed', err)
+      const msg = err?.response?.data?.message || err.message || 'Delete failed'
+      Swal.fire({ icon: 'error', title: 'Delete Failed', text: msg })
+    }
+  }
+
   const token = localStorage.getItem('authToken')
 
   const handleSubmit = async () => {
@@ -262,6 +292,7 @@ const AudioCampaign = () => {
                   <th>Scheduled</th>
                   <th>Completed</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,6 +304,9 @@ const AudioCampaign = () => {
                     <td>{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : '-'}</td>
                     <td>{c.result?.completedAt ? new Date(c.result.completedAt).toLocaleString() : '-'}</td>
                     <td>{c.status || c.state || 'N/A'}</td>
+                    <td>
+                      <CButton color="danger" size="sm" onClick={() => handleDelete(c)} className="me-2">Delete</CButton>
+                    </td>
                   </tr>
                 ))}
               </tbody>
