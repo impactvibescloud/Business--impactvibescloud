@@ -74,6 +74,13 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "IVR Management",
+    icon: <CIcon icon={cilCommand} customClassName="nav-icon" />,
+    to: "/ivr-management",
+    group: "Call Logs",
+  },
+  {
+    component: CNavItem,
     name: "Department",
     icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />,
     to: "/department",
