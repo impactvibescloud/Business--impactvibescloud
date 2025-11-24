@@ -154,6 +154,7 @@ const Branches = React.lazy(() => import("./views/Branches/Branches"));
 const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
 const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
+const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagement"));
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
@@ -836,6 +837,12 @@ const routes = [
     name: 'Call Uses',
     element: CallUses,
     navName: "Call Logs",
+  },
+  {
+    path: '/ivr-management',
+    name: 'IVR Management',
+    element: IVRManagement,
+    navName: 'Call Logs',
   },
   {
     path: '/call-settings',
