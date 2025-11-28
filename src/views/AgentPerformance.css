@@ -1,0 +1,17 @@
+/* Basic styling for Agent Performance page */
+.agent-performance-container {
+  padding: 32px;
+}
+
+.agent-performance-container h2 {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.agent-performance-container .mb-4 {
+  margin-bottom: 2rem !important;
+}
+
+.agent-performance-container .mt-4 {
+  margin-top: 2rem !important;
+}

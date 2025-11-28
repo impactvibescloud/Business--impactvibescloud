@@ -20,6 +20,9 @@ $enable-rtl: true;
 @import "global-professional";
 @import "button-styles";
 
+// Import overrides last so they take precedence over other styles
+@import "overrides";
+
 .container .ql-editor {
   min-height: 5in;
 

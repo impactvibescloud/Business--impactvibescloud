@@ -15,8 +15,7 @@ import CIcon from "@coreui/icons-react";
 import { cilBell, cilEnvelopeOpen, cilList, cilMenu } from "@coreui/icons";
 import "./AppHeader.css";
 
-import { AppBreadcrumb, UserActivityStatus } from "./index";
-import { AppHeaderDropdown } from "./header/index";
+import { AppBreadcrumb } from "./index";
 import { logo } from "src/assets/brand/logo";
 import ConnectionStatus from "./ConnectionStatus";
 import axios from "axios";
@@ -97,10 +96,6 @@ const AppHeader = () => {
         </CHeaderNav>
         <CHeaderNav className="d-flex align-items-center">
           <ConnectionStatus />
-          <UserActivityStatus />
-        </CHeaderNav>
-        <CHeaderNav className="d-flex align-items-center ms-3">
-          <AppHeaderDropdown />
         </CHeaderNav>
       </CContainer>
       

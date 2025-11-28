@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
+import './AppSidebar.css';
 import { useSelector, useDispatch } from "react-redux";
 
 import {
   CSidebar,
   CSidebarBrand,
   CSidebarNav,
-  CSidebarToggler,
 } from "@coreui/react";
 import CIcon from "@coreui/icons-react";
 
@@ -16,6 +16,7 @@ import { sygnet } from "src/assets/brand/sygnet";
 
 import SimpleBar from "simplebar-react";
 import "simplebar/dist/simplebar.min.css";
+import { UserActivityStatus } from './index';
 
 // sidebar nav config
 import navigation from "../_nav";
@@ -27,6 +28,14 @@ const AppSidebar = () => {
   const dispatch = useDispatch();
   const unfoldable = useSelector((state) => state.sidebarUnfoldable);
   const sidebarShow = useSelector((state) => state.coreUI.sidebarShow); // Updated selector
+  // Local collapsed state for sidebar minimization (persisted in localStorage)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-collapsed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [navigationItem, setNavigationItem] = useState(navigation);
 
   const [userdata, setUserData] = useState(null);
@@ -90,6 +99,30 @@ const AppSidebar = () => {
   const [FooterlogoUrl, setFooterlogoUrl] = useState("");
   const [AdminlogoUrl, setAdminlogoUrl] = useState("");
 
+  // Toggle collapsed state utility (prevent link navigation when toggling)
+  const handleToggle = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false');
+    } catch (err) {}
+  };
+
+  // Logo click handler: toggle sidebar unless user used a modifier or middle-click (allow navigation)
+  const handleLogoClick = (e) => {
+    // React synthetic events wrap nativeEvent
+    const native = e && e.nativeEvent ? e.nativeEvent : e;
+    const isModifier = native && (native.ctrlKey || native.metaKey || native.shiftKey || native.altKey);
+    const isMiddle = native && (native.button === 1 || native.which === 2);
+    if (isModifier || isMiddle) {
+      // allow normal navigation (open in new tab / middle click)
+      return;
+    }
+    if (e && e.preventDefault) e.preventDefault();
+    handleToggle();
+  };
+
   useEffect(() => {
     async function getConfiguration() {
       try {
@@ -127,48 +160,63 @@ const AppSidebar = () => {
       position="fixed"
       unfoldable={unfoldable}
       visible={sidebarShow}
+      className={collapsed ? 'c-sidebar c-sidebar-minimized' : 'c-sidebar'}
+      style={{ background: '#FFFFFF', backgroundImage: 'none' }}
       onVisibleChange={(visible) => {
         dispatch({ type: "set", payload: { sidebarShow: visible } }); // Updated dispatch action
       }}
     >
-      <CSidebarBrand
-        className="d-none d-md-flex"
-        style={{ background: "rgb(140, 213, 213)", height: "56px", position: "relative", overflow: "visible", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-        to="/"
-      >
-        {/* Custom header: logo + title */}
-        <Link to="/dashboard" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "flex-start", position: "relative", padding: '8px 12px' }}>
-          {/**
-           * Use AdminlogoUrl if available. Determine dark mode by checking body class (fallback false).
-           */}
-          {typeof document !== 'undefined' && document && !document.__sidebar_dark_checked && (document.__sidebar_dark_checked = true)}
-          <div className="d-flex align-items-center" style={{ gap: 10, justifyContent: 'flex-start' }}>
-            <img
-              src={AdminlogoUrl ? `${AdminlogoUrl}` : '/Logos/sidebarlogo.ico'}
-              alt="Just Connect"
-              style={{ width: 44, height: 44, objectFit: 'contain' }}
-            />
-            <div style={{ lineHeight: 1, textAlign: 'left' }}>
-              <div style={{ fontSize: '1.15rem', fontWeight: 650 }}>
-                <span style={{ color: '#0760c7ff' /* blue */ }}>just</span>
-                <span style={{ marginLeft: 6, color: '#f97316' /* orange */ }}>Connect</span>
-              </div>
-              <div style={{ fontSize: '9px', color: (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('c-dark-theme')) ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)', marginTop: 6 }}>Enterprise Conversations Simplified</div>
-            </div>
+      <CSidebarBrand className="d-none d-md-flex sidebar-brand" style={{ padding: 0, height: 56 }}>
+        <div className="sidebar-brand-inner" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Link
+              to="/dashboard"
+              className="sidebar-logo"
+              aria-label="Go to dashboard"
+              onClick={(e) => handleLogoClick(e)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
+            >
+              <img src={AdminlogoUrl ? `${AdminlogoUrl}` : '/Logos/sidebarlogo.ico'} alt="Just Connect" style={{ width: 44, height: 44, objectFit: 'contain' }} />
+            </Link>
+            <button
+              className="sidebar-title"
+              onClick={(e) => { e.preventDefault(); handleToggle(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
+              aria-pressed={collapsed}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <div className="sidebar-title-main"><span style={{ color: '#0760c7ff' }}>just</span><span style={{ marginLeft: 6, color: '#f97316' }}>Connect</span></div>
+              <div className="sidebar-title-sub">Enterprise Conversations Simplified</div>
+            </button>
           </div>
-        </Link>
+
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => { const next = !collapsed; setCollapsed(next); try { localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false'); } catch (e) {} }}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <span className="sidebar-toggle-icon" aria-hidden>{'›'}</span>
+          </button>
+        </div>
       </CSidebarBrand>
       <CSidebarNav>
         <SimpleBar>
           <AppSidebarNav items={navigationItem} />
         </SimpleBar>
       </CSidebarNav>
-      <CSidebarToggler
-        className="d-none d-lg-flex"
-        onClick={() =>
-          dispatch({ type: "set", sidebarUnfoldable: !unfoldable })
-        }
-      />
+      {/* Sidebar footer: user/profile + status (fixed at bottom) */}
+      {/* Divider to separate main nav from bottom menu */}
+      <div className="sidebar-divider" aria-hidden />
+
+      <div className="sidebar-footer p-2">
+        <div className="sidebar-footer-inner" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Unified user chip: combined avatar, status dot, status controls and settings */}
+          <div className="sidebar-user-status">
+            <UserActivityStatus />
+          </div>
+        </div>
+      </div>
     </CSidebar>
   );
 };

@@ -1,10 +1,25 @@
+/* Force avatar and status dot to show in collapsed sidebar */
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .user-avatar-wrapper,
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .user-avatar,
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .status-dot {
+	display: inline-flex !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+}
 /* Sidebar layout and visual improvements */
 .c-sidebar {
-	width: 250px;
-	background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+	width: 260px;
+	/* Use a plain white background to match design */
+	background: #FFFFFF !important;
 	border-right: 1px solid rgba(0, 0, 0, 0.04);
 	transition: width 0.2s ease, transform 0.2s ease;
 	box-shadow: none;
+}
+
+/* Make sidebar a column flex container so footer can sit after nav (no overlap) */
+.c-sidebar {
+  display: flex;
+  flex-direction: column;
 }
 
 .c-sidebar .c-sidebar-brand {
@@ -14,13 +29,219 @@
 	padding: 8px 12px;
 }
 
-.c-sidebar .c-sidebar-nav {
-	padding-top: 8px;
+/* New sidebar brand/header styles */
+.sidebar-brand {
+	background: transparent !important;
+}
+.sidebar-brand .sidebar-brand-inner {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+.sidebar-logo img {
+	width: 44px;
+	height: 44px;
+	object-fit: contain;
+	display: block;
 }
 
-.c-sidebar .simplebar-content {
-	padding: 8px 0;
+.sidebar-logo {
+	display: inline-block;
+	cursor: pointer;
 }
+.sidebar-title {
+	border: 0;
+	background: transparent;
+	padding: 0;
+	text-align: left;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+}
+.sidebar-title .sidebar-title-main {
+	font-size: 1.05rem;
+	font-weight: 650;
+	line-height: 1;
+}
+.sidebar-title .sidebar-title-sub {
+	font-size: 9px;
+	color: rgba(0,0,0,0.6);
+	margin-top: 4px;
+}
+.sidebar-toggle-btn {
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	padding: 6px 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.sidebar-toggle-icon {
+	display: inline-block;
+	transform: rotate(180deg);
+}
+
+/* Collapse behavior: hide title, keep logo and toggle minimal */
+.c-sidebar.c-sidebar-minimized .sidebar-title,
+.c-sidebar.c-sidebar-minimized .sidebar-title-main,
+.c-sidebar.c-sidebar-minimized .sidebar-title-sub {
+	display: none !important;
+}
+.c-sidebar.c-sidebar-minimized .sidebar-brand .sidebar-brand-inner {
+	justify-content: center;
+}
+.c-sidebar.c-sidebar-minimized .sidebar-toggle-btn {
+	display: none !important;
+}
+
+.c-sidebar .c-sidebar-nav {
+	padding-top: 4px;
+}
+
+.c-sidebar .simplebar-content,
+.c-sidebar .simplebar-content-wrapper,
+.c-sidebar .simplebar-scroll-content,
+.c-sidebar .c-sidebar-nav {
+	/* extra-compact horizontal padding for a tighter menu */
+	padding: 2px 4px 0 4px !important;
+}
+
+/* Ensure main nav leaves space above footer and visually separated */
+.c-sidebar .c-sidebar-nav {
+	flex: 1 1 auto; /* allow nav to grow and scroll */
+	overflow: auto;
+	padding-bottom: 0; /* footer sits outside, no extra bottom padding needed */
+}
+
+/* Hide native scrollbar but keep scrolling functional */
+.c-sidebar .c-sidebar-nav,
+.c-sidebar .simplebar-content,
+.c-sidebar .simplebar-scroll-content {
+	-ms-overflow-style: none; /* IE and Edge */
+	scrollbar-width: none; /* Firefox */
+}
+.c-sidebar .c-sidebar-nav::-webkit-scrollbar,
+.c-sidebar .simplebar-content::-webkit-scrollbar,
+.c-sidebar .simplebar-scroll-content::-webkit-scrollbar {
+	width: 0px;
+	height: 0px;
+}
+
+/* Hide SimpleBar's custom tracks/scrollbars while allowing scroll */
+.c-sidebar .simplebar-track,
+.c-sidebar .simplebar-scrollbar {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+}
+
+/* Extra aggressive hiding (covers more variants) */
+.c-sidebar ::-webkit-scrollbar,
+.c-sidebar *::-webkit-scrollbar {
+	width: 0 !important;
+	height: 0 !important;
+}
+.c-sidebar .simplebar-track,
+.c-sidebar .simplebar-track-vertical,
+.c-sidebar .simplebar-track-horizontal,
+.c-sidebar .simplebar-scrollbar,
+.c-sidebar .simplebar-scrollbar:before,
+.c-sidebar .simplebar-scrollbar:after,
+.c-sidebar .simplebar-vertical,
+.c-sidebar .simplebar-horizontal {
+	display: none !important;
+	visibility: hidden !important;
+	opacity: 0 !important;
+}
+.c-sidebar {
+	-webkit-overflow-scrolling: touch;
+}
+
+.sidebar-divider {
+	height: 1px;
+	width: calc(100% - 24px);
+	margin: 8px 12px;
+	background: rgba(0,0,0,0.06);
+	border-radius: 1px;
+}
+
+/* Section header used to group menu items (e.g. DATA & ANALYTICS) */
+.sidebar-section {
+	display: flex;
+	align-items: center;
+	padding: 6px 12px;
+	/* add vertical breathing room above each section header */
+	margin-top: 12px;
+	color: #6b7280; /* slate-500 */
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	font-weight: 600;
+}
+.sidebar-section::before {
+	content: "";
+	display: inline-block;
+	width: 4px;
+	height: 18px;
+	background: #0d6efd; /* primary blue */
+	border-radius: 2px;
+	margin-right: 10px;
+}
+
+/* Hide the section label when collapsed (only icons should show) */
+.c-sidebar.c-sidebar-minimized .sidebar-section,
+.c-sidebar.c-sidebar-minimized .sidebar-section-label {
+	display: none !important;
+}
+
+.sidebar-footer {
+	border-top: none; /* divider handles the visual line */
+	padding: 8px 12px;
+	background: rgba(255,255,255,0.98);
+	position: static !important; /* override any absolute positioning */
+	margin-top: auto;
+}
+
+.sidebar-footer-inner {
+	gap: 6px;
+}
+
+/* Footer brand styles (mirror of header) */
+.sidebar-footer-brand {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.sidebar-footer-logo img {
+	width: 36px;
+	height: 36px;
+	object-fit: contain;
+	display: block;
+}
+.sidebar-footer-title {
+	display: flex;
+	flex-direction: column;
+	line-height: 1;
+}
+.sidebar-footer-main {
+	font-size: 0.95rem;
+	font-weight: 600;
+}
+.sidebar-footer-sub {
+	font-size: 10px;
+	color: rgba(0,0,0,0.6);
+}
+
+/* Collapsed behavior: hide footer title but keep logo and avatar/status visible */
+.c-sidebar.c-sidebar-minimized .sidebar-footer .sidebar-footer-title,
+.c-sidebar.c-sidebar-minimized .sidebar-footer .sidebar-footer-main,
+.c-sidebar.c-sidebar-minimized .sidebar-footer .sidebar-footer-sub {
+	display: none !important;
+}
+
 
 /* When collapsed/unfoldable the coreui sidebar may use a modifier class; make it compact */
 .c-sidebar.c-sidebar-minimized,
@@ -28,9 +249,258 @@
 	width: 72px;
 }
 
+/* When minimized: hide nav text but keep icons visible and centered */
+.c-sidebar.c-sidebar-minimized .c-sidebar-nav .nav-link span,
+.c-sidebar.c-sidebar-minimized .c-sidebar-nav .c-nav-group-toggle span,
+.c-sidebar.c-sidebar-minimized .c-sidebar-nav .c-nav-group-toggle .nav-link-text {
+	display: none !important;
+}
+
+/* Reduce brand contents when collapsed */
+.c-sidebar.c-sidebar-minimized .c-sidebar-brand .d-flex {
+	justify-content: center !important;
+}
+
+/* Hide brand text (title/subtitle) when sidebar is collapsed, keep logo visible */
+.c-sidebar.c-sidebar-minimized .c-sidebar-brand .d-flex > div {
+	display: none !important;
+}
+
+/* Sidebar footer in collapsed state: keep icons visible and center content */
+.c-sidebar.c-sidebar-minimized > .sidebar-footer {
+	padding: 8px !important;
+	text-align: center;
+}
+
+/* Hide footer text (username/profile labels) when collapsed; keep dropdown/activity icons visible */
+
+/* Only hide the text label in collapsed sidebar, keep avatar and status dot visible */
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .sidebar-user-text {
+	display: none !important;
+}
+
+/* When collapsed: hide the brand title/subtitle and the toggle button, keep only the logo centered */
+.c-sidebar.c-sidebar-minimized .c-sidebar-brand {
+	padding: 6px 0 !important;
+	height: 56px;
+}
+.c-sidebar.c-sidebar-minimized .c-sidebar-brand .d-flex > div {
+	display: none !important; /* hide the text block */
+}
+.c-sidebar.c-sidebar-minimized .sidebar-toggle-btn {
+	display: none !important; /* hide the visible toggle when minimized */
+}
+
+/* Collapsed state: show only icons and center them */
+.c-sidebar.c-sidebar-minimized {
+	width: 72px !important;
+}
+.c-sidebar.c-sidebar-minimized .c-sidebar-nav,
+.c-sidebar.c-sidebar-minimized .simplebar-content,
+.c-sidebar.c-sidebar-minimized .simplebar-scroll-content {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+.c-sidebar.c-sidebar-minimized .c-nav-link,
+.c-sidebar.c-sidebar-minimized .nav-link,
+.c-sidebar.c-sidebar-minimized .c-nav-group-toggle,
+.c-sidebar.c-sidebar-minimized .app-sidebar-link,
+.c-sidebar.c-sidebar-minimized .app-sidebar-group {
+	justify-content: center !important;
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+	gap: 0 !important;
+	margin-bottom: 4px !important;
+}
+.c-sidebar.c-sidebar-minimized .nav-icon-wrapper,
+.c-sidebar.c-sidebar-minimized .nav-icon,
+.c-sidebar.c-sidebar-minimized .c-icon,
+.c-sidebar.c-sidebar-minimized svg {
+	display: inline-block !important;
+	width: 20px !important;
+	height: 20px !important;
+	margin: 0 !important;
+}
+
+/* Hide all text/badges in collapsed state but keep icons visible */
+.c-sidebar.c-sidebar-minimized .c-nav-link span:not(.nav-icon-wrapper):not(.nav-icon),
+.c-sidebar.c-sidebar-minimized .nav-link span:not(.nav-icon-wrapper):not(.nav-icon),
+.c-sidebar.c-sidebar-minimized .c-nav-group-toggle span:not(.nav-icon-wrapper):not(.nav-icon),
+.c-sidebar.c-sidebar-minimized .app-sidebar-link span:not(.nav-icon-wrapper):not(.nav-icon),
+.c-sidebar.c-sidebar-minimized .app-sidebar-group span:not(.nav-icon-wrapper):not(.nav-icon),
+.c-sidebar.c-sidebar-minimized .c-badge,
+.c-sidebar.c-sidebar-minimized .sidebar-title,
+.c-sidebar.c-sidebar-minimized .sidebar-title-main,
+.c-sidebar.c-sidebar-minimized .sidebar-title-sub {
+	display: none !important;
+}
+
+/* Footer: keep avatar/icon centered and hide text when collapsed */
+.c-sidebar.c-sidebar-minimized > .sidebar-footer,
+.c-sidebar.c-sidebar-minimized .sidebar-footer {
+	padding: 8px !important;
+	text-align: center !important;
+}
+
+/* Only hide text and extra divs, but keep avatar and status dot visible */
+
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .user-avatar-wrapper,
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .user-avatar,
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .status-dot {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Small circular status dot overlaid on avatar in footer when collapsed */
+.sidebar-footer .user-avatar-wrapper {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.sidebar-footer .user-avatar {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	object-fit: cover;
+	display: inline-block;
+}
+
+/* Give the user avatar a subtle background so initials or icons read well */
+.sidebar-user-chip .user-avatar,
+.sidebar-footer .user-avatar,
+.sidebar-user-chip .user-avatar svg {
+  background: #f3f4f6; /* light slate */
+  color: #1f2937 !important; /* dark icon/text for contrast */
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-user-chip .user-avatar { padding: 2px; }
+.c-sidebar.c-sidebar-minimized .sidebar-footer .user-avatar { background: #f3f4f6; }
+.sidebar-footer .status-dot {
+	position: absolute;
+	right: -1px;
+	bottom: -1px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	border: 2px solid #fff; /* small white ring for contrast */
+	box-shadow: 0 0 0 1px rgba(0,0,0,0.04);
+}
+/* Status color mapping */
+.sidebar-footer .status-dot.status-online { background: #28a745; }
+.sidebar-footer .status-dot.status-offline { background: #6c757d; }
+.sidebar-footer .status-dot.status-lunch { background: #ffc107; }
+.sidebar-footer .status-dot.status-break { background: #0dcaf0; }
+
+/* When sidebar is not minimized, keep status-dot positioned but allow label text */
+.c-sidebar .sidebar-footer .status-dot { display: inline-block; }
+
+/* Ensure avatar + wrapper + dot are visible and centered when sidebar is minimized */
+
+/* Only hide text in collapsed sidebar, keep avatar and status dot visible */
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .sidebar-user-text {
+	display: none !important;
+}
+
+/* Slightly reduce avatar size in collapsed mode to fit the smaller footer */
+.c-sidebar.c-sidebar-minimized .sidebar-footer .user-avatar {
+	width: 24px !important;
+	height: 24px !important;
+}
+
+/* User profile chip styling (wrapper used on CDropdownToggle) */
+.sidebar-user-chip {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 14px !important; /* more breathing room */
+	border-radius: 10px !important;
+	background: transparent;
+	cursor: pointer;
+	transition: background 140ms ease, transform 120ms ease;
+	min-height: 44px;
+}
+.sidebar-user-chip:hover {
+	background: rgba(0,0,0,0.04) !important;
+}
+
+/* Text next to avatar inside the chip */
+.sidebar-user-text {
+	display: inline-block;
+	line-height: 1.1;
+	font-size: 1rem; /* larger for readability */
+	color: inherit;
+}
+.sidebar-user-text small span:first-child {
+	font-weight: 700;
+}
+.sidebar-user-text small span:last-child {
+	font-size: 0.85rem;
+	color: #6b7280;
+}
+
+/* When sidebar is collapsed, center the chip and hide text */
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip {
+	justify-content: center !important;
+	padding: 6px !important;
+	gap: 0 !important;
+}
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip .sidebar-user-text {
+	display: none !important;
+}
+
+/* Ensure dropdown toggle inside footer doesn't expand beyond footer; allow auto width */
+.sidebar-footer .sidebar-user-chip {
+	width: 100%; /* use the full width of the sidebar footer */
+	display: flex !important;
+	align-items: center;
+	box-sizing: border-box;
+	padding-right: 12px !important;
+}
+
+/* Ensure there's visible left padding when the sidebar is expanded */
+.c-sidebar:not(.c-sidebar-minimized) .sidebar-footer .sidebar-user-chip {
+	padding-left: 14px !important;
+}
+
+/* Give the avatar a small left margin so it's not flush to the chip's edge */
+.sidebar-user-chip .user-avatar-wrapper {
+	margin-left: 6px !important;
+}
+
+/* Larger avatar when sidebar is expanded to avoid cramped look */
+.c-sidebar:not(.c-sidebar-minimized) .sidebar-footer .user-avatar {
+	width: 36px !important;
+	height: 36px !important;
+}
+
+/* Default chip aligns content to the left so it fills width nicely */
+.sidebar-user-chip {
+	justify-content: flex-start !important;
+}
+.c-sidebar.c-sidebar-minimized .sidebar-user-chip {
+	justify-content: center !important;
+}
+
+/* Make the footer container and wrapper expand so the chip can fill width */
+.sidebar-footer-inner {
+	width: 100%;
+}
+.sidebar-footer-inner .sidebar-user-status {
+	flex: 1 1 auto;
+	display: flex;
+	width: 100%;
+}
+.sidebar-user-status .sidebar-user-chip {
+	width: 100% !important;
+}
+
 @media (max-width: 991px) {
 	.c-sidebar {
-		width: 220px;
+		width: 260px;
 		transform: translateX(0);
 	}
 }
@@ -39,3 +509,331 @@
 .c-sidebar .c-sidebar-toggler {
 	margin: 12px;
 }
+
+/* Ensure sidebar text/icons are dark on white background */
+.c-sidebar,
+.c-sidebar .c-sidebar-nav,
+.c-sidebar .c-nav,
+.c-sidebar .c-sidebar-nav .nav-link,
+.c-sidebar .c-nav-link,
+.c-sidebar .nav-link,
+.c-sidebar .c-nav-group-toggle {
+	color: #1f2937 !important; /* slate-800 */
+}
+
+/* Typography: use smooth, lightweight font rendering for menu text and icons */
+.c-sidebar .c-nav-link,
+.c-sidebar .nav-link,
+.c-sidebar .c-nav-group-toggle,
+.app-sidebar-link,
+.app-sidebar-group,
+.sidebar-section,
+.sidebar-section-label,
+.sidebar-title .sidebar-title-main,
+.sidebar-title .sidebar-title-sub,
+.sidebar-footer {
+	font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-weight: 300 !important;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+	letter-spacing: 0.01em;
+}
+
+/* Improve SVG/icon rendering for a lighter, crisper appearance */
+.c-sidebar .nav-icon,
+.c-sidebar .nav-icon-wrapper,
+.c-sidebar .c-icon,
+.c-sidebar svg {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	shape-rendering: geometricPrecision;
+	vector-effect: non-scaling-stroke;
+}
+
+.c-sidebar .nav-link:hover,
+.c-sidebar .c-nav-link:hover,
+.c-sidebar .c-nav-group-toggle:hover {
+	color: inherit !important; /* keep text color unchanged */
+}
+
+/* Neutralize any CoreUI hover/background so only our custom hover shows */
+.c-sidebar .nav-link,
+.c-sidebar .c-nav-link,
+.c-sidebar .c-nav-group-toggle {
+	background: transparent !important;
+	box-shadow: none !important;
+	background-image: none !important;
+}
+.c-sidebar .nav-link:hover,
+.c-sidebar .c-nav-link:hover,
+.c-sidebar .c-nav-group-toggle:hover {
+	background: transparent !important; /* ensure CoreUI doesn't add its own bg */
+}
+
+/* Menu item base styling (text-only menu items) */
+.app-sidebar-link,
+.app-sidebar-group {
+	display: block; /* make inner wrapper non-blocking so outer anchor defines the box */
+	margin: 0;
+	padding: 0;
+	background: transparent !important;
+	border-radius: 0 !important;
+	line-height: 1;
+	font-size: 0.95rem;
+}
+
+/* Hover state removed: keep appearance unchanged on hover */
+.app-sidebar-link:hover,
+.app-sidebar-group:hover {
+		background: transparent !important;
+		color: inherit !important;
+}
+
+/* Subtle 'milkshake' hover on the outer link (light off-white) */
+.c-sidebar .c-nav-link:hover,
+.c-sidebar .nav-link:hover,
+.c-sidebar .c-nav-group-toggle:hover {
+	background: #f5f7fb !important; /* soft off-white / chalk */
+}
+
+/* Active state: stronger background and left indicator */
+.app-sidebar-link.active,
+.app-sidebar-group.active,
+.c-sidebar .nav-link.active,
+.c-sidebar .c-nav-link.active {
+	/* Active state applied to the outer anchor; keep inner wrapper transparent */
+	background: transparent !important;
+	color: inherit !important;
+}
+
+/* Make the outer link the visible box: apply padding, radius and active bg here */
+.c-sidebar .c-nav-link,
+.c-sidebar .nav-link,
+.c-sidebar .c-nav-group-toggle {
+	display: flex;
+	align-items: center;
+	gap: 10px; /* increased gap between icon and text */
+	padding: 8px 12px; /* increased vertical/horizontal padding */
+	padding-left: 16px !important; /* larger left inset for visual comfort */
+	border-radius: 6px; /* slightly larger radius */
+	background: transparent;
+	min-height: 40px; /* comfortable row height */
+	margin-bottom: 6px; /* small vertical gap between items */
+}
+
+/* Reduce bottom gap for last item in nav so footer/divider isn't spaced out too much */
+.c-sidebar .c-sidebar-nav .c-nav-link:last-child,
+.c-sidebar .c-sidebar-nav .nav-link:last-child,
+.c-sidebar .c-sidebar-nav .c-nav-group-toggle:last-child {
+	margin-bottom: 0;
+}
+.c-sidebar .c-nav-link.active,
+.c-sidebar .nav-link.active,
+.c-sidebar .c-nav-group-toggle.active,
+.c-sidebar a[aria-current="page"],
+.c-sidebar a[aria-current="true"] {
+	background: rgba(13,110,253,0.12) !important;
+	color: #0d6efd !important;
+}
+
+/* Ensure active items keep their active background when hovered (override hover) */
+.app-sidebar-link.active:hover,
+.app-sidebar-group.active:hover,
+.c-sidebar .nav-link.active:hover,
+.c-sidebar .c-nav-link.active:hover,
+.c-sidebar a[aria-current="page"]:hover,
+.c-sidebar a[aria-current="true"]:hover {
+	background: rgba(13,110,253,0.12) !important;
+	color: #0d6efd !important;
+}
+
+/* Removed left indicator bar; active state uses background color only */
+/* Removed left indicator bar; active state uses background color only */
+
+/* Also style links that are active via React Router's aria-current attribute
+	 This covers cases where the 'active' class isn't forwarded by wrapper components. */
+.c-sidebar a[aria-current="page"],
+.c-sidebar a[aria-current="true"],
+.c-sidebar a[aria-current="page"] .app-sidebar-link,
+.c-sidebar a[aria-current="true"] .app-sidebar-link {
+	background: rgba(13,110,253,0.12) !important;
+	color: #0d6efd !important;
+}
+.c-sidebar a[aria-current="page"] span,
+.c-sidebar a[aria-current="true"] span {
+	color: #0d6efd !important;
+}
+
+/* Active/selected link styling */
+.c-sidebar .nav-link.active,
+.c-sidebar .c-nav-link.active,
+.c-sidebar .c-nav-group-toggle.active {
+	color: #0d6efd !important;
+	background: rgba(13,110,253,0.12) !important;
+}
+
+/* Icons in the sidebar should also be dark */
+.c-sidebar .nav-icon,
+.c-sidebar .c-icon,
+.c-sidebar svg {
+		display: inline-block !important; /* show icon elements */
+		width: 18px !important;
+		height: 18px !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		color: #1f2937 !important;
+		fill: currentColor !important;
+		vertical-align: middle;
+}
+
+/* If CoreUI icons use a customClassName 'nav-icon' we keep a small right margin handled by flex gap, but ensure they don't create extra boxes */
+.c-sidebar .nav-icon svg,
+.c-sidebar .c-icon svg {
+	display: inline-block !important;
+	width: 18px !important;
+	height: 18px !important;
+}
+
+/* Ensure inner spans / badges don't create extra boxes */
+.app-sidebar-link *,
+.app-sidebar-group * {
+	background: transparent !important;
+	box-shadow: none !important;
+	border-radius: 0 !important;
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+/* Icon wrapper to preserve original icon element but enforce consistent sizing */
+.nav-icon-wrapper {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	flex: 0 0 18px;
+	margin-right: 8px;
+}
+.nav-icon-wrapper svg {
+	width: 18px !important;
+	height: 18px !important;
+	color: inherit !important;
+	fill: currentColor !important;
+}
+
+/* Ensure the sidebar brand / header text keeps its original heavier styling
+   so that our lightweight menu rules don't affect the header title */
+.sidebar-title .sidebar-title-main,
+.sidebar-title .sidebar-title-sub {
+	font-family: inherit !important;
+	font-weight: 650 !important; /* restore the brand/title weight */
+	-webkit-font-smoothing: auto !important;
+	-moz-osx-font-smoothing: auto !important;
+	text-rendering: auto !important;
+}
+
+/* Footer area inside sidebar */
+.sidebar-footer {
+	border-top: 1px solid rgba(0,0,0,0.04);
+	padding: 10px 12px;
+	position: relative;
+}
+
+/* Make footer stick to bottom when sidebar is full height */
+.c-sidebar > .sidebar-footer {
+	margin-top: auto;
+}
+
+/* Footer compact layout: put avatar and status close together */
+.sidebar-footer-inner {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.sidebar-user-status {
+	display: flex;
+	align-items: center;
+}
+
+/* Remove the small status badge (dot) from the sidebar footer */
+.sidebar-footer .c-badge {
+	display: none !important;
+}
+
+/* Reduce any unintended list-like marker spacing inside the dropdown toggle */
+.sidebar-footer .c-dropdown-toggle,
+.sidebar-footer .py-0 {
+	padding: 0 !important;
+}
+
+/* Ensure name/status text stacks properly but compactly */
+.sidebar-footer .d-flex.flex-column small {
+	margin: 0 !important;
+	line-height: 1 !important;
+}
+
+/* Additional targeted fallbacks to ensure text is fully hidden when minimized */
+/* Hide the brand title/subtitle container (exact structure from AppSidebar.js) */
+.c-sidebar.c-sidebar-minimized .c-sidebar-brand > div > .d-flex > div {
+	display: none !important;
+}
+
+/* Hide the footer's inner text block while keeping dropdowns/icons visible */
+.c-sidebar.c-sidebar-minimized .sidebar-footer > div > div > div {
+	display: none !important;
+}
+
+/* Stronger fallback: hide any non-image/non-svg children in brand/footer when minimized */
+.c-sidebar.c-sidebar-minimized .c-sidebar-brand *:not(img):not(svg):not(.sidebar-toggle-btn) {
+	display: none !important;
+}
+
+.c-sidebar.c-sidebar-minimized .sidebar-footer *:not(img):not(svg):not(.c-icon):not(.status-dot):not(.user-avatar-wrapper):not(.user-avatar) {
+	display: none !important;
+}
+
+/* Remove any list markers or pseudo-element bullets inside the sidebar footer */
+.sidebar-footer,
+.sidebar-footer * {
+	list-style: none !important;
+}
+.sidebar-footer *::before,
+.sidebar-footer *::marker,
+.sidebar-footer::before,
+.sidebar-footer::marker {
+	content: none !important;
+	display: none !important;
+}
+.sidebar-footer li {
+	margin-left: 0 !important;
+	padding-left: 0 !important;
+}
+
+/* Strong overrides to ensure the user chip aligns to the left edge of the sidebar */
+.sidebar-footer {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+.sidebar-footer-inner {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+}
+.sidebar-footer .sidebar-user-status {
+	width: 100%;
+	justify-content: flex-start !important;
+}
+.sidebar-footer .sidebar-user-chip {
+	padding-left: 16px !important; /* align with nav items' left inset */
+	padding-right: 16px !important;
+	justify-content: flex-start !important;
+	text-align: left !important;
+}
+
+/* Ensure no centering from dropdown wrappers overrides our positioning */
+.sidebar-footer .c-dropdown,
+.sidebar-footer .c-dropdown-toggle {
+	display: block !important;
+	width: 100% !important;
+}
+

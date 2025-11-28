@@ -1,0 +1,52 @@
+.main-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+/* The CoreUI sidebar (.c-sidebar) sits before the .wrapper in DOM; when present
+   the wrapper should be offset so content is not hidden under the sidebar. */
+.main-layout .c-sidebar + .wrapper {
+  margin-left: 260px; /* match the active sidebar width */
+  transition: margin-left 0.2s ease;
+}
+
+/* When the sidebar is collapsed/unfoldable, reduce the wrapper offset */
+.main-layout .c-sidebar.c-sidebar-minimized + .wrapper,
+.main-layout .c-sidebar.c-sidebar-unfoldable + .wrapper {
+  margin-left: 72px; /* collapsed sidebar width used across the app */
+}
+
+/* Mobile screens: sidebar overlays content so remove offset */
+@media (max-width: 991px) {
+  .main-layout .c-sidebar + .wrapper {
+    margin-left: 0;
+  }
+  .main-layout .c-sidebar {
+    position: fixed;
+    z-index: 1050;
+  }
+}
+
+/* Wrapper and page body sizing */
+.main-layout .wrapper {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-layout .body {
+  flex: 1 1 auto;
+}
+
+/* Sidebar footer inside the CoreUI sidebar: keep it at the bottom */
+.main-layout .c-sidebar > .sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  border-top: 1px solid rgba(0,0,0,0.04);
+  background: transparent;
+}
