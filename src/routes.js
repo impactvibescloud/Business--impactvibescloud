@@ -77,7 +77,7 @@ const AddNewAppointment = React.lazy(() => import("./views/Appointments/AddNewAp
 // Campaigns and Categories
 const Campaign = React.lazy(() => import("./views/Campaigns/Campaign.js"));
 const AddCampaign = React.lazy(() => import("./views/Campaigns/AddCampaign.js"));
-const Categories = React.lazy(() => import("./views/Categories/categories"));
+const Categories = React.lazy(() => import("./views/Brands/Brands"));
 const Brands = React.lazy(() => import("./views/Brands/Brands"));
 const Content = React.lazy(() => import("./views/Content/content"));
 
@@ -158,6 +158,8 @@ const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagemen
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
+const AgentPerformance = React.lazy(() => import("./views/AgentPerformance"));
+const DepartmentPerformance = React.lazy(() => import("./views/DepartmentPerformance"));
 
 const routes = [
   //dashboard
@@ -885,6 +887,18 @@ const routes = [
     name: "Settings",
     element: Settings,
     navName: "Settings",
+  },
+  {
+    path: "/agent-performance",
+    name: "Agent Performance",
+    element: AgentPerformance,
+    navName: "Reports & Analytics",
+  },
+  {
+    path: "/department-performance",
+    name: "Department Performance",
+    element: DepartmentPerformance,
+    navName: "Reports & Analytics",
   },
 ];
 

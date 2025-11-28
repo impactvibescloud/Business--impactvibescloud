@@ -50,6 +50,37 @@ const Branches = () => {
   const [department, setDepartment] = useState("");
   const [timeGroup, setTimeGroup] = useState("");
   const [timeCondition, setTimeCondition] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+
+  // Default start/end times for known time groups
+  // Defaults aligned with the UI labels:
+  // Morning Shift (8 AM - 4 PM) => 08:00 - 16:00
+  // Afternoon Shift (12 PM - 8 PM) => 12:00 - 20:00
+  // Evening Shift (4 PM - 12 AM) => 16:00 - 00:00
+  // Night Shift (10 PM - 6 AM) => 22:00 - 06:00
+  // 24 Hours => 00:00 - 23:59
+  const TIME_GROUP_DEFAULTS = {
+    morning: { startTime: '08:00', endTime: '16:00' },
+    afternoon: { startTime: '12:00', endTime: '20:00' },
+    evening: { startTime: '16:00', endTime: '00:00' },
+    night: { startTime: '22:00', endTime: '06:00' },
+    '24hours': { startTime: '00:00', endTime: '23:59' },
+  };
+
+  const handleTimeGroupChange = (value) => {
+    setTimeGroup(value);
+    // If there are known defaults for this group, overwrite start/end with correct defaults
+    const defaults = TIME_GROUP_DEFAULTS[value];
+    if (defaults) {
+      setStartTime(defaults.startTime);
+      setEndTime(defaults.endTime);
+    } else {
+      // clear times when no group selected
+      setStartTime("");
+      setEndTime("");
+    }
+  };
   const [stickyAgents, setStickyAgents] = useState(false);
   const [managerName, setManagerName] = useState("");
   const [managerEmail, setManagerEmail] = useState("");
@@ -207,9 +238,12 @@ const Branches = () => {
         businessId: user.businessId,
         didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
         stickyBranch: stickyAgents, // Renamed from stickyAgents to stickyBranch
-        timeGroup,
+        timeGroup: timeGroup,
         timeCondition
       };
+      // Only include start/end times if they have values
+      if (startTime && startTime.trim() !== '') requestBody.startTime = startTime;
+      if (endTime && endTime.trim() !== '') requestBody.endTime = endTime;
       if (department) {
         requestBody.department = department;
       }
@@ -270,7 +304,24 @@ const Branches = () => {
     setManagerName(branch.user?.name || branch.manager?.name || "");
     setManagerEmail(branch.user?.email || branch.manager?.email || "");
     setDepartment(branch.department?._id || "");
-    setTimeGroup(branch.timeGroup || "");
+    // branch.timeGroup may be a string (legacy) or an object { timeGroup, startTime, endTime }
+    const tg = branch.timeGroup;
+    if (tg && typeof tg === 'object') {
+      setTimeGroup(tg.timeGroup || "");
+      setStartTime(tg.startTime || "");
+      setEndTime(tg.endTime || "");
+    } else {
+      // If legacy string, set timeGroup and populate defaults if available
+      setTimeGroup(tg || "");
+      if (tg && typeof tg === 'string' && TIME_GROUP_DEFAULTS[tg]) {
+        const d = TIME_GROUP_DEFAULTS[tg];
+        setStartTime(d.startTime || "");
+        setEndTime(d.endTime || "");
+      } else {
+        setStartTime("");
+        setEndTime("");
+      }
+    }
     setTimeCondition(branch.timeCondition || "");
     setStickyAgents(branch.stickyBranch || false);
     setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
@@ -302,17 +353,21 @@ const Branches = () => {
       if (foundDid) {
         didNumberValue = foundDid.number;
       }
-  const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', {
+  // Build payload and include start/end only when provided
+  const updatePayload = {
         branchName,
         userEmail: managerEmail,
         userName: managerName,
         businessId: user.businessId,
         didNumbers: didNumberValue ? [didNumberValue] : [],
         stickyBranch: stickyAgents,
-        timeGroup,
+        timeGroup: timeGroup,
         timeCondition,
         ...(department ? { department } : {})
-      });
+      };
+  if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
+  if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
+  const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
 
       // Assign DID to branch if selectedDid is present
       if (selectedDid && (selectedBranch._id || (res.data && (res.data.branch?._id || res.data.data?._id)))) {
@@ -348,6 +403,8 @@ const Branches = () => {
     setAgentPhone("");
     setDepartment("");
     setTimeGroup("");
+    setStartTime("");
+    setEndTime("");
     setTimeCondition("");
     setStickyAgents(false); // This will be sent as stickyBranch
     setManagerName("");
@@ -957,7 +1014,7 @@ const Branches = () => {
               <CFormSelect
                 id="timeGroup"
                 value={timeGroup}
-                onChange={e => setTimeGroup(e.target.value)}
+                onChange={e => handleTimeGroupChange(e.target.value)}
                 required
               >
                 <option value="">Select Shifts</option>
@@ -1080,7 +1137,7 @@ const Branches = () => {
               <CFormSelect
                 id="editTimeGroup"
                 value={timeGroup}
-                onChange={e => setTimeGroup(e.target.value)}
+                onChange={e => handleTimeGroupChange(e.target.value)}
                 required
               >
                 <option value="">Select Shifts</option>

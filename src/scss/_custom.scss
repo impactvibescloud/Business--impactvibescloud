@@ -33,3 +33,29 @@ $a-tags: "a, a:active, a:hover, a:visited";
 .blog-toolbar {
   background-color: #f2f2f2;
 }
+
+/* Reset global theme color variables coming from CoreUI/Bootstrap so
+   app-level colors are easier to customize. This neutralizes the
+   precompiled :root variables and lets component-level styles take
+   precedence. Adjust or remove entries below if you want specific
+   theme colors instead of clearing them. */
+:root {
+  --cui-primary: initial;
+  --cui-white: initial;
+  --cui-gray: initial;
+  --cui-gray-dark: initial;
+  --cui-gray-100: initial;
+  --cui-gray-200: initial;
+  --cui-gray-300: initial;
+  --cui-gray-400: initial;
+  --cui-gray-500: initial;
+  --cui-gray-600: initial;
+  --cui-gray-700: initial;
+  --cui-gray-800: initial;
+  --cui-gray-900: initial;
+  --cui-primary: initial;
+  --bs-body-bg: initial;
+  --bs-body-color: initial;
+  --bs-primary: initial;
+  --bs-link-color: initial;
+}

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
+import './DefaultLayout.css';
 import {
   AppContent,
   AppSidebar,
-  AppFooter,
-  AppHeader,
   MaintenanceAlert,
 } from "../components/index";
 import { getMaintenanceConfig, isInMaintenanceWindow } from "../config/maintenanceConfig";
@@ -47,7 +46,7 @@ const DefaultLayout = () => {
     <div className="main-layout">
       <AppSidebar />
       <div className="wrapper d-flex flex-column min-vh-100 bg-light">
-        <AppHeader />
+        {/* Header removed - profile and status moved to sidebar footer */}
         {loading ? (
           <div>Loading maintenance status...</div>
         ) : showMaintenance ? (
@@ -65,7 +64,6 @@ const DefaultLayout = () => {
         <div className="body flex-grow-1 px-3">
           <AppContent />
         </div>
-        <AppFooter />
       </div>
     </div>
   );

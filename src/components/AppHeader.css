@@ -24,8 +24,14 @@
 
 /* When sidebar is present, shift main wrapper to the right so content does not sit under the sidebar */
 .c-sidebar + .wrapper {
-  margin-left: 250px;
+  margin-left: 260px; /* match updated sidebar width */
   transition: margin-left 0.2s ease;
+}
+
+/* When sidebar is minimized, reduce wrapper margin to the collapsed width */
+.c-sidebar.c-sidebar-minimized + .wrapper,
+.c-sidebar.c-sidebar-unfoldable + .wrapper {
+  margin-left: 72px; /* collapsed sidebar width */
 }
 
 /* Mobile / small screens: sidebar overlays content, remove left margin */

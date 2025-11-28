@@ -39,24 +39,31 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: "Call Settings",
-    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
-    to: "/call-settings",
-    group: "Settings",
+    name: "Department",
+    icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />,
+    to: "/department",
+    group: "Department",
   },
   {
     component: CNavItem,
-    name: "Contacts",
-    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
-    to: "/contacts",
-    group: "Contacts",
+    name: "Department Performance",
+    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    to: "/department-performance",
+    group: "Reports & Analytics",
   },
   {
     component: CNavItem,
-    name: "Contact Lists",
-    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
-    to: "/contactlists",
-    group: "Contact Lists",
+    name: "Reports & Analytics",
+    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    to: "/reports-analytics",
+    group: "Reports & Analytics",
+  },
+  {
+    component: CNavItem,
+    name: "Agent Performance",
+    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    to: "/agent-performance",
+    group: "Reports & Analytics",
   },
   {
     component: CNavItem,
@@ -74,18 +81,41 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "Call Settings",
+    icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+    to: "/call-settings",
+    group: "Settings",
+  },
+  {
+    component: CNavItem,
     name: "IVR Management",
     icon: <CIcon icon={cilCommand} customClassName="nav-icon" />,
     to: "/ivr-management",
     group: "Call Logs",
   },
+  
   {
     component: CNavItem,
-    name: "Department",
-    icon: <CIcon icon={cilBuilding} customClassName="nav-icon" />,
-    to: "/department",
-    group: "Department",
+    name: "Virtual Numbers",
+    icon: <CIcon icon={cilPhone} customClassName="nav-icon" />,
+    to: "/virtual-numbers",
+    group: "Virtual Numbers",
   },
+  {
+    component: CNavItem,
+    name: "Contacts",
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    to: "/contacts",
+    group: "Contacts",
+  },
+  {
+    component: CNavItem,
+    name: "Contact Lists",
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    to: "/contactlists",
+    group: "Contact Lists",
+  },
+  
   // {
   //   component: CNavGroup,
   //   name: "Campaigns",
@@ -104,16 +134,11 @@ const _nav = [
   //   ],
   // },
   {
-    component: CNavGroup,
-    name: "Campaigns",
-    icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: "Audio",
-        to: "/campaigns/audio",
-      },
-    ],
+    component: CNavItem,
+    name: "Audio Cmpaign",
+    icon: <CIcon icon={cilVideo} customClassName="nav-icon" />,
+    to: "/campaigns/audio",
+    group: "Campaigns",
   },
   // {
   //   component: CNavItem,
@@ -129,13 +154,7 @@ const _nav = [
   //   to: "/templates",
   //   group: "Templates",
   // },
-  {
-    component: CNavItem,
-    name: "Virtual Numbers",
-    icon: <CIcon icon={cilPhone} customClassName="nav-icon" />,
-    to: "/virtual-numbers",
-    group: "Virtual Numbers",
-  },
+  
   {
     component: CNavItem,
     name: "Billing",
@@ -143,13 +162,8 @@ const _nav = [
     to: "/billing",
     group: "Billing",
   },
-  {
-    component: CNavItem,
-    name: "Reports & Analytics",
-    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
-    to: "/reports-analytics",
-    group: "Reports & Analytics",
-  },
+  
+  
   // {
   //   component: CNavItem,
   //   name: "Settings",
