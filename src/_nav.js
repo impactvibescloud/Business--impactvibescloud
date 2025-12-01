@@ -33,7 +33,7 @@ const _nav = [
   {
     component: CNavItem,
     name: "Agents",
-    icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilGroup} customClassName="nav-icon" />,
     to: "/branch",
     group: "Agents",
   },
@@ -50,32 +50,44 @@ const _nav = [
     icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
     to: "/department-performance",
     group: "Reports & Analytics",
+    feature: "advancedReporting",
+  },
+  {
+    component: CNavItem,
+    name: "Call Dispositions",
+    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    to: "/reports/call-dispositions",
+    group: "Data & Analytics",
+    feature: "advancedDispositions",
   },
   {
     component: CNavItem,
     name: "Reports & Analytics",
-    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilViewModule} customClassName="nav-icon" />,
     to: "/reports-analytics",
     group: "Reports & Analytics",
+    feature: "analytics",
   },
   {
     component: CNavItem,
     name: "Agent Performance",
-    icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
     to: "/agent-performance",
     group: "Reports & Analytics",
+    feature: "advancedReporting",
   },
   {
     component: CNavItem,
     name: "Call Logs",
-    icon: <CIcon icon={cilLocationPin} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilHistory} customClassName="nav-icon" />,
     to: "/callogs",
     group: "Call Logs",
+    feature: "callRecording",
   },
   {
     component: CNavItem,
     name: "Call Uses",
-    icon: <CIcon icon={cilHistory} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilText} customClassName="nav-icon" />,
     to: "/calluses",
     group: "Call Logs",
   },
@@ -92,6 +104,7 @@ const _nav = [
     icon: <CIcon icon={cilCommand} customClassName="nav-icon" />,
     to: "/ivr-management",
     group: "Call Logs",
+    feature: "ivrManagement",
   },
   
   {
@@ -111,7 +124,7 @@ const _nav = [
   {
     component: CNavItem,
     name: "Contact Lists",
-    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilDescription} customClassName="nav-icon" />,
     to: "/contactlists",
     group: "Contact Lists",
   },
@@ -136,9 +149,10 @@ const _nav = [
   {
     component: CNavItem,
     name: "Audio Cmpaign",
-    icon: <CIcon icon={cilVideo} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
     to: "/campaigns/audio",
     group: "Campaigns",
+    feature: "bulkOperations",
   },
   // {
   //   component: CNavItem,
@@ -158,7 +172,7 @@ const _nav = [
   {
     component: CNavItem,
     name: "Billing",
-    icon: <CIcon icon={cilDollar} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilMoney} customClassName="nav-icon" />,
     to: "/billing",
     group: "Billing",
   },
@@ -177,6 +191,7 @@ const _nav = [
     icon: <CIcon icon={cilNotes} customClassName="nav-icon" />,
     to: "/tickets",
     group: "Support",
+    feature: "ticketing",
   },
 ];
 

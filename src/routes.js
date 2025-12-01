@@ -21,6 +21,7 @@ const UsersTeams = React.lazy(() => import("./views/UsersTeams/UsersTeams"));
 const VirtualNumbers = React.lazy(() => import("./views/VirtualNumbers/VirtualNumbers"));
 const Billing = React.lazy(() => import("./views/Billing/Billing"));
 const ReportsAnalytics = React.lazy(() => import("./views/ReportsAnalytics/ReportsAnalytics"));
+const CallDispositions = React.lazy(() => import("./views/ReportsAnalytics/CallDispositions"));
 const Payments = React.lazy(() => import("./views/Payments/Payments"));
 const Settings = React.lazy(() => import("./views/Settings/Settings"));
 const Department = React.lazy(() => import("./views/Department/Department"));
@@ -376,6 +377,14 @@ const routes = [
   //Sales
 
   //------------------ End customers Route-------------------------
+
+  // Data & Analytics - Call Dispositions
+  {
+    path: "/reports/call-dispositions",
+    name: "Call Dispositions",
+    element: CallDispositions,
+    navName: "Data & Analytics",
+  },
 
   // {
   //   path: "/users-address/add",

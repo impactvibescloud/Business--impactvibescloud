@@ -283,6 +283,9 @@ const Dashboard = () => {
 
   return (
     <>
+      <div style={{ margin: '1rem 0' }}>
+        <h1 className="contact-list-title">Dashboard</h1>
+      </div>
       <WidgetsDropdown
         agents={agents}
         agentStatuses={agentStatuses}
