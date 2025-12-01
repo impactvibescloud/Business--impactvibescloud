@@ -17,6 +17,7 @@ import { sygnet } from "src/assets/brand/sygnet";
 import SimpleBar from "simplebar-react";
 import "simplebar/dist/simplebar.min.css";
 import { UserActivityStatus } from './index';
+import { getBusinessFeatures, filterNavigationByFeatures } from '../utils/featureCheck';
 
 // sidebar nav config
 import navigation from "../_nav";
@@ -39,6 +40,8 @@ const AppSidebar = () => {
   const [navigationItem, setNavigationItem] = useState(navigation);
 
   const [userdata, setUserData] = useState(null);
+  const [features, setFeatures] = useState({});
+  const [featuresLoading, setFeaturesLoading] = useState(false);
   const token = isAutheticated();
   // console.log("userDatt", userdata);
 
@@ -76,19 +79,55 @@ const AppSidebar = () => {
     };
     getUser();
   }, []);
+  // Fetch business features when userdata is available
   useEffect(() => {
-    if (userdata && userdata.accessTo) {
-      const filteredNavigation = navigation.filter((item) => {
+    const fetchFeatures = async () => {
+      if (!userdata) return;
+
+      const businessId = userdata.businessId || localStorage.getItem('businessId');
+      const token = localStorage.getItem('authToken');
+
+      if (!businessId || !token) {
+        console.warn('Cannot fetch features: missing businessId or token');
+        return;
+      }
+
+      setFeaturesLoading(true);
+      const businessFeatures = await getBusinessFeatures(businessId, token);
+      setFeatures(businessFeatures);
+      setFeaturesLoading(false);
+      console.log('Business features loaded:', businessFeatures);
+    };
+
+    fetchFeatures();
+  }, [userdata]);
+
+  // Filter navigation based on both accessTo and features
+  useEffect(() => {
+    if (!userdata) {
+      setNavigationItem(navigation);
+      return;
+    }
+
+    let filtered = navigation;
+
+    // Step 1: Filter by user access (accessTo)
+    if (userdata.accessTo) {
+      filtered = filtered.filter((item) => {
         if (userdata.accessTo[item.name]) {
           return true;
         }
         return false;
       });
-      setNavigationItem(filteredNavigation);
-    } else {
-      setNavigationItem(navigation);
     }
-  }, [userdata]);
+
+    // Step 2: Filter by business features (if features are loaded)
+    if (!featuresLoading && Object.keys(features).length > 0) {
+      filtered = filterNavigationByFeatures(filtered, features);
+    }
+
+    setNavigationItem(filtered);
+  }, [userdata, features, featuresLoading]);
 
   ///----------------------//
   const [loading, setLoading] = useState(false);
