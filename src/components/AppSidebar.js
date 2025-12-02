@@ -17,7 +17,7 @@ import { sygnet } from "src/assets/brand/sygnet";
 import SimpleBar from "simplebar-react";
 import "simplebar/dist/simplebar.min.css";
 import { UserActivityStatus } from './index';
-import { getBusinessFeatures, filterNavigationByFeatures } from '../utils/featureCheck';
+import { getBusinessFeatures, filterNavigationByFeatures, filterNavigationByFeaturesMenu } from '../utils/featureCheck';
 
 // sidebar nav config
 import navigation from "../_nav";
@@ -40,7 +40,8 @@ const AppSidebar = () => {
   const [navigationItem, setNavigationItem] = useState(navigation);
 
   const [userdata, setUserData] = useState(null);
-  const [features, setFeatures] = useState({});
+  const [featuresMap, setFeaturesMap] = useState({});
+  const [featuresMenu, setFeaturesMenu] = useState([]);
   const [featuresLoading, setFeaturesLoading] = useState(false);
   const token = isAutheticated();
   // console.log("userDatt", userdata);
@@ -94,9 +95,13 @@ const AppSidebar = () => {
 
       setFeaturesLoading(true);
       const businessFeatures = await getBusinessFeatures(businessId, token);
-      setFeatures(businessFeatures);
+      // businessFeatures now: { featuresMap, featuresMenu }
+      const map = businessFeatures.featuresMap || {};
+      const menu = Array.isArray(businessFeatures.featuresMenu) ? businessFeatures.featuresMenu : [];
+      setFeaturesMap(map);
+      setFeaturesMenu(menu);
       setFeaturesLoading(false);
-      console.log('Business features loaded:', businessFeatures);
+      console.log('Business features loaded:', { map, menu });
     };
 
     fetchFeatures();
@@ -122,12 +127,16 @@ const AppSidebar = () => {
     }
 
     // Step 2: Filter by business features (if features are loaded)
-    if (!featuresLoading && Object.keys(features).length > 0) {
-      filtered = filterNavigationByFeatures(filtered, features);
+    if (!featuresLoading) {
+      if (Array.isArray(featuresMenu) && featuresMenu.length > 0) {
+        filtered = filterNavigationByFeaturesMenu(filtered, featuresMenu, featuresMap);
+      } else if (Object.keys(featuresMap || {}).length > 0) {
+        filtered = filterNavigationByFeatures(filtered, featuresMap);
+      }
     }
 
     setNavigationItem(filtered);
-  }, [userdata, features, featuresLoading]);
+  }, [userdata, featuresMap, featuresMenu, featuresLoading]);
 
   ///----------------------//
   const [loading, setLoading] = useState(false);

@@ -10,7 +10,7 @@ export const getBusinessFeatures = async (businessId, token) => {
   try {
     if (!businessId) {
       console.warn('featureCheck: No businessId provided');
-      return {};
+      return { featuresMap: {}, featuresMenu: [] };
     }
 
     const response = await axios.get(`/api/features/check/${businessId}`, {
@@ -21,13 +21,16 @@ export const getBusinessFeatures = async (businessId, token) => {
     });
 
     if (response.data && response.data.success) {
-      return response.data.features || response.data.data || {};
+      // Normalize response to include both a feature map and a featuresMenu array
+      const featuresMap = response.data.features || response.data.data || {};
+      const featuresMenu = response.data.featuresMenu || [];
+      return { featuresMap, featuresMenu };
     }
 
-    return {};
+    return { featuresMap: {}, featuresMenu: [] };
   } catch (error) {
     console.error('Failed to fetch business features:', error);
-    return {};
+    return { featuresMap: {}, featuresMenu: [] };
   }
 };
 
@@ -61,4 +64,49 @@ export const filterNavigationByFeatures = (navItems, features) => {
     // Check if the feature is enabled
     return isFeatureEnabled(features, item.feature);
   });
+};
+
+/**
+ * Filter navigation using the featuresMenu array returned from API.
+ * It matches items by their `to` path and respects `enabled` flag.
+ * Also supports nested groups by applying filtering recursively.
+ */
+export const filterNavigationByFeaturesMenu = (navItems, featuresMenu = [], featuresMap = {}) => {
+  if (!Array.isArray(featuresMenu) || featuresMenu.length === 0) {
+    // No menu data provided, fallback to featuresMap-based filtering
+    return filterNavigationByFeatures(navItems, featuresMap);
+  }
+
+  const findMenuEntry = (to) => featuresMenu.find((m) => m && m.to === to);
+
+  const filterRecursive = (items) => {
+    return items.reduce((acc, item) => {
+      // If group (has items), recurse into children
+      if (item.items && Array.isArray(item.items)) {
+        const children = filterRecursive(item.items);
+        if (children.length > 0) {
+          acc.push({ ...item, items: children });
+        }
+        return acc;
+      }
+
+      // For single nav item, try to find its entry in featuresMenu
+      const entry = findMenuEntry(item.to);
+      if (entry) {
+        if (entry.enabled) acc.push(item);
+        return acc;
+      }
+
+      // If not found in menu response, fallback to feature flag mapping
+      if (!item.feature) {
+        acc.push(item);
+        return acc;
+      }
+
+      if (isFeatureEnabled(featuresMap, item.feature)) acc.push(item);
+      return acc;
+    }, []);
+  };
+
+  return filterRecursive(navItems);
 };
