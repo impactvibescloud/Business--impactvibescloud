@@ -87,8 +87,15 @@ const _nav = [
   {
     component: CNavItem,
     name: "Call Uses",
-    icon: <CIcon icon={cilText} customClassName="nav-icon" />,
+    icon: <CIcon icon={cilText} customClassName="nav-icon" />, 
     to: "/calluses",
+    group: "Call Logs",
+  },
+  {
+    component: CNavItem,
+    name: "Call Monitor",
+    icon: <CIcon icon={cilVideo} customClassName="nav-icon" />, 
+    to: "/callmonitor",
     group: "Call Logs",
   },
   {
