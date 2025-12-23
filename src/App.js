@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useState } from "react";
+import GlobalMaintenanceModal from "./components/GlobalMaintenanceModal";
 import './App.css';
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -29,24 +30,47 @@ const Page500 = React.lazy(() => import("./views/pages/page500/Page500"));
 const App = () => {
   const [userdata, setUserData] = useState(null);
   const token = isAutheticated();
+  const [maintenance, setMaintenance] = useState({ active: false, message: '', estimatedDowntime: '' });
 
   // Initialize timeout prevention systems
   useEffect(() => {
     console.log('🚀 Initializing timeout prevention systems...')
-    
     // Setup axios interceptors for better error handling and session management
     setupAxiosInterceptors()
-    
     // Setup fetch interceptor for any remaining direct fetch calls
     setupFetchInterceptor()
-    
     // Store session start time for reference
     if (!localStorage.getItem('sessionStart')) {
       localStorage.setItem('sessionStart', Date.now().toString())
     }
-    
-    console.log('✅ Basic interceptors initialized')
-  }, [])
+    // Patch axios to globally catch maintenanceMode in responses
+    const respInterceptor = axios.interceptors.response.use(
+      (response) => {
+        if (response?.data?.maintenanceMode) {
+          setMaintenance({
+            active: true,
+            message: response.data.message || 'System is currently under maintenance. Please try again later.',
+            estimatedDowntime: response.data.estimatedDowntime || '',
+          });
+        }
+        return response;
+      },
+      (error) => {
+        if (error?.response?.data?.maintenanceMode) {
+          setMaintenance({
+            active: true,
+            message: error.response.data.message || 'System is currently under maintenance. Please try again later.',
+            estimatedDowntime: error.response.data.estimatedDowntime || '',
+          });
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => {
+      axios.interceptors.response.eject(respInterceptor);
+    };
+    // eslint-disable-next-line
+  }, []);
 
   useEffect(() => {
     const getUser = async () => {
@@ -88,29 +112,31 @@ const App = () => {
               </div>
             }
           >
-        <Routes>
-          {/* <Route exact path="/change-password" name="My profile" element={<ChangePassword />} /> */}
-          <Route exact path="/" name="Login Page" element={<Login />} />
-          <Route exact path="/404" name="Page 404" element={<Page404 />} />
-          <Route exact path="/500" name="Page 500" element={<Page500 />} />
-          <Route
-            exact
-            path="/forget-password"
-            name="Page 500"
-            element={<ForgotPassword />}
-          />
-
-          <Route
-            path="/*"
-            element={<ProtectedRoute element={DefaultLayout} />}
-          />
-          <Route path="*" name="Home" element={<DefaultLayout />} />
-        </Routes>
-        <Toaster />
-      </Suspense>
+            <Routes>
+              {/* <Route exact path="/change-password" name="My profile" element={<ChangePassword />} /> */}
+              <Route exact path="/" name="Login Page" element={<Login />} />
+              <Route exact path="/404" name="Page 404" element={<Page404 />} />
+              <Route exact path="/500" name="Page 500" element={<Page500 />} />
+              <Route
+                exact
+                path="/forget-password"
+                name="Page 500"
+                element={<ForgotPassword />}
+              />
+              <Route
+                path="/*"
+                element={<ProtectedRoute element={DefaultLayout} />}
+              />
+              <Route path="*" name="Home" element={<DefaultLayout />} />
+            </Routes>
+            <Toaster />
+            {maintenance.active && (
+              <GlobalMaintenanceModal message={maintenance.message} estimatedDowntime={maintenance.estimatedDowntime} />
+            )}
+          </Suspense>
         </AuthProvider>
       </UserActivityProvider>
-  </Router>
+    </Router>
   );
 };
 

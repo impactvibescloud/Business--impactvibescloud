@@ -211,7 +211,10 @@ const AppSidebar = () => {
       className={collapsed ? 'c-sidebar c-sidebar-minimized' : 'c-sidebar'}
       style={{ background: '#FFFFFF', backgroundImage: 'none' }}
       onVisibleChange={(visible) => {
-        dispatch({ type: "set", payload: { sidebarShow: visible } }); // Updated dispatch action
+        // Prevent redundant dispatches/loops: only update store when value actually changed.
+        if (visible !== sidebarShow) {
+          dispatch({ type: "set", payload: { sidebarShow: visible } });
+        }
       }}
     >
       <CSidebarBrand className="d-none d-md-flex sidebar-brand" style={{ padding: 0, height: 56 }}>

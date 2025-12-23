@@ -16,6 +16,7 @@ const Logo = React.lazy(() => import("./views/configuration/Logo.js"));
 const Login = React.lazy(() => import("./views/pages/login/Login"));
 
 // Missing Components Imports - Using lazy loading
+const CallMonitor = React.lazy(() => import("./views/CallMonitor/CallMonitor"));
 const Templates = React.lazy(() => import("./views/Templates/Templates"));
 const UsersTeams = React.lazy(() => import("./views/UsersTeams/UsersTeams"));
 const VirtualNumbers = React.lazy(() => import("./views/VirtualNumbers/VirtualNumbers"));
@@ -58,6 +59,9 @@ const ViewTestimonial = React.lazy(() => import("./views/Testimonials/ViewTestim
 const Policies = React.lazy(() => import("./views/configuration/Policies/Policies"));
 
 // Purpose
+
+// Call Monitor
+
 const Purpose = React.lazy(() => import("./views/configuration/Purpose/Purpose"));
 const AddPurpose = React.lazy(() => import("./views/configuration/Purpose/AddPurpose"));
 const EditPurpose = React.lazy(() => import("./views/configuration/Purpose/EditPurpose.js"));
@@ -847,6 +851,12 @@ const routes = [
     path: '/calluses',
     name: 'Call Uses',
     element: CallUses,
+    navName: "Call Uses",
+  },
+  {
+    path: '/callmonitor',
+    element: CallMonitor,
+    navName: "Call Monitor",
     navName: "Call Logs",
   },
   {
