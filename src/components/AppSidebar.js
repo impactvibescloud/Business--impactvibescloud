@@ -29,6 +29,9 @@ const AppSidebar = () => {
   const dispatch = useDispatch();
   const unfoldable = useSelector((state) => state.sidebarUnfoldable);
   const sidebarShow = useSelector((state) => state.coreUI.sidebarShow); // Updated selector
+  // Coerce values to booleans to avoid CoreUI internal toggling when undefined/null
+  const visibleFlag = Boolean(sidebarShow);
+  const unfoldableFlag = Boolean(unfoldable);
   // Local collapsed state for sidebar minimization (persisted in localStorage)
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -110,7 +113,12 @@ const AppSidebar = () => {
   // Filter navigation based on both accessTo and features
   useEffect(() => {
     if (!userdata) {
-      setNavigationItem(navigation);
+      setNavigationItem((prev) => {
+        try {
+          if (JSON.stringify(prev) === JSON.stringify(navigation)) return prev
+        } catch (e) {}
+        return navigation
+      });
       return;
     }
 
@@ -135,7 +143,12 @@ const AppSidebar = () => {
       }
     }
 
-    setNavigationItem(filtered);
+    setNavigationItem((prev) => {
+      try {
+        if (JSON.stringify(prev) === JSON.stringify(filtered)) return prev
+      } catch (e) {}
+      return filtered
+    });
   }, [userdata, featuresMap, featuresMenu, featuresLoading]);
 
   ///----------------------//
@@ -206,14 +219,18 @@ const AppSidebar = () => {
   return (
     <CSidebar
       position="fixed"
-      unfoldable={unfoldable}
-      visible={sidebarShow}
+      unfoldable={unfoldableFlag}
+      visible={visibleFlag}
       className={collapsed ? 'c-sidebar c-sidebar-minimized' : 'c-sidebar'}
       style={{ background: '#FFFFFF', backgroundImage: 'none' }}
       onVisibleChange={(visible) => {
         // Prevent redundant dispatches/loops: only update store when value actually changed.
-        if (visible !== sidebarShow) {
-          dispatch({ type: "set", payload: { sidebarShow: visible } });
+        const newVisible = Boolean(visible)
+        if (newVisible === visibleFlag) return
+        try {
+          dispatch({ type: "set", payload: { sidebarShow: newVisible } });
+        } catch (e) {
+          console.warn('Failed to dispatch sidebar visibility change', e)
         }
       }}
     >
