@@ -49,7 +49,6 @@ const Branches = () => {
   const [agentPhone, setAgentPhone] = useState("");
   const [department, setDepartment] = useState("");
   const [timeGroup, setTimeGroup] = useState("");
-  const [timeCondition, setTimeCondition] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
@@ -62,6 +61,7 @@ const Branches = () => {
   // 24 Hours => 00:00 - 23:59
   const TIME_GROUP_DEFAULTS = {
     morning: { startTime: '08:00', endTime: '16:00' },
+    full: { startTime: '09:00', endTime: '18:00' },
     afternoon: { startTime: '12:00', endTime: '20:00' },
     evening: { startTime: '16:00', endTime: '00:00' },
     night: { startTime: '22:00', endTime: '06:00' },
@@ -81,8 +81,6 @@ const Branches = () => {
       setEndTime("");
     }
   };
-  const [stickyAgents, setStickyAgents] = useState(false);
-  const [managerName, setManagerName] = useState("");
   const [managerEmail, setManagerEmail] = useState("");
   const [branchStatus, setBranchStatus] = useState("Active");
   const [selectedBranch, setSelectedBranch] = useState(null);
@@ -181,6 +179,19 @@ const Branches = () => {
           email: branch.user?.email || '',
           userId: branch.user?._id || ''
         },
+        // Normalize department object to ensure UI can always read .name
+        department: (function() {
+          const d = branch.department || branch.deparment || branch.dept;
+          if (!d) return null;
+          if (typeof d === 'object') {
+            return {
+              _id: d._id || d.id || d.departmentId || null,
+              name: d.name || d.departmentName || d.label || ''
+            };
+          }
+          // If department is a primitive (string id or name), attempt to treat it as name
+          return { _id: String(d), name: String(d) };
+        })(),
         id: branch._id,
         didNumber: branch.didNumbers?.[0] || '',
       }));
@@ -237,9 +248,7 @@ const Branches = () => {
         phone: agentPhone, // Include phone field
         businessId: user.businessId,
         didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
-        stickyBranch: stickyAgents, // Renamed from stickyAgents to stickyBranch
-        timeGroup: timeGroup,
-        timeCondition
+        timeGroup: timeGroup
       };
       // Only include start/end times if they have values
       if (startTime && startTime.trim() !== '') requestBody.startTime = startTime;
@@ -301,7 +310,6 @@ const Branches = () => {
   const handleEditBranch = (branch) => {
     setSelectedBranch(branch);
     setBranchName(branch.branchName || "");
-    setManagerName(branch.user?.name || branch.manager?.name || "");
     setManagerEmail(branch.user?.email || branch.manager?.email || "");
     setDepartment(branch.department?._id || "");
     // branch.timeGroup may be a string (legacy) or an object { timeGroup, startTime, endTime }
@@ -322,8 +330,7 @@ const Branches = () => {
         setEndTime("");
       }
     }
-    setTimeCondition(branch.timeCondition || "");
-    setStickyAgents(branch.stickyBranch || false);
+    
     setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
     // Find the DID id from didNumbers list that matches the assigned number
     let assignedDidId = "";
@@ -357,12 +364,9 @@ const Branches = () => {
   const updatePayload = {
         branchName,
         userEmail: managerEmail,
-        userName: managerName,
         businessId: user.businessId,
         didNumbers: didNumberValue ? [didNumberValue] : [],
-        stickyBranch: stickyAgents,
         timeGroup: timeGroup,
-        timeCondition,
         ...(department ? { department } : {})
       };
   if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
@@ -405,9 +409,6 @@ const Branches = () => {
     setTimeGroup("");
     setStartTime("");
     setEndTime("");
-    setTimeCondition("");
-    setStickyAgents(false); // This will be sent as stickyBranch
-    setManagerName("");
     setManagerEmail("");
     setBranchStatus("Active");
     setSelectedDid(""); // Reset DID selection
@@ -1010,45 +1011,24 @@ const Branches = () => {
               </CFormSelect>
             </div>
             <div className="mb-3">
-              <CFormLabel htmlFor="timeGroup">Time Group</CFormLabel>
+              <CFormLabel htmlFor="timeGroup">Shift</CFormLabel>
               <CFormSelect
                 id="timeGroup"
                 value={timeGroup}
                 onChange={e => handleTimeGroupChange(e.target.value)}
                 required
               >
-                <option value="">Select Shifts</option>
+                <option value="">Select Shift</option>
                 <option value="morning">Morning Shift (8 AM - 4 PM)</option>
                 <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
                 <option value="evening">Evening Shift (4 PM - 12 AM)</option>
+                <option value="full">Full Shift (9 AM - 6 PM)</option>
                 <option value="night">Night Shift (10 PM - 6 AM)</option>
                 <option value="24hours">24 Hours</option>
               </CFormSelect>
+              
             </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="timeCondition">Time Condition</CFormLabel>
-              <CFormInput
-                type="text"
-                id="timeCondition"
-                value={timeCondition}
-                onChange={e => setTimeCondition(e.target.value)}
-                placeholder="Enter time condition"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="stickyAgents">Sticky Agents</CFormLabel>
-              <CFormSelect
-                id="stickyAgents"
-                value={stickyAgents}
-                onChange={e => setStickyAgents(e.target.value === 'true')}
-                required
-              >
-                <option value="">Select Option</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </CFormSelect>
-            </div>
+            
             <div className="mb-3">
               <CFormLabel htmlFor="assignDid">Assign DID</CFormLabel>
               <CFormSelect
@@ -1095,16 +1075,7 @@ const Branches = () => {
                 required
               />
             </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editAgentName2">Agent Name</CFormLabel>
-              <CFormInput
-                type="text"
-                id="editAgentName2"
-                value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
-                placeholder="Enter agent name"
-              />
-            </div>
+            {/* Manager Name removed per request */}
             <div className="mb-3">
               <CFormLabel htmlFor="editManagerEmail">Email Address</CFormLabel>
               <CFormInput
@@ -1133,45 +1104,24 @@ const Branches = () => {
               </CFormSelect>
             </div>
             <div className="mb-3">
-              <CFormLabel htmlFor="editTimeGroup">Time Group</CFormLabel>
+              <CFormLabel htmlFor="editTimeGroup">Shift</CFormLabel>
               <CFormSelect
                 id="editTimeGroup"
                 value={timeGroup}
                 onChange={e => handleTimeGroupChange(e.target.value)}
                 required
               >
-                <option value="">Select Shifts</option>
+                <option value="">Select Shift</option>
                 <option value="morning">Morning Shift (8 AM - 4 PM)</option>
                 <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
                 <option value="evening">Evening Shift (4 PM - 12 AM)</option>
+                <option value="full">Full Shift (9 AM - 6 PM)</option>
                 <option value="night">Night Shift (10 PM - 6 AM)</option>
                 <option value="24hours">24 Hours</option>
               </CFormSelect>
+              
             </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editTimeCondition">Time Condition</CFormLabel>
-              <CFormInput
-                type="text"
-                id="editTimeCondition"
-                value={timeCondition}
-                onChange={e => setTimeCondition(e.target.value)}
-                placeholder="Enter time condition"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editStickyAgents">Sticky Agents</CFormLabel>
-              <CFormSelect
-                id="editStickyAgents"
-                value={stickyAgents}
-                onChange={e => setStickyAgents(e.target.value === 'true')}
-                required
-              >
-                <option value="">Select Option</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </CFormSelect>
-            </div>
+            
             <div className="mb-3">
               <CFormLabel htmlFor="editAssignDid">Assign DID</CFormLabel>
               <CFormSelect

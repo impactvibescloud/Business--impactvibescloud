@@ -35,6 +35,11 @@ body * {
 }
 
 // Ensure all pages use consistent font sizing
+// Reduce base font-size to make the UI more compact on 100% zoom.
+// If you want a user-toggleable compact mode, we can add a class on <html>
+// and switch between these values instead of changing the global root.
 html, body {
-  font-size: 0.875rem;
+  // Reduce base font-size to make UI more compact at 100% browser zoom
+  // was 0.75rem (~12px), lower to 0.70rem to reduce overall text and spacing
+  font-size: 0.70rem; // ~11.2px
 }

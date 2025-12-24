@@ -245,7 +245,7 @@ const NewTicketComponent = () => {
   const getFilteredTickets = () => {
     return tickets.filter(ticket => {
       // Filter by status
-      if (filterStatus !== 'all' && ticket.status !== filterStatus) {
+      if (filterStatus !== 'all' && String(ticket.status || '') !== String(filterStatus || '')) {
         return false;
       }
       
@@ -253,10 +253,10 @@ const NewTicketComponent = () => {
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
         return (
-          ticket.subject.toLowerCase().includes(searchLower) ||
-          ticket.description.toLowerCase().includes(searchLower) ||
-          ticket.category.toLowerCase().includes(searchLower) ||
-          ticket.status.toLowerCase().includes(searchLower)
+          String(ticket.subject || '').toLowerCase().includes(searchLower) ||
+          String(ticket.description || '').toLowerCase().includes(searchLower) ||
+          String(ticket.category || '').toLowerCase().includes(searchLower) ||
+          String(ticket.status || '').toLowerCase().includes(searchLower)
         );
       }
       
@@ -270,21 +270,32 @@ const NewTicketComponent = () => {
       setLoading(true);
       setError(null);
       const ticketData = await apiCall(ENDPOINTS.TICKETS);
-      const formattedTickets = ticketData.tickets.map((t) => ({
-        id: t._id,
-        subject: t.subject,
-        description: t.description,
-        priority: t.priority,
-        category: t.category,
-        status: statusMap[t.status] || "Open",
-        createdBy: t.createdBy,
-        businessId: t.businessId,
-        createdAt: t.createdAt,
-        resolvedAt: t.resolvedAt,
-        assignedTo: t.assignedTo,
-        lastMessage: t.lastMessage,
-        updatedAt: t.updatedAt
-      }));
+      const formattedTickets = ticketData.tickets.map((t) => {
+        // Normalize status: handle variants like "inProgress", "in progress", etc.
+        const rawStatus = (t.status || '').toString();
+        const normalizedKey = rawStatus
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '_')
+          .replace(/-/g, '_');
+        const displayStatus = statusMap[normalizedKey] || statusMap[rawStatus] || 'Open';
+
+        return {
+          id: t._id,
+          subject: t.subject,
+          description: t.description,
+          priority: t.priority,
+          category: t.category,
+          status: displayStatus,
+          createdBy: t.createdBy,
+          businessId: t.businessId,
+          createdAt: t.createdAt,
+          resolvedAt: t.resolvedAt,
+          assignedTo: t.assignedTo,
+          lastMessage: t.lastMessage,
+          updatedAt: t.updatedAt
+        };
+      });
       setTickets(formattedTickets);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to fetch tickets.");
@@ -629,16 +640,35 @@ const NewTicketComponent = () => {
                 ) : (
                   <div className="messages-container">
                     {ticketMessages.map((msg) => {
-                      const isCurrentUser = msg.sender._id === "684fe39ca8254e8906e99aab";
+                      // Determine whether the message is from the current business
+                      const currentBusinessId = businessId || userDetails?.businessId || userDetails?.business?._id;
+                      const currentUserId = userId || userDetails?._id;
+                      const senderBusinessId = msg.sender?.businessId || msg.sender?.business?._id || null;
+
+                      // Fallback: consider same business if sender email domain matches current user's email domain
+                      const userEmail = userDetails?.email || '';
+                      const userDomain = userEmail.includes('@') ? userEmail.split('@')[1] : '';
+                      const senderEmail = msg.sender?.email || '';
+                      const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : '';
+
+                      const isFromBusiness = (
+                        // direct id matches
+                        (senderBusinessId && currentBusinessId && String(senderBusinessId) === String(currentBusinessId)) ||
+                        // sender is the current logged-in user
+                        (msg.sender && currentUserId && String(msg.sender._id) === String(currentUserId)) ||
+                        // domain fallback
+                        (userDomain && senderDomain && userDomain === senderDomain)
+                      );
+
                       return (
-                        <div key={msg._id} className={`chat-message ${isCurrentUser ? 'sent' : 'received'}`}>
-                          <div className={`flex items-start ${isCurrentUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                            <div className={`chat-avatar ${isCurrentUser ? 'sent' : 'received'}`}>
-                              {msg.sender.name.charAt(0).toUpperCase()}
+                        <div key={msg._id} className={`chat-message ${isFromBusiness ? 'sent' : 'received'}`}>
+                          <div className={`flex items-start ${isFromBusiness ? 'flex-row-reverse' : 'flex-row'}`}>
+                            <div className={`chat-avatar ${isFromBusiness ? 'sent' : 'received'}`}>
+                              {msg.sender.name ? msg.sender.name.charAt(0).toUpperCase() : '?'}
                             </div>
                             <div className="chat-message-content">
                               <span className="chat-sender-name">{msg.sender.name}</span>
-                              <div className={`chat-message-bubble ${isCurrentUser ? 'sent' : 'received'}`}>
+                              <div className={`chat-message-bubble ${isFromBusiness ? 'sent' : 'received'}`}>
                                 <p>{msg.message}</p>
                                 {msg.statusUpdate && (
                                   <div className="status-update">
@@ -678,7 +708,7 @@ const NewTicketComponent = () => {
                 <CButton
                   color="primary"
                   className="chat-send-button"
-                  onClick={() => selectedTicket && sendMessage(selectedTicket, newMessage)}
+                  onClick={() => selectedTicket && sendMessage(selectedTicket.id || selectedTicket._id, newMessage)}
                   disabled={!newMessage.trim() || sendingMessage}
                 >
                   {sendingMessage ? (

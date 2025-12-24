@@ -33,14 +33,16 @@ import {
   cilSearch, 
   cilFilter, 
   cilMediaPlay,
-  cilCloudDownload
+  cilCloudDownload,
+  cilDescription
 } from '@coreui/icons'
 import './CallLogs.css'
 import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
 
 const CallLogs = () => {
   const [callLogs, setCallLogs] = useState([])
-  const [pageSize, setPageSize] = useState(20)
+  // Fixed page size: show 10 records per page only
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -58,6 +60,8 @@ const CallLogs = () => {
   const [callTypeFilter, setCallTypeFilter] = useState('All')
   const [showModal, setShowModal] = useState(false)
   const [selectedLog, setSelectedLog] = useState(null)
+  const [showNotesModal, setShowNotesModal] = useState(false)
+  const [notesContent, setNotesContent] = useState('')
   const [audioBlobUrl, setAudioBlobUrl] = useState(null)
   const [recordingLoading, setRecordingLoading] = useState(false)
   const [recordingError, setRecordingError] = useState(null)
@@ -733,7 +737,7 @@ const CallLogs = () => {
 
       // Prepare CSV headers and rows
       const headers = [
-        'S.NO', 'CALL TYPE', 'CALL DATE', 'CALL INITIATED BY', 'CALL RECEIVED BY', 'CALL REJECTED BY', 'TEAM', 'HANG UP BY', 'DURATION', 'COST', 'NOTES', 'STATUS', 'VIRTUAL NUMBER', 'CONTACT'
+        'S.NO', 'TYPE', 'DATE', 'INITIATED BY', 'RECEIVED BY', 'REJECTED BY', 'TEAM', 'HANG UP BY', 'DURATION', 'COST', 'NOTES', 'STATUS', 'VIRTUAL NUMBER', 'CONTACT'
       ]
 
       const csvRows = []
@@ -822,14 +826,10 @@ const CallLogs = () => {
                 <CInputGroup style={{ maxWidth: 180 }}>
                   <CFormInput
                     type="number"
-                    min={5}
-                    max={100}
                     value={pageSize}
-                    onChange={e => {
-                      setPageSize(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    placeholder="Rows per page"
+                    disabled
+                    readOnly
+                    aria-label="Rows per page"
                   />
                   <CButton type="button" color="secondary" variant="outline" disabled>
                     Rows/Page
@@ -919,15 +919,12 @@ const CallLogs = () => {
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>CALL TYPE</CTableHeaderCell>
-                <CTableHeaderCell>CALL DATE</CTableHeaderCell>
-                <CTableHeaderCell>CALL INITIATED BY</CTableHeaderCell>
-                <CTableHeaderCell>CALL RECEIVED BY</CTableHeaderCell>
-                <CTableHeaderCell>CALL REJECTED BY</CTableHeaderCell>
-                <CTableHeaderCell>TEAM</CTableHeaderCell>
-                <CTableHeaderCell>HANG UP BY</CTableHeaderCell>
-                <CTableHeaderCell>DURATION</CTableHeaderCell>
-                <CTableHeaderCell>COST</CTableHeaderCell>
+                  <CTableHeaderCell>TYPE</CTableHeaderCell>
+                  <CTableHeaderCell>DATE</CTableHeaderCell>
+                  <CTableHeaderCell>INITIATED BY</CTableHeaderCell>
+                  <CTableHeaderCell>RECEIVED BY</CTableHeaderCell>
+                  {/* Columns removed: REJECTED BY, TEAM, HANG UP BY, DURATION, COST
+                    Their values will be shown inside the call details modal. */}
                 <CTableHeaderCell>NOTES</CTableHeaderCell>
                 <CTableHeaderCell>STATUS</CTableHeaderCell>
               </CTableRow>
@@ -989,24 +986,22 @@ const CallLogs = () => {
                       <CTableDataCell>
                         <div>{log.callReceivedBy || 'N/A'}</div>
                       </CTableDataCell>
+                      {/* Removed inline columns: these values are shown in modal */}
                       <CTableDataCell>
-                        <div>{log.callRejectedBy || 'N/A'}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div>{log.team || 'N/A'}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div>{log.hangUpBy || 'Unknown'}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div>{formatDuration(log.callDuration || log.duration)}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div>${log.cost ? log.cost.toFixed(2) : 'N/A'}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="text-truncate" style={{maxWidth: '200px'}} title={log.notes || 'No notes available'}>
-                          {log.notes || 'No notes available'}
+                        <div>
+                          <CButton
+                            size="sm"
+                            color="info"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotesContent(log.notes || '');
+                              setShowNotesModal(true);
+                            }}
+                            title={log.notes ? 'View notes' : 'No notes'}
+                          >
+                            <CIcon icon={cilDescription} />
+                          </CButton>
                         </div>
                       </CTableDataCell>
                       <CTableDataCell>
@@ -1100,7 +1095,7 @@ const CallLogs = () => {
       </CCard>
 
       {/* Recording Modal */}
-      <CModal visible={showModal} onClose={() => {
+      <CModal visible={showModal} scrollable onClose={() => {
         setShowModal(false);
         if (audioBlobUrl) { try { URL.revokeObjectURL(audioBlobUrl); } catch(e){}; setAudioBlobUrl(null); }
         setRecordingMimeType(null);
@@ -1113,7 +1108,7 @@ const CallLogs = () => {
         <CModalHeader>
           <h5>Call Recording - {selectedLog ? formatDate(selectedLog.callDate || selectedLog.createdAt) : ''}</h5>
         </CModalHeader>
-        <CModalBody>
+          <CModalBody style={{ maxHeight: '65vh', overflowY: 'auto' }}>
           {selectedLog && (
             <div>
               <div className="mb-3">
@@ -1121,7 +1116,11 @@ const CallLogs = () => {
                 <p>Type: {selectedLog.callType || 'Unknown'}</p>
                 <p>Initiated By: {selectedLog.callInitiatedBy || 'Unknown'}</p>
                 <p>Received By: {selectedLog.callReceivedBy || 'N/A'}</p>
+                <p>Rejected By: {selectedLog.callRejectedBy || 'N/A'}</p>
+                <p>Team: {selectedLog.team || 'N/A'}</p>
+                <p>Hang Up By: {selectedLog.hangUpBy || 'Unknown'}</p>
                 <p>Duration: {formatDuration(selectedLog.callDuration || selectedLog.duration)}</p>
+                <p>Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</p>
                 <p>Status: {formatCallStatus(selectedLog.status)}</p>
               </div>
               
@@ -1283,6 +1282,28 @@ const CallLogs = () => {
           }}>
             Close
           </CButton>
+        </CModalFooter>
+      </CModal>
+      {/* Notes Modal (notepad) */}
+      <CModal visible={showNotesModal} scrollable onClose={() => setShowNotesModal(false)} size="md">
+        <CModalHeader>
+          <h5>Notes</h5>
+        </CModalHeader>
+        <CModalBody style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+          <div>
+            <textarea
+              readOnly
+              value={notesContent}
+              rows={12}
+              style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', padding: '10px', borderRadius: 4, border: '1px solid #ddd', background: '#fffef6' }}
+            />
+            {(!notesContent || String(notesContent).trim() === '') && (
+              <div className="text-muted mt-2">No notes available for this call.</div>
+            )}
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" onClick={() => setShowNotesModal(false)}>Close</CButton>
         </CModalFooter>
       </CModal>
     </div>
