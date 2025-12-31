@@ -36,6 +36,8 @@ const ReportsAnalytics = () => {
   const [error, setError] = useState(null)
   const [reportType, setReportType] = useState('data-access-logs')
   const [dateRange, setDateRange] = useState('today')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [resourceFilter, setResourceFilter] = useState('all')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -115,7 +117,7 @@ const ReportsAnalytics = () => {
       setResourceFilter('all')
       setRoleFilter('all')
     }
-  }, [reportType, dateRange, currentPage, itemsPerPage])
+  }, [reportType, dateRange, startDate, endDate, currentPage, itemsPerPage])
 
   const fetchReportData = async () => {
     setLoading(true)
@@ -129,7 +131,8 @@ const ReportsAnalytics = () => {
           limit: itemsPerPage,
           sortBy: 'createdAt',
           order: 'desc',
-          ...(dateRange !== 'all' && { dateRange }),
+          ...(dateRange !== 'all' && dateRange !== 'custom' && { dateRange }),
+          ...(dateRange === 'custom' && startDate && endDate && { dateFrom: startDate, dateTo: endDate }),
           ...(resourceFilter !== 'all' && { resource: resourceFilter }),
           ...(roleFilter !== 'all' && { role: roleFilter }),
           ...(searchTerm && { search: searchTerm })
@@ -444,17 +447,42 @@ const ReportsAnalytics = () => {
             <CCol md={2}>
               <CFormSelect
                 value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setDateRange(val)
+                  if (val !== 'custom') {
+                    setStartDate('')
+                    setEndDate('')
+                  }
+                }}
               >
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
                 <option value="last-7-days">Last 7 Days</option>
                 <option value="last-30-days">Last 30 Days</option>
-                <option value="this-month">This Month</option>
-                <option value="last-month">Last Month</option>
                 <option value="custom">Custom Range</option>
               </CFormSelect>
             </CCol>
+            {dateRange === 'custom' && (
+              <>
+                <CCol md={2}>
+                  <CFormInput
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    aria-label="Start date"
+                  />
+                </CCol>
+                <CCol md={2}>
+                  <CFormInput
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    aria-label="End date"
+                  />
+                </CCol>
+              </>
+            )}
             {reportType === 'data-access-logs' && (
               <>
                 <CCol md={2}>
