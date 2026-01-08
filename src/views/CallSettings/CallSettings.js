@@ -7,6 +7,7 @@ import {
   CFormInput,
   CButton,
   CSpinner,
+  CFormSwitch,
 } from "@coreui/react";
 import { apiCall } from "../../config/api";
 import Swal from "sweetalert2";
@@ -18,6 +19,8 @@ const CallSettings = () => {
   const [loading, setLoading] = useState(true);
   const [phones, setPhones] = useState({});
   const [savingIds, setSavingIds] = useState([]);
+  const [savingForwardIds, setSavingForwardIds] = useState([]);
+  const [numberExtensions, setNumberExtensions] = useState({});
   const token = isAutheticated();
 
   useEffect(() => {
@@ -50,12 +53,23 @@ const CallSettings = () => {
           const phone = branch.user?.phone || branch.phone || branch.didNumber || '';
           // try to determine assigned DID (display only). API returns `didNumbers` array.
           const did = (Array.isArray(branch.didNumbers) && branch.didNumbers[0]) || branch.didNumber || branch.did || branch.user?.didNumber || '';
+          // try to seed sticky flag from backend or local cache
+          let sticky = !!branch.stickyBranch;
+          try {
+            const key = `cf_forward_${branch._id || branch.id}`;
+            if (!sticky && typeof localStorage !== 'undefined') {
+              sticky = localStorage.getItem(key) === '1';
+            }
+          } catch (e) {
+            // ignore localStorage errors
+          }
           return {
             id: branch._id || branch.id,
             name,
             phone,
             did,
             raw: branch,
+            stickyBranch: sticky,
           };
         });
         setAgents(agentsArr);
@@ -72,6 +86,78 @@ const CallSettings = () => {
     };
     fetchAgents();
   }, [user?.businessId]);
+
+  // Fetch extension info for numbers assigned to agents (DIDs)
+  useEffect(() => {
+    if (!agents || agents.length === 0) return;
+    let cancelled = false;
+
+    const toFetch = [];
+    agents.forEach((a) => {
+      const did = a.did;
+      if (did && numberExtensions[did] === undefined) toFetch.push(did);
+    });
+    if (toFetch.length === 0) return;
+
+    const fetchAll = async () => {
+      for (const did of toFetch) {
+        if (cancelled) break;
+        try {
+          const res = await apiCall(`/api/v1/numbers/business/by-number/${encodeURIComponent(did)}`, 'GET');
+          // apiCall returns axios response.data (e.g. { success: true, data: { ... } })
+          // prefer `data.extension` or `data.sip_endpoint` per API shape
+          const ext = res?.data?.extension ?? res?.data?.sip_endpoint ?? res?.data?.extensionNumber ?? res?.data?.ext ?? null;
+          setNumberExtensions((prev) => ({ ...prev, [did]: ext ?? '—' }));
+        } catch (err) {
+          setNumberExtensions((prev) => ({ ...prev, [did]: '—' }));
+        }
+      }
+    };
+
+    fetchAll();
+    return () => { cancelled = true; };
+  }, [agents, numberExtensions]);
+
+  const handleToggleForward = async (agent) => {
+    const id = agent.id;
+    const next = !agent.stickyBranch;
+    const did = agent.did || agent.raw?.didNumber || agent.raw?.did;
+    const extensionFromCache = did ? numberExtensions[did] : undefined;
+    const extension = extensionFromCache && extensionFromCache !== '—' ? extensionFromCache : (agent.raw?.extension || agent.raw?.extensionNumber || agent.raw?.didNumber || agent.raw?.did || null);
+    const phone = (phones && phones[id]) || agent.phone || '';
+
+    // optimistic update
+    setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, stickyBranch: next } : a)));
+    setSavingForwardIds((s) => [...s, id]);
+    try {
+      if (!extension) throw new Error('No extension available for this agent to configure call forward.');
+
+      if (next) {
+        await apiCall('/v1/sipdatabase/astdb/cf', 'POST', { extension: String(extension), user_phone: String(phone) });
+      } else {
+        await apiCall('/v1/sipdatabase/astdb/cf', 'DELETE', { extension: String(extension) });
+      }
+
+      await apiCall(`/branch/edit/${id}`, 'PATCH', { stickyBranch: next });
+      // persist a local flag so the UI or other parts of the app can know
+      // that call-forward was enabled for this branch (simple cache)
+      try {
+        if (next) {
+          localStorage.setItem(`cf_forward_${id}`, '1');
+        } else {
+          localStorage.removeItem(`cf_forward_${id}`);
+        }
+      } catch (e) {
+        // ignore localStorage errors (e.g. private mode)
+      }
+    } catch (err) {
+      setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, stickyBranch: !next } : a)));
+      console.error('Failed to toggle forward for agent', id, err);
+      Swal.fire({ icon: 'error', title: 'Error', text: err?.response?.data?.message || err?.message || 'Failed to update forward flag' });
+    } finally {
+      setSavingForwardIds((s) => s.filter((x) => x !== id));
+    }
+  };
 
   const handlePhoneChange = (id, value) => {
     setPhones((p) => ({ ...p, [id]: value }));
@@ -115,32 +201,36 @@ const CallSettings = () => {
             <div>
               {/* Header labels for columns */}
               <CRow className="align-items-center mb-2">
-                <CCol sm={4} className="fw-semibold">
-                  Agent
-                </CCol>
-                <CCol sm={3} className="fw-semibold text-muted">
-                  Assigned DID
-                </CCol>
-                <CCol sm={3} className="fw-semibold">
-                  Forward number
-                </CCol>
-                <CCol sm={2} />
+                <CCol sm={3} className="fw-semibold">Agent</CCol>
+                <CCol sm={3} className="fw-semibold text-muted">Assigned DID</CCol>
+                <CCol sm={2} className="fw-semibold">Extension</CCol>
+                <CCol sm={2} className="fw-semibold">Forward number</CCol>
+                <CCol sm={1} className="fw-semibold text-end">Save</CCol>
+                <CCol sm={1} className="fw-semibold text-center">Forward</CCol>
               </CRow>
 
               {agents.map((agent) => (
                 <CRow className="align-items-center mb-3" key={agent.id}>
-                  <CCol sm={4} className="fw-semibold">
-                    {agent.name}
-                  </CCol>
+                  <CCol sm={3} className="fw-semibold">{agent.name}</CCol>
 
                   {/* Assigned DID (display only) */}
                   <CCol sm={3} className="text-muted">
-                    <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {agent.did ? agent.did : '—'}
                     </div>
                   </CCol>
 
-                  <CCol sm={3}>
+                  <CCol sm={2} className="text-muted">
+                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {(() => {
+                        const did = agent.did;
+                        if (did && numberExtensions[did] !== undefined) return numberExtensions[did];
+                        return agent.raw?.extension ?? agent.raw?.extensionNumber ?? '—';
+                      })()}
+                    </div>
+                  </CCol>
+
+                  <CCol sm={2}>
                     <CFormInput
                       type="text"
                       value={phones[agent.id] || ""}
@@ -148,14 +238,26 @@ const CallSettings = () => {
                       placeholder="Enter phone number"
                     />
                   </CCol>
-                  <CCol sm={2} className="text-end">
+
+                  <CCol sm={1} className="text-end">
                     <CButton
                       color="primary"
                       onClick={() => handleSave(agent)}
                       disabled={savingIds.includes(agent.id)}
+                      size="sm"
                     >
                       {savingIds.includes(agent.id) ? 'Saving...' : 'Save'}
                     </CButton>
+                  </CCol>
+
+                  <CCol sm={1} className="text-center">
+                    <CFormSwitch
+                      id={`cf_switch_${agent.id}`}
+                      checked={!!agent.stickyBranch}
+                      onChange={() => handleToggleForward(agent)}
+                      disabled={savingForwardIds.includes(agent.id)}
+                      label=""
+                    />
                   </CCol>
                 </CRow>
               ))}
