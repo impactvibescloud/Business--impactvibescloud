@@ -53,16 +53,8 @@ const CallSettings = () => {
           const phone = branch.user?.phone || branch.phone || branch.didNumber || '';
           // try to determine assigned DID (display only). API returns `didNumbers` array.
           const did = (Array.isArray(branch.didNumbers) && branch.didNumbers[0]) || branch.didNumber || branch.did || branch.user?.didNumber || '';
-          // try to seed sticky flag from backend or local cache
-          let sticky = !!branch.stickyBranch;
-          try {
-            const key = `cf_forward_${branch._id || branch.id}`;
-            if (!sticky && typeof localStorage !== 'undefined') {
-              sticky = localStorage.getItem(key) === '1';
-            }
-          } catch (e) {
-            // ignore localStorage errors
-          }
+          // prefer explicit `callforward` flag from backend, fall back to `stickyBranch`
+          const sticky = typeof branch.callforward === 'boolean' ? branch.callforward : !!branch.stickyBranch;
           return {
             id: branch._id || branch.id,
             name,
@@ -135,21 +127,12 @@ const CallSettings = () => {
       if (next) {
         await apiCall('/v1/sipdatabase/astdb/cf', 'POST', { extension: String(extension), user_phone: String(phone) });
       } else {
-        await apiCall('/v1/sipdatabase/astdb/cf', 'DELETE', { extension: String(extension) });
+        // axios requires DELETE request bodies to be provided via `data` in the config
+        await apiCall('/v1/sipdatabase/astdb/cf', 'DELETE', null, { data: { extension: String(extension) } });
       }
 
-      await apiCall(`/branch/edit/${id}`, 'PATCH', { stickyBranch: next });
-      // persist a local flag so the UI or other parts of the app can know
-      // that call-forward was enabled for this branch (simple cache)
-      try {
-        if (next) {
-          localStorage.setItem(`cf_forward_${id}`, '1');
-        } else {
-          localStorage.removeItem(`cf_forward_${id}`);
-        }
-      } catch (e) {
-        // ignore localStorage errors (e.g. private mode)
-      }
+      // persist branch-level flag `callforward` (also keep stickyBranch for compatibility)
+      await apiCall(`/branch/edit/${id}`, 'PATCH', { stickyBranch: next, callforward: next });
     } catch (err) {
       setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, stickyBranch: !next } : a)));
       console.error('Failed to toggle forward for agent', id, err);
