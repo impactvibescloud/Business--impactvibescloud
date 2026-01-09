@@ -19,6 +19,7 @@ const CallSettings = () => {
   const [loading, setLoading] = useState(true);
   const [phones, setPhones] = useState({});
   const [savingIds, setSavingIds] = useState([]);
+  const [savingClickIds, setSavingClickIds] = useState([]);
   const [savingForwardIds, setSavingForwardIds] = useState([]);
   const [numberExtensions, setNumberExtensions] = useState({});
   const token = isAutheticated();
@@ -55,6 +56,8 @@ const CallSettings = () => {
           const did = (Array.isArray(branch.didNumbers) && branch.didNumbers[0]) || branch.didNumber || branch.did || branch.user?.didNumber || '';
           // prefer explicit `callforward` flag from backend, fall back to `stickyBranch`
           const sticky = typeof branch.callforward === 'boolean' ? branch.callforward : !!branch.stickyBranch;
+          // click-to-call initial flag: backend may expose `clickToCall` or `mobile`
+          const click = typeof branch.clickToCall === 'boolean' ? branch.clickToCall : !!(branch.mobile || branch.user?.mobile || branch.callToMobile);
           return {
             id: branch._id || branch.id,
             name,
@@ -62,6 +65,7 @@ const CallSettings = () => {
             did,
             raw: branch,
             stickyBranch: sticky,
+            clickToCall: click,
           };
         });
         setAgents(agentsArr);
@@ -150,16 +154,35 @@ const CallSettings = () => {
     const id = agent.id;
     const phone = (phones && phones[id]) || "";
     setSavingIds((s) => [...s, id]);
+    setSavingClickIds((s) => [...s, id]);
     try {
       // Patch branch - backend may accept userPhone or phone. We try userPhone first.
       const payload = { userPhone: phone };
       await apiCall(`/branch/edit/${id}`, 'PATCH', payload);
-      Swal.fire({ icon: 'success', title: 'Saved', text: `Phone for ${agent.name} updated.` });
+      // Also save mobile to AST DB for click-to-call via agent extension if available.
+      const did = agent.did || agent.raw?.didNumber || agent.raw?.did;
+      const extensionFromCache = did ? numberExtensions[did] : undefined;
+      const extension = extensionFromCache && extensionFromCache !== '—' ? extensionFromCache : (agent.raw?.extension || agent.raw?.extensionNumber || agent.raw?.didNumber || agent.raw?.did || null);
+      try {
+        if (extension) {
+          if (phone && String(phone).trim() !== '') {
+            await apiCall(`/api/agent/${encodeURIComponent(extension)}/mobile`, 'POST', { mobile: String(phone) });
+          } else {
+            // no phone provided - remove mobile mapping
+            await apiCall(`/api/agent/${encodeURIComponent(extension)}/mobile`, 'DELETE', null, { data: {} });
+          }
+        }
+        Swal.fire({ icon: 'success', title: 'Saved', text: `Phone for ${agent.name} updated.` });
+      } catch (err) {
+        console.error('Failed to update agent mobile in AST DB', err);
+        Swal.fire({ icon: 'warning', title: 'Partial save', text: `Phone saved for ${agent.name}, but AST DB update failed: ${err?.response?.data?.message || err?.message}` });
+      }
     } catch (err) {
       console.error('Failed to save phone for agent', id, err);
       Swal.fire({ icon: 'error', title: 'Error', text: err?.response?.data?.message || 'Failed to save phone' });
     } finally {
       setSavingIds((s) => s.filter((x) => x !== id));
+      setSavingClickIds((s) => s.filter((x) => x !== id));
     }
   };
 
@@ -183,7 +206,7 @@ const CallSettings = () => {
           ) : (
             <div>
               {/* Header labels for columns */}
-              <CRow className="align-items-center mb-2">
+              <CRow className="align-items-center mb-2 g-1">
                 <CCol sm={3} className="fw-semibold">Agent</CCol>
                 <CCol sm={3} className="fw-semibold text-muted">Assigned DID</CCol>
                 <CCol sm={2} className="fw-semibold">Extension</CCol>
@@ -193,7 +216,7 @@ const CallSettings = () => {
               </CRow>
 
               {agents.map((agent) => (
-                <CRow className="align-items-center mb-3" key={agent.id}>
+                <CRow className="align-items-center mb-3 g-1" key={agent.id}>
                   <CCol sm={3} className="fw-semibold">{agent.name}</CCol>
 
                   {/* Assigned DID (display only) */}
@@ -226,10 +249,10 @@ const CallSettings = () => {
                     <CButton
                       color="primary"
                       onClick={() => handleSave(agent)}
-                      disabled={savingIds.includes(agent.id)}
+                      disabled={savingIds.includes(agent.id) || savingClickIds.includes(agent.id)}
                       size="sm"
                     >
-                      {savingIds.includes(agent.id) ? 'Saving...' : 'Save'}
+                      {savingIds.includes(agent.id) || savingClickIds.includes(agent.id) ? 'Saving...' : 'Save'}
                     </CButton>
                   </CCol>
 
