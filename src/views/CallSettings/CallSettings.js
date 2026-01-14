@@ -83,6 +83,7 @@ const CallSettings = () => {
     fetchAgents();
   }, [user?.businessId]);
 
+  
   // Fetch extension info for numbers assigned to agents (DIDs)
   useEffect(() => {
     if (!agents || agents.length === 0) return;
