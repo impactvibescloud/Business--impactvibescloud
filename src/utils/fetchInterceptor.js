@@ -11,7 +11,7 @@ export const setupFetchInterceptor = () => {
   window.fetch = async (url, options = {}) => {
     // Enhanced URL interception - catch all variations of the production API URL
     if (typeof url === 'string' && (
-      url.includes('https://api-impactvibescloud.onrender.com') ||
+      url.includes('https://api.justconnect.biz') ||
       url.includes('api-impactvibescloud.onrender.com')
     )) {
       // Clean and normalize the URL

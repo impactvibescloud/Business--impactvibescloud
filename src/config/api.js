@@ -13,7 +13,7 @@ export const API_CONFIG = {
   // Development environment (can be set via REACT_APP_API_URL)
   DEV_URL: normalizeUrl(process.env.REACT_APP_API_URL) || 'http://localhost:5040',
   // Production environment: prefer explicit PRODUCTION var, then a generic BASE URL
-  PROD_URL: normalizeUrl(process.env.REACT_APP_PROD_API_URL) || normalizeUrl(process.env.REACT_APP_BASE_URL) || 'https://api-impactvibescloud.onrender.com',
+  PROD_URL: normalizeUrl(process.env.REACT_APP_PROD_API_URL) || normalizeUrl(process.env.REACT_APP_BASE_URL) || 'https://api.justconnect.biz',
   // Base API path appended to the host (we will prefix '/api' centrally)
   API_PATH: '/api'
 }
