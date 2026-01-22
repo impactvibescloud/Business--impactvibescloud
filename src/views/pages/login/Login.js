@@ -122,9 +122,9 @@ const Login = () => {
     /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[^\w\s]).{7,}$/
   );
   const history = useNavigate();
-  // Use the public Logos sidebar icon from the `public/Logos` folder
-  const adminLogo = process.env.PUBLIC_URL + "/Logos/sidebarlogo.ico";
-  const publicLogoPath = process.env.PUBLIC_URL + "/Logos/sidebarlogo.ico";
+  // Use the public logos sidebar icon from the `public/logos` folder (case-sensitive on Linux)
+  const adminLogo = process.env.PUBLIC_URL + "/logos/sidebarlogo.ico";
+  const publicLogoPath = process.env.PUBLIC_URL + "/logos/sidebarlogo.ico";
   const dark = typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('c-dark-theme');
   // const handleChange = (e) => (event) => {
 
