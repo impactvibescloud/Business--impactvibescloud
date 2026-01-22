@@ -17,6 +17,7 @@ import { cibGmail } from "@coreui/icons";
 import { createRoot } from "react-dom/client";
 import { setupAxiosInterceptors } from './utils/axiosInterceptors'
 import { setupFetchInterceptor } from './utils/fetchInterceptor'
+import { getBaseURL } from './config/api'
 import { disableConsoleOutput } from './utils/logger'
 
 // Configure debug mode - set to true to enable console logs
@@ -31,8 +32,10 @@ if (!window.DEBUG_MODE) {
 window.DEBUG_MODE = false; // Set this to false to disable most console logs
 
 const setupAxios = () => {
-  // Use proxy configuration - set baseURL to empty since package.json proxy handles routing
-  axios.defaults.baseURL = "";
+  // Set axios baseURL based on environment. In development we keep empty
+  // so local proxy/dev server can route; in production use the configured
+  // API host so the browser calls the API directly.
+  axios.defaults.baseURL = process.env.NODE_ENV === 'development' ? '' : getBaseURL();
   
   axios.defaults.headers = {
     "Cache-Control": "no-cache,no-store",
