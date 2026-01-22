@@ -10,12 +10,17 @@ export const setupFetchInterceptor = () => {
   
   window.fetch = async (url, options = {}) => {
     // Enhanced URL interception - catch all variations of the production API URL
-    if (typeof url === 'string' && (
-      url.includes('https://api.justconnect.biz') ||
-      url.includes('api-impactvibescloud.onrender.com')
-    )) {
-      // Clean and normalize the URL
-      let cleanUrl = url.replace(/^https?:\/\//, '').replace('api-impactvibescloud.onrender.com', '')
+    // Proxy rewrite is opt-in. Set `REACT_APP_FORCE_PROXY=true` to enable
+    // legacy behaviour that rewrites absolute API URLs into relative paths
+    // (so hosting-level redirects/proxy rules can forward them). For
+    // production deployments that should call the API directly, leave this
+    // unset or false.
+    if (
+      process.env.REACT_APP_FORCE_PROXY === 'true' &&
+      typeof url === 'string' && url.includes('https://api.justconnect.biz')
+    ) {
+      // Clean and normalize the URL (strip the host so hosting redirects can match)
+      let cleanUrl = url.replace(/^https?:\/\//, '').replace('https://api.justconnect.biz', '').replace(/^\/+/, '')
       if (!cleanUrl.startsWith('/')) {
         cleanUrl = '/' + cleanUrl
       }

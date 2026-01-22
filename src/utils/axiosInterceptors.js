@@ -125,11 +125,9 @@ export const setupAxiosInterceptors = () => {
         // Clean up any double api in the path
         config.url = config.url.replace(/\/api\/api\//g, '/api/')
         
-        // Handle all variations of production URLs
+        // Strip absolute production host if present so axios uses relative paths
         if (config.url.includes('https://api.justconnect.biz')) {
           config.url = config.url.replace('https://api.justconnect.biz', '')
-        } else if (config.url.includes('api-impactvibescloud.onrender.com')) {
-          config.url = config.url.replace(/.*api-impactvibescloud\.onrender\.com/, '')
         }
       }
       
