@@ -244,7 +244,7 @@ const AppSidebar = () => {
               onClick={(e) => handleLogoClick(e)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
             >
-              <img src={AdminlogoUrl ? `${AdminlogoUrl}` : '/Logos/sidebarlogo.ico'} alt="Just Connect" style={{ width: 44, height: 44, objectFit: 'contain' }} />
+              <img src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'} alt="Just Connect" style={{ width: 44, height: 44, objectFit: 'contain' }} />
             </Link>
             <button
               className="sidebar-title"
