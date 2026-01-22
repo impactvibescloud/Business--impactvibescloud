@@ -126,8 +126,8 @@ export const setupAxiosInterceptors = () => {
         config.url = config.url.replace(/\/api\/api\//g, '/api/')
         
         // Handle all variations of production URLs
-        if (config.url.includes('https://api-impactvibescloud.onrender.com')) {
-          config.url = config.url.replace('https://api-impactvibescloud.onrender.com', '')
+        if (config.url.includes('https://api.justconnect.biz')) {
+          config.url = config.url.replace('https://api.justconnect.biz', '')
         } else if (config.url.includes('api-impactvibescloud.onrender.com')) {
           config.url = config.url.replace(/.*api-impactvibescloud\.onrender\.com/, '')
         }
