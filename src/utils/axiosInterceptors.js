@@ -90,6 +90,27 @@ const generateFallbackData = (url) => {
 export const setupAxiosInterceptors = () => {
   if (interceptorsSetup) return
   
+  // If requested, force axios to use the direct backend host as baseURL
+  // This makes calls like `axios.post('/api/v1/user/login/')` target
+  // `https://api.justconnect.biz/api/v1/user/login/` directly instead
+  // of relying on dev-server proxying or stripping behavior.
+  // Configure axios baseURL according to environment:
+  // - development => http://localhost:5040
+  // - production  => https://api.justconnect.biz
+  // This can be explicitly overridden by setting `REACT_APP_USE_DIRECT_BACKEND=true`
+  // and optionally `REACT_APP_DIRECT_BACKEND_URL` for a custom URL.
+  if (process.env.REACT_APP_USE_DIRECT_BACKEND === 'true') {
+    axios.defaults.baseURL = process.env.REACT_APP_DIRECT_BACKEND_URL || 'https://api.justconnect.biz'
+    console.log('✅ Axios configured to use direct backend:', axios.defaults.baseURL)
+  } else if (!axios.defaults.baseURL) {
+    if (process.env.NODE_ENV === 'development') {
+      axios.defaults.baseURL = 'http://localhost:5040'
+    } else {
+      axios.defaults.baseURL = 'https://api.justconnect.biz'
+    }
+    console.log('✅ Axios baseURL set to:', axios.defaults.baseURL)
+  }
+  
   // Enhanced URL rewriting interceptor with session management
   axios.interceptors.request.use(
     (config) => {
@@ -126,7 +147,8 @@ export const setupAxiosInterceptors = () => {
         config.url = config.url.replace(/\/api\/api\//g, '/api/')
         
         // Strip absolute production host if present so axios uses relative paths
-        if (config.url.includes('https://api.justconnect.biz')) {
+        // Only do this when not explicitly configured to use the direct backend.
+        if (process.env.REACT_APP_USE_DIRECT_BACKEND !== 'true' && config.url.includes('https://api.justconnect.biz')) {
           config.url = config.url.replace('https://api.justconnect.biz', '')
         }
       }
