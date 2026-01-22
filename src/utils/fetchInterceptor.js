@@ -28,7 +28,42 @@ export const setupFetchInterceptor = () => {
       url = cleanUrl
     }
     
+    // Special-case: convert JSON POSTs to the login endpoint into
+    // application/x-www-form-urlencoded so the browser doesn't issue
+    // a CORS preflight OPTIONS request (makes the request "simple").
+    // This is intentionally targeted to the login endpoint only.
     try {
+      try {
+        const isLogin = typeof url === 'string' && url.includes('/api/v1/user/login')
+        const method = (options && options.method) ? options.method.toString().toUpperCase() : 'GET'
+        if (isLogin && method === 'POST' && options && options.body) {
+          // Normalize headers access (Headers instance or plain object)
+          const headers = options.headers instanceof Headers ? options.headers : Object.assign({}, options.headers || {})
+          const contentType = (headers['Content-Type'] || headers['content-type'] || '').toString().toLowerCase()
+
+          if (contentType === 'application/json') {
+            try {
+              const parsed = typeof options.body === 'string' ? JSON.parse(options.body) : options.body
+              // Only convert plain objects
+              if (parsed && typeof parsed === 'object' && !(parsed instanceof FormData)) {
+                const params = new URLSearchParams()
+                Object.keys(parsed).forEach(k => {
+                  const v = parsed[k]
+                  if (v !== undefined && v !== null) params.append(k, String(v))
+                })
+                options.body = params.toString()
+                if (options.headers instanceof Headers) options.headers.set('Content-Type', 'application/x-www-form-urlencoded')
+                else options.headers = Object.assign({}, headers, { 'Content-Type': 'application/x-www-form-urlencoded' })
+                console.warn('🔄 Converted login JSON POST to x-www-form-urlencoded to avoid preflight')
+              }
+            } catch (e) {
+              // leave body as-is if parsing fails
+            }
+          }
+        }
+      } catch (e) {
+        // ignore conversion errors and proceed
+      }
       return await originalFetch(url, options)
     } catch (error) {
       // Handle fetch errors gracefully
