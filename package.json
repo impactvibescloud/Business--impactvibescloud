@@ -18,7 +18,7 @@
     "test:debug": "react-scripts --inspect-brk test --runInBand",
     "heroku-postbuild": "npm run build"
   },
-  "homepage": ".",
+  "homepage": "/",
   "bugs": {
     "url": "https://github.com/coreui/coreui-free-react-admin-template/issues"
   },
