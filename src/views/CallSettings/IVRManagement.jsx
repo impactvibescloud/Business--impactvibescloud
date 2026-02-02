@@ -20,6 +20,7 @@ import {
   CTableHeaderCell,
   CTableDataCell,
   CSpinner,
+  CFormSwitch,
 } from '@coreui/react'
 import Swal from 'sweetalert2'
 import axios from 'axios'
@@ -33,7 +34,6 @@ const IVRManagement = () => {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [audioFile, setAudioFile] = useState(null)
-  const [menuJson, setMenuJson] = useState('')
   const [menuWelcome, setMenuWelcome] = useState('')
   const [menuRepeat, setMenuRepeat] = useState('')
   const [options, setOptions] = useState([])
@@ -96,6 +96,49 @@ const IVRManagement = () => {
     })
   }
 
+  // Attach a child mapping to a specific option (stores mapping in children array)
+  const addChildForOption = (path, optKey) => {
+    // Add a child node inside the matching option's `children` array so multiple children per option are supported
+    setTree(prev => {
+      const parent = getNodeAtPath(prev, path)
+      const options = parent.menu?.options || []
+      const found = options.findIndex(o => o.key === optKey)
+      const optIdx = found >= 0 ? found : 0
+      const child = { name: optKey || '', menu: { welcome: '', options: [], repeat: '' }, children: [] }
+      const newOptions = options.map((o, i) => i === optIdx ? { ...(o || {}), children: [...((o && o.children) || []), child] } : o)
+      const newParent = { ...parent, menu: { ...parent.menu, options: newOptions } }
+      return setNodeAtPath(prev, path, newParent)
+    })
+  }
+
+  const updateChildInOption = (path, optIndex, childIndex, newChild) => {
+    setTree(prev => {
+      const parent = getNodeAtPath(prev, path)
+      const options = parent.menu?.options || []
+      const newOptions = options.map((o, i) => {
+        if (i !== optIndex) return o
+        const children = (o.children || []).map((c, ci) => (ci === childIndex ? newChild : c))
+        return { ...o, children }
+      })
+      const newParent = { ...parent, menu: { ...parent.menu, options: newOptions } }
+      return setNodeAtPath(prev, path, newParent)
+    })
+  }
+
+  const removeChildFromOption = (path, optIndex, childIndex) => {
+    setTree(prev => {
+      const parent = getNodeAtPath(prev, path)
+      const options = parent.menu?.options || []
+      const newOptions = options.map((o, i) => {
+        if (i !== optIndex) return o
+        const children = (o.children || []).filter((_, ci) => ci !== childIndex)
+        return { ...o, children }
+      })
+      const newParent = { ...parent, menu: { ...parent.menu, options: newOptions } }
+      return setNodeAtPath(prev, path, newParent)
+    })
+  }
+
   const updateOptionAt = (path, optIndex, newOpt) => {
     setTree(prev => {
       const parent = getNodeAtPath(prev, path)
@@ -114,39 +157,107 @@ const IVRManagement = () => {
     })
   }
 
-  const NodeEditor = ({ path }) => {
-    const node = getNodeAtPath(tree, path)
+  const NodeEditor = ({ path, nodeProp, onChange }) => {
+    const resolvedNode = nodeProp || getNodeAtPath(tree, path)
+    const setNode = (newNode) => {
+      if (onChange) return onChange(newNode)
+      return updateTreeNode(path, newNode)
+    }
+    // Local helper wrappers that operate on the `node` when in `nodeProp` mode,
+    // or delegate to global functions when editing by path.
+    const updateOptionLocal = (optIdx, newOpt) => {
+      if (onChange) {
+        const newOptions = (node.menu?.options || []).map((o, i) => (i === optIdx ? newOpt : o))
+        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
+      } else {
+        updateOptionAt(path, optIdx, newOpt)
+      }
+    }
+    const addOptionLocal = () => {
+      if (onChange) {
+        const newOptions = [...(node.menu?.options || []), { key: '', text: '', destination: '', destinationType: 'menu' }]
+        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
+      } else addOptionAt(path)
+    }
+    const removeOptionLocal = (optIdx) => {
+      if (onChange) {
+        const newOptions = (node.menu?.options || []).filter((_, i) => i !== optIdx)
+        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
+      } else removeOptionAt(path, optIdx)
+    }
+    const addChildToOptionLocal = (optIdx) => {
+      if (onChange) {
+        const options = node.menu?.options || []
+        const child = { name: '', menu: { welcome: '', options: [], repeat: '' }, children: [] }
+        const newOptions = options.map((o, i) => i === optIdx ? { ...(o || {}), children: [...((o && o.children) || []), child] } : o)
+        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
+      } else {
+        const opt = (node.menu?.options || [])[optIdx]
+        addChildForOption(path, opt && opt.key)
+      }
+    }
+    const removeChildFromOptionLocal = (optIdx, childIdx) => {
+      if (onChange) {
+        const options = node.menu?.options || []
+        const newOptions = options.map((o, i) => {
+          if (i !== optIdx) return o
+          const children = (o.children || []).filter((_, ci) => ci !== childIdx)
+          return { ...o, children }
+        })
+        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
+      } else removeChildFromOption(path, optIdx, childIdx)
+    }
+    const node = resolvedNode
+    const rawChildren = node.children || []
     return (
       <div className="border rounded p-2 mb-2">
         <div className="mb-2">
-          <CFormLabel>Node Key</CFormLabel>
-          <CFormInput value={node.name || ''} onChange={(e) => updateTreeNode(path, { ...node, name: e.target.value })} placeholder="e.g. menu or SalesMenu" />
+          <CFormLabel>name</CFormLabel>
+          <CFormInput value={node.name || ''} onChange={(e) => setNode({ ...node, name: e.target.value })} placeholder="name (e.g. menu or SalesMenu)" />
         </div>
         <div className="mb-2">
-          <CFormLabel>Welcome Message</CFormLabel>
-          <CFormInput value={node.menu?.welcome || ''} onChange={(e) => updateTreeNode(path, { ...node, menu: { ...node.menu, welcome: e.target.value } })} />
+          <CFormLabel>menu.welcome</CFormLabel>
+          <CFormInput value={node.menu?.welcome || ''} onChange={(e) => setNode({ ...node, menu: { ...node.menu, welcome: e.target.value } })} />
         </div>
         <div className="mb-2">
-          <CFormLabel>Options</CFormLabel>
+          <CFormLabel>menu.options[]</CFormLabel>
           {(node.menu?.options || []).map((opt, idx) => (
-            <div className="input-group mb-2" key={idx}>
-              <CFormInput style={{ maxWidth: 80 }} value={opt.key || ''} placeholder="Key" onChange={(e) => updateOptionAt(path, idx, { ...opt, key: e.target.value })} />
-              <CFormInput value={opt.text || ''} placeholder="Option text" onChange={(e) => updateOptionAt(path, idx, { ...opt, text: e.target.value })} />
-              <select className="form-control" style={{ maxWidth: 180, marginRight: 6 }} value={opt.destinationType || 'menu'} onChange={(e) => updateOptionAt(path, idx, { ...opt, destinationType: e.target.value, destination: '' })}>
-                <option value="menu">Menu (text)</option>
-                <option value="did">DID Number</option>
-              </select>
-              { (opt.destinationType || 'menu') === 'did' ? (
-                <select className="form-control" style={{ maxWidth: 220 }} value={opt.destination || ''} onChange={(e) => updateOptionAt(path, idx, { ...opt, destination: e.target.value })}>
-                  <option value="">Select DID</option>
-                  {loadingDids ? <option disabled>Loading...</option> : didOptions.map(d => (
-                    <option key={d.id} value={d.id}>{d.number}</option>
-                  ))}
+            <div key={idx} className="mb-2">
+                <div className="input-group mb-1">
+                <CFormInput style={{ maxWidth: 80 }} value={opt.key || ''} placeholder="menu.options[].key" onChange={(e) => {
+                  const newOpt = { ...opt, key: e.target.value }
+                  updateOptionLocal(idx, newOpt)
+                }} />
+                <CFormInput value={opt.text || ''} placeholder="menu.options[].text" onChange={(e) => updateOptionLocal(idx, { ...opt, text: e.target.value })} />
+                <select className="form-control" style={{ maxWidth: 180, marginRight: 6 }} value={opt.destinationType || 'menu'} onChange={(e) => updateOptionLocal(idx, { ...opt, destinationType: e.target.value, destination: '' })}>
+                  <option value="menu">menu.options[].destination (menu)</option>
+                  <option value="did">menu.options[].destination (did)</option>
                 </select>
-              ) : (
-                <CFormInput value={opt.destination || ''} placeholder="Destination (menu name)" onChange={(e) => updateOptionAt(path, idx, { ...opt, destination: e.target.value })} />
-              )}
-              <button type="button" className="btn btn-danger" onClick={() => removeOptionAt(path, idx)}>Remove</button>
+                { (opt.destinationType || 'menu') === 'did' ? (
+                  <select className="form-control" style={{ maxWidth: 220 }} value={opt.destination || ''} onChange={(e) => updateOptionLocal(idx, { ...opt, destination: e.target.value })}>
+                    <option value="">menu.options[].destination</option>
+                    {loadingDids ? <option disabled>Loading...</option> : didOptions.map(d => (
+                      <option key={d.id} value={d.id}>{d.number}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <CFormInput value={opt.destination || ''} placeholder="menu.options[].destination" onChange={(e) => updateOptionLocal(idx, { ...opt, destination: e.target.value })} />
+                )}
+                <button type="button" className="btn btn-danger" onClick={() => removeOptionLocal(idx)}>Remove</button>
+              </div>
+              <div>
+                {(opt.children || []).map((childNode, cIdx) => (
+                  <div key={cIdx} className="ms-3 mb-2">
+                    <div className="mb-1 text-end">
+                      <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildFromOptionLocal(idx, cIdx)}>Remove Child</button>
+                    </div>
+                    <NodeEditor nodeProp={childNode} onChange={(newNode) => updateChildInOption(path, idx, cIdx, newNode)} />
+                  </div>
+                ))}
+                <div className="mt-1">
+                  <CButton color="secondary" size="sm" onClick={() => addChildToOptionLocal(idx)}>Add Child Menu</CButton>
+                </div>
+              </div>
             </div>
           ))}
           <div className="mt-2">
@@ -154,19 +265,23 @@ const IVRManagement = () => {
           </div>
         </div>
         <div className="mb-2">
-          <CFormLabel>Repeat Message</CFormLabel>
-          <CFormInput value={node.menu?.repeat || ''} onChange={(e) => updateTreeNode(path, { ...node, menu: { ...node.menu, repeat: e.target.value } })} />
+          <CFormLabel>menu.repeat</CFormLabel>
+          <CFormInput value={node.menu?.repeat || ''} onChange={(e) => setNode({ ...node, menu: { ...node.menu, repeat: e.target.value } })} />
         </div>
         <div className="mb-2">
-          <CFormText className="text-muted">Children menus</CFormText>
-          {(node.children || []).map((ch, idx) => (
-            <div key={idx} className="ms-3">
-              <NodeEditor path={[...path, idx]} />
-              <div className="mb-2 text-end">
-                <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildAt(path, idx)}>Remove Child</button>
+          <CFormText className="text-muted">children (unattached)</CFormText>
+          {(rawChildren || []).map((ch, idx) => {
+            // skip attached mapping children (those with key+child/children that match an option)
+            if (ch && ch.key && (ch.child || ch.children) && (node.menu?.options || []).some(o => o.key === ch.key)) return null
+            return (
+              <div key={idx} className="ms-3">
+                <NodeEditor path={[...path, idx]} />
+                <div className="mb-2 text-end">
+                  <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildAt(path, idx)}>Remove Child</button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           <div>
             <CButton color="secondary" size="sm" onClick={() => addChildAt(path)}>Add Child Menu</CButton>
           </div>
@@ -245,21 +360,12 @@ const IVRManagement = () => {
     }
 
     try {
-      // If user built the menu using form fields or provided menuJson, call the nested create endpoint
-      const hasMenuForm = menuJson && menuJson.trim().length > 0 || (tree && (tree.menu && (tree.menu.welcome || (tree.menu.options && tree.menu.options.length > 0) || tree.menu.repeat) || (tree.children && tree.children.length > 0)))
+      // If user built the menu using the visual editor, call the nested create endpoint
+      const hasMenuForm = (tree && (tree.menu && (tree.menu.welcome || (tree.menu.options && tree.menu.options.length > 0) || tree.menu.repeat) || (tree.children && tree.children.length > 0)))
       if (hasMenuForm) {
-        let payloadTree = null
-        if (menuJson && menuJson.trim().length > 0) {
-          try {
-            payloadTree = JSON.parse(menuJson)
-          } catch (e) {
-            return Swal.fire({ icon: 'error', title: 'Invalid JSON', text: 'Menu JSON is not valid.' })
-          }
-        } else {
-          // use the tree state; ensure it has a name
-          payloadTree = { ...tree }
-          if (!payloadTree.name) payloadTree.name = name || 'menu'
-        }
+        // use the tree state; ensure it has a name
+        const payloadTree = { ...tree }
+        if (!payloadTree.name) payloadTree.name = name || 'menu'
         const url = `${getBaseURL()}/api/ivr/create-nested`
         await axios.post(url, { businessId, tree: payloadTree }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
       } else if (audioFile) {
@@ -282,7 +388,6 @@ const IVRManagement = () => {
       setName('')
       setDescription('')
       setAudioFile(null)
-      setMenuJson('')
       setMenuWelcome('')
       setMenuRepeat('')
       setOptions([])
@@ -416,7 +521,28 @@ const IVRManagement = () => {
           </div>
         )}
         {menu.repeat ? <div className="text-muted">Repeat: {menu.repeat}</div> : null}
-        {/* children may be an array of { key, destination, child } or array of nodes */}
+        {/* Option-level children (menu.options[].children) */}
+        {menu.options && menu.options.length > 0 && (
+          <div className="mt-2">
+            <small className="text-muted">Option Children:</small>
+            <div>
+              {menu.options.map((o, i) => (
+                (o.children && o.children.length > 0) ? (
+                  <div key={i} className="mb-2">
+                    <div className="text-muted">On press <strong>{o.key}</strong> → {o.text}</div>
+                    {o.children.map((child, ci) => (
+                      <div key={ci} className="ms-3 mb-1">
+                        <TreeViewer node={child} level={level + 1} />
+                      </div>
+                    ))}
+                  </div>
+                ) : null
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* children may also be an array of nodes or old-style mappings on the node */}
         {children && children.length > 0 && (
           <div className="mt-2">
             <small className="text-muted">Children:</small>
@@ -473,9 +599,35 @@ const IVRManagement = () => {
     setExpandedKeys(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k])
   }
 
+  const [switchingIds, setSwitchingIds] = useState([])
+  const isSwitching = (id) => switchingIds.includes(id)
+
+  const handleSwitch = async (ivr, turnOn) => {
+    const id = ivr._id || ivr.id || ivr.name
+    if (!id) return Swal.fire({ icon: 'error', title: 'Invalid IVR' })
+    const statusLower = (ivr.ivrStatus || ivr.status || ivr.state || '').toString().toLowerCase()
+    // If caller provided explicit desired state, use it. Otherwise fall back to previous toggle logic.
+    const action = typeof turnOn === 'boolean' ? (turnOn ? 'on' : 'off') : (statusLower === 'off' ? 'off' : ((statusLower === 'on' || statusLower === 'active') ? 'off' : 'on'))
+    try {
+      setSwitchingIds(prev => [...prev, id])
+      const payload = { action, name: ivr.name || ivr.fileName || ivr.file || '', businessId }
+      const url = `${getBaseURL()}/api/ivr/switch`
+      await axios.post(url, payload, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
+      Swal.fire({ icon: 'success', title: `Switched ${action}` })
+      await fetchIvrs()
+    } catch (err) {
+      console.error('Switch failed', err)
+      const msg = err?.response?.data?.message || err?.message || 'Switch failed'
+      Swal.fire({ icon: 'error', title: 'Switch failed', text: msg })
+    } finally {
+      setSwitchingIds(prev => prev.filter(x => x !== id))
+    }
+  }
+
   const renderTreeRows = (node, level = 0, path = '') => {
     if (!node) return []
     const key = node._id || node.name || path || Math.random().toString(36).slice(2)
+    const id = node._id || node.id || node.name || key
     const indentStyle = { paddingLeft: `${level * 18}px` }
     const rows = []
     rows.push(
@@ -501,6 +653,13 @@ const IVRManagement = () => {
         <CTableDataCell>{node.status || node.state || '-'}</CTableDataCell>
         <CTableDataCell>{node.createdAt ? new Date(node.createdAt).toLocaleString() : '-'}</CTableDataCell>
         <CTableDataCell>
+          {isSwitching(id) && <CSpinner size="sm" className="me-2" />}
+          {(() => {
+            const isOn = ((node.ivrStatus || node.status || node.state || '').toString().toLowerCase() === 'on' || (node.ivrStatus || node.status || '').toString().toLowerCase() === 'active')
+            return (
+              <CFormSwitch checked={isOn} className="me-2" disabled={isSwitching(id)} onChange={(e) => handleSwitch(node, e.target.checked)} />
+            )
+          })()}
           { (node.name || node.fileName || node.audio) && (
             <CButton color="info" size="sm" className="me-2" onClick={() => handlePlay(node)}>
               {playingId === (node._id || node.id) ? 'Stop' : 'Play'}
@@ -556,23 +715,15 @@ const IVRManagement = () => {
             </CModalHeader>
             <CModalBody>
               <div className="mb-3">
-                <CFormLabel>IVR Name</CFormLabel>
-                <CFormInput value={name} onChange={(e) => setName(e.target.value)} placeholder="IVR name" />
+                <CFormLabel>name</CFormLabel>
+                <CFormInput value={name} onChange={(e) => setName(e.target.value)} placeholder="name" />
               </div>
               <div className="mb-3">
-                <CFormLabel>Description</CFormLabel>
-                <CFormInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description" />
+                <CFormLabel>description</CFormLabel>
+                <CFormInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="description" />
               </div>
-              <div className="mb-3">
-                <CFormLabel>Audio Prompt (optional)</CFormLabel>
-                <CFormInput type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} ref={audioRef} />
-                <CFormText className="text-muted">Upload an audio prompt for this IVR.</CFormText>
-              </div>
-                <div className="mb-3">
-                  <CFormLabel>Menu JSON (optional)</CFormLabel>
-                  <textarea className="form-control" rows={6} value={menuJson} onChange={(e) => setMenuJson(e.target.value)} placeholder='Paste full tree JSON matching the create-nested API (or leave empty to use the visual editor)' />
-                  <CFormText className="text-muted">If provided, this JSON will be sent directly to `/api/ivr/create-nested` as the tree.</CFormText>
-                </div>
+              
+                
 
                 <div className="mb-3">
                   <CFormLabel>Build Menu (visual editor)</CFormLabel>
