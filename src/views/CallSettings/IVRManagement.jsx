@@ -498,12 +498,33 @@ const IVRManagement = () => {
     if (payloadTree) setTree(normalizeTree(payloadTree))
   }, [ivrs])
 
+  // Clean tree payload - remove nested children that came from API, only send what user entered in visual editor
+  const cleanTreeForSave = (t) => {
+    if (!t) return t
+    const cleanedTree = {
+      name: t.name || 'menu',
+      menu: {
+        welcome: t.menu?.welcome || '',
+        options: (t.menu?.options || []).map(opt => ({
+          key: opt.key || '',
+          text: opt.text || '',
+          destination: opt.destination || '',
+          destinationType: opt.destinationType || 'menu',
+          // Don't include children array - those are populated from API and shouldn't be sent back
+        })),
+        repeat: t.menu?.repeat || '',
+      },
+      // Don't include children array - that's populated from API response
+    }
+    return cleanedTree
+  }
+
   const handleSave = async (existingIvr) => {
     if (!businessId) return Swal.fire({ icon: 'warning', title: 'Missing business', text: 'Business ID not available' })
     try {
       const hasMenuForm = (tree && (tree.menu && (tree.menu.welcome || (tree.menu.options && tree.menu.options.length > 0) || tree.menu.repeat) || (tree.children && tree.children.length > 0)))
       if (hasMenuForm) {
-        const payloadTree = { ...tree }
+        const payloadTree = cleanTreeForSave(tree)
         if (!payloadTree.name) payloadTree.name = name || 'menu'
         const url = `${getBaseURL()}/api/ivr/create-nested`
         await axios.post(url, { businessId, tree: payloadTree }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
@@ -544,7 +565,7 @@ const IVRManagement = () => {
       const hasMenuForm = (tree && (tree.menu && (tree.menu.welcome || (tree.menu.options && tree.menu.options.length > 0) || tree.menu.repeat) || (tree.children && tree.children.length > 0)))
       if (hasMenuForm) {
         // use the tree state; ensure it has a name
-        const payloadTree = { ...tree }
+        const payloadTree = cleanTreeForSave(tree)
         if (!payloadTree.name) payloadTree.name = name || 'menu'
         const url = `${getBaseURL()}/api/ivr/create-nested`
         await axios.post(url, { businessId, tree: payloadTree }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
@@ -607,8 +628,7 @@ const IVRManagement = () => {
   }
 
   const handlePlay = async (ivr) => {
-    const id = ivr._id || ivr.id
-    // Prefer using the IVR 'name' as the download key (example: /api/ivr/download/menu)
+    const id = ivr._id || ivr.id || ivr.name
     const fileKey = ivr.name || ivr.fileName || ivr.file || ''
     if (!fileKey) return Swal.fire({ icon: 'error', title: 'No audio', text: 'No audio file available for this IVR.' })
 
@@ -618,27 +638,19 @@ const IVRManagement = () => {
       return
     }
 
+    // Use same approach as handleOpenInNewTab - fetch with auth, create blob, open in new tab
     try {
-      // stop any existing
       handleStop()
       const url = `${getBaseURL()}/api/ivr/download/${encodeURIComponent(fileKey)}`
-      // request as arraybuffer to ensure we receive raw bytes
-      const resp = await axios.get(url, { responseType: 'arraybuffer', headers: { Authorization: `Bearer ${token}` } })
-      const contentType = resp.headers && resp.headers['content-type'] ? resp.headers['content-type'] : 'audio/wav'
-      const blob = new Blob([resp.data], { type: contentType })
+      const resp = await axios.get(url, { responseType: 'blob', headers: { Authorization: `Bearer ${token}` } })
+      const blob = new Blob([resp.data], { type: resp.data.type || 'audio/wav' })
       const objectUrl = window.URL.createObjectURL(blob)
-      setPlayingUrl(objectUrl)
-      setPlayingId(id)
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.src = objectUrl
-        // ensure audio element loads the new source
-        try { audioPlayerRef.current.load() } catch (e) { /* ignore */ }
-        try { await audioPlayerRef.current.play() } catch (e) { /* autoplay might be blocked */ }
-      }
+      window.open(objectUrl, '_blank')
+      // revoke after a delay
+      setTimeout(() => { try { window.URL.revokeObjectURL(objectUrl) } catch (e) {} }, 60000)
     } catch (err) {
       console.error('Play failed', err)
-      const message = err?.response?.data || err?.message || 'Could not play audio'
-      Swal.fire({ icon: 'error', title: 'Play failed', text: message })
+      Swal.fire({ icon: 'error', title: 'Play failed', text: err?.response?.data?.message || err?.message || 'Could not play audio' })
     }
   }
 
@@ -943,6 +955,16 @@ const IVRManagement = () => {
                           </div>
                         )}
                         <div className="text-end">
+                          {ivr && (
+                            <CButton 
+                              color={playingId === (ivr._id || ivr.id || ivr.name) ? 'warning' : 'info'} 
+                              size="sm" 
+                              className="me-2" 
+                              onClick={() => handlePlay(ivr)}
+                            >
+                              {playingId === (ivr._id || ivr.id || ivr.name) ? 'Stop' : 'Play'}
+                            </CButton>
+                          )}
                           {ivr && <CButton color="secondary" size="sm" className="me-2" onClick={() => handleShowTree(ivr)}>View Tree</CButton>}
                           {ivr && <CButton color="danger" size="sm" className="me-2" onClick={() => handleDelete(ivr)}>Delete</CButton>}
                           <CButton color="primary" onClick={() => handleSave(ivr)}>{ivr ? 'Save' : 'Create'}</CButton>
