@@ -50,6 +50,11 @@ const IVRManagement = () => {
   const [activeTree, setActiveTree] = useState(null)
   const [treeLoading, setTreeLoading] = useState(false)
 
+  const getLevelBg = (level) => {
+    const levelColors = ['#e8fff0', '#e8f7ff', '#fff7e0', '#f7e8ff', '#ffffff']
+    return levelColors[level] || (level % 2 === 0 ? '#f7f7f7' : '#eef7f7')
+  }
+
   // Helpers to manage tree state immutably by path (path is array of child indices)
   const getNodeAtPath = (node, path) => {
     if (!path || path.length === 0) return node
@@ -157,67 +162,107 @@ const IVRManagement = () => {
     })
   }
 
-  const NodeEditor = ({ path, nodeProp, onChange }) => {
+  const NodeEditor = ({ path, nodeProp, onChange, level = 0 }) => {
     const resolvedNode = nodeProp || getNodeAtPath(tree, path)
+    const [localNode, setLocalNode] = useState(resolvedNode)
+    const containerRef = useRef(null)
+    const [expandedOptChildren, setExpandedOptChildren] = useState(() => new Set())
+    const [expandedChildren, setExpandedChildren] = useState(() => new Set())
+    useEffect(() => {
+      try {
+        // If an input inside this editor is focused, avoid overwriting local state (prevents blur/caret issues)
+        const active = document && document.activeElement
+        if (containerRef.current && active && containerRef.current.contains(active)) {
+          return
+        }
+      } catch (e) {
+        // ignore (server-side or test env)
+      }
+      setLocalNode(resolvedNode)
+    }, [resolvedNode])
+
     const setNode = (newNode) => {
-      if (onChange) return onChange(newNode)
-      return updateTreeNode(path, newNode)
+      // only update local copy — defer committing to parent until blur or explicit commit
+      setLocalNode(newNode)
     }
+
+    const commitNode = (nodeToCommit) => {
+      if (!nodeToCommit) nodeToCommit = localNode
+      if (syncTimer.current) {
+        clearTimeout(syncTimer.current)
+        syncTimer.current = null
+      }
+      if (onChange) return onChange(nodeToCommit)
+      return updateTreeNode(path, nodeToCommit)
+    }
+
+    const syncTimer = useRef(null)
+    useEffect(() => {
+      return () => { if (syncTimer.current) clearTimeout(syncTimer.current) }
+    }, [])
     // Local helper wrappers that operate on the `node` when in `nodeProp` mode,
     // or delegate to global functions when editing by path.
     const updateOptionLocal = (optIdx, newOpt) => {
-      if (onChange) {
-        const newOptions = (node.menu?.options || []).map((o, i) => (i === optIdx ? newOpt : o))
-        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
-      } else {
-        updateOptionAt(path, optIdx, newOpt)
-      }
+      const newOptions = (localNode.menu?.options || []).map((o, i) => (i === optIdx ? newOpt : o))
+      const newLocal = { ...localNode, menu: { ...localNode.menu, options: newOptions } }
+      setNode(newLocal)
     }
     const addOptionLocal = () => {
-      if (onChange) {
-        const newOptions = [...(node.menu?.options || []), { key: '', text: '', destination: '', destinationType: 'menu' }]
-        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
-      } else addOptionAt(path)
+      const newOptions = [...(localNode.menu?.options || []), { key: '', text: '', destination: '', destinationType: 'menu' }]
+      const newLocal = { ...localNode, menu: { ...localNode.menu, options: newOptions } }
+      setNode(newLocal)
+      // commit structural change immediately
+      commitNode(newLocal)
     }
     const removeOptionLocal = (optIdx) => {
-      if (onChange) {
-        const newOptions = (node.menu?.options || []).filter((_, i) => i !== optIdx)
-        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
-      } else removeOptionAt(path, optIdx)
+      const newOptions = (localNode.menu?.options || []).filter((_, i) => i !== optIdx)
+      const newLocal = { ...localNode, menu: { ...localNode.menu, options: newOptions } }
+      setNode(newLocal)
+      commitNode(newLocal)
     }
     const addChildToOptionLocal = (optIdx) => {
-      if (onChange) {
-        const options = node.menu?.options || []
-        const child = { name: '', menu: { welcome: '', options: [], repeat: '' }, children: [] }
-        const newOptions = options.map((o, i) => i === optIdx ? { ...(o || {}), children: [...((o && o.children) || []), child] } : o)
-        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
-      } else {
-        const opt = (node.menu?.options || [])[optIdx]
-        addChildForOption(path, opt && opt.key)
+      const options = localNode.menu?.options || []
+      const child = { name: '', menu: { welcome: '', options: [], repeat: '' }, children: [] }
+      const newOptions = options.map((o, i) => i === optIdx ? { ...(o || {}), children: [...((o && o.children) || []), child] } : o)
+      const newLocal = { ...localNode, menu: { ...localNode.menu, options: newOptions } }
+      setNode(newLocal)
+      commitNode(newLocal)
+    }
+
+    const addChildLocal = () => {
+      if (path && path.length >= 0) {
+        // when editing by path, delegate to global helper
+        return addChildAt(path)
       }
+      const child = { name: '', menu: { welcome: '', options: [], repeat: '' }, children: [] }
+      const newLocal = { ...localNode, children: [...(localNode.children || []), child] }
+      setNode(newLocal)
+      commitNode(newLocal)
     }
     const removeChildFromOptionLocal = (optIdx, childIdx) => {
-      if (onChange) {
-        const options = node.menu?.options || []
-        const newOptions = options.map((o, i) => {
-          if (i !== optIdx) return o
-          const children = (o.children || []).filter((_, ci) => ci !== childIdx)
-          return { ...o, children }
-        })
-        setNode({ ...node, menu: { ...node.menu, options: newOptions } })
-      } else removeChildFromOption(path, optIdx, childIdx)
+      const options = localNode.menu?.options || []
+      const newOptions = options.map((o, i) => {
+        if (i !== optIdx) return o
+        const children = (o.children || []).filter((_, ci) => ci !== childIdx)
+        return { ...o, children }
+      })
+      const newLocal = { ...localNode, menu: { ...localNode.menu, options: newOptions } }
+      setNode(newLocal)
+      commitNode(newLocal)
     }
-    const node = resolvedNode
+    // determine effective level: prefer path depth if editing by path, otherwise use explicit level prop
+    const effectiveLevel = (Array.isArray(path) ? path.length : level) || 0
+    const node = localNode
     const rawChildren = node.children || []
     return (
-      <div className="border rounded p-2 mb-2">
+      <div ref={containerRef} className="border rounded p-2 mb-2" style={{ backgroundColor: getLevelBg(effectiveLevel) }}>
         <div className="mb-2">
           <CFormLabel>name</CFormLabel>
-          <CFormInput value={node.name || ''} onChange={(e) => setNode({ ...node, name: e.target.value })} placeholder="name (e.g. menu or SalesMenu)" />
+          <CFormInput value={node.name || ''} onChange={(e) => setNode({ ...node, name: e.target.value })} onBlur={() => commitNode()} placeholder="name (e.g. menu or SalesMenu)" />
         </div>
         <div className="mb-2">
           <CFormLabel>menu.welcome</CFormLabel>
-          <CFormInput value={node.menu?.welcome || ''} onChange={(e) => setNode({ ...node, menu: { ...node.menu, welcome: e.target.value } })} />
+          <CFormInput value={node.menu?.welcome || ''} onChange={(e) => setNode({ ...node, menu: { ...node.menu, welcome: e.target.value } })} onBlur={() => commitNode()} />
         </div>
         <div className="mb-2">
           <CFormLabel>menu.options[]</CFormLabel>
@@ -227,33 +272,50 @@ const IVRManagement = () => {
                 <CFormInput style={{ maxWidth: 80 }} value={opt.key || ''} placeholder="menu.options[].key" onChange={(e) => {
                   const newOpt = { ...opt, key: e.target.value }
                   updateOptionLocal(idx, newOpt)
-                }} />
-                <CFormInput value={opt.text || ''} placeholder="menu.options[].text" onChange={(e) => updateOptionLocal(idx, { ...opt, text: e.target.value })} />
-                <select className="form-control" style={{ maxWidth: 180, marginRight: 6 }} value={opt.destinationType || 'menu'} onChange={(e) => updateOptionLocal(idx, { ...opt, destinationType: e.target.value, destination: '' })}>
+                }} onBlur={() => commitNode()} />
+                <CFormInput value={opt.text || ''} placeholder="menu.options[].text" onChange={(e) => updateOptionLocal(idx, { ...opt, text: e.target.value })} onBlur={() => commitNode()} />
+                <select className="form-control" style={{ maxWidth: 180, marginRight: 6 }} value={opt.destinationType || 'menu'} onChange={(e) => updateOptionLocal(idx, { ...opt, destinationType: e.target.value, destination: '' })} onBlur={() => commitNode()}>
                   <option value="menu">menu.options[].destination (menu)</option>
                   <option value="did">menu.options[].destination (did)</option>
                 </select>
                 { (opt.destinationType || 'menu') === 'did' ? (
-                  <select className="form-control" style={{ maxWidth: 220 }} value={opt.destination || ''} onChange={(e) => updateOptionLocal(idx, { ...opt, destination: e.target.value })}>
+                  <select className="form-control" style={{ maxWidth: 220 }} value={opt.destination || ''} onChange={(e) => updateOptionLocal(idx, { ...opt, destination: e.target.value })} onBlur={() => commitNode()}>
                     <option value="">menu.options[].destination</option>
                     {loadingDids ? <option disabled>Loading...</option> : didOptions.map(d => (
                       <option key={d.id} value={d.id}>{d.number}</option>
                     ))}
                   </select>
                 ) : (
-                  <CFormInput value={opt.destination || ''} placeholder="menu.options[].destination" onChange={(e) => updateOptionLocal(idx, { ...opt, destination: e.target.value })} />
+                  <CFormInput value={opt.destination || ''} placeholder="menu.options[].destination" onChange={(e) => updateOptionLocal(idx, { ...opt, destination: e.target.value })} onBlur={() => commitNode()} />
                 )}
                 <button type="button" className="btn btn-danger" onClick={() => removeOptionLocal(idx)}>Remove</button>
               </div>
               <div>
-                {(opt.children || []).map((childNode, cIdx) => (
-                  <div key={cIdx} className="ms-3 mb-2">
-                    <div className="mb-1 text-end">
-                      <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildFromOptionLocal(idx, cIdx)}>Remove Child</button>
-                    </div>
-                    <NodeEditor nodeProp={childNode} onChange={(newNode) => updateChildInOption(path, idx, cIdx, newNode)} />
-                  </div>
-                ))}
+                      {(opt.children || []).map((childNode, cIdx) => {
+                        const childKey = `opt-${idx}-child-${cIdx}`
+                        const isExpandedChild = expandedOptChildren.has(childKey)
+                        return (
+                          <div key={cIdx} className="ms-3 mb-2">
+                            <div className="d-flex justify-content-between mb-1">
+                              <div className="text-muted small">{childNode.name || childNode.fileName || 'Child Menu'}</div>
+                              <div>
+                                <CButton color="light" size="sm" className="me-2" onClick={() => {
+                                  setExpandedOptChildren(prev => {
+                                    const copy = new Set(prev)
+                                    if (copy.has(childKey)) copy.delete(childKey)
+                                    else copy.add(childKey)
+                                    return copy
+                                  })
+                                }}>{isExpandedChild ? 'Collapse' : 'Expand'}</CButton>
+                                <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildFromOptionLocal(idx, cIdx)}>Remove Child</button>
+                              </div>
+                            </div>
+                            {isExpandedChild ? (
+                              <NodeEditor nodeProp={childNode} level={effectiveLevel + 1} onChange={(newNode) => updateChildInOption(path, idx, cIdx, newNode)} />
+                            ) : null}
+                          </div>
+                        )
+                      })}
                 <div className="mt-1">
                   <CButton color="secondary" size="sm" onClick={() => addChildToOptionLocal(idx)}>Add Child Menu</CButton>
                 </div>
@@ -261,29 +323,42 @@ const IVRManagement = () => {
             </div>
           ))}
           <div className="mt-2">
-            <CButton color="secondary" size="sm" onClick={() => addOptionAt(path)}>Add Option</CButton>
+            <CButton color="secondary" size="sm" onClick={() => addOptionLocal()}>Add Option</CButton>
           </div>
         </div>
         <div className="mb-2">
           <CFormLabel>menu.repeat</CFormLabel>
-          <CFormInput value={node.menu?.repeat || ''} onChange={(e) => setNode({ ...node, menu: { ...node.menu, repeat: e.target.value } })} />
+          <CFormInput value={node.menu?.repeat || ''} onChange={(e) => setNode({ ...node, menu: { ...node.menu, repeat: e.target.value } })} onBlur={() => commitNode()} />
         </div>
         <div className="mb-2">
           <CFormText className="text-muted">children (unattached)</CFormText>
           {(rawChildren || []).map((ch, idx) => {
             // skip attached mapping children (those with key+child/children that match an option)
             if (ch && ch.key && (ch.child || ch.children) && (node.menu?.options || []).some(o => o.key === ch.key)) return null
+            const childKey = `child-${idx}`
+            const isExpanded = expandedChildren.has(childKey)
             return (
-              <div key={idx} className="ms-3">
-                <NodeEditor path={[...path, idx]} />
-                <div className="mb-2 text-end">
-                  <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildAt(path, idx)}>Remove Child</button>
+              <div key={idx} className="ms-3 mb-2">
+                <div className="d-flex justify-content-between mb-1">
+                  <div className="text-muted small">{ch.name || ch.fileName || 'Child Menu'}</div>
+                  <div>
+                    <CButton color="light" size="sm" className="me-2" onClick={() => setExpandedChildren(prev => {
+                      const copy = new Set(prev)
+                      if (copy.has(childKey)) copy.delete(childKey)
+                      else copy.add(childKey)
+                      return copy
+                    })}>{isExpanded ? 'Collapse' : 'Expand'}</CButton>
+                    <button type="button" className="btn btn-sm btn-danger" onClick={() => removeChildAt(path, idx)}>Remove Child</button>
+                  </div>
                 </div>
+                {isExpanded ? (
+                  <NodeEditor path={[...path, idx]} level={effectiveLevel + 1} />
+                ) : null}
               </div>
             )
           })}
           <div>
-            <CButton color="secondary" size="sm" onClick={() => addChildAt(path)}>Add Child Menu</CButton>
+            <CButton color="secondary" size="sm" onClick={() => addChildLocal()}>Add Child Menu</CButton>
           </div>
         </div>
       </div>
@@ -353,9 +428,114 @@ const IVRManagement = () => {
     }
   }
 
+  // populate form when single IVR exists
+  useEffect(() => {
+    if (!displayedIvrs) return
+    if (displayedIvrs.length === 0) {
+      // clear form for fresh creation when no IVR exists
+      setName('')
+      setDescription('')
+      setAudioFile(null)
+      setTree({ name: '', menu: { welcome: '', options: [], repeat: '' }, children: [] })
+      return
+    }
+    const ivr = displayedIvrs[0]
+    setName(ivr.name || '')
+    setDescription(ivr.description || '')
+    // try to populate tree shape
+    let payloadTree = null
+    if (ivr.tree) payloadTree = ivr.tree
+    else if (ivr.menu) payloadTree = { name: ivr.name || '', menu: ivr.menu, children: ivr.children || [] }
+    else payloadTree = ivr
+    // normalize option children: if option children reference ivr ids, replace with full child node from tree.children
+    const normalizeTree = (t) => {
+      if (!t) return t
+      const map = new Map()
+      // collect direct child nodes from tree.children which may contain { key, destination, child }
+      if (Array.isArray(t.children)) {
+        t.children.forEach(c => {
+          if (c && c.child && (c.child._id || c.child.id)) {
+            map.set(c.child._id || c.child.id, c.child)
+          } else if (c && (c._id || c.id)) {
+            map.set(c._id || c.id, c)
+          }
+        })
+      }
+      // also collect any children that may appear under menu.options[].children as full nodes
+      if (t.menu && Array.isArray(t.menu.options)) {
+        t.menu.options.forEach(o => {
+          if (o && Array.isArray(o.children)) {
+            o.children.forEach(ch => {
+              const id = ch && (ch._id || ch.ivrId || ch.id)
+              if (id && ch.menu) {
+                map.set(id, ch)
+              }
+            })
+          }
+        })
+      }
+
+      // replace shallow children with full nodes when possible
+      if (t.menu && Array.isArray(t.menu.options)) {
+        t.menu.options = t.menu.options.map(o => {
+          if (!o) return o
+          if (Array.isArray(o.children)) {
+            o.children = o.children.map(ch => {
+              const id = ch && (ch._id || ch.ivrId || ch.id)
+              if (id && map.has(id)) return map.get(id)
+              // if child already has menu, keep as-is
+              if (ch && ch.menu) return ch
+              // otherwise construct a minimal node so inputs render
+              return { name: ch.name || '', fileName: ch.fileName || ch.file || '', businessId: ch.businessId || t.businessId || '', menu: ch.menu || { welcome: '', options: [], repeat: '' }, children: ch.children || [] }
+            })
+          }
+          return o
+        })
+      }
+      return t
+    }
+
+    if (payloadTree) setTree(normalizeTree(payloadTree))
+  }, [ivrs])
+
+  const handleSave = async (existingIvr) => {
+    if (!businessId) return Swal.fire({ icon: 'warning', title: 'Missing business', text: 'Business ID not available' })
+    try {
+      const hasMenuForm = (tree && (tree.menu && (tree.menu.welcome || (tree.menu.options && tree.menu.options.length > 0) || tree.menu.repeat) || (tree.children && tree.children.length > 0)))
+      if (hasMenuForm) {
+        const payloadTree = { ...tree }
+        if (!payloadTree.name) payloadTree.name = name || 'menu'
+        const url = `${getBaseURL()}/api/ivr/create-nested`
+        await axios.post(url, { businessId, tree: payloadTree }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
+      } else if (audioFile) {
+        const form = new FormData()
+        form.append('name', name)
+        form.append('description', description)
+        form.append('businessId', businessId)
+        form.append('audio', audioFile)
+        const url = `${getBaseURL()}/api/ivr`
+        await axios.post(url, form, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+        })
+      } else {
+        const url = `${getBaseURL()}/api/ivr`
+        await axios.post(url, { name, description, businessId }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
+      }
+      Swal.fire({ icon: 'success', title: existingIvr ? 'Saved' : 'Created' })
+      // reset audio input
+      if (audioRef.current) audioRef.current.value = ''
+      setAudioFile(null)
+      await fetchIvrs()
+    } catch (err) {
+      console.error('Save failed', err)
+      const msg = err?.response?.data?.message || err?.message || 'Save failed'
+      Swal.fire({ icon: 'error', title: 'Save failed', text: msg })
+    }
+  }
+
   const handleCreate = async () => {
-    if (!name || !businessId) {
-      Swal.fire({ icon: 'warning', title: 'Missing fields', text: 'Please provide a name.' })
+    if (!businessId) {
+      Swal.fire({ icon: 'warning', title: 'Missing fields', text: 'Business ID not available.' })
       return
     }
 
@@ -507,7 +687,7 @@ const IVRManagement = () => {
     const menu = node.menu || {}
     const children = node.children || []
     return (
-      <div style={indent} className="mb-2">
+      <div style={{ ...indent, backgroundColor: getLevelBg(level), borderRadius: 4 }} className="mb-2 p-2">
         <div><strong>{node.name || node.fileName || 'Menu'}</strong> {node.fileName ? <span className="text-muted">({node.fileName})</span> : null}</div>
         {menu.welcome ? <div className="text-muted">{menu.welcome}</div> : null}
         {menu.options && menu.options.length > 0 && (
@@ -631,27 +811,24 @@ const IVRManagement = () => {
     const indentStyle = { paddingLeft: `${level * 18}px` }
     const rows = []
     rows.push(
-      <CTableRow key={`node-${key}`}>
+      <CTableRow key={`node-${key}`} style={{ backgroundColor: getLevelBg(level) }}>
         <CTableDataCell>
           <div style={indentStyle} className="d-flex align-items-center">
             { (node.children && node.children.length > 0) ? (
               <CButton color="light" size="sm" className="me-2" onClick={() => toggleExpand(key)}>{isExpanded(key) ? '▾' : '▸'}</CButton>
             ) : <span style={{ width: 34 }} /> }
             <div>
-              <div><strong>{node.name || node.fileName || 'Menu'}</strong></div>
+              <div><strong>{node.name || 'Menu'}</strong></div>
               {node.menu && node.menu.welcome ? <div className="text-muted small">{node.menu.welcome}</div> : null}
             </div>
           </div>
         </CTableDataCell>
-        <CTableDataCell>{node.description || '-'}</CTableDataCell>
         <CTableDataCell>
           { (node.name || node.fileName) ? (
             <CButton color="link" size="sm" className="p-0" onClick={() => handleOpenInNewTab(node)}>{node.name || node.fileName}</CButton>
           ) : (node.audio ? <a href={node.audio} target="_blank" rel="noreferrer">Play</a> : '-')}
         </CTableDataCell>
         <CTableDataCell style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>{(node.menu && node.menu.options && node.menu.options.map(o=>`${o.key}:${o.text}`).join(', ')) || node.generatedText || '-'}</CTableDataCell>
-        <CTableDataCell>{node.status || node.state || '-'}</CTableDataCell>
-        <CTableDataCell>{node.createdAt ? new Date(node.createdAt).toLocaleString() : '-'}</CTableDataCell>
         <CTableDataCell>
           {isSwitching(id) && <CSpinner size="sm" className="me-2" />}
           {(() => {
@@ -660,11 +837,8 @@ const IVRManagement = () => {
               <CFormSwitch checked={isOn} className="me-2" disabled={isSwitching(id)} onChange={(e) => handleSwitch(node, e.target.checked)} />
             )
           })()}
-          { (node.name || node.fileName || node.audio) && (
-            <CButton color="info" size="sm" className="me-2" onClick={() => handlePlay(node)}>
-              {playingId === (node._id || node.id) ? 'Stop' : 'Play'}
-            </CButton>
-          )}
+        </CTableDataCell>
+        <CTableDataCell>
           <CButton color="secondary" size="sm" className="me-2" onClick={() => handleShowTree(node)}>View Tree</CButton>
           <CButton color="danger" size="sm" onClick={() => handleDelete(node)}>Delete</CButton>
         </CTableDataCell>
@@ -678,11 +852,11 @@ const IVRManagement = () => {
         if (c && c.child) {
           // render an option row describing the mapping then the child node
           rows.push(
-            <CTableRow key={`opt-${key}-${idx}`}>
-              <CTableDataCell colSpan={7}>
-                <div style={{ paddingLeft: `${(level+1) * 18}px` }} className="text-muted small">On press <strong>{c.key}</strong> → {c.destination}</div>
-              </CTableDataCell>
-            </CTableRow>
+            <CTableRow key={`opt-${key}-${idx}`} style={{ backgroundColor: getLevelBg(level + 1) }}>
+                  <CTableDataCell colSpan={5}>
+                    <div style={{ paddingLeft: `${(level+1) * 18}px` }} className="text-muted small">On press <strong>{c.key}</strong> → {c.destination}</div>
+                  </CTableDataCell>
+                </CTableRow>
           )
           rows.push(...renderTreeRows(c.child, level + 1, `${path}/${idx}`))
         } else {
@@ -705,56 +879,87 @@ const IVRManagement = () => {
               <p className="text-muted">Create and manage IVR flows and audio prompts.</p>
             </CCol>
             <CCol className="text-end">
-              <CButton color="primary" onClick={() => setShowModal(true)}>New IVR</CButton>
             </CCol>
           </CRow>
 
-          <CModal visible={showModal} onClose={() => setShowModal(false)}>
-            <CModalHeader closeButton>
-              <CModalTitle>New IVR</CModalTitle>
-            </CModalHeader>
-            <CModalBody>
-              <div className="mb-3">
-                <CFormLabel>name</CFormLabel>
-                <CFormInput value={name} onChange={(e) => setName(e.target.value)} placeholder="name" />
-              </div>
-              <div className="mb-3">
-                <CFormLabel>description</CFormLabel>
-                <CFormInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="description" />
-              </div>
-              
-                
+          {showModal && (
+            <CCard className="mb-4">
+              <CCardBody>
+                <CRow className="align-items-center mb-3">
+                  <CCol>
+                    <h4 className="mb-0">New IVR</h4>
+                  </CCol>
+                  <CCol className="text-end">
+                    <CButton color="secondary" onClick={() => setShowModal(false)}>Back</CButton>
+                  </CCol>
+                </CRow>
+
+                <div className="mb-3">
+                  <CFormLabel>name</CFormLabel>
+                  <CFormInput value={name} onChange={(e) => setName(e.target.value)} placeholder="name" />
+                </div>
+                <div className="mb-3">
+                  <CFormLabel>description</CFormLabel>
+                  <CFormInput value={description} onChange={(e) => setDescription(e.target.value)} placeholder="description" />
+                </div>
 
                 <div className="mb-3">
                   <CFormLabel>Build Menu (visual editor)</CFormLabel>
                   <NodeEditor path={[]} />
                   <CFormText className="text-muted">Use the visual editor to build a nested menu tree. Top-level node name will default to the IVR name if left empty.</CFormText>
                 </div>
-            </CModalBody>
-            <CModalFooter>
-              <CButton color="secondary" onClick={() => setShowModal(false)}>Cancel</CButton>
-              <CButton color="primary" onClick={handleCreate}>Create</CButton>
-            </CModalFooter>
-          </CModal>
+
+                <div className="text-end">
+                  <CButton color="secondary" onClick={() => setShowModal(false)}>Cancel</CButton>
+                  <CButton color="primary" onClick={handleCreate} className="ms-2">Create</CButton>
+                </div>
+              </CCardBody>
+            </CCard>
+          )}
 
           <div className="mt-4">
-            <h5>IVR List</h5>
-            {/* Showing only main/root menus */}
+            <h5>IVR Settings</h5>
+            {/* If loading, show spinner. If no IVRs show message. If one IVR, show settings UI. Otherwise show table list. */}
             {loading ? (
               <div className="py-3 text-center"><CSpinner /></div>
-            ) : displayedIvrs.length === 0 ? (
-              <p className="text-muted">No IVRs found for this business.</p>
+            ) : (displayedIvrs.length <= 1 ? (
+              (() => {
+                  const ivr = displayedIvrs[0]
+                  const id = ivr && (ivr._id || ivr.id || ivr.name)
+                  const isOn = !!(ivr && ((ivr.ivrStatus || ivr.status || ivr.state || '').toString().toLowerCase() === 'on' || (ivr.ivrStatus || ivr.status || '').toString().toLowerCase() === 'active'))
+                  return (
+                    <CCard>
+                      <CCardBody>
+                        <div className="mb-3">
+                          <CFormLabel>Build Menu (visual editor)</CFormLabel>
+                          <NodeEditor path={[]} />
+                          <CFormText className="text-muted">Use the visual editor to build a nested menu tree.</CFormText>
+                        </div>
+                        {ivr && (
+                          <div className="mb-3 d-flex align-items-center">
+                            <strong className="me-2">Status:</strong>
+                            {isSwitching(id) && <CSpinner size="sm" className="me-2" />}
+                            <CFormSwitch checked={isOn} className="me-2" disabled={isSwitching(id)} onChange={(e) => handleSwitch(ivr, e.target.checked)} />
+                          </div>
+                        )}
+                        <div className="text-end">
+                          {ivr && <CButton color="secondary" size="sm" className="me-2" onClick={() => handleShowTree(ivr)}>View Tree</CButton>}
+                          {ivr && <CButton color="danger" size="sm" className="me-2" onClick={() => handleDelete(ivr)}>Delete</CButton>}
+                          <CButton color="primary" onClick={() => handleSave(ivr)}>{ivr ? 'Save' : 'Create'}</CButton>
+                        </div>
+                      </CCardBody>
+                    </CCard>
+                  )
+                })()
             ) : (
               <div className="table-responsive">
                 <CTable>
                   <CTableHead>
                     <CTableRow>
                       <CTableHeaderCell>Name</CTableHeaderCell>
-                      <CTableHeaderCell>Description</CTableHeaderCell>
                       <CTableHeaderCell>File</CTableHeaderCell>
                       <CTableHeaderCell>Generated Text</CTableHeaderCell>
                       <CTableHeaderCell>Status</CTableHeaderCell>
-                      <CTableHeaderCell>Created</CTableHeaderCell>
                       <CTableHeaderCell>Actions</CTableHeaderCell>
                     </CTableRow>
                   </CTableHead>
@@ -763,7 +968,7 @@ const IVRManagement = () => {
                   </CTableBody>
                 </CTable>
               </div>
-            )}
+            ))}
             {/* Audio player (visible when playing) */}
             {playingUrl && (
               <div className="mt-3">
