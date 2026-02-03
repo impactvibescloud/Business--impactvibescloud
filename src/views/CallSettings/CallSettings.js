@@ -211,7 +211,7 @@ const CallSettings = () => {
                 <CCol sm={3} className="fw-semibold">Agent</CCol>
                 <CCol sm={3} className="fw-semibold text-muted">Assigned DID</CCol>
                 <CCol sm={2} className="fw-semibold">Extension</CCol>
-                <CCol sm={2} className="fw-semibold">Forward number</CCol>
+                <CCol sm={2} className="fw-semibold">Agent Number</CCol>
                 <CCol sm={1} className="fw-semibold text-end">Save</CCol>
                 <CCol sm={1} className="fw-semibold text-center">Forward</CCol>
               </CRow>

@@ -155,7 +155,7 @@ const _nav = [
   // },
   {
     component: CNavItem,
-    name: "Audio Cmpaign",
+    name: "Audio Campaign",
     icon: <CIcon icon={cilBullhorn} customClassName="nav-icon" />,
     to: "/campaigns/audio",
     group: "Campaigns",
