@@ -31,16 +31,22 @@ import {
   Tooltip,
   Legend,
   CategoryScale,
-  LinearScale
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement
 } from 'chart.js';
-import { Pie, Doughnut } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 
 ChartJS.register(
   ArcElement,
   Tooltip,
   Legend,
   CategoryScale,
-  LinearScale
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement
 );
 
 function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetails = [], totalBreakTime = 0 }) {
@@ -153,11 +159,9 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
       [''],
       ['Call Type', 'Count', 'Percentage'],
       ['Total Calls', callData.totalCalls, '100%'],
-      ['Live Calls', callData.liveCalls, ((callData.liveCalls / callData.totalCalls) * 100).toFixed(1) + '%'],
       ['Outbound Calls', callData.outboundCalls, ((callData.outboundCalls / callData.totalCalls) * 100).toFixed(1) + '%'],
       ['Inbound Calls', callData.inboundCalls, ((callData.inboundCalls / callData.totalCalls) * 100).toFixed(1) + '%'],
       ['Missed Calls', callData.missedCalls, ((callData.missedCalls / callData.totalCalls) * 100).toFixed(1) + '%'],
-      ['Rejected Calls', callData.rejectedCalls, ((callData.rejectedCalls / callData.totalCalls) * 100).toFixed(1) + '%'],
       ['Calls per Day', callData.callsPerDay, '-']
     ];
 
@@ -186,22 +190,18 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
   };
 
   const pieChartData = {
-    labels: ['Live Calls', 'Outbound Calls', 'Inbound Calls', 'Missed Calls', 'Rejected Calls'],
+    labels: ['Outbound Calls', 'Inbound Calls', 'Missed Calls'],
     datasets: [
       {
         data: [
-          Math.max(callData.liveCalls, 0), 
           Math.max(callData.outboundCalls, 0), 
           Math.max(callData.inboundCalls, 0), 
-          Math.max(callData.missedCalls, 0), 
-          Math.max(callData.rejectedCalls, 0)
+          Math.max(callData.missedCalls, 0)
         ],
         backgroundColor: [
-          '#2eb85c', // Live Calls - Green
           '#f9b115', // Outbound Calls - Orange
           '#39f',    // Inbound Calls - Blue
-          '#e55353', // Missed Calls - Red
-          '#636f83'  // Rejected Calls - Gray
+          '#e55353'  // Missed Calls - Red
         ],
         borderWidth: 2,
         borderColor: '#fff'
@@ -238,195 +238,74 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
   };
   return (
     <>
-      {/* First Row - Agent Status Cards */}
+      {/* Stats List on Left, Charts on Right */}
       <CRow className="mb-4">
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #6f42c1' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div style={{ backgroundColor: 'rgba(111, 66, 193, 0.1)' }} className="p-3 rounded">
-                  <CIcon icon={cilPeople} size="xl" style={{ color: '#6f42c1' }} />
+        <CCol lg={3}>
+          <CCard style={{ borderRadius: '12px', border: '1px solid #e9ecef', boxShadow: 'none' }} className="h-100">
+            <CCardBody className="p-3">
+              {/* Agent Statistics Section */}
+              <div className="mb-3">
+                <h6 className="mb-2 fw-semibold" style={{ fontSize: '0.85rem', color: '#495057' }}>
+                  <CIcon icon={cilPeople} className="me-2" style={{ color: '#6c757d' }} />Agent Statistics
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#495057', fontSize: '0.85rem' }}>Total</span>
+                    <span style={{ color: '#212529', fontSize: '0.9rem', fontWeight: '600' }}>{agents || 0}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#28a745', fontSize: '0.85rem' }}>Active</span>
+                    <span style={{ color: '#28a745', fontSize: '0.9rem', fontWeight: '600' }}>{agentStatus.active}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#dc3545', fontSize: '0.85rem' }}>Inactive</span>
+                    <span style={{ color: '#dc3545', fontSize: '0.9rem', fontWeight: '600' }}>{agentStatus.deactive}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1">
+                    <span style={{ color: '#ffc107', fontSize: '0.85rem' }}>Break</span>
+                    <span style={{ color: '#e0a800', fontSize: '0.9rem', fontWeight: '600' }}>{agentStatus.break}</span>
+                  </div>
                 </div>
               </div>
+              
+              {/* Call Statistics Section */}
               <div>
-                <div className="fs-6 fw-semibold" style={{ color: '#6f42c1' }}>{agents || 0}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Total Agents</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #28a745' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-success bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilCheckCircle} size="xl" className="text-success" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-success">{agentStatus.active}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Active Agents</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #dc3545' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-danger bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilX} size="xl" className="text-danger" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-danger">{agentStatus.deactive}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Inactive Agents</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard 
-            className="mb-4" 
-            style={{ borderLeft: '4px solid #ffc107' }}
-          >
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-warning bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilMinus} size="xl" className="text-warning" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-warning">{agentStatus.break}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">
-                  Break Time Agents
+                <h6 className="mb-2 fw-semibold" style={{ fontSize: '0.85rem', color: '#495057' }}>
+                  <CIcon icon={cilPhone} className="me-2" style={{ color: '#6c757d' }} />Call Statistics
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#495057', fontSize: '0.85rem' }}>Total</span>
+                    <span style={{ color: '#212529', fontSize: '0.9rem', fontWeight: '600' }}>{callData.totalCalls}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#fd7e14', fontSize: '0.85rem' }}>Outbound</span>
+                    <span style={{ color: '#fd7e14', fontSize: '0.9rem', fontWeight: '600' }}>{callData.outboundCalls}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#28a745', fontSize: '0.85rem' }}>Inbound</span>
+                    <span style={{ color: '#28a745', fontSize: '0.9rem', fontWeight: '600' }}>{callData.inboundCalls}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ borderColor: '#f1f3f4' }}>
+                    <span style={{ color: '#dc3545', fontSize: '0.85rem' }}>Missed</span>
+                    <span style={{ color: '#dc3545', fontSize: '0.9rem', fontWeight: '600' }}>{callData.missedCalls}</span>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center py-1">
+                    <span style={{ color: '#495057', fontSize: '0.85rem' }}>Per Day</span>
+                    <span style={{ color: '#212529', fontSize: '0.9rem', fontWeight: '600' }}>{callData.callsPerDay}</span>
+                  </div>
                 </div>
               </div>
             </CCardBody>
           </CCard>
         </CCol>
-      </CRow>
-
-      {/* Second Row - Call Statistics */}
-      <CRow className="mb-4">
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #321fdb' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-primary bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilPhone} size="xl" className="text-primary" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-primary">{callData.totalCalls}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Total Calls</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #2eb85c' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-success bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilCheckCircle} size="xl" className="text-success" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-success">{callData.liveCalls}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Live Calls</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #f9b115' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-warning bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilArrowRight} size="xl" className="text-warning" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-warning">{callData.outboundCalls}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Outbound Calls</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #20c997' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-success bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilChart} size="xl" className="text-success" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-success">{callData.callsPerDay}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Calls per Day</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-
-      {/* Third Row - Additional Call Statistics */}
-      <CRow className="mb-4">
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #39f' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-info bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilPhone} size="xl" className="text-info" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-info">{callData.inboundCalls}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Inbound Calls</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #e55353' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-danger bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilMinus} size="xl" className="text-danger" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-danger">{callData.missedCalls}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Missed Calls</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol sm={6} lg={3}>
-          <CCard className="mb-4" style={{ borderLeft: '4px solid #636f83' }}>
-            <CCardBody className="d-flex align-items-center">
-              <div className="me-3">
-                <div className="bg-secondary bg-opacity-10 p-3 rounded">
-                  <CIcon icon={cilX} size="xl" className="text-secondary" />
-                </div>
-              </div>
-              <div>
-                <div className="fs-6 fw-semibold text-secondary">{callData.rejectedCalls}</div>
-                <div className="text-medium-emphasis text-uppercase fw-semibold small">Rejected Calls</div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-
-      {/* Pie Chart Section */}
-      <CRow className="mb-4">
-        <CCol lg={12}>
-          <CCard>
-            <CCardHeader>
+        <CCol lg={9}>
+          <CCard style={{ borderRadius: '12px', border: '1px solid #e9ecef', boxShadow: 'none' }} className="h-100">
+            <CCardHeader style={{ backgroundColor: '#fff', borderBottom: '1px solid #e9ecef', borderRadius: '12px 12px 0 0' }}>
               <div className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Call Statistics Overview</h5>
+                <div>
+                  {/* Time filter removed - charts show current data */}
+                </div>
                 <div className="d-flex gap-2">
                   <CButton 
                     color="outline-primary" 
@@ -450,221 +329,157 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
               </div>
             </CCardHeader>
             <CCardBody>
-              {/* Filter Controls */}
-              <CRow className="mb-4">
-                <CCol md={3}>
-                  <CFormSelect 
-                    value={timeFilter} 
-                    onChange={(e) => {
-                      const newFilter = e.target.value;
-                      setTimeFilter(newFilter);
-                      // Trigger fetch with the new time filter if the parent provided a handler
-                      if (typeof window.fetchCallStatistics === 'function') {
-                        window.fetchCallStatistics(newFilter);
-                      }
-                    }}
-                    aria-label="Time Filter"
-                  >
-                    <option value="today">Current Day</option>
-                    <option value="7days">7 Days</option>
-                    <option value="month">Month</option>
-                    <option value="custom">Custom</option>
-                  </CFormSelect>
-                </CCol>
-                {timeFilter === 'custom' && (
-                  <>
-                    <CCol md={3}>
-                      <CInputGroup>
-                        <CFormInput
-                          type="date"
-                          value={customStartDate}
-                          onChange={(e) => setCustomStartDate(e.target.value)}
-                          placeholder="Start Date"
-                        />
-                      </CInputGroup>
-                    </CCol>
-                    <CCol md={3}>
-                      <CInputGroup>
-                        <CFormInput
-                          type="date"
-                          value={customEndDate}
-                          onChange={(e) => setCustomEndDate(e.target.value)}
-                          placeholder="End Date"
-                        />
-                      </CInputGroup>
-                    </CCol>
-                    <CCol md={3}>
-                      <CButton 
-                        color="primary" 
-                        onClick={() => {
-                          if (typeof window.fetchCallStatistics === 'function') {
-                            window.fetchCallStatistics('custom', customStartDate, customEndDate);
-                          }
-                        }}
-                      >
-                        Apply
-                      </CButton>
-                    </CCol>
-                  </>
-                )}
-              </CRow>
-
-              {/* Charts Section - Donut Chart (Left) and Pie Chart (Right) */}
+              {/* Charts Section - Bar Chart (Left) and Line Chart (Right) */}
               <CRow>
-                {/* Total Agents Donut Chart - Left Side */}
-                <CCol lg={4}>
-                  <CCard className="h-100">
-                    <CCardBody className="text-center">
-                      <h6 className="mb-3">Agent Status Distribution</h6>
-                      <div style={{ height: '250px', position: 'relative' }}>
-                        <Doughnut 
-                          data={{
-                            labels: ['Active', 'Deactive', 'Break'],
-                            datasets: [{
-                              data: [agentStatus.active, agentStatus.deactive, agentStatus.break],
-                              backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
-                              borderWidth: 2,
-                              borderColor: '#fff',
-                              cutout: '70%'
-                            }]
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                              legend: {
-                                display: true,
-                                position: 'bottom',
-                                labels: {
-                                  padding: 10,
-                                  usePointStyle: true,
-                                  font: {
-                                    size: 10
-                                  }
-                                }
-                              },
-                              tooltip: {
-                                callbacks: {
-                                  label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.parsed || 0;
-                                    return `${label}: ${value} agents`;
-                                  }
+                {/* Bar Chart - Call Statistics */}
+                <CCol lg={6}>
+                  <div className="mb-3">
+                    <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600', fontSize: '0.9rem' }}>Call Statistics</h6>
+                    <div style={{ height: '280px' }}>
+                      <Bar 
+                        data={{
+                          labels: ['Total', 'Outbound', 'Inbound', 'Missed'],
+                          datasets: [{
+                            label: 'Calls',
+                            data: [callData.totalCalls, callData.outboundCalls, callData.inboundCalls, callData.missedCalls],
+                            backgroundColor: ['#4A9AF8', '#4A9AF8', '#4A9AF8', '#4A9AF8'],
+                            borderRadius: 4,
+                            barThickness: 40
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              display: false
+                            },
+                            tooltip: {
+                              backgroundColor: '#343a40',
+                              padding: 10,
+                              cornerRadius: 4,
+                              callbacks: {
+                                label: function(context) {
+                                  return `${context.parsed.y} calls`;
                                 }
                               }
                             }
-                          }}
-                        />
-                        <div style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          textAlign: 'center'
-                        }}>
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50' }}>
-                            Total
-                          </div>
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50' }}>
-                            Agents
-                          </div>
-                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#2c3e50', marginTop: '3px' }}>
-                            {agentStatus.total}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '15px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-                          <div>
-                            <div style={{ 
-                              fontSize: '9px', 
-                              fontWeight: '600', 
-                              color: '#28a745',
-                              textTransform: 'uppercase',
-                              letterSpacing: '1px'
-                            }}>
-                              ACTIVE
-                            </div>
-                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#28a745' }}>
-                              {agentStatus.active}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ 
-                              fontSize: '9px', 
-                              fontWeight: '600', 
-                              color: '#dc3545',
-                              textTransform: 'uppercase',
-                              letterSpacing: '1px'
-                            }}>
-                              DEACTIVE
-                            </div>
-                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#dc3545' }}>
-                              {agentStatus.deactive}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ 
-                              fontSize: '9px', 
-                              fontWeight: '600', 
-                              color: '#ffc107',
-                              textTransform: 'uppercase',
-                              letterSpacing: '1px'
-                            }}>
-                              BREAK
-                            </div>
-                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffc107' }}>
-                              {agentStatus.break}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CCardBody>
-                  </CCard>
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              grid: {
+                                color: '#e9ecef'
+                              },
+                              ticks: {
+                                color: '#6c757d'
+                              }
+                            },
+                            x: {
+                              grid: {
+                                display: false
+                              },
+                              ticks: {
+                                color: '#495057'
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
                 </CCol>
 
-                {/* Pie Chart - Right Side */}
-                <CCol lg={5}>
-                  <CCard className="h-100">
-                    <CCardBody className="text-center">
-                      <h6 className="mb-3">Call Type Distribution</h6>
-                      <div style={{ height: '300px', position: 'relative' }}>
-                        <Pie data={pieChartData} options={pieChartOptions} />
-                      </div>
-                    </CCardBody>
-                  </CCard>
-                </CCol>
-
-                {/* Call Summary - Far Right */}
-                <CCol lg={3}>
-                  <CCard className="h-100">
-                    <CCardBody>
-                      <h6 className="mb-3 text-center">Call Summary</h6>
-                      <div className="chart-summary">
-                        <div className="mb-2">
-                          <span className="fw-semibold">Total Calls:</span> {callData.totalCalls}
-                        </div>
-                        <div className="mb-2">
-                          <span className="fw-semibold">Live Calls:</span> {callData.liveCalls}
-                        </div>
-                        <div className="mb-2">
-                          <span className="fw-semibold">Outbound Calls:</span> {callData.outboundCalls}
-                        </div>
-                        <div className="mb-2">
-                          <span className="fw-semibold">Inbound Calls:</span> {callData.inboundCalls}
-                        </div>
-                        <div className="mb-2">
-                          <span className="fw-semibold">Missed Calls:</span> {callData.missedCalls}
-                        </div>
-                        <div className="mb-2">
-                          <span className="fw-semibold">Rejected Calls:</span> {callData.rejectedCalls}
-                        </div>
-                        <div className="mb-2">
-                          <span className="fw-semibold">Calls per Day:</span> {callData.callsPerDay}
-                        </div>
-                      </div>
-                    </CCardBody>
-                  </CCard>
+                {/* Line Chart - Call Trend */}
+                <CCol lg={6}>
+                  <div className="mb-3">
+                    <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600', fontSize: '0.9rem' }}>Call Trend (Today)</h6>
+                    <div style={{ height: '280px' }}>
+                      <Line 
+                        data={{
+                          labels: ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM', '8PM'],
+                          datasets: [
+                            {
+                              label: 'Outbound',
+                              data: [5, 12, 18, 15, 22, 19, 14, 8],
+                              borderColor: '#4A9AF8',
+                              backgroundColor: 'transparent',
+                              tension: 0.3,
+                              fill: false,
+                              pointRadius: 3,
+                              pointBackgroundColor: '#4A9AF8',
+                              borderWidth: 2
+                            },
+                            {
+                              label: 'Inbound',
+                              data: [3, 8, 12, 10, 15, 13, 9, 5],
+                              borderColor: '#8ED081',
+                              backgroundColor: 'transparent',
+                              tension: 0.3,
+                              fill: false,
+                              pointRadius: 3,
+                              pointBackgroundColor: '#8ED081',
+                              borderWidth: 2
+                            },
+                            {
+                              label: 'Missed',
+                              data: [2, 4, 6, 5, 8, 7, 4, 3],
+                              borderColor: '#3399ff',
+                              backgroundColor: 'transparent',
+                              tension: 0.3,
+                              fill: false,
+                              pointRadius: 3,
+                              pointBackgroundColor: '#3399ff',
+                              borderWidth: 2,
+                              borderDash: [5, 5]
+                            }
+                          ]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              display: true,
+                              position: 'top',
+                              labels: {
+                                usePointStyle: true,
+                                padding: 15,
+                                color: '#495057',
+                                font: {
+                                  size: 11
+                                }
+                              }
+                            },
+                            tooltip: {
+                              backgroundColor: '#343a40',
+                              padding: 10,
+                              cornerRadius: 4
+                            }
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              grid: {
+                                color: '#e9ecef'
+                              },
+                              ticks: {
+                                color: '#6c757d'
+                              }
+                            },
+                            x: {
+                              grid: {
+                                display: false
+                              },
+                              ticks: {
+                                color: '#495057'
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
                 </CCol>
               </CRow>
             </CCardBody>
@@ -676,45 +491,45 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
       {agentStatus.break > 0 && (
         <CRow className="mb-4">
           <CCol lg={12}>
-            <CCard>
-              <CCardHeader>
-                <h5 className="mb-0">
-                  <CIcon icon={cilMinus} className="text-warning me-2" />
+            <CCard style={{ borderRadius: '12px', border: '1px solid #e9ecef', boxShadow: 'none' }}>
+              <CCardHeader style={{ backgroundColor: '#fff', borderRadius: '12px 12px 0 0', borderBottom: '1px solid #e9ecef' }}>
+                <h6 className="mb-0" style={{ color: '#495057', fontWeight: '600' }}>
+                  <CIcon icon={cilMinus} className="me-2" style={{ color: '#ffc107' }} />
                   Break Time Agents ({agentStatus.break})
-                </h5>
+                </h6>
               </CCardHeader>
               <CCardBody>
                 <CRow>
                   <CCol>
                     <div className="d-flex align-items-center mb-3">
-                      <div className="bg-warning bg-opacity-10 p-2 me-3 rounded">
-                        <CIcon icon={cilMinus} size="lg" className="text-warning" />
+                      <div style={{ backgroundColor: '#fff3cd', padding: '10px', borderRadius: '8px' }} className="me-3">
+                        <CIcon icon={cilMinus} style={{ color: '#ffc107' }} />
                       </div>
                       <div>
-                        <h6 className="mb-0">Current agents on break</h6>
-                        <small className="text-muted">
+                        <h6 className="mb-0" style={{ color: '#333', fontWeight: '600' }}>Current agents on break</h6>
+<small style={{ color: '#6c757d' }}>
                           Data refreshes automatically every minute
                         </small>
                       </div>
                     </div>
                     {breakTimeAgentDetails && breakTimeAgentDetails.length > 0 ? (
                       <CTable small hover responsive>
-                        <CTableHead>
+                        <CTableHead style={{ backgroundColor: '#f8f9fa' }}>
                           <CTableRow>
-                            <CTableHeaderCell>Agent</CTableHeaderCell>
-                            <CTableHeaderCell>Start Time</CTableHeaderCell>
-                            <CTableHeaderCell>Duration</CTableHeaderCell>
-                            <CTableHeaderCell>Status</CTableHeaderCell>
+                            <CTableHeaderCell style={{ fontWeight: '600', color: '#495057' }}>Agent</CTableHeaderCell>
+                            <CTableHeaderCell style={{ fontWeight: '600', color: '#495057' }}>Start Time</CTableHeaderCell>
+                            <CTableHeaderCell style={{ fontWeight: '600', color: '#495057' }}>Duration</CTableHeaderCell>
+                            <CTableHeaderCell style={{ fontWeight: '600', color: '#495057' }}>Status</CTableHeaderCell>
                           </CTableRow>
                         </CTableHead>
                         <CTableBody>
                           {breakTimeAgentDetails.slice(0, 5).map((agent, index) => (
                             <CTableRow key={agent.id || index}>
-                              <CTableDataCell>{agent.name}</CTableDataCell>
-                              <CTableDataCell>
+                              <CTableDataCell style={{ color: '#212529' }}>{agent.name}</CTableDataCell>
+                              <CTableDataCell style={{ color: '#495057' }}>
                                 {agent.startTime ? new Date(agent.startTime).toLocaleTimeString() : 'N/A'}
                               </CTableDataCell>
-                              <CTableDataCell>
+                              <CTableDataCell style={{ color: '#495057' }}>
                                 {agent.duration !== undefined ? `${agent.duration} min` : 'N/A'}
                               </CTableDataCell>
                               <CTableDataCell>
@@ -725,7 +540,7 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
                           {breakTimeAgentDetails.length > 5 && (
                             <CTableRow>
                               <CTableDataCell colSpan={4} className="text-center">
-                                <small className="text-muted">
+                                <small style={{ color: '#6c757d' }}>
                                   + {breakTimeAgentDetails.length - 5} more agents on break
                                 </small>
                               </CTableDataCell>
@@ -734,8 +549,8 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
                         </CTableBody>
                       </CTable>
                     ) : (
-                      <div className="text-center py-3">
-                        <p className="mb-0">
+                      <div className="text-center py-3" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                        <p className="mb-0" style={{ color: '#495057' }}>
                           {agentStatus.break} agent(s) currently on break
                         </p>
                       </div>

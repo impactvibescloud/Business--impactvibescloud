@@ -281,11 +281,14 @@ const CallDispositions = () => {
             <button
               className="btn btn-sm btn-outline-warning me-2"
               onClick={() => {
-                // Seed a sample businessId (for dev only) and trigger fetch
+                // Prompt for a businessId in dev to avoid committing static IDs
                 try {
-                  localStorage.setItem('businessId', '68d3c1bbcf0bcde3eac2606b')
+                  const devId = window.prompt('Enter businessId for dev testing (leave empty to cancel)')
+                  if (devId) {
+                    localStorage.setItem('businessId', devId)
+                    fetchDispositions(1)
+                  }
                 } catch (e) {}
-                fetchDispositions(1)
               }}
             >
               Force Fetch (dev)
