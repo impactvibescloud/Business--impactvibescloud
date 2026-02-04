@@ -54,13 +54,13 @@ const Branches = () => {
 
   // Default start/end times for known time groups
   // Defaults aligned with the UI labels:
-  // Morning Shift (8 AM - 4 PM) => 08:00 - 16:00
+  // Morning Shift (8 AM - 8 PM) => 08:00 - 20:00
   // Afternoon Shift (12 PM - 8 PM) => 12:00 - 20:00
   // Evening Shift (4 PM - 12 AM) => 16:00 - 00:00
   // Night Shift (10 PM - 6 AM) => 22:00 - 06:00
   // 24 Hours => 00:00 - 23:59
   const TIME_GROUP_DEFAULTS = {
-    morning: { startTime: '08:00', endTime: '16:00' },
+    morning: { startTime: '08:00', endTime: '20:00' },
     full: { startTime: '09:00', endTime: '18:00' },
     afternoon: { startTime: '12:00', endTime: '20:00' },
     evening: { startTime: '16:00', endTime: '00:00' },
@@ -1019,7 +1019,7 @@ const Branches = () => {
                 required
               >
                 <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (8 AM - 4 PM)</option>
+                <option value="morning">Morning Shift (8 AM - 8 PM)</option>
                 <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
                 <option value="evening">Evening Shift (4 PM - 12 AM)</option>
                 <option value="full">Full Shift (9 AM - 6 PM)</option>
@@ -1112,7 +1112,7 @@ const Branches = () => {
                 required
               >
                 <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (8 AM - 4 PM)</option>
+                <option value="morning">Morning Shift (8 AM - 8 PM)</option>
                 <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
                 <option value="evening">Evening Shift (4 PM - 12 AM)</option>
                 <option value="full">Full Shift (9 AM - 6 PM)</option>

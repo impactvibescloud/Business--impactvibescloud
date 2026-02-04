@@ -71,23 +71,25 @@ const Dashboard = () => {
     const fetchCallLogsAndStats = async () => {
       if (!token || !user?.businessId) return;
       try {
-        // Use the dedicated today endpoint to fetch daily statistics from the server
-        const response = await axios.get(getApiUrl(`/api/call-logs/today?businessId=${user.businessId}`), {
+        // Use the call-uses today endpoint for accurate statistics
+        const response = await axios.get(getApiUrl(`/api/call-uses/today/business/${user.businessId}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
-        if (response.data && response.data.success && response.data.statistics) {
-          const stats = response.data.statistics || {}
+        if (response.data && response.data.success) {
+          const data = response.data
+          const totals = data.totals || {}
+          const byType = data.byType || {}
           setCallLogs([]) // dashboard widgets derive numbers from stats, not full logs
           setCallStats({
-            totalCalls: stats.totalCalls || 0,
+            totalCalls: totals.totalCalls || 0,
             liveCalls: 0,
-            outboundCalls: (stats.callsByType && stats.callsByType.outbound) || 0,
-            callsPerDay: stats.totalCalls || 0,
-            inboundCalls: (stats.callsByType && stats.callsByType.inbound) || 0,
-            missedCalls: (stats.callsByStatus && stats.callsByStatus.missed) || 0,
-            rejectedCalls: (stats.callsByStatus && stats.callsByStatus.rejected) || 0
+            outboundCalls: byType.outbound || 0,
+            callsPerDay: totals.totalCalls || 0,
+            inboundCalls: byType.inbound || 0,
+            missedCalls: totals.missed || 0,
+            rejectedCalls: totals.rejected || 0
           })
         } else {
           setCallLogs([])
@@ -130,17 +132,16 @@ const Dashboard = () => {
     const fetchCallUses = async () => {
       if (!token || !user?.businessId) return;
       try {
-        // Use the dedicated today endpoint to get daily call uses
-        const response = await axios.get(getApiUrl(`/api/call-uses/today?businessId=${user.businessId}`), {
+        // Use the call-uses today endpoint for accurate data
+        const response = await axios.get(getApiUrl(`/api/call-uses/today/business/${user.businessId}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
-        // Expecting response.perUserNumber as an array (per-day usage per virtual number/user)
-        if (response.data && response.data.success && Array.isArray(response.data.perUserNumber)) {
-          // keep the raw perUserNumber list; add response date for display if present
-          const date = response.data.date || null;
-          const list = response.data.perUserNumber.map(item => ({ ...item, apiDate: date }));
+        // Expecting response.byNumber as an array (per virtual number usage)
+        if (response.data && response.data.success && Array.isArray(response.data.byNumber)) {
+          const dateRange = response.data.dateRange || {};
+          const list = response.data.byNumber.map(item => ({ ...item, apiDate: dateRange.end || null }));
           setCallUses(list);
         } else {
           setCallUses([]);
@@ -300,13 +301,13 @@ const Dashboard = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px #e5e7eb' }}>
             <thead style={{ background: '#f3f4f6' }}>
                 <tr>
-                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Agent</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Extension</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Number</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Outbound</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Inbound</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Missed</th>
-                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Hang</th>
-                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Last Updated</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Successful</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Total Calls</th>
               </tr>
             </thead>
             <tbody>
@@ -314,14 +315,14 @@ const Dashboard = () => {
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>No call usage data found.</td></tr>
               ) : (
                 paginatedCallUses.map((item, idx) => (
-                  <tr key={item.numberId?.toString() || item.userId || idx}>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.name || item.userEmail || item.userId || '-'}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.virtualNumber || (item.numberId && item.numberId.number) || '-'}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{(item.callsByType && item.callsByType.outbound) ?? item.totalCalls ?? 0}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{(item.callsByType && item.callsByType.inbound) ?? 0}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{/* not provided per user in this endpoint */ 0}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{/* hang calls not provided */ 0}</td>
-                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.apiDate ? new Date(item.apiDate).toLocaleString() : '-'}</td>
+                  <tr key={item.numberId?.toString() || idx}>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.extension || '-'}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.virtualNumber || '-'}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.outbound ?? 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.inbound ?? 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.missed ?? 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.successful ?? 0}</td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>{item.totalCalls ?? 0}</td>
                   </tr>
                 ))
               )}
