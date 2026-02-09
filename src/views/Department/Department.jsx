@@ -32,6 +32,7 @@ import { cilPlus, cilSearch, cilPencil, cilTrash, cilBuilding } from '@coreui/ic
 import { apiCall, ENDPOINTS, API_CONFIG, getBaseURL } from '../../config/api'
 import { errorLog } from '../../utils/logger'
 import './Department.css'
+import { useAuth } from '../../context/authContext'
 
 // Helper function to get API URL
 const getApiUrl = () => {
@@ -71,65 +72,33 @@ function Department() {
     members: [] // Array of member objects {userId, phone, role}
   })
 
-  // Get current user's business ID and fetch business details
+  // Get current businessId from Auth context or localStorage and initialize
+  const { businessId: authBusinessId } = useAuth();
+
   useEffect(() => {
-    const getCurrentUser = async () => {
-      try {
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          const userResponse = await fetch('/api/v1/user/details', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await userResponse.json();
-          if (data?.user?.businessId) {
-            setCurrentBusinessId(data.user.businessId);
-            setFormData(prev => ({
-              ...prev,
-              businessId: data.user.businessId
-            }));
-            // Fetch business details to get business name
-            await fetchBusinessDetails(data.user.businessId);
-            // Fetch available agents/branches
-            await fetchAvailableAgents(data.user.businessId);
-          } else {
-            // If user details don't have businessId, try to get it from localStorage
-            const storedBusinessId = localStorage.getItem('businessId');
-            if (storedBusinessId) {
-              setCurrentBusinessId(storedBusinessId);
-              setFormData(prev => ({
-                ...prev,
-                businessId: storedBusinessId
-              }));
-              await fetchBusinessDetails(storedBusinessId);
-              await fetchAvailableAgents(storedBusinessId);
-            } else {
-              // Use fallback ID if nothing else works
-              const fallbackId = '64f7b1234567890abcdef123';
-              setCurrentBusinessId(fallbackId);
-              setFormData(prev => ({
-                ...prev,
-                businessId: fallbackId
-              }));
-              await fetchBusinessDetails(fallbackId);
-              await fetchAvailableAgents(fallbackId);
-            }
-          }
+    const initBusiness = async () => {
+      const id = authBusinessId || localStorage.getItem('businessId') || '';
+      if (id) {
+        setCurrentBusinessId(id);
+        setFormData(prev => ({ ...prev, businessId: id }));
+        try {
+          await fetchBusinessDetails(id);
+        } catch (e) {
+          errorLog('Error fetching business details during init:', e);
         }
-      } catch (error) {
-        errorLog('Error fetching user details:', error);
-        // Fallback to default businessId
-        const fallbackId = '64f7b1234567890abcdef123';
-        setCurrentBusinessId(fallbackId);
-        setBusinessName('My Business');
-        setFormData(prev => ({
-          ...prev,
-          businessId: fallbackId
-        }));
-        await fetchAvailableAgents(fallbackId);
+        try {
+          await fetchAvailableAgents(id);
+        } catch (e) {
+          errorLog('Error fetching agents during init:', e);
+        }
+      } else {
+        // No businessId available from context or localStorage; show a neutral state
+        setBusinessName('Business not found');
+        console.warn('No businessId available from Auth context or localStorage');
       }
-    };
-    getCurrentUser();
-  }, [])
+    }
+    initBusiness()
+  }, [authBusinessId])
 
   const fetchBusinessDetails = async (businessId) => {
     try {
@@ -361,7 +330,7 @@ function Department() {
     setSelectedMemberIds([])
     setSelectedDepartmentHeadBranchId('')
     setFormData({
-      businessId: currentBusinessId || '64f7b1234567890abcdef123',
+      businessId: currentBusinessId || '',
       name: '',
       description: '',
       status: 'active', // Default to active for new departments
@@ -418,6 +387,7 @@ function Department() {
           selectedMembers.push({
             userId: branch.userId || branch._id || branch.id,
             phone: branch.phone || branch.didNumber || '',
+            didNumber: branch.didNumber || branch.did || '',
             role: branch.role || 'branch'
           })
         }
@@ -470,15 +440,27 @@ function Department() {
     }
     
     setSelectedMemberIds(memberIds)
+    // Normalize members to ensure didNumber is included where possible
+    const normalizedMembers = (department.members && Array.isArray(department.members)) ? department.members.map(m => {
+      const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
+      return {
+        userId: m.userId || m.user || m._id || '',
+        phone: m.phone || (matchingBranch && (matchingBranch.phone || matchingBranch.didNumber)) || '',
+        didNumber: m.didNumber || (matchingBranch && (matchingBranch.didNumber || matchingBranch.did)) || '',
+        role: m.role || 'branch',
+        _id: m._id || m.id || undefined
+      }
+    }) : []
+
     setFormData({
-      businessId: department.businessId || currentBusinessId || '64f7b1234567890abcdef123',
+      businessId: department.businessId || currentBusinessId || '',
       name: department.name,
       description: department.description,
       status: department.status || 'active',
       // Keep the userId in formData for API
       departmentHead: departmentHeadUserId || '',
       didNumber: department.didNumber || '',
-      members: department.members || []
+      members: normalizedMembers
     })
     setShowDepartmentModal(true)
   }
@@ -562,7 +544,17 @@ function Department() {
         'Authorization': token ? `Bearer ${token}` : ''
       };
       
-      // Prepare department data
+      // Prepare department data and ensure each member has didNumber
+      const normalizedMembers = (formData.members && Array.isArray(formData.members)) ? formData.members.map(m => {
+        const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
+        return {
+          userId: m.userId || m._id || m.id || '',
+          phone: m.phone || (matchingBranch && (matchingBranch.phone || matchingBranch.didNumber)) || '',
+          didNumber: m.didNumber || (matchingBranch && (matchingBranch.didNumber || matchingBranch.did)) || '',
+          role: m.role || 'branch'
+        }
+      }) : []
+
       const departmentData = {
         businessId: formData.businessId,
         name: formData.name,
@@ -570,7 +562,7 @@ function Department() {
         status: formData.status,
         departmentHead: formData.departmentHead,
         didNumber: formData.didNumber,
-        members: formData.members // Array of {userId, phone, role} objects
+        members: normalizedMembers // Array of {userId, phone, didNumber, role}
       };
       
       console.log('Department data being sent:', JSON.stringify(departmentData, null, 2));
@@ -594,7 +586,7 @@ function Department() {
             status: formData.status,
             departmentHead: formData.departmentHead,
             didNumber: formData.didNumber,
-            members: formData.members
+            members: departmentData.members
           },
           { headers }
         );

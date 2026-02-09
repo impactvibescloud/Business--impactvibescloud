@@ -11,6 +11,17 @@ const SipRegistration = ({ sipConfig = {}, enableDebug = false, onRegistrationSt
       return
     }
 
+    // If a global sipUA exists and is registered, reuse it instead of reinitializing
+    try {
+      if (window.sipUA && typeof window.sipUA === 'object' && window.sipUA.isRegistered && window.sipUA.isRegistered()) {
+        onRegistrationStatus && onRegistrationStatus('registered')
+        try { onUaReady && onUaReady(window.sipUA) } catch (e) { console.warn('onUaReady failed', e) }
+        return
+      }
+    } catch (e) {
+      // ignore and continue
+    }
+
     const wsPath = sipConfig.ws_path || '/ws'
     const defaultPort = sipConfig.ws_port || (sipConfig.wss !== false ? 8089 : 8088)
     const proto = sipConfig.wss !== false ? 'wss' : 'ws'
