@@ -36,6 +36,9 @@ const IVRManagement = () => {
   const [editingNode, setEditingNode] = useState(null)
   const [availableAgents, setAvailableAgents] = useState([])
   const [departmentMembers, setDepartmentMembers] = useState({})
+  const [playingUrl, setPlayingUrl] = useState(null)
+  const [playingAudio, setPlayingAudio] = useState(null)
+  const [playingIvrId, setPlayingIvrId] = useState(null)
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -260,6 +263,56 @@ const IVRManagement = () => {
       const d = new Date(iso)
       return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     } catch (e) { return iso }
+  }
+
+  const playIvrFile = async (ivr) => {
+    try {
+      const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+      const id = ivr._id || ivr.id
+      let endpoint = ''
+      if (id) {
+        // preferred endpoint uses ivrs and the resource id
+        endpoint = `/ivrs/download/${encodeURIComponent(id)}?businessId=${encodeURIComponent(currentBusinessId)}`
+      } else {
+        const name = ivr.fileName || ivr.audioFile
+        if (!name) return
+        endpoint = `/ivr/download/${encodeURIComponent(name)}?businessId=${encodeURIComponent(currentBusinessId)}`
+      }
+      // fetch binary audio
+      const data = await apiCall(endpoint, 'GET', null, { responseType: 'arraybuffer' })
+      if (!data) return
+      const mime = (ivr.mimeType || 'audio/wav')
+      const blob = new Blob([data], { type: mime })
+      const url = window.URL.createObjectURL(blob)
+      // stop previously playing
+      if (playingAudio) {
+        try { playingAudio.pause() } catch (e) {}
+        try { window.URL.revokeObjectURL(playingUrl) } catch (e) {}
+      }
+      const audio = new Audio(url)
+      setPlayingUrl(url)
+      setPlayingAudio(audio)
+      setPlayingIvrId(ivr._id || ivr.id || name)
+      audio.play().catch((e) => { console.error('Audio play failed', e) })
+      audio.onended = () => {
+        try { window.URL.revokeObjectURL(url) } catch (e) {}
+        setPlayingUrl(null)
+        setPlayingAudio(null)
+        setPlayingIvrId(null)
+      }
+    } catch (err) {
+      console.error('Failed to play IVR file', err)
+    }
+  }
+
+  const stopPlaying = () => {
+    if (playingAudio) {
+      try { playingAudio.pause() } catch (e) {}
+      try { window.URL.revokeObjectURL(playingUrl) } catch (e) {}
+    }
+    setPlayingAudio(null)
+    setPlayingUrl(null)
+    setPlayingIvrId(null)
   }
 
   return (
@@ -641,7 +694,17 @@ const IVRManagement = () => {
                           <div style={{ flex: 1 }}>
                             <h6 className="mb-2">IVR Details</h6>
                             {/* Welcome removed (not used anymore) */}
-                            <div className="mb-2"><strong>File:</strong> {i.fileName || i.audioFile || i._id || '-'}</div>
+                            <div className="mb-2"><strong>File:</strong> {i.fileName || i.audioFile || i._id || '-'}
+                              { (i.fileName || i.audioFile || i._id) && (
+                                <>
+                                  {playingIvrId === (i._id || i.id || (i.fileName || i.audioFile)) ? (
+                                    <button className="btn btn-sm btn-outline-danger ms-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }}>Stop</button>
+                                  ) : (
+                                    <button className="btn btn-sm btn-outline-primary ms-2" onClick={(e) => { e.stopPropagation(); playIvrFile(i) }}>Play</button>
+                                  )}
+                                </>
+                              )}
+                            </div>
                             <div className="mb-2"><strong>Menu Options:</strong></div>
                             <div>
                               {Array.isArray(i.options) && i.options.length > 0 ? (
