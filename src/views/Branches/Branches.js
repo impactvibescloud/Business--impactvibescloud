@@ -53,19 +53,17 @@ const Branches = () => {
   const [endTime, setEndTime] = useState("");
 
   // Default start/end times for known time groups
-  // Defaults aligned with the UI labels:
-  // Morning Shift (8 AM - 8 PM) => 08:00 - 20:00
-  // Afternoon Shift (12 PM - 8 PM) => 12:00 - 20:00
-  // Evening Shift (4 PM - 12 AM) => 16:00 - 00:00
-  // Night Shift (10 PM - 6 AM) => 22:00 - 06:00
-  // 24 Hours => 00:00 - 23:59
+  // Default start/end times for known time groups (user-defined presets):
+  // Morning Shift — 9 AM → 12 PM
+  // Afternoon Shift — 12 PM → 6 PM
+  // Full Shift — 9 AM → 6 PM
+  // Night Shift — 6 PM → 12 AM
+  // Custom Shift — no defaults (user-entered)
   const TIME_GROUP_DEFAULTS = {
-    morning: { startTime: '08:00', endTime: '20:00' },
+    morning: { startTime: '09:00', endTime: '12:00' },
+    afternoon: { startTime: '12:00', endTime: '18:00' },
     full: { startTime: '09:00', endTime: '18:00' },
-    afternoon: { startTime: '12:00', endTime: '20:00' },
-    evening: { startTime: '16:00', endTime: '00:00' },
-    night: { startTime: '22:00', endTime: '06:00' },
-    '24hours': { startTime: '00:00', endTime: '23:59' },
+    night: { startTime: '18:00', endTime: '00:00' },
   };
 
   const handleTimeGroupChange = (value) => {
@@ -1019,12 +1017,11 @@ const Branches = () => {
                 required
               >
                 <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (8 AM - 8 PM)</option>
-                <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
-                <option value="evening">Evening Shift (4 PM - 12 AM)</option>
+                <option value="morning">Morning Shift (9 AM - 12 PM)</option>
+                <option value="afternoon">Afternoon Shift (12 PM - 6 PM)</option>
                 <option value="full">Full Shift (9 AM - 6 PM)</option>
-                <option value="night">Night Shift (10 PM - 6 AM)</option>
-                <option value="24hours">24 Hours</option>
+                <option value="night">Night Shift (6 PM - 12 AM)</option>
+                <option value="custom">Custom Shift</option>
               </CFormSelect>
               
             </div>
@@ -1112,12 +1109,11 @@ const Branches = () => {
                 required
               >
                 <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (8 AM - 8 PM)</option>
-                <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
-                <option value="evening">Evening Shift (4 PM - 12 AM)</option>
+                <option value="morning">Morning Shift (9 AM - 12 PM)</option>
+                <option value="afternoon">Afternoon Shift (12 PM - 6 PM)</option>
                 <option value="full">Full Shift (9 AM - 6 PM)</option>
-                <option value="night">Night Shift (10 PM - 6 AM)</option>
-                <option value="24hours">24 Hours</option>
+                <option value="night">Night Shift (6 PM - 12 AM)</option>
+                <option value="custom">Custom Shift</option>
               </CFormSelect>
               
             </div>
