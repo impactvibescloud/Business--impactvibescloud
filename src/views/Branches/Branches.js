@@ -20,6 +20,7 @@ import {
   CTableHeaderCell,
   CTableBody,
   CTableDataCell,
+  CCardHeader,
   CBadge,
   CSpinner,
   CAlert,
@@ -632,30 +633,40 @@ const Branches = () => {
       )}
       
       <CCard className="mb-4">
+        <style>{`
+          /* Compact table tweaks scoped to this component */
+          .compact-table th, .compact-table td {
+            padding: 0.25rem 0.4rem !important;
+            vertical-align: middle !important;
+            line-height: 1.15 !important;
+          }
+          .compact-table td { overflow: hidden; text-overflow: ellipsis; }
+          .compact-table .note-col { white-space: normal !important; }
+          .compact-table .nowrap { white-space: nowrap !important; }
+        `}</style>
+        <CCardHeader className="d-flex justify-content-between align-items-center">
+          <span>Agents</span>
+          <div>
+            <button className="btn btn-sm btn-outline-primary me-2" onClick={() => fetchBranches()} disabled={loading}>Refresh</button>
+            {process.env.NODE_ENV === 'development' && (
+              <button className="btn btn-sm btn-outline-warning me-2" onClick={() => {
+                try {
+                  const devId = window.prompt('Enter businessId for dev testing (leave empty to cancel)')
+                  if (devId) {
+                    localStorage.setItem('businessId', devId)
+                    fetchBranches()
+                  }
+                } catch (e) {}
+              }}>Force Fetch (dev)</button>
+            )}
+            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
+            <span className="mx-2">Page {currentPage}</span>
+            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
+            <button className="btn btn-sm btn-secondary me-2" onClick={() => fileInputRef.current && fileInputRef.current.click()}>Bulk Upload</button>
+            <button className="btn btn-sm btn-primary" onClick={handleAddBranch}><CIcon icon={cilPlus} className="me-1" /> Add Agent</button>
+          </div>
+        </CCardHeader>
         <CCardBody>
-          <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
-              <h1 className="branches-title">Agents</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-                <div className="d-flex gap-2">
-                  <CButton color="secondary" className="add-agent-btn" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
-                    Bulk Upload
-                  </CButton>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleFileSelect(e)}
-                  />
-                  <CButton color="primary" className="add-agent-btn" onClick={handleAddBranch}>
-                    <CIcon icon={cilPlus} className="me-2" />
-                    Add Agent
-                  </CButton>
-                </div>
-            </CCol>
-          </CRow>
           
           <CRow className="mb-4">
             <CCol md={6}>
@@ -672,7 +683,7 @@ const Branches = () => {
             </CCol>
           </CRow>
 
-          <CTable hover responsive className="branches-table">
+          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>

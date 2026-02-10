@@ -19,9 +19,14 @@ import {
   CModalBody,
   CModalFooter,
   CButton,
+  CInputGroup,
+  CFormInput,
+  CPagination,
+  CPaginationItem,
 } from '@coreui/react'
 import axios from 'axios'
 import { apiCall } from '../../config/api'
+import '../Branches/Branches.css'
 
 const CallDispositions = () => {
   const [dispositions, setDispositions] = useState([])
@@ -222,20 +227,9 @@ const CallDispositions = () => {
 
   return (
     <CCard className="mb-4">
-      <style>{`
-        /* Compact table tweaks scoped to this component */
-        .compact-table th, .compact-table td {
-          padding: 0.25rem 0.4rem !important;
-          vertical-align: middle !important;
-          line-height: 1.15 !important;
-        }
-        .compact-table td { overflow: hidden; text-overflow: ellipsis; }
-        .compact-table .note-col { white-space: normal !important; }
-        .compact-table .nowrap { white-space: nowrap !important; }
-      `}</style>
       <CCardHeader className="d-flex justify-content-between align-items-center">
         <span>Call Dispositions</span>
-        <div>
+        <div className="d-flex align-items-center">
           <button
             className="btn btn-sm btn-outline-primary me-2"
             onClick={() => fetchDispositions(1)}
@@ -267,7 +261,7 @@ const CallDispositions = () => {
             Apply
           </button>
           <button
-            className="btn btn-sm btn-outline-secondary me-2"
+            className="btn btn-sm btn-outline-secondary me-3"
             onClick={() => {
               setStartDateFilter('')
               setEndDateFilter('')
@@ -277,38 +271,11 @@ const CallDispositions = () => {
           >
             Clear
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              className="btn btn-sm btn-outline-warning me-2"
-              onClick={() => {
-                // Prompt for a businessId in dev to avoid committing static IDs
-                try {
-                  const devId = window.prompt('Enter businessId for dev testing (leave empty to cancel)')
-                  if (devId) {
-                    localStorage.setItem('businessId', devId)
-                    fetchDispositions(1)
-                  }
-                } catch (e) {}
-              }}
-            >
-              Force Fetch (dev)
-            </button>
-          )}
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-          >
-            Prev
-          </button>
-          <span className="mx-2">Page {page}</span>
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={() => setPage((p) => p + 1)}
-            disabled={loading}
-          >
-            Next
-          </button>
+          <CPagination aria-label="Call dispositions pages" className="mb-0">
+            <CPaginationItem onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}>Prev</CPaginationItem>
+            <CPaginationItem active>{page}</CPaginationItem>
+            <CPaginationItem onClick={() => setPage((p) => p + 1)} disabled={loading}>Next</CPaginationItem>
+          </CPagination>
         </div>
       </CCardHeader>
       <CCardBody>
@@ -385,38 +352,45 @@ const CallDispositions = () => {
         ) : dispositions.length === 0 ? (
           <div className="text-center py-3">No call logs found</div>
         ) : (
-          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
+          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell style={{ width: '3%' }}></CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>Agent</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>Contact</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>Virtual Number</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '8%' }}>Duration</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>Call Date</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '10%' }}>Call Type</CTableHeaderCell>
-                <CTableHeaderCell className="text-center" style={{ width: '10%' }}>Status</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '15%' }}>AGENT</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '12%' }}>CONTACT</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '12%' }}>VIRTUAL NUMBER</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '8%' }}>DURATION</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '15%' }}>CALL DATE</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '10%' }}>CALL TYPE</CTableHeaderCell>
+                <CTableHeaderCell className="text-center" style={{ width: '10%' }}>STATUS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
               {dispositions.map((d) => (
                 <React.Fragment key={d._id}>
-                  <CTableRow 
-                    onClick={() => toggleRow(d._id)} 
-                    style={{ cursor: 'pointer', backgroundColor: expandedRows.has(d._id) ? '#f8f9fa' : 'transparent' }} 
-                    role="button" 
+                  <CTableRow
+                    onClick={() => toggleRow(d._id)}
+                    style={{ cursor: 'pointer', backgroundColor: expandedRows.has(d._id) ? '#f8f9fa' : 'transparent' }}
+                    role="button"
                     tabIndex={0}
                   >
-                    <CTableDataCell className="align-middle text-center">
-                      <span style={{ fontSize: '1.2rem' }}>{expandedRows.has(d._id) ? '▼' : '▶'}</span>
+                    <CTableDataCell className="align-middle">
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ fontSize: '1.1rem', marginRight: 10 }}>{expandedRows.has(d._id) ? '▼' : '▶'}</div>
+                        <div className="agent-name" title={d.agent?.email || d.agent?._id || '-'}>{d.agent?.email?.split('@')[0] || d.agent?._id || '-'}</div>
+                      </div>
                     </CTableDataCell>
                     <CTableDataCell className="align-middle">
-                      <span title={d.agent?.email || d.agent?._id || '-'}>{d.agent?.email?.split('@')[0] || d.agent?._id || '-'}</span>
+                      <div className="manager-email">{d.callLog?.contact || d.contact || '-'}</div>
                     </CTableDataCell>
-                    <CTableDataCell className="align-middle">{d.callLog?.contact || d.contact || '-'}</CTableDataCell>
-                    <CTableDataCell className="align-middle">{d.callLog?.virtualNumber || d.virtualNumber || '-'}</CTableDataCell>
-                    <CTableDataCell className="align-middle">{d.callLog?.duration || d.duration ? `${d.callLog?.duration || d.duration}s` : '-'}</CTableDataCell>
-                    <CTableDataCell className="align-middle nowrap">{formatDateTimeShort(d.callLog?.callDate || d.callDate)}</CTableDataCell>
+                    <CTableDataCell className="align-middle">
+                      <div className="agent-number">{d.callLog?.virtualNumber || d.virtualNumber || '-'}</div>
+                    </CTableDataCell>
+                    <CTableDataCell className="align-middle">
+                      <div className="agent-number">{d.callLog?.duration || d.duration ? `${d.callLog?.duration || d.duration}s` : '-'}</div>
+                    </CTableDataCell>
+                    <CTableDataCell className="align-middle nowrap">
+                      <div className="department-name">{formatDateTimeShort(d.callLog?.callDate || d.callDate)}</div>
+                    </CTableDataCell>
                     <CTableDataCell className="align-middle">{d.callType || '-'}</CTableDataCell>
                     <CTableDataCell className="text-center align-middle">
                       <CBadge color={

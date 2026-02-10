@@ -54,3 +54,13 @@ a {
   0% { transform: scale(0); }
   100% { transform: scale(1); opacity: 0; }
 }
+
+/* Hide per-page "Show" selectors globally. Pagination is fixed to 10 rows per page. */
+.dataTables_length {
+  display: none !important;
+}
+
+/* Backstop: some pages use custom labels around selects */
+.dataTables_length label {
+  display: none !important;
+}
