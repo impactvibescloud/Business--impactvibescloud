@@ -81,6 +81,27 @@ const Dashboard = () => {
           const data = response.data
           const totals = data.totals || {}
           const byType = data.byType || {}
+          // Attempt to extract time-series trend data if present in response
+          let trend = null
+          if (Array.isArray(data.byTime) && data.byTime.length > 0) {
+            const labels = data.byTime.map(t => t.label || t.time || t.hour || String(t.timestamp || ''))
+            const outbound = data.byTime.map(t => t.outbound || 0)
+            const inbound = data.byTime.map(t => t.inbound || 0)
+            const missed = data.byTime.map(t => t.missed || 0)
+            trend = { labels, outbound, inbound, missed }
+          } else if (Array.isArray(data.byHour) && data.byHour.length > 0) {
+            const labels = data.byHour.map(t => t.hour || t.label || String(t.timestamp || ''))
+            const outbound = data.byHour.map(t => t.outbound || 0)
+            const inbound = data.byHour.map(t => t.inbound || 0)
+            const missed = data.byHour.map(t => t.missed || 0)
+            trend = { labels, outbound, inbound, missed }
+          } else if (data.timeSeries && Array.isArray(data.timeSeries)) {
+            const labels = data.timeSeries.map(t => t.label || t.time || String(t.timestamp || ''))
+            const outbound = data.timeSeries.map(t => t.outbound || 0)
+            const inbound = data.timeSeries.map(t => t.inbound || 0)
+            const missed = data.timeSeries.map(t => t.missed || 0)
+            trend = { labels, outbound, inbound, missed }
+          }
           setCallLogs([]) // dashboard widgets derive numbers from stats, not full logs
           setCallStats({
             totalCalls: totals.totalCalls || 0,
@@ -89,7 +110,8 @@ const Dashboard = () => {
             callsPerDay: totals.totalCalls || 0,
             inboundCalls: byType.inbound || 0,
             missedCalls: totals.missed || 0,
-            rejectedCalls: totals.rejected || 0
+            rejectedCalls: totals.rejected || 0,
+            trend: trend
           })
         } else {
           setCallLogs([])

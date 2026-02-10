@@ -395,47 +395,47 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
                   <div className="mb-3">
                     <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600', fontSize: '0.9rem' }}>Call Trend (Today)</h6>
                     <div style={{ height: '280px' }}>
-                      <Line 
-                        data={{
-                          labels: ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM', '8PM'],
-                          datasets: [
-                            {
-                              label: 'Outbound',
-                              data: [5, 12, 18, 15, 22, 19, 14, 8],
-                              borderColor: '#4A9AF8',
-                              backgroundColor: 'transparent',
-                              tension: 0.3,
-                              fill: false,
-                              pointRadius: 3,
-                              pointBackgroundColor: '#4A9AF8',
-                              borderWidth: 2
-                            },
-                            {
-                              label: 'Inbound',
-                              data: [3, 8, 12, 10, 15, 13, 9, 5],
-                              borderColor: '#8ED081',
-                              backgroundColor: 'transparent',
-                              tension: 0.3,
-                              fill: false,
-                              pointRadius: 3,
-                              pointBackgroundColor: '#8ED081',
-                              borderWidth: 2
-                            },
-                            {
-                              label: 'Missed',
-                              data: [2, 4, 6, 5, 8, 7, 4, 3],
-                              borderColor: '#3399ff',
-                              backgroundColor: 'transparent',
-                              tension: 0.3,
-                              fill: false,
-                              pointRadius: 3,
-                              pointBackgroundColor: '#3399ff',
-                              borderWidth: 2,
-                              borderDash: [5, 5]
-                            }
-                          ]
-                        }}
-                        options={{
+                      <Line
+                          data={{
+                            labels: (callData && callData.trend && Array.isArray(callData.trend.labels) && callData.trend.labels.length > 0) ? callData.trend.labels : ['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM', '8PM'],
+                            datasets: [
+                              {
+                                label: 'Outbound',
+                                data: (callData && callData.trend && Array.isArray(callData.trend.outbound)) ? callData.trend.outbound : [5, 12, 18, 15, 22, 19, 14, 8],
+                                borderColor: '#4A9AF8',
+                                backgroundColor: 'transparent',
+                                tension: 0.3,
+                                fill: false,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#4A9AF8',
+                                borderWidth: 2
+                              },
+                              {
+                                label: 'Inbound',
+                                data: (callData && callData.trend && Array.isArray(callData.trend.inbound)) ? callData.trend.inbound : [3, 8, 12, 10, 15, 13, 9, 5],
+                                borderColor: '#8ED081',
+                                backgroundColor: 'transparent',
+                                tension: 0.3,
+                                fill: false,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#8ED081',
+                                borderWidth: 2
+                              },
+                              {
+                                label: 'Missed',
+                                data: (callData && callData.trend && Array.isArray(callData.trend.missed)) ? callData.trend.missed : [2, 4, 6, 5, 8, 7, 4, 3],
+                                borderColor: '#3399ff',
+                                backgroundColor: 'transparent',
+                                tension: 0.3,
+                                fill: false,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#3399ff',
+                                borderWidth: 2,
+                                borderDash: [5, 5]
+                              }
+                            ]
+                          }}
+                          options={{
                           responsive: true,
                           maintainAspectRatio: false,
                           plugins: {

@@ -15,6 +15,7 @@ import {
   CFormInput,
   CPagination,
   CPaginationItem,
+  CCardHeader,
   CModal,
   CModalHeader,
   CModalTitle,
@@ -726,19 +727,40 @@ function Department() {
       )}
       
       <CCard className="mb-4">
+        <style>{`
+          /* Compact table tweaks scoped to this component (match Agents page) */
+          .compact-table th, .compact-table td {
+            padding: 0.25rem 0.4rem !important;
+            vertical-align: middle !important;
+            line-height: 1.15 !important;
+            font-size: 0.8125rem !important;
+          }
+          .compact-table td { overflow: hidden; text-overflow: ellipsis; }
+          .compact-table .note-col { white-space: normal !important; }
+          .compact-table .nowrap { white-space: nowrap !important; }
+        `}</style>
+        <CCardHeader className="d-flex justify-content-between align-items-center">
+          <span>Departments</span>
+          <div>
+            <button className="btn btn-sm btn-outline-primary me-2" onClick={() => fetchDepartments()} disabled={loading}>Refresh</button>
+            {process.env.NODE_ENV === 'development' && (
+              <button className="btn btn-sm btn-outline-warning me-2" onClick={() => {
+                try {
+                  const devId = window.prompt('Enter businessId for dev testing (leave empty to cancel)')
+                  if (devId) {
+                    localStorage.setItem('businessId', devId)
+                    fetchDepartments()
+                  }
+                } catch (e) {}
+              }}>Force Fetch (dev)</button>
+            )}
+            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
+            <span className="mx-2">Page {currentPage}</span>
+            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
+            <button className="btn btn-sm btn-primary" onClick={handleNewDepartment}><CIcon icon={cilPlus} className="me-1" /> New Department</button>
+          </div>
+        </CCardHeader>
         <CCardBody>
-          <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
-              <h1 className="contact-list-title">Department Management</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              <CButton color="primary" className="add-contact-btn" onClick={handleNewDepartment}>
-                <CIcon icon={cilPlus} className="me-2" />
-                New Department
-              </CButton>
-            </CCol>
-          </CRow>
-          
           <CRow className="mb-4">
             <CCol md={6}>
               <CInputGroup>
@@ -754,7 +776,7 @@ function Department() {
             </CCol>
           </CRow>
 
-          <CTable hover responsive className="contact-table">
+          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>

@@ -37,6 +37,7 @@ import {
   cilDescription
 } from '@coreui/icons'
 import './CallLogs.css'
+import '../Branches/Branches.css'
 import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
 
 const CallLogs = () => {
@@ -915,7 +916,7 @@ const CallLogs = () => {
               </div>
             </CCol>
           </CRow>
-          <CTable hover responsive className="call-logs-table">
+          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>
@@ -971,21 +972,11 @@ const CallLogs = () => {
                       }}
                       style={{ cursor: 'pointer' }}
                     >
-                      <CTableDataCell>
-                        <span className="log-number">{(currentPage - 1) * pageSize + index + 1}</span>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="log-type text-capitalize">{callType}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="log-date">{callDate}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div>{log.callInitiatedBy || 'Unknown'}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div>{log.callReceivedBy || 'N/A'}</div>
-                      </CTableDataCell>
+                        <CTableDataCell className="align-middle"><div className="agent-number">{(currentPage - 1) * pageSize + index + 1}</div></CTableDataCell>
+                        <CTableDataCell className="align-middle"><div className="agent-name text-capitalize">{callType}</div></CTableDataCell>
+                        <CTableDataCell className="align-middle"><div className="department-name">{callDate}</div></CTableDataCell>
+                        <CTableDataCell className="align-middle"><div className="agent-name">{log.callInitiatedBy || 'Unknown'}</div></CTableDataCell>
+                        <CTableDataCell className="align-middle"><div className="manager-email">{log.callReceivedBy || 'N/A'}</div></CTableDataCell>
                       {/* Removed inline columns: these values are shown in modal */}
                       <CTableDataCell>
                         <div>

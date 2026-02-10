@@ -19,6 +19,7 @@ import {
   CButton,
 } from '@coreui/react'
 import { apiCall } from '../../config/api'
+import '../Branches/Branches.css'
 
 const IVRManagement = () => {
   const [ivrs, setIvrs] = useState([])
@@ -317,9 +318,6 @@ const IVRManagement = () => {
 
   return (
     <CCard className="mb-4">
-      <style>{`
-        .compact-table th, .compact-table td { padding: 0.25rem 0.4rem !important; vertical-align: middle !important; }
-      `}</style>
       <CCardHeader className="d-flex justify-content-between align-items-center">
         <span>IVR Management</span>
         <div>
@@ -482,7 +480,7 @@ const IVRManagement = () => {
                 // Build options from the friendly editor if it has entries, otherwise fall back to Advanced JSON
                 const hasEditorOptions = Array.isArray(newIvr.options) && newIvr.options.some(o => o.key && (o.target || o.voice))
 
-                if (editingNode) {
+                  if (editingNode) {
                   // Build payload for PUT /ivr/:node using array format
                   let optionsArray = []
                   if (hasEditorOptions) {
@@ -551,22 +549,41 @@ const IVRManagement = () => {
                     }
                   }
 
-                  const putPayload = {
+                  const savePayload = {
                     businessId: currentBusinessId,
+                    node: editingNode,
                     menu: {
                       voice: newIvr.voice || '',
                       options: optionsArray,
                     }
                   }
-                  const endpoint = `/ivr/${editingNode}`
-                  const res = await apiCall(endpoint, 'PUT', putPayload)
-                  if (res && (res.success || res.updated)) {
-                    setAddOpen(false)
-                    setEditingNode(null)
-                    setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
-                    fetchIvrs(1)
-                  } else {
-                    console.error('Failed to update IVR', res)
+                  try {
+                    // Save metadata to MongoDB first
+                    const saveRes = await apiCall(`/ivr/update/save/${encodeURIComponent(editingNode)}`, 'PUT', savePayload)
+                    if (saveRes && (saveRes.success || saveRes.saved || saveRes.data)) {
+                      // Enqueue TTS generation (generate audio & save to DB)
+                      try {
+                        const genRes = await apiCall(`/ivr/update/generate-only/${encodeURIComponent(editingNode)}`, 'PUT', savePayload)
+                        console.debug('Enqueued generate-only', genRes)
+                        // After generation, enqueue upload-only to sync audio to Asterisk/AST DB
+                        try {
+                          await apiCall(`/ivr/update/upload-only/${encodeURIComponent(editingNode)}`, 'PUT', { businessId: currentBusinessId })
+                          console.debug('Enqueued upload-only for', editingNode)
+                        } catch (upErr) {
+                          console.error('Failed to enqueue upload-only', upErr)
+                        }
+                      } catch (genErr) {
+                        console.error('Failed to enqueue generate-only', genErr)
+                      }
+                      setAddOpen(false)
+                      setEditingNode(null)
+                      setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
+                      fetchIvrs(1)
+                    } else {
+                      console.error('Failed to save IVR metadata', saveRes)
+                    }
+                  } catch (err) {
+                    console.error('Failed to save IVR metadata', err)
                   }
                 } else {
                   // Create (existing generate flow)
@@ -631,20 +648,53 @@ const IVRManagement = () => {
                     }
                   }
 
-                  const generatePayload = {
-                    businessId: currentBusinessId,
-                    node: newIvr.node || `menu_${Date.now()}`,
-                    voice: newIvr.voice || ``,
-                    options: parsedOptions,
+                  const nodeName = newIvr.node || `menu_${Date.now()}`
+                  // Ensure options is an array of { key, voice, destination }
+                  let optionsArrayFromParsed = []
+                  if (Array.isArray(parsedOptions)) {
+                    optionsArrayFromParsed = parsedOptions
+                  } else if (parsedOptions && typeof parsedOptions === 'object') {
+                    optionsArrayFromParsed = Object.keys(parsedOptions).map((k) => {
+                      const v = parsedOptions[k]
+                      if (typeof v === 'string') return { key: k, voice: '', destination: v }
+                      return { key: k, voice: v?.voice || '', destination: v?.destination || v }
+                    })
                   }
-                  const endpoint = `/ivr/generate`
-                  const res = await apiCall(endpoint, 'POST', generatePayload)
-                  if (res && (res.success || res.generated)) {
-                    setAddOpen(false)
-                    setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
-                    fetchIvrs(1)
-                  } else {
-                    console.error('Failed to generate IVR', res)
+
+                  const savePayload = {
+                    businessId: currentBusinessId,
+                    node: nodeName,
+                    menu: {
+                      voice: newIvr.voice || ``,
+                      options: optionsArrayFromParsed,
+                    }
+                  }
+                  try {
+                    // Save metadata first
+                    const saveRes = await apiCall('/ivr/save', 'POST', savePayload)
+                    if (saveRes && (saveRes.success || saveRes.saved || saveRes.data)) {
+                      // Enqueue TTS generation (generate audio & save to DB)
+                      try {
+                        const genRes = await apiCall('/ivr/generate-only', 'POST', savePayload)
+                        console.debug('Enqueued generate-only', genRes)
+                        // After generation, enqueue upload-only to sync audio to Asterisk/AST DB
+                        try {
+                          await apiCall('/ivr/upload-only', 'POST', { name: nodeName, businessId: currentBusinessId })
+                          console.debug('Enqueued upload-only for', nodeName)
+                        } catch (upErr) {
+                          console.error('Failed to enqueue upload-only', upErr)
+                        }
+                      } catch (genErr) {
+                        console.error('Failed to enqueue generate-only', genErr)
+                      }
+                      setAddOpen(false)
+                      setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
+                      fetchIvrs(1)
+                    } else {
+                      console.error('Failed to save IVR metadata', saveRes)
+                    }
+                  } catch (err) {
+                    console.error('Error creating IVR metadata', err)
                   }
                 }
               } catch (err) {
@@ -659,27 +709,30 @@ const IVRManagement = () => {
         ) : ivrs.length === 0 ? (
           <div className="text-center py-3">No IVRs found</div>
         ) : (
-          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
+          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell style={{ width: '3%' }}></CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '25%' }}>Name</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '30%' }}>Voice</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '10%' }}>Options</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>Created At</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '10%' }}>Action</CTableHeaderCell>
-                <CTableHeaderCell className="text-center" style={{ width: '10%' }}>Status</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '25%' }}>NAME</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '30%' }}>VOICE</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '10%' }}>OPTIONS</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '15%' }}>CREATED AT</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '10%' }}>ACTION</CTableHeaderCell>
+                <CTableHeaderCell className="text-center" style={{ width: '10%' }}>STATUS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
               {ivrs.map((i) => (
                 <React.Fragment key={i._id || i.id || i.name}>
                   <CTableRow onClick={() => toggleRow(i._id || i.id || i.name)} style={{ cursor: 'pointer', backgroundColor: expandedRows.has(i._id || i.id || i.name) ? '#f8f9fa' : 'transparent' }} role="button" tabIndex={0}>
-                    <CTableDataCell className="align-middle text-center"><span style={{ fontSize: '1.2rem' }}>{expandedRows.has(i._id || i.id || i.name) ? '▼' : '▶'}</span></CTableDataCell>
-                    <CTableDataCell className="align-middle">{i.name || '-'}</CTableDataCell>
-                    <CTableDataCell className="align-middle">{i.voice || '-'}</CTableDataCell>
-                    <CTableDataCell className="align-middle">{Array.isArray(i.options) ? i.options.length : (i.totalMenuOptions || '-')}</CTableDataCell>
-                    <CTableDataCell className="align-middle">{formatDateTimeShort(i.createdAt)}</CTableDataCell>
+                    <CTableDataCell className="align-middle">
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ fontSize: '1.1rem', marginRight: 10 }}>{expandedRows.has(i._id || i.id || i.name) ? '▼' : '▶'}</div>
+                        <div className="agent-name">{i.name || '-'}</div>
+                      </div>
+                    </CTableDataCell>
+                    <CTableDataCell className="align-middle"><div className="manager-email">{i.voice || '-'}</div></CTableDataCell>
+                    <CTableDataCell className="align-middle"><div className="agent-number">{Array.isArray(i.options) ? i.options.length : (i.totalMenuOptions || '-')}</div></CTableDataCell>
+                    <CTableDataCell className="align-middle"><div className="department-name">{formatDateTimeShort(i.createdAt)}</div></CTableDataCell>
                     <CTableDataCell className="align-middle">
                       <div>
                         <button className="btn btn-sm btn-warning" onClick={(e) => { e.stopPropagation(); openEdit(i) }}>Edit</button>
