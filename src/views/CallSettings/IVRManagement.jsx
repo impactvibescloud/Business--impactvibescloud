@@ -480,7 +480,7 @@ const IVRManagement = () => {
                 // Build options from the friendly editor if it has entries, otherwise fall back to Advanced JSON
                 const hasEditorOptions = Array.isArray(newIvr.options) && newIvr.options.some(o => o.key && (o.target || o.voice))
 
-                  if (editingNode) {
+                if (editingNode) {
                   // Build payload for PUT /ivr/:node using array format
                   let optionsArray = []
                   if (hasEditorOptions) {
@@ -549,41 +549,21 @@ const IVRManagement = () => {
                     }
                   }
 
-                  const savePayload = {
+                  const putPayload = {
                     businessId: currentBusinessId,
-                    node: editingNode,
                     menu: {
                       voice: newIvr.voice || '',
                       options: optionsArray,
                     }
                   }
-                  try {
-                    // Save metadata to MongoDB first
-                    const saveRes = await apiCall(`/ivr/update/save/${encodeURIComponent(editingNode)}`, 'PUT', savePayload)
-                    if (saveRes && (saveRes.success || saveRes.saved || saveRes.data)) {
-                      // Enqueue TTS generation (generate audio & save to DB)
-                      try {
-                        const genRes = await apiCall(`/ivr/update/generate-only/${encodeURIComponent(editingNode)}`, 'PUT', savePayload)
-                        console.debug('Enqueued generate-only', genRes)
-                        // After generation, enqueue upload-only to sync audio to Asterisk/AST DB
-                        try {
-                          await apiCall(`/ivr/update/upload-only/${encodeURIComponent(editingNode)}`, 'PUT', { businessId: currentBusinessId })
-                          console.debug('Enqueued upload-only for', editingNode)
-                        } catch (upErr) {
-                          console.error('Failed to enqueue upload-only', upErr)
-                        }
-                      } catch (genErr) {
-                        console.error('Failed to enqueue generate-only', genErr)
-                      }
-                      setAddOpen(false)
-                      setEditingNode(null)
-                      setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
-                      fetchIvrs(1)
-                    } else {
-                      console.error('Failed to save IVR metadata', saveRes)
-                    }
-                  } catch (err) {
-                    console.error('Failed to save IVR metadata', err)
+                  const res = await apiCall(`/ivr/update/full/${encodeURIComponent(editingNode)}`, 'PUT', putPayload)
+                  if (res && (res.success || res.updated || res.data)) {
+                    setAddOpen(false)
+                    setEditingNode(null)
+                    setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
+                    fetchIvrs(1)
+                  } else {
+                    console.error('Failed to update IVR', res)
                   }
                 } else {
                   // Create (existing generate flow)
@@ -649,7 +629,7 @@ const IVRManagement = () => {
                   }
 
                   const nodeName = newIvr.node || `menu_${Date.now()}`
-                  // Ensure options is an array of { key, voice, destination }
+                  // Normalize parsedOptions into an array of { key, voice, destination }
                   let optionsArrayFromParsed = []
                   if (Array.isArray(parsedOptions)) {
                     optionsArrayFromParsed = parsedOptions
@@ -670,31 +650,17 @@ const IVRManagement = () => {
                     }
                   }
                   try {
-                    // Save metadata first
-                    const saveRes = await apiCall('/ivr/save', 'POST', savePayload)
-                    if (saveRes && (saveRes.success || saveRes.saved || saveRes.data)) {
-                      // Enqueue TTS generation (generate audio & save to DB)
-                      try {
-                        const genRes = await apiCall('/ivr/generate-only', 'POST', savePayload)
-                        console.debug('Enqueued generate-only', genRes)
-                        // After generation, enqueue upload-only to sync audio to Asterisk/AST DB
-                        try {
-                          await apiCall('/ivr/upload-only', 'POST', { name: nodeName, businessId: currentBusinessId })
-                          console.debug('Enqueued upload-only for', nodeName)
-                        } catch (upErr) {
-                          console.error('Failed to enqueue upload-only', upErr)
-                        }
-                      } catch (genErr) {
-                        console.error('Failed to enqueue generate-only', genErr)
-                      }
+                    const saveRes = await apiCall('/ivr/create', 'POST', savePayload)
+                    if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
+                      // Creation succeeded; generation/upload are handled server-side now
                       setAddOpen(false)
                       setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
                       fetchIvrs(1)
                     } else {
-                      console.error('Failed to save IVR metadata', saveRes)
+                      console.error('Failed to create IVR', saveRes)
                     }
                   } catch (err) {
-                    console.error('Error creating IVR metadata', err)
+                    console.error('Error creating IVR', err)
                   }
                 }
               } catch (err) {
