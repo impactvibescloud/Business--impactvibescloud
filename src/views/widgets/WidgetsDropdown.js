@@ -393,7 +393,7 @@ function WidgetsDropdown({ agents, agentStatuses, callStats, breakTimeAgentDetai
                 {/* Line Chart - Call Trend */}
                 <CCol lg={6}>
                   <div className="mb-3">
-                    <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600', fontSize: '0.9rem' }}>Call Trend (Today)</h6>
+                    <h6 className="mb-3" style={{ color: '#495057', fontWeight: '600', fontSize: '0.9rem' }}>Call Trend (Todays)</h6>
                     <div style={{ height: '280px' }}>
                       <Line
                           data={{
