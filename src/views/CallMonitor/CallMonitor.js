@@ -3,6 +3,7 @@ import {
   CRow,
   CCol,
   CCard,
+  CCardHeader,
   CCardBody,
   CButton,
   CTable,
@@ -13,6 +14,7 @@ import {
   CTableDataCell,
   CSpinner,
   CBadge,
+  
 } from '@coreui/react'
 import { apiCall } from '../../config/api'
 import SipRegistration from '../../components/sip/SipRegistration'
@@ -25,6 +27,7 @@ const CallMonitor = () => {
   const [liveCalls, setLiveCalls] = useState([])
   const [logicalCalls, setLogicalCalls] = useState([])
   const pollingRef = useRef(null)
+  
   const [regStatus, setRegStatus] = useState('disconnected')
   const [ua, setUa] = useState(null)
   const [monitorSession, setMonitorSession] = useState(null)
@@ -93,6 +96,8 @@ const CallMonitor = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  
 
   // SIP config (using credentials provided)
   const sipCfg = {
@@ -239,108 +244,110 @@ const CallMonitor = () => {
     <CRow>
       <CCol>
         <CCard>
-          <CCardBody>
-            <SipRegistration sipConfig={sipCfg} enableDebug={false} onRegistrationStatus={setRegStatus} onUaReady={(u) => setUa(u)} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <h3 style={{ margin: 0 }}>Call Monitor</h3>
-                <CBadge color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'secondary'}>{regStatus}</CBadge>
-              </div>
-              <div>
-                <CButton color="primary" onClick={fetchLiveCalls} disabled={loading}>
-                  {loading ? <><CSpinner size="sm" />&nbsp;Refreshing</> : 'Refresh'}
-                </CButton>
-              </div>
-            </div>
+          <div>
+              <style>{`
+                .compact-table th, .compact-table td { padding: 0.25rem 0.4rem !important; vertical-align: middle !important; line-height: 1.15 !important; }
+                .compact-table td { overflow: hidden; text-overflow: ellipsis; }
+              `}</style>
+              <CCardHeader className="d-flex justify-content-between align-items-center">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <h3 style={{ margin: 0 }}>Call Monitor</h3>
+                  <CBadge color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'secondary'}>{regStatus}</CBadge>
+                </div>
+                <div>
+                  <button className="btn btn-sm btn-outline-primary me-2" onClick={fetchLiveCalls} disabled={loading}>{loading ? 'Refreshing' : 'Refresh'}</button>
+                </div>
+              </CCardHeader>
 
-            {error && <div style={{ color: 'var(--cui-danger)' }}>{error}</div>}
+              <CCardBody>
+                <SipRegistration sipConfig={sipCfg} enableDebug={false} onRegistrationStatus={setRegStatus} onUaReady={(u) => setUa(u)} />
 
-            <div style={{ marginTop: 12 }}>
-              {loading && !liveCalls.length ? (
-                <div style={{ padding: 20 }}><CSpinner />&nbsp;Loading live calls...</div>
-              ) : (
-                <>
-                  {liveCalls.length === 0 ? (
-                    <div style={{ padding: 20 }}><CBadge color="secondary">No active calls</CBadge></div>
+                {error && <div style={{ color: 'var(--cui-danger)' }}>{error}</div>}
+
+                <div style={{ marginTop: 12 }}>
+                  {loading && !liveCalls.length ? (
+                    <div style={{ padding: 20 }}><CSpinner />&nbsp;Loading live calls...</div>
                   ) : (
-                    <CTable striped hover responsive>
-                      <CTableHead>
-                        <CTableRow>
-                          <CTableHeaderCell>Direction</CTableHeaderCell>
-                          <CTableHeaderCell>Channel</CTableHeaderCell>
-                          <CTableHeaderCell>Status</CTableHeaderCell>
-                          <CTableHeaderCell>Duration</CTableHeaderCell>
-                          <CTableHeaderCell>DID</CTableHeaderCell>
-                          <CTableHeaderCell>Agent</CTableHeaderCell>
-                          <CTableHeaderCell>Branch</CTableHeaderCell>
-                          <CTableHeaderCell>Raw</CTableHeaderCell>
-                          <CTableHeaderCell>Actions</CTableHeaderCell>
-                        </CTableRow>
-                      </CTableHead>
-                      <CTableBody>
-                        {liveCalls.map((c, idx) => (
-                          <CTableRow key={`${c.channel || c.groupId || idx}-${idx}`}>
-                            <CTableDataCell>
-                              {(() => {
-                                const dir = detectDirection(c)
-                                return (
-                                  <CBadge color={dir === 'Outgoing' ? 'primary' : dir === 'Inbound' ? 'info' : 'secondary'}>
-                                    {dir}
+                    <>
+                      {liveCalls.length === 0 ? (
+                        <div style={{ padding: 20 }}><CBadge color="secondary">No active calls</CBadge></div>
+                      ) : (
+                        <CTable striped hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
+                          <CTableHead>
+                            <CTableRow>
+                              <CTableHeaderCell>Direction</CTableHeaderCell>
+                              <CTableHeaderCell>Channel</CTableHeaderCell>
+                              <CTableHeaderCell>Status</CTableHeaderCell>
+                              <CTableHeaderCell>Duration</CTableHeaderCell>
+                              <CTableHeaderCell>DID</CTableHeaderCell>
+                              <CTableHeaderCell>Agent</CTableHeaderCell>
+                              <CTableHeaderCell>Branch</CTableHeaderCell>
+                              <CTableHeaderCell>Raw</CTableHeaderCell>
+                              <CTableHeaderCell>Actions</CTableHeaderCell>
+                            </CTableRow>
+                          </CTableHead>
+                          <CTableBody>
+                            {liveCalls.map((c, idx) => (
+                              <CTableRow key={`${c.channel || c.groupId || idx}-${idx}`}>
+                                <CTableDataCell>
+                                  {(() => {
+                                    const dir = detectDirection(c)
+                                    return (
+                                      <CBadge color={dir === 'Outgoing' ? 'primary' : dir === 'Inbound' ? 'info' : 'secondary'}>
+                                        {dir}
+                                      </CBadge>
+                                    )
+                                  })()}
+                                </CTableDataCell>
+                                <CTableDataCell>{c.channel || '-'}</CTableDataCell>
+                                <CTableDataCell>
+                                  <CBadge color={String(c.status || '').toLowerCase() === 'up' ? 'success' : String(c.status || '').toLowerCase() === 'ring' ? 'warning' : 'secondary'}>
+                                    {c.status || '-'}
                                   </CBadge>
-                                )
-                              })()}
-                            </CTableDataCell>
-                            <CTableDataCell>{c.channel || '-'}</CTableDataCell>
-                            <CTableDataCell>
-                              <CBadge color={String(c.status || '').toLowerCase() === 'up' ? 'success' : String(c.status || '').toLowerCase() === 'ring' ? 'warning' : 'secondary'}>
-                                {c.status || '-'}
-                              </CBadge>
-                            </CTableDataCell>
-                            <CTableDataCell>{c.duration || '-'}</CTableDataCell>
-                            <CTableDataCell>{c.did?.number || c.tokens?.[3] || '-'}</CTableDataCell>
-                            <CTableDataCell>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</CTableDataCell>
-                            <CTableDataCell>{c.branch?.branchName || '-'}</CTableDataCell>
-                            <CTableDataCell style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.raw || '-'}</CTableDataCell>
-                            <CTableDataCell>
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <CButton
-                                  size="sm"
-                                  color="info"
-                                  onClick={() => handleMonitorClick(c)}
-                                  disabled={regStatus !== 'registered' || !ua}
-                                  title={regStatus === 'registered' && ua ? 'Monitor' : `Disabled: waiting for SIP registration (${regStatus})`}
-                                >
-                                  Monitor
-                                </CButton>
-                                <CButton
-                                  size="sm"
-                                  color="warning"
-                                  onClick={() => handleWhisperClick(c)}
-                                  disabled={regStatus !== 'registered' || !ua}
-                                  title={regStatus === 'registered' && ua ? 'Whisper' : `Disabled: waiting for SIP registration (${regStatus})`}
-                                >
-                                  Whisper
-                                </CButton>
-                                <CButton
-                                  size="sm"
-                                  color="success"
-                                  onClick={() => handleBargeClick(c)}
-                                  disabled={regStatus !== 'registered' || !ua}
-                                  title={regStatus === 'registered' && ua ? 'Barge' : `Disabled: waiting for SIP registration (${regStatus})`}
-                                >
-                                  Barge
-                                </CButton>
-                              </div>
-                            </CTableDataCell>
-                          </CTableRow>
-                        ))}
-                      </CTableBody>
-                    </CTable>
+                                </CTableDataCell>
+                                <CTableDataCell>{c.duration || '-'}</CTableDataCell>
+                                <CTableDataCell>{c.did?.number || c.tokens?.[3] || '-'}</CTableDataCell>
+                                <CTableDataCell>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</CTableDataCell>
+                                <CTableDataCell>{c.branch?.branchName || '-'}</CTableDataCell>
+                                <CTableDataCell style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.raw || '-'}</CTableDataCell>
+                                <CTableDataCell>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <CButton
+                                      size="sm"
+                                      color="info"
+                                      onClick={() => handleMonitorClick(c)}
+                                      disabled={regStatus !== 'registered' || !ua}
+                                    >
+                                      Monitor
+                                    </CButton>
+                                    <CButton
+                                      size="sm"
+                                      color="warning"
+                                      onClick={() => handleWhisperClick(c)}
+                                      disabled={regStatus !== 'registered' || !ua}
+                                    >
+                                      Whisper
+                                    </CButton>
+                                    <CButton
+                                      size="sm"
+                                      color="success"
+                                      onClick={() => handleBargeClick(c)}
+                                      disabled={regStatus !== 'registered' || !ua}
+                                    >
+                                      Barge
+                                    </CButton>
+                                  </div>
+                                </CTableDataCell>
+                              </CTableRow>
+                            ))}
+                          </CTableBody>
+                        </CTable>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </div>
+                </div>
           </CCardBody>
+              </div>
         </CCard>
       </CCol>
       </CRow>
