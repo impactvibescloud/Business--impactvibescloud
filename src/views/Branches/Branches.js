@@ -644,46 +644,29 @@ const Branches = () => {
           .compact-table .note-col { white-space: normal !important; }
           .compact-table .nowrap { white-space: nowrap !important; }
         `}</style>
-        <CCardHeader className="d-flex justify-content-between align-items-center">
-          <span>Agents</span>
-          <div>
-            <button className="btn btn-sm btn-outline-primary me-2" onClick={() => fetchBranches()} disabled={loading}>Refresh</button>
-            {process.env.NODE_ENV === 'development' && (
-              <button className="btn btn-sm btn-outline-warning me-2" onClick={() => {
-                try {
-                  const devId = window.prompt('Enter businessId for dev testing (leave empty to cancel)')
-                  if (devId) {
-                    localStorage.setItem('businessId', devId)
-                    fetchBranches()
-                  }
-                } catch (e) {}
-              }}>Force Fetch (dev)</button>
-            )}
-            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
-            <span className="mx-2">Page {currentPage}</span>
-            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
-            <button className="btn btn-sm btn-secondary me-2" onClick={() => fileInputRef.current && fileInputRef.current.click()}>Bulk Upload</button>
-            <button className="btn btn-sm btn-primary" onClick={handleAddBranch}><CIcon icon={cilPlus} className="me-1" /> Add Agent</button>
-          </div>
-        </CCardHeader>
-        <CCardBody>
-          
-          <CRow className="mb-4">
-            <CCol md={6}>
+          <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
+            <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
               <CInputGroup>
                 <CFormInput
+                  className="w-100"
                   placeholder="Search agents..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
               </CInputGroup>
-            </CCol>
-          </CRow>
+            </div>
+            <div>
+              <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
+              <span className="mx-2">Page {currentPage}</span>
+              <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
+              <button className="add-agent-btn-minimal btn-sm" onClick={handleAddBranch}><CIcon icon={cilPlus} className="me-1" /> Add Agent</button>
+            </div>
+          </CCardHeader>
+        <CCardBody>
+          
+          {/* Search moved to header */}
 
-          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
+          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>

@@ -117,10 +117,7 @@ const ContactLists = () => {
           let businessId = '';
           const authToken = localStorage.getItem('authToken');
           if (authToken) {
-            const userResponse = await fetch('/api/v1/user/details', {
-              headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            const userData = await userResponse.json();
+            const userData = await apiCall('/v1/user/details', 'GET')
             businessId = userData?.user?.businessId || localStorage.getItem('businessId');
           } else {
             businessId = localStorage.getItem('businessId');
@@ -437,10 +434,7 @@ const ContactLists = () => {
         let branchId = '';
         const authToken = localStorage.getItem('authToken');
         if (authToken) {
-          const userResponse = await fetch('/api/v1/user/details', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
-          const userData = await userResponse.json();
+          const userData = await apiCall('/v1/user/details', 'GET')
           businessId = userData?.user?.businessId || localStorage.getItem('businessId');
           branchId = userData?.user?.branchId || localStorage.getItem('branchId');
         } else {
@@ -492,10 +486,7 @@ const ContactLists = () => {
         let branchId = '';
         const authToken = localStorage.getItem('authToken');
         if (authToken) {
-          const userResponse = await fetch('/api/v1/user/details', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
-          const userData = await userResponse.json();
+          const userData = await apiCall('/v1/user/details', 'GET')
           businessId = userData?.user?.businessId || localStorage.getItem('businessId');
           branchId = userData?.user?.branchId || localStorage.getItem('branchId');
         } else {

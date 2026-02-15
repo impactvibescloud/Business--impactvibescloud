@@ -30,9 +30,10 @@ import '../Branches/Branches.css'
 
 const CallDispositions = () => {
   const [dispositions, setDispositions] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
-  const [limit] = useState(50)
+  const [limit] = useState(10)
 
   const [businessId, setBusinessId] = useState(localStorage.getItem('businessId') || '')
   const [startDateFilter, setStartDateFilter] = useState('')
@@ -225,18 +226,32 @@ const CallDispositions = () => {
     setExpandedRows(newExpanded)
   }
 
+  const filteredDispositions = dispositions.filter((d) => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return true
+    return (
+      (d.agent?.email || d.agent?._id || '').toString().toLowerCase().includes(q) ||
+      (d.callLog?.contact || d.contact || '').toString().toLowerCase().includes(q) ||
+      (d.callLog?.virtualNumber || d.virtualNumber || '').toString().toLowerCase().includes(q) ||
+      (d.code || '').toString().toLowerCase().includes(q) ||
+      (d.note || '').toString().toLowerCase().includes(q)
+    )
+  })
+
   return (
     <CCard className="mb-4">
-      <CCardHeader className="d-flex justify-content-between align-items-center">
-        <span>Call Dispositions</span>
+      <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
+        <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+          <CInputGroup>
+            <CFormInput
+              className="w-100"
+              placeholder="Search dispositions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </CInputGroup>
+        </div>
         <div className="d-flex align-items-center">
-          <button
-            className="btn btn-sm btn-outline-primary me-2"
-            onClick={() => fetchDispositions(1)}
-            disabled={loading}
-          >
-            Refresh
-          </button>
           <input
             type="date"
             className="form-control form-control-sm d-inline-block me-2"
@@ -271,11 +286,11 @@ const CallDispositions = () => {
           >
             Clear
           </button>
-          <CPagination aria-label="Call dispositions pages" className="mb-0">
-            <CPaginationItem onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}>Prev</CPaginationItem>
-            <CPaginationItem active>{page}</CPaginationItem>
-            <CPaginationItem onClick={() => setPage((p) => p + 1)} disabled={loading}>Next</CPaginationItem>
-          </CPagination>
+          <div>
+            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}>Prev</button>
+            <span className="mx-2">Page {page}</span>
+            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setPage((p) => p + 1)} disabled={loading}>Next</button>
+          </div>
         </div>
       </CCardHeader>
       <CCardBody>
@@ -345,14 +360,14 @@ const CallDispositions = () => {
             <CButton color="secondary" onClick={closeDetails}>Close</CButton>
           </CModalFooter>
         </CModal>
-        {loading ? (
+          {loading ? (
           <div className="text-center py-4">
             <CSpinner />
           </div>
-        ) : dispositions.length === 0 ? (
+        ) : filteredDispositions.length === 0 ? (
           <div className="text-center py-3">No call logs found</div>
         ) : (
-          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
+          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell style={{ width: '15%' }}>AGENT</CTableHeaderCell>
@@ -365,7 +380,7 @@ const CallDispositions = () => {
               </CTableRow>
             </CTableHead>
             <CTableBody>
-              {dispositions.map((d) => (
+              {filteredDispositions.map((d) => (
                 <React.Fragment key={d._id}>
                   <CTableRow
                     onClick={() => toggleRow(d._id)}

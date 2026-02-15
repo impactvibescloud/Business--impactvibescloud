@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
   CCard,
+  CCardHeader,
   CCardBody,
   CCol,
   CRow,
@@ -413,22 +414,66 @@ const ReportsAnalytics = () => {
     <div className="contact-list-container">
       <CCard className="mb-4">
         <CCardBody>
-          <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
-              <h1 className="contact-list-title">Reports & Analytics</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              <CButton
-                color="primary"
-                className="add-contact-btn"
+          <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
+            <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+              <div className="d-flex align-items-center">
+                {/* Search removed per request */}
+                <div className="d-flex align-items-center ms-2">
+                  <CFormSelect
+                    className="form-select-sm me-2"
+                    style={{ width: 140 }}
+                    value={dateRange}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setDateRange(val)
+                      if (val !== 'custom') {
+                        setStartDate('')
+                        setEndDate('')
+                      }
+                    }}
+                  >
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last-7-days">Last 7 Days</option>
+                    <option value="last-30-days">Last 30 Days</option>
+                    <option value="custom">Custom Range</option>
+                  </CFormSelect>
+
+                  <CFormSelect
+                    className="form-select-sm me-2"
+                    style={{ width: 160 }}
+                    value={resourceFilter}
+                    onChange={(e) => setResourceFilter(e.target.value)}
+                  >
+                    <option value="all">All Resources</option>
+                    {availableResources.map((resource, index) => (
+                      <option key={index} value={resource}>{resource}</option>
+                    ))}
+                  </CFormSelect>
+
+                  <CFormSelect
+                    className="form-select-sm"
+                    style={{ width: 160 }}
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="business">Business</option>
+                    <option value="agent(branch_manager)">Agent (Branch Manager)</option>
+                  </CFormSelect>
+                </div>
+              </div>
+            </div>
+            <div>
+              <button
+                className="add-agent-btn-minimal btn-sm"
                 onClick={handleDownloadReport}
                 disabled={loading || filteredData.length === 0}
               >
-                <CIcon icon={cilCloudDownload} className="me-2" />
-                Export Report
-              </CButton>
-            </CCol>
-          </CRow>
+                <CIcon icon={cilCloudDownload} className="me-1" /> Export Report
+              </button>
+            </div>
+          </CCardHeader>
           
           {/* Filters Section */}
           <CRow className="mb-4">
@@ -444,25 +489,7 @@ const ReportsAnalytics = () => {
                 <option value="contact-analytics">Contact Analytics</option>
               </CFormSelect>
             </CCol> */}
-            <CCol md={2}>
-              <CFormSelect
-                value={dateRange}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setDateRange(val)
-                  if (val !== 'custom') {
-                    setStartDate('')
-                    setEndDate('')
-                  }
-                }}
-              >
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="last-7-days">Last 7 Days</option>
-                <option value="last-30-days">Last 30 Days</option>
-                <option value="custom">Custom Range</option>
-              </CFormSelect>
-            </CCol>
+            
             {dateRange === 'custom' && (
               <>
                 <CCol md={2}>
@@ -483,45 +510,8 @@ const ReportsAnalytics = () => {
                 </CCol>
               </>
             )}
-            {reportType === 'data-access-logs' && (
-              <>
-                <CCol md={2}>
-                  <CFormSelect
-                    value={resourceFilter}
-                    onChange={(e) => setResourceFilter(e.target.value)}
-                  >
-                    <option value="all">All Resources</option>
-                    {availableResources.map((resource, index) => (
-                      <option key={index} value={resource}>
-                        {resource}
-                      </option>
-                    ))}
-                  </CFormSelect>
-                </CCol>
-                <CCol md={2}>
-                  <CFormSelect
-                    value={roleFilter}
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                  >
-                    <option value="all">All Roles</option>
-                    <option value="business">Business</option>
-                    <option value="agent(branch_manager)">Agent (Branch Manager)</option>
-                  </CFormSelect>
-                </CCol>
-              </>
-            )}
-            <CCol md={reportType === 'data-access-logs' ? 6 : 10}>
-              <CInputGroup>
-                <CFormInput
-                  placeholder="Search reports..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </CCol>
+            
+            <CCol md={reportType === 'data-access-logs' ? 6 : 10} />
           </CRow>
 
           {/* Active Filters Display */}
@@ -572,7 +562,7 @@ const ReportsAnalytics = () => {
             </CAlert>
           )}
 
-          <CTable hover responsive className="contact-table">
+          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
             <CTableHead>
               {renderTableHeaders()}
             </CTableHead>
@@ -616,26 +606,11 @@ const ReportsAnalytics = () => {
                     Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalRecords)} of {totalRecords} entries
                   </span>
                 </div>
-                <CPagination 
-                  aria-label="Page navigation example"
-                  className="mb-0"
-                >
-                  <CPaginationItem 
-                    disabled={currentPage === 1} 
-                    onClick={() => handlePageChange(currentPage - 1)}
-                  >
-                    Previous
-                  </CPaginationItem>
-                  <CPaginationItem active>
-                    {currentPage} of {apiTotalPages}
-                  </CPaginationItem>
-                  <CPaginationItem 
-                    disabled={currentPage === apiTotalPages} 
-                    onClick={() => handlePageChange(currentPage + 1)}
-                  >
-                    Next
-                  </CPaginationItem>
-                </CPagination>
+                <div>
+                  <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => handlePageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1 || loading}>Prev</button>
+                  <span className="mx-2">Page {currentPage} of {apiTotalPages}</span>
+                  <button className="btn btn-sm btn-outline-secondary ms-2" onClick={() => handlePageChange(Math.min(apiTotalPages, currentPage + 1))} disabled={currentPage === apiTotalPages || loading}>Next</button>
+                </div>
               </CCol>
             </CRow>
           )}

@@ -175,6 +175,15 @@ const Dashboard = () => {
     fetchCallUses();
   }, [token, user?.businessId]);
 
+  // Compute a dynamic greeting based on local time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+  const greeting = getGreeting();
+
   useEffect(() => {
     if (!token) return;
     
@@ -307,7 +316,8 @@ const Dashboard = () => {
   return (
     <>
       <div style={{ margin: '1rem 0' }}>
-        <h1 className="contact-list-title">Dashboard</h1>
+        <h1 className="contact-list-title">{greeting}, {user?.name || 'User'}</h1>
+        {/* Hero tiles removed as requested */}
       </div>
       <WidgetsDropdown
         agents={agents}

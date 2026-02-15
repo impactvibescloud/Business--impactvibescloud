@@ -31,7 +31,7 @@ const IVRManagement = () => {
   const [selectedItem, setSelectedItem] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [newIvr, setNewIvr] = useState({ node: '', voice: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }], menu: '' })
+  const [newIvr, setNewIvr] = useState({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] })
   const [departments, setDepartments] = useState([])
   const [deletingAll, setDeletingAll] = useState(false)
   const [editingNode, setEditingNode] = useState(null)
@@ -40,6 +40,7 @@ const IVRManagement = () => {
   const [playingUrl, setPlayingUrl] = useState(null)
   const [playingAudio, setPlayingAudio] = useState(null)
   const [playingIvrId, setPlayingIvrId] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -195,7 +196,7 @@ const IVRManagement = () => {
       }
       return { key: o.key || o._id || '', type: 'node', target: rest.join(':') || '', agentId: '', voice: o.voice || o.text || '' }
     })
-    setNewIvr({ node, voice, active: (item.status === 'active' || item.ivrStatus === 'on' || item.status === 'on'), options: options.length ? options : [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }], menu: '' })
+    setNewIvr({ node, voice, options: options.length ? options : [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] })
     setEditingNode(node)
     setAddOpen(true)
     // ensure department members are fetched and agent dropdowns populate. If ext present, map it back to agentId.
@@ -266,6 +267,17 @@ const IVRManagement = () => {
     } catch (e) { return iso }
   }
 
+  const deepLowercase = (obj) => {
+    if (typeof obj === 'string') return obj.toLowerCase()
+    if (Array.isArray(obj)) return obj.map(deepLowercase)
+    if (obj && typeof obj === 'object') {
+      const out = {}
+      Object.keys(obj).forEach((k) => { out[k] = deepLowercase(obj[k]) })
+      return out
+    }
+    return obj
+  }
+
   const playIvrFile = async (ivr) => {
     try {
       const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -321,7 +333,7 @@ const IVRManagement = () => {
       <CCardHeader className="d-flex justify-content-between align-items-center">
         <span>IVR Management</span>
         <div>
-          <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }], menu: '' }); setAddOpen(true) }}>Add</button>
+          <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] }); setAddOpen(true) }}>Add</button>
           <button className="btn btn-sm btn-outline-danger me-2" onClick={async () => {
             const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
             if (!currentBusinessId) return
@@ -342,10 +354,6 @@ const IVRManagement = () => {
               setDeletingAll(false)
             }
           }} disabled={deletingAll || loading}>Delete all</button>
-          <button className="btn btn-sm btn-outline-primary me-2" onClick={() => fetchIvrs(1)} disabled={loading}>Refresh</button>
-          <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}>Prev</button>
-          <span className="mx-2">Page {page}</span>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setPage((p) => p + 1)} disabled={loading}>Next</button>
         </div>
       </CCardHeader>
       <CCardBody>
@@ -378,18 +386,20 @@ const IVRManagement = () => {
           </CModalFooter>
         </CModal>
 
-        <CModal visible={addOpen} onClose={() => { setAddOpen(false); setEditingNode(null) }} alignment="center" size="xl">
+        <CModal visible={addOpen} onClose={() => { setAddOpen(false); setEditingNode(null) }} alignment="center" size="lg">
           <CModalHeader>
             <CModalTitle>{editingNode ? `Edit IVR (${editingNode})` : 'Add IVR'}</CModalTitle>
           </CModalHeader>
           <CModalBody>
-            <div className="mb-2">
-              <label className="form-label">Node (identifier)</label>
-              <input className="form-control" value={newIvr.node} placeholder="e.g. menu, sales_menu" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
-            </div>
-            <div className="mb-2">
-              <label className="form-label">Voice Text</label>
-              <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
+            <div className="row mb-2">
+              <div className="col-12 col-md-4">
+                <label className="form-label">Node (identifier)</label>
+                <input className="form-control" value={newIvr.node} placeholder="e.g. menu, sales" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
+              </div>
+              <div className="col-12 col-md-8">
+                <label className="form-label">Voice Text</label>
+                <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
+              </div>
             </div>
             <div className="mb-2">
               <label className="form-label">Options (press {'>'} target)</label>
@@ -407,7 +417,7 @@ const IVRManagement = () => {
                   {opt.type === 'dept' ? (
                     <div className="me-2 d-flex" style={{ gap: 8 }}>
                       <select className="form-select" value={opt.target || ''} onChange={(e) => {
-                        const val = e.target.value
+                        const val = e.target.value;
                         const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: val, agentId: '' }; setNewIvr({ ...newIvr, options: copy })
                         // fetch members for this department so agent dropdown can populate
                         fetchDepartmentMembers(val)
@@ -418,7 +428,7 @@ const IVRManagement = () => {
                         ))}
                       </select>
                       <select className="form-select" value={opt.agentId || ''} onChange={(e) => {
-                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], agentId: e.target.value }; setNewIvr({ ...newIvr, options: copy })
+                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], agentId: e.target.value }; setNewIvr({ ...newIvr, options: copy });
                       }}>
                         <option value="">Select agent (optional)</option>
                         {(() => {
@@ -436,7 +446,7 @@ const IVRManagement = () => {
                     </div>
                     ) : (
                       existingNodes.length > 0 ? (
-                      <select className="form-select me-2" value={opt.target || ''} onChange={(e) => {
+                      <select className="form-select me-2" style={{ width: 180 }} value={opt.target || ''} onChange={(e) => {
                         const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
                       }}>
                         <option value="">Select node</option>
@@ -445,13 +455,13 @@ const IVRManagement = () => {
                         ))}
                       </select>
                       ) : (
-                        <input className="form-control me-2" value={opt.target} onChange={(e) => {
+                        <input className="form-control me-2" style={{ maxWidth: 220 }} value={opt.target} onChange={(e) => {
                           const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
-                        }} placeholder="e.g. sales_menu" />
+                        }} placeholder="e.g. sales" />
                       )
                     )
                   }
-                  <input style={{ width: 200 }} className="form-control me-2" value={opt.voice || ''} onChange={(e) => {
+                  <input style={{ width: 260 }} className="form-control me-2" value={opt.voice || ''} onChange={(e) => {
                     const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], voice: e.target.value }; setNewIvr({ ...newIvr, options: copy })
                   }} placeholder="Option voice text (e.g. For sales)" />
                   <button className="btn btn-sm btn-outline-danger" onClick={() => {
@@ -462,212 +472,177 @@ const IVRManagement = () => {
               <button className="btn btn-sm btn-outline-primary" onClick={() => setNewIvr({ ...newIvr, options: [...newIvr.options, { key: '', type: 'node', target: '', agentId: '', voice: '' }] })}>Add option</button>
             </div>
             {/* Timeout removed per request */}
-            <div className="mb-2">
-              <label className="form-label">Advanced JSON (optional)</label>
-              <textarea className="form-control" rows={6} value={newIvr.menu} onChange={(e) => setNewIvr({ ...newIvr, menu: e.target.value })} placeholder='{"options": {"1":"node:sales_menu"}}' />
-            </div>
-            <div className="form-check form-switch mb-2">
-              <input className="form-check-input" type="checkbox" id="ivrActive" checked={!!newIvr.active} onChange={(e) => setNewIvr({ ...newIvr, active: e.target.checked })} />
-              <label className="form-check-label" htmlFor="ivrActive">Active</label>
-            </div>
+            {/* Advanced JSON removed per request */}
+            {/* Active toggle removed */}
           </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { setAddOpen(false); setEditingNode(null) }}>Cancel</CButton>
-            <CButton color="primary" onClick={async () => {
-              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
-              if (!currentBusinessId) return
-              try {
-                // Build options from the friendly editor if it has entries, otherwise fall back to Advanced JSON
-                const hasEditorOptions = Array.isArray(newIvr.options) && newIvr.options.some(o => o.key && (o.target || o.voice))
+            <CModalFooter>
+              <CButton color="secondary" onClick={() => { setAddOpen(false); setEditingNode(null) }} disabled={saving}>Cancel</CButton>
+              <CButton color="primary" onClick={async () => {
+                const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+                if (!currentBusinessId) return
+                setSaving(true)
+                try {
+                  // Build options from the friendly editor if it has entries, otherwise fall back to Advanced JSON
+                  const hasEditorOptions = Array.isArray(newIvr.options) && newIvr.options.some(o => o.key && (o.target || o.voice))
 
-                if (editingNode) {
-                  // Build payload for PUT /ivr/:node using array format
-                  let optionsArray = []
-                  if (hasEditorOptions) {
-                    newIvr.options.forEach((o) => {
-                      if (!o.key) return
-                      if (o.type === 'dept') {
-                        // if an agent was selected for this department option, prefer dept:<department>:<didExtension>
-                        if (o.agentId) {
-                          // try to resolve department from o.target first, otherwise find department containing this agent
-                          let dept = departments.find(d => d._id === o.target || d.id === o.target)
-                          if (!dept) {
-                            dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
-                          }
-                          const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target || ''
-                          let ext = ''
-                          // prefer explicit member info on dept.members
-                          if (dept && Array.isArray(dept.members) && dept.members.length) {
-                            const member = dept.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId))
-                            if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
-                          }
-                          // fallback to fetched departmentMembers cache
-                          if (!ext) {
-                            const members = dept ? (departmentMembers[dept._id] || departmentMembers[dept.id] || []) : []
-                            const member = members.find(m => (m._id === o.agentId || m.id === o.agentId))
-                            if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
-                          }
-                          // as last resort, search departmentMembers across all departments for this agent
-                          if (!ext) {
-                            const allDeps = Object.keys(departmentMembers)
-                            for (let k = 0; k < allDeps.length && !ext; k++) {
-                              const mlist = departmentMembers[allDeps[k]] || []
-                              const member = mlist.find(m => (m._id === o.agentId || m.id === o.agentId))
+                  if (editingNode) {
+                    // Build payload for PUT /ivr/:node using array format
+                    let optionsArray = []
+                    if (hasEditorOptions) {
+                      newIvr.options.forEach((o) => {
+                        if (!o.key) return
+                        if (o.type === 'dept') {
+                          // if an agent was selected for this department option, prefer dept:<department>:<didExtension>
+                          if (o.agentId) {
+                            // try to resolve department from o.target first, otherwise find department containing this agent
+                            let dept = departments.find(d => d._id === o.target || d.id === o.target)
+                            if (!dept) {
+                              dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
+                            }
+                            const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target || ''
+                            let ext = ''
+                            // prefer explicit member info on dept.members
+                            if (dept && Array.isArray(dept.members) && dept.members.length) {
+                              const member = dept.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId))
                               if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
                             }
-                          }
-                          const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
-                          optionsArray.push({ key: o.key, voice: o.voice || '', destination: dest })
-                        } else {
-                          const dept = departments.find(d => (
-                            d._id === o.target || d.id === o.target ||
-                            (d.slug && d.slug === o.target) ||
-                            (d.name && d.name.toString().toLowerCase() === (o.target || '').toString().toLowerCase())
-                          ))
-                          const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
-                          const dest = `dept:${String(resolvedName || '').toLowerCase()}`
-                          optionsArray.push({ key: o.key, voice: o.voice || '', destination: dest })
-                        }
-                      } else {
-                        optionsArray.push({ key: o.key, voice: o.voice || '', destination: `node:${o.target || ''}` })
-                      }
-                    })
-                  } else if (newIvr.menu) {
-                    try {
-                      const parsed = JSON.parse(newIvr.menu)
-                      if (parsed && typeof parsed === 'object') {
-                        if (Array.isArray(parsed.options)) optionsArray = parsed.options
-                        else if (parsed.options && typeof parsed.options === 'object') optionsArray = Object.keys(parsed.options).map(k => ({ key: k, voice: parsed.options[k].voice || '', destination: parsed.options[k].destination || parsed.options[k] }))
-                      }
-                    } catch (e) {
-                      // fallback: try lines
-                      const lines = newIvr.menu.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-                      lines.forEach((line) => {
-                        const m = line.match(/^(\d+)\s*[:=]\s*(.+)$/)
-                        if (m) optionsArray.push({ key: m[1], voice: '', destination: m[2].trim() })
-                      })
-                    }
-                  }
-
-                  const putPayload = {
-                    businessId: currentBusinessId,
-                    menu: {
-                      voice: newIvr.voice || '',
-                      options: optionsArray,
-                    }
-                  }
-                  const res = await apiCall(`/ivr/update/full/${encodeURIComponent(editingNode)}`, 'PUT', putPayload)
-                  if (res && (res.success || res.updated || res.data)) {
-                    setAddOpen(false)
-                    setEditingNode(null)
-                    setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
-                    fetchIvrs(1)
-                  } else {
-                    console.error('Failed to update IVR', res)
-                  }
-                } else {
-                  // Create (existing generate flow)
-                  let parsedOptions = {}
-                  if (hasEditorOptions) {
-                    newIvr.options.forEach((o) => {
-                      if (!o.key) return
-                      if (o.type === 'dept') {
-                        if (o.agentId) {
-                          // resolve department and extension similarly to update path
-                          let dept = departments.find(d => d._id === o.target || d.id === o.target)
-                          if (!dept) {
-                            dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
-                          }
-                          const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target || ''
-                          let ext = ''
-                          if (dept && Array.isArray(dept.members) && dept.members.length) {
-                            const member = dept.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId))
-                            if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
-                          }
-                          if (!ext) {
-                            const members = dept ? (departmentMembers[dept._id] || departmentMembers[dept.id] || []) : []
-                            const member = members.find(m => (m._id === o.agentId || m.id === o.agentId))
-                            if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
-                          }
-                          if (!ext) {
-                            const allDeps = Object.keys(departmentMembers)
-                            for (let k = 0; k < allDeps.length && !ext; k++) {
-                              const mlist = departmentMembers[allDeps[k]] || []
-                              const member = mlist.find(m => (m._id === o.agentId || m.id === o.agentId))
+                            // fallback to fetched departmentMembers cache
+                            if (!ext) {
+                              const members = dept ? (departmentMembers[dept._id] || departmentMembers[dept.id] || []) : []
+                              const member = members.find(m => (m._id === o.agentId || m.id === o.agentId))
                               if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
                             }
+                            // as last resort, search departmentMembers across all departments for this agent
+                            if (!ext) {
+                              const allDeps = Object.keys(departmentMembers)
+                              for (let k = 0; k < allDeps.length && !ext; k++) {
+                                const mlist = departmentMembers[allDeps[k]] || []
+                                const member = mlist.find(m => (m._id === o.agentId || m.id === o.agentId))
+                                if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                              }
+                            }
+                            const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
+                            optionsArray.push({ key: o.key, voice: o.voice || '', destination: dest })
+                          } else {
+                            const dept = departments.find(d => (
+                              d._id === o.target || d.id === o.target ||
+                              (d.slug && d.slug === o.target) ||
+                              (d.name && d.name.toString().toLowerCase() === (o.target || '').toString().toLowerCase())
+                            ))
+                            const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
+                            const dest = `dept:${String(resolvedName || '').toLowerCase()}`
+                            optionsArray.push({ key: o.key, voice: o.voice || '', destination: dest })
                           }
-                          const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
-                          parsedOptions[o.key] = { destination: dest, voice: o.voice || '' }
                         } else {
-                          const dept = departments.find(d => (
-                            d._id === o.target || d.id === o.target ||
-                            (d.slug && d.slug === o.target) ||
-                            (d.name && d.name.toString().toLowerCase() === (o.target || '').toString().toLowerCase())
-                          ))
-                          const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
-                          const dest = `dept:${String(resolvedName || '').toLowerCase()}`
-                          parsedOptions[o.key] = { destination: dest, voice: o.voice || '' }
+                          optionsArray.push({ key: o.key, voice: o.voice || '', destination: `node:${o.target || ''}` })
                         }
-                      } else {
-                        parsedOptions[o.key] = { destination: `node:${o.target || ''}`, voice: o.voice || '' }
-                      }
-                    })
-                  } else if (newIvr.menu) {
-                    try {
-                      const parsed = JSON.parse(newIvr.menu)
-                      if (parsed && typeof parsed === 'object') {
-                        parsedOptions = parsed.options && typeof parsed.options === 'object' ? parsed.options : parsed
-                      }
-                    } catch (e) {
-                      const lines = newIvr.menu.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-                      lines.forEach((line) => {
-                        const m = line.match(/^(\d+)\s*[:=]\s*(.+)$/)
-                        if (m) parsedOptions[m[1]] = m[2].trim()
                       })
+                    // Advanced JSON removed: rely on editor options only
                     }
-                  }
 
-                  const nodeName = newIvr.node || `menu_${Date.now()}`
-                  // Normalize parsedOptions into an array of { key, voice, destination }
-                  let optionsArrayFromParsed = []
-                  if (Array.isArray(parsedOptions)) {
-                    optionsArrayFromParsed = parsedOptions
-                  } else if (parsedOptions && typeof parsedOptions === 'object') {
-                    optionsArrayFromParsed = Object.keys(parsedOptions).map((k) => {
-                      const v = parsedOptions[k]
-                      if (typeof v === 'string') return { key: k, voice: '', destination: v }
-                      return { key: k, voice: v?.voice || '', destination: v?.destination || v }
-                    })
-                  }
-
-                  const savePayload = {
-                    businessId: currentBusinessId,
-                    node: nodeName,
-                    menu: {
-                      voice: newIvr.voice || ``,
-                      options: optionsArrayFromParsed,
+                    const putPayload = {
+                      businessId: currentBusinessId,
+                      menu: {
+                        voice: newIvr.voice || '',
+                        options: optionsArray,
+                      }
                     }
-                  }
-                  try {
-                    const saveRes = await apiCall('/ivr/create', 'POST', savePayload)
-                    if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
-                      // Creation succeeded; generation/upload are handled server-side now
+                    const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', deepLowercase(putPayload))
+                    if (res && (res.success || res.updated || res.data)) {
                       setAddOpen(false)
-                      setNewIvr({ node: '', prompt: '', active: true, options: [{ key: '1', type: 'node', target: '', agentId: '' }], menu: '' })
+                      setEditingNode(null)
+                      setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
                       fetchIvrs(1)
                     } else {
-                      console.error('Failed to create IVR', saveRes)
+                      console.error('Failed to update IVR', res)
                     }
-                  } catch (err) {
-                    console.error('Error creating IVR', err)
+                  } else {
+                    // Create (existing generate flow)
+                    let parsedOptions = {}
+                    if (hasEditorOptions) {
+                      newIvr.options.forEach((o) => {
+                        if (!o.key) return
+                        if (o.type === 'dept') {
+                          if (o.agentId) {
+                            // resolve department and extension similarly to update path
+                            let dept = departments.find(d => d._id === o.target || d.id === o.target)
+                            if (!dept) {
+                              dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
+                            }
+                            const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target || ''
+                            let ext = ''
+                            if (dept && Array.isArray(dept.members) && dept.members.length) {
+                              const member = dept.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId))
+                              if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                            }
+                            if (!ext) {
+                              const members = dept ? (departmentMembers[dept._id] || departmentMembers[dept.id] || []) : []
+                              const member = members.find(m => (m._id === o.agentId || m.id === o.agentId))
+                              if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                            }
+                            if (!ext) {
+                              const allDeps = Object.keys(departmentMembers)
+                              for (let k = 0; k < allDeps.length && !ext; k++) {
+                                const mlist = departmentMembers[allDeps[k]] || []
+                                const member = mlist.find(m => (m._id === o.agentId || m.id === o.agentId))
+                                if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                              }
+                            }
+                            const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
+                            parsedOptions[o.key] = { destination: dest, voice: o.voice || '' }
+                          } else {
+                            const dept = departments.find(d => (
+                              d._id === o.target || d.id === o.target ||
+                              (d.slug && d.slug === o.target) ||
+                              (d.name && d.name.toString().toLowerCase() === (o.target || '').toString().toLowerCase())
+                            ))
+                            const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
+                            const dest = `dept:${String(resolvedName || '').toLowerCase()}`
+                            parsedOptions[o.key] = { destination: dest, voice: o.voice || '' }
+                          }
+                        } else {
+                          parsedOptions[o.key] = { destination: `node:${o.target || ''}`, voice: o.voice || '' }
+                        }
+                      })
+                      // Advanced JSON removed: rely on editor options only
+                    }
+
+                    const nodeName = (newIvr.node || `menu_${Date.now()}`).toString().toLowerCase()
+                    // Normalize parsedOptions into an array of { key, voice, destination }
+                    let optionsArrayFromParsed = []
+                    // parsedOptions flow removed; use editor options only (optionsArrayFromParsed stays [])
+
+                    const savePayload = {
+                      businessId: currentBusinessId,
+                      node: nodeName,
+                      menu: {
+                        voice: newIvr.voice || ``,
+                        options: optionsArrayFromParsed,
+                      }
+                    }
+                    try {
+                      const saveRes = await apiCall('/ivr/create', 'POST', deepLowercase(savePayload))
+                      if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
+                        // Creation succeeded; generation/upload are handled server-side now
+                        setAddOpen(false)
+                        setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
+                        fetchIvrs(1)
+                      } else {
+                        console.error('Failed to create IVR', saveRes)
+                      }
+                    } catch (err) {
+                      console.error('Error creating IVR', err)
+                    }
                   }
+                } catch (err) {
+                  console.error('Error saving IVR', err)
+                } finally {
+                  setSaving(false)
                 }
-              } catch (err) {
-                console.error('Error saving IVR', err)
-              }
-            }}>{editingNode ? 'Save' : 'Create'}</CButton>
-          </CModalFooter>
+              }} disabled={saving}>
+                {saving ? (<><CSpinner size="sm" />&nbsp;Saving</>) : (editingNode ? 'Save' : 'Create')}
+              </CButton>
+            </CModalFooter>
         </CModal>
 
         {loading ? (

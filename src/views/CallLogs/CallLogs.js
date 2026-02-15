@@ -75,6 +75,7 @@ const CallLogs = () => {
   const [recordingInfo, setRecordingInfo] = useState(null)
   const [downloadLoading, setDownloadLoading] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [callStats, setCallStats] = useState(null)
   const lastDateFilterKeyRef = useRef('')
 
   // Get the business ID when component mounts
@@ -202,14 +203,18 @@ const CallLogs = () => {
           } else if (res && Array.isArray(res.data)) {
             logs = res.data;
             pagination = res.pagination || null;
+            // store server statistics if provided
+            setCallStats(res.statistics || null);
           } else if (res && Array.isArray(res.callLogs)) {
             // fallback key
             logs = res.callLogs;
             pagination = res.pagination || null;
+            setCallStats(res.statistics || null);
           } else {
             // Unknown shape, try to be defensive
             logs = [];
             pagination = res?.pagination || null;
+            setCallStats(res?.statistics || null);
           }
         }
 
@@ -225,6 +230,8 @@ const CallLogs = () => {
           setCallLogs(logs)
           setTotalRecords(logs.length)
           setTotalPages(Math.max(1, Math.ceil(logs.length / pageSize)))
+          // No server stats expected when we fetched the full list, clear stats
+          setCallStats(null)
           // reset to page 1 only when filters changed
           if (filtersChanged) {
             setCurrentPage(1)
@@ -241,6 +248,8 @@ const CallLogs = () => {
             setTotalRecords(logs.length);
             setTotalPages(Math.max(1, Math.ceil(logs.length / pageSize)));
           }
+          // If server included statistics, ensure we capture them (fallback)
+          if (!callStats && res?.statistics) setCallStats(res.statistics)
         }
       } catch (err) {
         setError(err.message === 'Business ID not found'
@@ -263,15 +272,42 @@ const CallLogs = () => {
       setAudioLoading(true)
       setAudioError(null)
       try {
-        // Centralized apiCall will prefix /api
-  const res = await apiCall('/v1/audio-recordings', 'GET')
-        if (Array.isArray(res?.files)) {
-          setAudioFiles(res.files)
-        } else if (Array.isArray(res)) {
-          setAudioFiles(res)
-        } else {
-          setAudioFiles([])
+        // Try several possible endpoints/response shapes to be tolerant of backend differences
+        const tryEndpoints = [
+          `/v1/audio-recordings`,
+          `/audio-recordings`,
+          `/audio-recordings/business/${businessId}`,
+          `/v1/audio-recordings/business/${businessId}`,
+        ];
+        let files = []
+        for (let ep of tryEndpoints) {
+          try {
+            const r = await apiCall(ep, 'GET')
+            // possible shapes: array of filenames, { files: [...] }, { data: [...] }, { recordings: [...] }
+            if (Array.isArray(r)) {
+              files = r
+            } else if (Array.isArray(r?.files)) {
+              files = r.files
+            } else if (Array.isArray(r?.data)) {
+              files = r.data
+            } else if (Array.isArray(r?.recordings)) {
+              files = r.recordings
+            }
+            if (files && files.length > 0) break
+          } catch (e) {
+            // try next endpoint
+            console.debug('audio recordings endpoint failed', ep, e.message)
+          }
         }
+
+        // Normalize entries to simple filename strings when objects are returned
+        const normalized = (files || []).map(f => {
+          if (!f) return ''
+          if (typeof f === 'string') return f
+          if (typeof f === 'object') return f.filename || f.fileName || f.name || f.key || JSON.stringify(f)
+          return String(f)
+        }).filter(Boolean)
+        setAudioFiles(normalized)
       } catch (err) {
         console.error('Failed to fetch audio recordings', err)
         setAudioError('Failed to load audio recordings')
@@ -802,18 +838,14 @@ const CallLogs = () => {
       <CCard className="mb-4">
         <CCardBody>
           <CRow className="mb-3 align-items-center">
-            <CCol md={6}>
-              <h1 className="call-logs-title">Call Logs</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              {/* kept intentionally minimal: filters moved below for better grouping */}
-            </CCol>
+            <CCol md={6} />
+            <CCol md={6} className="d-flex justify-content-end" />
           </CRow>
           <CRow className="mb-4">
             <CCol md={6}>
               <CInputGroup>
                 <CFormInput
-                  placeholder="Search call logs..."
+                  placeholder="Search dispositions..."
                   value={searchTerm}
                   onChange={handleSearch}
                 />
@@ -822,22 +854,7 @@ const CallLogs = () => {
                 </CButton>
               </CInputGroup>
             </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              <div className="d-flex align-items-center">
-                <CInputGroup style={{ maxWidth: 180 }}>
-                  <CFormInput
-                    type="number"
-                    value={pageSize}
-                    disabled
-                    readOnly
-                    aria-label="Rows per page"
-                  />
-                  <CButton type="button" color="secondary" variant="outline" disabled>
-                    Rows/Page
-                  </CButton>
-                </CInputGroup>
-              </div>
-            </CCol>
+            <CCol md={6} className="d-flex justify-content-end" />
           </CRow>
           <CRow className="mb-3">
             <CCol md={12}>

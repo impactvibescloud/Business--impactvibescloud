@@ -825,7 +825,7 @@ const routes = [
   },
   {
     path: "/branch",
-    name: "Branch",
+    name: "Agents",
     element: Branches,
     navName: "Branch",
   },
@@ -843,9 +843,9 @@ const routes = [
   },
   {
     path: '/callogs',
-    name: 'Call Logs',
+    name: 'Call Dispositions',
     element: CallLogs,
-    navName: "Call Logs",
+    navName: "Call Dispositions",
   },
   {
     path: '/calluses',
