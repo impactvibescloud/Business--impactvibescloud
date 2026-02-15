@@ -16,7 +16,6 @@ import { sygnet } from "src/assets/brand/sygnet";
 
 import SimpleBar from "simplebar-react";
 import "simplebar/dist/simplebar.min.css";
-import { UserActivityStatus } from './index';
 import { getBusinessFeatures, filterNavigationByFeatures, filterNavigationByFeaturesMenu } from '../utils/featureCheck';
 
 // sidebar nav config
@@ -279,10 +278,7 @@ const AppSidebar = () => {
 
       <div className="sidebar-footer p-2">
         <div className="sidebar-footer-inner" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Unified user chip: combined avatar, status dot, status controls and settings */}
-          <div className="sidebar-user-status">
-            <UserActivityStatus />
-          </div>
+          {/* Footer intentionally empty - user/profile actions moved to header dropdown */}
         </div>
       </div>
     </CSidebar>

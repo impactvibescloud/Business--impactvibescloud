@@ -1,72 +1,132 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 // Add modern form styles using useEffect to inject CSS only once
 const MODERN_LOGIN_CSS = [
-  '.modern-login-card, .modern-login-form, .modern-login-card h2, .modern-login-card p, .modern-login-form label, .modern-login-form input, .modern-login-form .form-floating {',
-  '  text-align: left !important;',
-  '}',
-  '.modern-login-form .form-floating {',
-  '  position: relative;',
-  '}',
-  '.modern-login-form .form-floating > label {',
+  '/* Fullscreen soft background with subtle radial glow */',
+  '.login-modern-bg {',
+  '  min-height: 100vh;',
+  '  width: 100vw;',
   '  display: flex;',
   '  align-items: center;',
+  '  justify-content: center;',
+  '  background: linear-gradient(180deg, #f6fbff 0%, #ffffff 60%);',
+  '  position: relative;',
+  '  overflow: hidden;',
+  '}',
+  '.login-modern-bg::before {',
+  '  content: "";',
   '  position: absolute;',
-  '  left: 16px;',
-  '  top: 50%;',
-  '  transform: translateY(-50%);',
-  '  height: 100%;',
-  '  color: #64748b;',
-  '  font-size: 16px;',
-  '  font-weight: 500;',
+  '  top: -20%;',
+  '  left: 50%;',
+  '  transform: translateX(-50%);',
+  '  width: 1100px;',
+  '  height: 1100px;',
+  '  border-radius: 50%;',
+  '  background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.12), transparent 20%), radial-gradient(circle at 70% 70%, rgba(59,130,246,0.06), transparent 30%);',
+  '  filter: blur(40px);',
   '  pointer-events: none;',
+  '}',
+  '.modern-login-card {',
+  '  display: none;',
+  '}',
+  '.login-content {',
+  '  width: 420px;',
+  '  max-width: calc(100% - 48px);',
   '  background: transparent;',
-  '  z-index: 2;',
-  '  transition: all 0.2s;',
+  '  border-radius: 8px;',
   '  padding: 0;',
+  '  position: relative;',
+  '  z-index: 2;',
   '}',
-  '.modern-login-form .form-floating > .form-control:focus ~ label,',
-  '.modern-login-form .form-floating > .form-control:not(:placeholder-shown) ~ label {',
-  '  top: 2px;',
-  '  left: 12px;',
-  '  background: #f4f8fb;',
-  '  color: #2563eb;',
-  '  font-size: 13px;',
-  '  height: auto;',
-  '  padding: 0 0.25rem;',
-  '  transform: none;',
+  '.login-content .brand {',
+  '  display: flex;',
+  '  align-items: center;',
+  '  gap: 12px;',
+  '  margin-bottom: 24px;',
+  '  text-align: center;',
+  '  justify-content: center;',
+  '  flex-direction: row;',
   '}',
-  '.modern-login-form .form-floating .input-icon {',
-  '  position: absolute;',
-  '  left: 16px;',
-  '  top: 50%;',
-  '  transform: translateY(-50%);',
+  '.login-content .brand img {',
+  '  width: 96px;',
+  '  height: 96px;',
+  '  object-fit: contain;',
+  '  flex-shrink: 0;',
+  '}',
+  '.login-content .brand-text {',
+  '  display: flex;',
+  '  flex-direction: column;',
+  '  gap: 2px;',
+  '  align-items: flex-start;',
+  '}',
+  '.login-content .brand-text .title {',
+  '  display: flex;',
+  '  gap: 0;',
+  '  align-items: baseline;',
+  '  justify-content: flex-start;',
+  '  font-weight: 800;',
   '  font-size: 20px;',
-  '  opacity: 0.7;',
-  '  pointer-events: none;',
   '}',
-  '.modern-login-form .form-floating > .form-control {',
-  '  background: #f4f8fb;',
-  '  border: 1.5px solid #d1d5db;',
-  '  border-radius: 16px;',
-  '  font-size: 17px;',
-  '  padding: 1.25rem 1.25rem 0.5rem 3rem;',
-  '  box-shadow: 0 2px 12px 0 rgba(59,130,246,0.07);',
-  '  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;',
+  '.login-content .brand-text .subtitle {',
+  '  font-size: 13px;',
+  '  color: #6b7280;',
+  '  text-align: left;',
+  '  font-weight: 700;',
   '}',
-  '.modern-login-form .form-floating > .form-control:focus {',
-  '  border-color: #38bdf8;',
-  '  box-shadow: 0 0 0 3px rgba(59,130,246,0.18);',
-  '  background: #e0f2fe;',
+  '.login-content .modern-login-form {',
+  '  margin-top: 6px;',
+  '}',
+  // sign-in header and subtitle removed per design
+  '.modern-login-card h2 {',
+  '  margin: 8px 0 0 0;',
+  '  font-size: 26px;',
+  '  font-weight: 700;',
+  '  color: #111827;',
+  '}',
+  '.modern-login-card p.lead {',
+  '  margin: 6px 0 18px 0;',
+  '  color: #6b7280;',
+  '}',
+  '.modern-login-form label {',
+  '  font-weight: 600;',
+  '  color: #111827;',
+  '  margin-bottom: 6px;',
+  '}',
+  '.modern-input {',
+  '  background: #ffffff;',
+  '  border: 1px solid rgba(15,23,42,0.06);',
+  '  border-radius: 12px;',
+  '  padding: 12px 12px 12px 40px;',
+  '  font-size: 15px;',
+  '  transition: box-shadow 0.15s, border-color 0.15s;',
+  '  max-width: 100%;',
+  '}',
+  '.modern-input:focus {',
+  '  outline: none;',
+  '  box-shadow: 0 6px 18px rgba(37,99,235,0.08);',
+  '  border-color: rgba(37,99,235,0.25);',
   '}',
   '.modern-login-btn {',
-  '  background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);',
+  '  background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);',
   '  border: none;',
   '  color: #fff;',
-  '  transition: background 0.2s, box-shadow 0.2s;',
+  '  padding: 12px 18px;',
+  '  border-radius: 12px;',
+  '  font-size: 16px;',
+  '  width: 100%;',
   '}',
-  '.modern-login-btn:active, .modern-login-btn:focus {',
-  '  background: linear-gradient(90deg, #2563eb 0%, #0891b2 100%);',
-  '  box-shadow: 0 2px 8px 0 rgba(59,130,246,0.15);',
+  '.modern-login-footer {',
+  '  position: fixed;',
+  '  left: 50%;',
+  '  bottom: 18px;',
+  '  transform: translateX(-50%);',
+  '  text-align: center;',
+  '  color: rgba(17,24,39,0.55);',
+  '  font-size: 13px;',
+  '  z-index: 9999;',
+  '  background: transparent;',
+  '}',
+  '.validation-error {',
+  '  font-size: 12px;',
   '}',
 ].join('\n');
 
@@ -105,7 +165,6 @@ import swal from "sweetalert";
 const Login = () => {
   useModernLoginCss();
   const [loading, setLoading] = useState(false);
-  const [validForm, setValidForm] = useState(false);
   const [auth, setAuth] = useState({
     email: "",
     password: "",
@@ -122,6 +181,27 @@ const Login = () => {
     /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[^\w\s]).{7,}$/
   );
   const history = useNavigate();
+  const submitGuardRef = useRef(false);
+  // Sync DOM values into React state on mount (handles browser autofill that doesn't trigger React events)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof document !== 'undefined') {
+        const e = document.getElementById('email');
+        const p = document.getElementById('password');
+        const emailVal = e && e.value ? e.value : '';
+        const passwordVal = p && p.value ? p.value : '';
+        if ((emailVal && emailVal.length > 0) || (passwordVal && passwordVal.length > 0)) {
+          setAuth((prev) => {
+            if (prev.email !== emailVal || prev.password !== passwordVal) {
+              return { ...prev, email: emailVal, password: passwordVal };
+            }
+            return prev;
+          });
+        }
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
   // Use the public logos sidebar icon from the `public/logos` folder (case-sensitive on Linux)
   const adminLogo = process.env.PUBLIC_URL + "/logos/sidebarlogo.ico";
   const publicLogoPath = process.env.PUBLIC_URL + "/logos/sidebarlogo.ico";
@@ -147,14 +227,18 @@ const Login = () => {
     return valid;
   };
 
-  //cheking email and password
-  useEffect(() => {
-    if (validateForm()) {
-      setValidForm(true);
-    } else {
-      setValidForm(false);
+  // derive validity from current state or DOM (handles browser autofill)
+  const isValid = (() => {
+    let emailVal = auth.email || "";
+    let passwordVal = auth.password || "";
+    if (typeof document !== 'undefined') {
+      const e = document.getElementById('email');
+      const p = document.getElementById('password');
+      if (e && e.value && e.value.length > 0) emailVal = e.value;
+      if (p && p.value && p.value.length > 0) passwordVal = p.value;
     }
-  }, [errors]);
+    return validEmailRegex.test(emailVal) && validPasswordRegex.test(passwordVal);
+  })();
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -182,12 +266,22 @@ const Login = () => {
   };
 
   const Login = async () => {
-    if (!(auth.email && auth.password)) {
+    // read current DOM values first (covers autofill) then fall back to state
+    let emailVal = auth.email || "";
+    let passwordVal = auth.password || "";
+    if (typeof document !== 'undefined') {
+      const e = document.getElementById('email');
+      const p = document.getElementById('password');
+      if (e && e.value && e.value.length > 0) emailVal = e.value;
+      if (p && p.value && p.value.length > 0) passwordVal = p.value;
+    }
+    if (!(emailVal && passwordVal)) {
       return swal("Error!", "All fields are required", "error");
     }
-    setLoading({ loading: true });
+    setLoading(true);
+    submitGuardRef.current = true;
     try {
-      const res = await axios.post("/api/v1/user/login/", auth);
+      const res = await axios.post("/api/v1/user/login/", { email: emailVal, password: passwordVal });
       console.log(res);
       if (res.data.success == true) {
         localStorage.setItem("authToken", res.data.token);
@@ -197,170 +291,151 @@ const Login = () => {
             Authorization: `Bearer ${res.data.token}`,
           },
         });
-        // console.log(response.data)
         const data = res.data;
         if (data.user.role === "business_admin" || data.user.role === "Employee") {
           history("/dashboard");
-          setLoading(false);
           window.location.reload();
+          return;
         } else {
           swal("Error!", "please try with admin credential!!", "error");
-          setLoading(false);
+          return;
         }
       } else {
-        setLoading(false);
-
         swal("Error!", "Invalid Credentials", "error");
+        return;
       }
     } catch (error) {
-      setLoading(false);
-
       swal("Error!", "Invalid Credentials", "error");
+      return;
+    } finally {
+      setLoading(false);
+      submitGuardRef.current = false;
     }
   };
 
   return (
-    <div className="login-modern-bg min-vh-100 vw-100 d-flex flex-row" style={{ background: '#f8fafc', minHeight: '100vh', width: '100vw', overflow: 'hidden' }}>
-      {/* Left Side: Brand */}
-  <div
-    className="login-modern-left d-flex flex-column justify-content-center align-items-center"
-    style={{
-  background: "linear-gradient(135deg, #f0fdf4 0%, #6ee7b7 60%, #34d399 100%)",
-      color: "#222",
-      width: "50vw",
-      minWidth: 350,
-      padding: "0 5vw",
-  backgroundImage: 'url(/image/grid-01.svg), linear-gradient(135deg, #f0fdf4 0%, #6ee7b7 60%, #34d399 100%)',
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'center',
-      backgroundSize: 'cover',
-      position: 'relative',
-    }}
-  >
-        <div className="w-100" style={{ textAlign: 'left' }}>
-          <div style={{ width: '100%', marginBottom: 32, textAlign: 'left' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-              <img
-                src={adminLogo ? adminLogo : publicLogoPath}
-                alt="Just Connect"
-                style={{ width: 140, height: 140, objectFit: 'contain' }}
-              />
-              <div style={{ lineHeight: 1 }}>
-                <div style={{ fontSize: 36, fontWeight: 800 }}>
-                  <span style={{ color: '#0760c7ff' }}>just</span>
-                  <span style={{ marginLeft: 8, color: '#f97316' }}>Connect</span>
-                </div>
-                <div style={{ fontSize: 16, color: dark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.75)', marginTop: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Enterprise Conversations Simplified</div>
-              </div>
+    <div className="login-modern-bg">
+      <div className="login-content">
+        <div className="brand">
+          <img src={adminLogo ? adminLogo : publicLogoPath} alt="JustConnect" />
+          <div className="brand-text">
+            <div className="title">
+              <div style={{ color: '#0760c7' }}>just</div>
+              <div style={{ color: '#f97316' }}>Connect</div>
             </div>
-            <div style={{ fontSize: 14, color: dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.65)', marginTop: 12, maxWidth: 420 }}>
-              Secure, scalable cloud telephony for enterprises — omnichannel voice, IVR, call analytics and integrations to keep customer conversations flowing.
-            </div>
+            <div className="subtitle">Enterprise Conversations Simplified</div>
           </div>
         </div>
-      </div>
-      {/* Right Side: Login Form */}
-  <div className="login-modern-right d-flex align-items-center justify-content-center" style={{ width: '50vw', minWidth: 350, background: '#fff', padding: '0 5vw' }}>
-        <div className="w-100" style={{ maxWidth: 420, margin: '0 auto', padding: '3.5rem 0' }}>
-          <h2 className="mb-2 fw-semibold" style={{ color: '#222', fontSize: 30, textAlign: 'left' }}>Business Sign In</h2>
-          <p className="mb-4" style={{ color: '#6b7280', fontSize: 17, textAlign: 'left' }}>Business Owners & Employees Only</p>
-          <CForm className="modern-login-form">
-            <div className="mb-4">
-              <label htmlFor="email" style={{ fontWeight: 500, color: '#222', marginBottom: 6, display: 'block' }}>Email</label>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 20, opacity: 0.7 }}>
-                  <CIcon icon={cilUser} />
-                </span>
-                <input
-                  type="email"
-                  className="form-control modern-input"
-                  id="email"
-                  placeholder="Enter your email"
-                  onChange={handleChange}
-                  value={auth.email}
-                  name="email"
-                  autoComplete="email"
-                  style={{ paddingLeft: 44 }}
-                />
-              </div>
+        {/* Sign-in header and subtitle removed */}
+
+        <CForm className="modern-login-form">
+          <div className="mb-3">
+            <label htmlFor="email">Email</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 18, opacity: 0.7 }}>
+                <CIcon icon={cilUser} />
+              </span>
+              <input
+                type="email"
+                className="form-control modern-input"
+                id="email"
+                placeholder="jane.doe@gmail.com"
+                onChange={handleChange}
+                value={auth.email}
+                name="email"
+                autoComplete="email"
+                style={{ paddingLeft: 44 }}
+              />
             </div>
-            {errors.emailError && (
-              <p className="text-danger mb-3" style={{ fontSize: 15 }}>{errors.emailError}</p>
-            )}
-            <div className="mb-4">
-              <label htmlFor="password" style={{ fontWeight: 500, color: '#222', marginBottom: 6, display: 'block' }}>Password</label>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 20, opacity: 0.7 }}>
-                  <CIcon icon={cilLockLocked} />
-                </span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  className="form-control modern-input"
-                  id="password"
-                  placeholder="Enter your password"
-                  name="password"
-                  value={auth.password}
-                  onChange={handleChange}
-                  autoComplete="current-password"
-                  style={{ paddingLeft: 44, paddingRight: 44 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  style={{
-                    position: 'absolute',
-                    right: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    fontSize: 16,
-                    color: '#2563eb',
-                  }}
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
+          </div>
+            {errors.emailError && <p className="text-danger validation-error mb-2">{errors.emailError}</p>}
+
+          <div className="mb-3">
+            <label htmlFor="password">Password</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 18, opacity: 0.7 }}>
+                <CIcon icon={cilLockLocked} />
+              </span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-control modern-input"
+                id="password"
+                placeholder="Password"
+                name="password"
+                value={auth.password}
+                onChange={handleChange}
+                autoComplete="current-password"
+                style={{ paddingLeft: 44, paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 14, color: '#2563eb' }}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M15 9.5a3 3 0 11-4 4" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="2" y1="2" x2="22" y2="22" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="1.5"/>
+                  </svg>
+                )}
+              </button>
             </div>
-            {errors.passwordError && (
-              <p className="text-danger mb-3" style={{ fontSize: 15 }}>{errors.passwordError}</p>
-            )}
-            <div className="row mb-4 align-items-center">
-              <div className="col-7 d-grid gap-2">
-                <CButton
-                  color="primary"
-                  className="py-2 fw-semibold modern-login-btn"
-                  style={{ fontSize: 18, borderRadius: 14, boxShadow: '0 4px 16px 0 rgba(59,130,246,0.10)' }}
-                  disabled={!validForm}
-                  onClick={Login}
-                >
-                  <ClipLoader loading={loading} size={18} />
-                  {!loading && "Sign In"}
-                </CButton>
-              </div>
-              <div className="col-5 text-end">
-                <Link to="/forget-password" style={{ fontSize: 15, textDecoration: 'none', color: '#2563eb', fontWeight: 500 }}>
-                  Forgot password?
-                </Link>
-              </div>
-            </div>
-            {/* <div className="d-flex justify-content-between align-items-center mb-2">
-              <Link to="/" style={{ textDecoration: 'none' }}>
-                <CButton color="secondary" variant="outline" className="fw-semibold px-3 py-1" style={{ borderRadius: 10, fontSize: 16 }}>
-                  Cancel
-                </CButton>
-              </Link>
-              <Link to="/forget-password" style={{ fontSize: 15 }}>Forgot password?</Link>
-            </div> */}
-          </CForm>
-          {/* <div className="text-center mt-3">
-            <Link to="/newRegister" style={{ fontSize: 16 }}>Don't have an account? <span className="fw-bold">Sign Up</span></Link>
-          </div> */}
-        </div>
+          </div>
+          {errors.passwordError && <p className="text-danger validation-error mb-2">{errors.passwordError}</p>}
+
+          <div className="d-grid mb-3">
+            <CButton
+              type="button"
+              className="modern-login-btn"
+              onMouseUp={() => {
+                if (loading) return;
+                if (!isValid) {
+                  swal("Error!", "Please enter valid credentials", "error");
+                  return;
+                }
+                if (!submitGuardRef.current) {
+                  submitGuardRef.current = true;
+                  Login();
+                }
+              }}
+              onClick={(e) => {
+                if (loading) {
+                  e.preventDefault();
+                  return;
+                }
+                if (submitGuardRef.current) {
+                  e.preventDefault();
+                  return;
+                }
+                // fallback: ensure validation before submitting
+                if (!isValid) {
+                  e.preventDefault();
+                  swal("Error!", "Please enter valid credentials", "error");
+                  return;
+                }
+                Login();
+              }}
+            >
+              <ClipLoader loading={loading} size={16} />
+              {!loading && 'Sign In'}
+            </CButton>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: 14, color: '#6b7280' }} />
+            <Link to="/forget-password" style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none' }}>Forgot password?</Link>
+          </div>
+
+          <div className="modern-login-footer">©2026 justConnect. All rights reserved.</div>
+        </CForm>
       </div>
     </div>
   );

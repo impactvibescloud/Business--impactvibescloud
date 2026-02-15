@@ -43,6 +43,8 @@
     "@emotion/styled": "^11.11.0",
     "@headlessui/react": "^2.1.2",
     "@heroicons/react": "^2.1.5",
+    "react-icons": "^4.11.0",
+    "lucide-react": "^0.268.0",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
     "@mui/icons-material": "^5.14.14",

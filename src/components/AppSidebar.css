@@ -8,12 +8,50 @@
 }
 /* Sidebar layout and visual improvements */
 .c-sidebar {
-	width: 260px;
-	/* Use a plain white background to match design */
-	background: #FFFFFF !important;
-	border-right: 1px solid rgba(0, 0, 0, 0.04);
+	width: 256px;
+	/* Exact base color from screenshot */
+	background: #FAFAFA !important;
+	color: #0f1724; /* dark text */
+	border-right: 1px solid rgba(15, 23, 36, 0.04);
 	transition: width 0.2s ease, transform 0.2s ease;
 	box-shadow: none;
+}
+
+/* Import Inter for sidebar menu typography (falls back to system fonts) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* Sidebar menu typography (only nav items and section headers) */
+.c-sidebar .c-nav-link,
+.c-sidebar .nav-link,
+.c-sidebar .c-nav-group-toggle,
+.c-sidebar .c-nav-link .nav-link-text,
+.c-sidebar .c-nav-group-toggle .nav-link-text,
+.c-sidebar .app-sidebar-link {
+	font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-weight: 400; /* default menu item weight */
+	font-size: 0.95rem;
+	color: inherit;
+}
+
+/* Section headers: slightly bolder */
+.c-sidebar .sidebar-section {
+	font-weight: 600; /* matches 500/600 guidance */
+	font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Active or hovered menu items use medium weight */
+.c-sidebar .c-nav-link.active,
+.c-sidebar .nav-link.active,
+.c-sidebar .c-nav-link:hover,
+.c-sidebar .nav-link:hover,
+.c-sidebar .c-nav-group-toggle:hover {
+	font-weight: 400;
+}
+
+/* Ensure active text inside link uses the medium weight */
+.c-sidebar .c-nav-link.active .nav-link-text,
+.c-sidebar .nav-link.active .nav-link-text {
+	font-weight: 400;
 }
 
 /* Make sidebar a column flex container so footer can sit after nav (no overlap) */
@@ -23,10 +61,10 @@
 }
 
 .c-sidebar .c-sidebar-brand {
-	height: 64px;
+	height: 56px;
 	display: flex;
 	align-items: center;
-	padding: 8px 12px;
+	padding: 6px 10px;
 }
 
 /* New sidebar brand/header styles */
@@ -40,8 +78,8 @@
 	justify-content: space-between;
 }
 .sidebar-logo img {
-	width: 44px;
-	height: 44px;
+	width: 40px;
+	height: 40px;
 	object-fit: contain;
 	display: block;
 }
@@ -61,14 +99,14 @@
 	align-items: flex-start;
 }
 .sidebar-title .sidebar-title-main {
-	font-size: 1.05rem;
-	font-weight: 650;
+	font-size: 0.95rem;
+	font-weight: 600;
 	line-height: 1;
 }
 .sidebar-title .sidebar-title-sub {
-	font-size: 9px;
+	font-size: 8px;
 	color: rgba(0,0,0,0.6);
-	margin-top: 4px;
+	margin-top: 3px;
 }
 .sidebar-toggle-btn {
 	border: 0;
@@ -99,6 +137,23 @@
 
 .c-sidebar .c-sidebar-nav {
 	padding-top: 4px;
+}
+
+/* Add a small gap between nav icons and menu text (when sidebar is expanded) */
+.c-sidebar .nav-icon-wrapper,
+.c-sidebar .nav-icon,
+.c-sidebar .c-icon,
+.c-sidebar svg {
+	margin-right: 10px;
+	vertical-align: middle;
+}
+
+/* When sidebar is minimized keep icons compact and remove gap */
+.c-sidebar.c-sidebar-minimized .nav-icon-wrapper,
+.c-sidebar.c-sidebar-minimized .nav-icon,
+.c-sidebar.c-sidebar-minimized .c-icon,
+.c-sidebar.c-sidebar-minimized svg {
+	margin-right: 0 !important;
 }
 
 .c-sidebar .simplebar-content,
@@ -175,20 +230,15 @@
 	padding: 6px 12px;
 	/* add vertical breathing room above each section header */
 	margin-top: 12px;
-	color: #6b7280; /* slate-500 */
+	color: #9ca3af; /* muted gray for section labels */
 	font-size: 0.75rem;
-	text-transform: uppercase;
-	letter-spacing: 0.02em;
+	text-transform: none; /* regular case like image */
+	letter-spacing: 0;
 	font-weight: 600;
 }
 .sidebar-section::before {
 	content: "";
-	display: inline-block;
-	width: 4px;
-	height: 18px;
-	background: #0d6efd; /* primary blue */
-	border-radius: 2px;
-	margin-right: 10px;
+	display: none; /* no colored bar in image */
 }
 
 /* Hide the section label when collapsed (only icons should show) */
@@ -500,7 +550,7 @@
 
 @media (max-width: 991px) {
 	.c-sidebar {
-		width: 260px;
+		width: 256px;
 		transform: translateX(0);
 	}
 }
@@ -594,7 +644,7 @@
 .c-sidebar .c-nav-link:hover,
 .c-sidebar .nav-link:hover,
 .c-sidebar .c-nav-group-toggle:hover {
-	background: #f5f7fb !important; /* soft off-white / chalk */
+	background: #F3F4F6 !important; /* subtle light gray hover */
 }
 
 /* Active state: stronger background and left indicator */
@@ -613,13 +663,13 @@
 .c-sidebar .c-nav-group-toggle {
 	display: flex;
 	align-items: center;
-	gap: 10px; /* increased gap between icon and text */
-	padding: 8px 12px; /* increased vertical/horizontal padding */
-	padding-left: 16px !important; /* larger left inset for visual comfort */
-	border-radius: 6px; /* slightly larger radius */
+	gap: 6px; /* tighter gap between icon and text */
+	padding: 4px 8px; /* further reduced vertical/horizontal padding */
+	padding-left: 12px !important; /* slightly smaller left inset */
+	border-radius: 6px;
 	background: transparent;
-	min-height: 40px; /* comfortable row height */
-	margin-bottom: 6px; /* small vertical gap between items */
+	min-height: 32px; /* slightly shorter row height */
+	margin-bottom: 3px; /* tighter vertical spacing */
 }
 
 /* Reduce bottom gap for last item in nav so footer/divider isn't spaced out too much */
@@ -633,66 +683,83 @@
 .c-sidebar .c-nav-group-toggle.active,
 .c-sidebar a[aria-current="page"],
 .c-sidebar a[aria-current="true"] {
-	background: rgba(13,110,253,0.12) !important;
-	color: #0d6efd !important;
+	background: #ECECEC !important; /* selected row: slightly darker than base */
+	color: #0f1724 !important; /* dark text when active */
+	border-radius: 8px !important; /* subtler pill style */
+	box-shadow: 0 0 0 1px rgba(15,23,36,0.02) inset; /* very subtle inner edge */
 }
 
-/* Ensure active items keep their active background when hovered (override hover) */
+/* Ensure active items keep white background and dark text when hovered */
 .app-sidebar-link.active:hover,
 .app-sidebar-group.active:hover,
 .c-sidebar .nav-link.active:hover,
 .c-sidebar .c-nav-link.active:hover,
 .c-sidebar a[aria-current="page"]:hover,
 .c-sidebar a[aria-current="true"]:hover {
-	background: rgba(13,110,253,0.12) !important;
-	color: #0d6efd !important;
+	background: #ECECEC !important;
+	color: #0f1724 !important;
 }
 
 /* Removed left indicator bar; active state uses background color only */
 /* Removed left indicator bar; active state uses background color only */
 
-/* Also style links that are active via React Router's aria-current attribute
-	 This covers cases where the 'active' class isn't forwarded by wrapper components. */
+/* Also style links that are active via React Router's aria-current attribute */
 .c-sidebar a[aria-current="page"],
 .c-sidebar a[aria-current="true"],
 .c-sidebar a[aria-current="page"] .app-sidebar-link,
 .c-sidebar a[aria-current="true"] .app-sidebar-link {
-	background: rgba(13,110,253,0.12) !important;
-	color: #0d6efd !important;
+	background: #ECECEC !important;
+	color: #0f1724 !important;
 }
 .c-sidebar a[aria-current="page"] span,
 .c-sidebar a[aria-current="true"] span {
-	color: #0d6efd !important;
+	color: #0f1724 !important;
 }
 
-/* Active/selected link styling */
+/* Active/selected link styling: keep dark text and white background */
 .c-sidebar .nav-link.active,
 .c-sidebar .c-nav-link.active,
 .c-sidebar .c-nav-group-toggle.active {
-	color: #0d6efd !important;
-	background: rgba(13,110,253,0.12) !important;
+	color: #0f1724 !important;
+	background: #ECECEC !important;
 }
 
 /* Icons in the sidebar should also be dark */
 .c-sidebar .nav-icon,
 .c-sidebar .c-icon,
 .c-sidebar svg {
-		display: inline-block !important; /* show icon elements */
-		width: 18px !important;
-		height: 18px !important;
-		margin: 0 !important;
-		padding: 0 !important;
-		color: #1f2937 !important;
-		fill: currentColor !important;
-		vertical-align: middle;
+	display: inline-block !important; /* show icon elements */
+	width: 16px !important;
+	height: 16px !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	color: #6b7280 !important; /* muted gray icon color */
+	/* render icons as outlines (no fill) by default */
+	fill: none !important;
+	stroke: currentColor !important;
+	stroke-width: 1.2 !important;
+	vector-effect: non-scaling-stroke;
+	vertical-align: middle;
+}
+
+/* Prefer outline (stroke) rendering for modern icons: remove fills and use stroke.
+	 This makes Lucide icons render as monoline outlines and avoids filled look. */
+.c-sidebar .nav-icon svg,
+.c-sidebar .nav-icon,
+.c-sidebar .nav-icon-wrapper svg,
+.c-sidebar svg {
+	fill: none !important;
+	stroke: currentColor !important;
+	stroke-width: 1.5 !important;
+	vector-effect: non-scaling-stroke;
 }
 
 /* If CoreUI icons use a customClassName 'nav-icon' we keep a small right margin handled by flex gap, but ensure they don't create extra boxes */
 .c-sidebar .nav-icon svg,
 .c-sidebar .c-icon svg {
 	display: inline-block !important;
-	width: 18px !important;
-	height: 18px !important;
+	width: 16px !important;
+	height: 16px !important;
 }
 
 /* Ensure inner spans / badges don't create extra boxes */
@@ -710,10 +777,64 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 18px;
-	height: 18px;
-	flex: 0 0 18px;
-	margin-right: 8px;
+	width: 16px;
+	height: 16px;
+	flex: 0 0 16px;
+	margin-right: 12px;
+}
+
+/* Menu text: slightly smaller and a bit bolder to match design */
+.c-sidebar .c-nav-link span,
+.c-sidebar .nav-link span,
+.app-sidebar-link span,
+.app-sidebar-group span {
+	font-size: 0.90rem !important; /* slightly smaller */
+	font-weight: 400 !important; /* normal weight for non-active items */
+	color: inherit !important;
+}
+
+/* Use lighter text color for non-active menu items */
+.c-sidebar .c-nav-link span,
+.c-sidebar .nav-link span,
+.app-sidebar-link span,
+.app-sidebar-group span {
+	color: #6b7280 !important; /* light/muted gray */
+}
+
+/* Section labels slightly lighter as well */
+.sidebar-section-label {
+	color: #9ca3af !important;
+	font-weight: 600;
+}
+
+
+/* Make active icons darker to match selected row contrast */
+.c-sidebar .c-nav-link.active .nav-icon,
+.c-sidebar .c-nav-link.active .nav-icon-wrapper svg,
+.c-sidebar .nav-link.active .nav-icon,
+.c-sidebar .nav-link.active .nav-icon-wrapper svg {
+	color: #0f1724 !important;
+	/* active icon: thicker stroke, still outline-only */
+	fill: none !important;
+	stroke: currentColor !important;
+	stroke-width: 1.8 !important;
+}
+
+/* Make only active menu item text bold */
+.c-sidebar .c-nav-link.active span,
+.c-sidebar .nav-link.active span,
+.app-sidebar-link.active span,
+.app-sidebar-group.active span,
+.c-sidebar a[aria-current="page"] span,
+.c-sidebar a[aria-current="true"] span {
+	font-weight: 400 !important;
+}
+
+/* Ensure the inner wrapper becomes pill-shaped too so hover/active fill looks uniform */
+.c-sidebar .c-nav-link,
+.c-sidebar .nav-link,
+.c-sidebar .c-nav-group-toggle {
+	border-radius: 8px; /* subtler pill look */
 }
 .nav-icon-wrapper svg {
 	width: 18px !important;
@@ -727,10 +848,11 @@
 .sidebar-title .sidebar-title-main,
 .sidebar-title .sidebar-title-sub {
 	font-family: inherit !important;
-	font-weight: 650 !important; /* restore the brand/title weight */
+	font-weight: 700 !important; /* bolder brand/title weight like image */
 	-webkit-font-smoothing: auto !important;
 	-moz-osx-font-smoothing: auto !important;
 	text-rendering: auto !important;
+	color: #0b1220; /* dark brand title */
 }
 
 /* Footer area inside sidebar */

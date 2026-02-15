@@ -366,10 +366,20 @@ function Department() {
         didNumber: selectedBranch?.didNumber || ''
       }))
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }))
+      // If the user is editing the department "name", prevent spaces
+      // and convert them automatically to underscores. Allow '-' and '_'.
+      if (name === 'name') {
+        const normalized = (value || '').replace(/\s+/g, '_')
+        setFormData(prev => ({
+          ...prev,
+          [name]: normalized
+        }))
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: value
+        }))
+      }
     }
   }
 
@@ -545,6 +555,13 @@ function Department() {
         'Authorization': token ? `Bearer ${token}` : ''
       };
       
+      // Normalize department name (convert spaces to underscores) to enforce no-space rule
+      const normalizedName = (formData.name || '').replace(/\s+/g, '_')
+      // Ensure formData reflects normalized name (keeps UI in sync)
+      if (normalizedName !== formData.name) {
+        setFormData(prev => ({ ...prev, name: normalizedName }))
+      }
+
       // Prepare department data and ensure each member has didNumber
       const normalizedMembers = (formData.members && Array.isArray(formData.members)) ? formData.members.map(m => {
         const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
@@ -558,7 +575,7 @@ function Department() {
 
       const departmentData = {
         businessId: formData.businessId,
-        name: formData.name,
+        name: normalizedName,
         description: formData.description,
         status: formData.status,
         departmentHead: formData.departmentHead,
@@ -582,7 +599,7 @@ function Department() {
         response = await axios.default.put(
           `${baseUrl}/api/departments/${departmentId}`,
           {
-            name: formData.name,
+            name: normalizedName,
             description: formData.description,
             status: formData.status,
             departmentHead: formData.departmentHead,
@@ -739,44 +756,29 @@ function Department() {
           .compact-table .note-col { white-space: normal !important; }
           .compact-table .nowrap { white-space: nowrap !important; }
         `}</style>
-        <CCardHeader className="d-flex justify-content-between align-items-center">
-          <span>Departments</span>
+        <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
+          <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+            <CInputGroup>
+              <CFormInput
+                className="w-100"
+                placeholder="Search departments..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </CInputGroup>
+          </div>
           <div>
-            <button className="btn btn-sm btn-outline-primary me-2" onClick={() => fetchDepartments()} disabled={loading}>Refresh</button>
-            {process.env.NODE_ENV === 'development' && (
-              <button className="btn btn-sm btn-outline-warning me-2" onClick={() => {
-                try {
-                  const devId = window.prompt('Enter businessId for dev testing (leave empty to cancel)')
-                  if (devId) {
-                    localStorage.setItem('businessId', devId)
-                    fetchDepartments()
-                  }
-                } catch (e) {}
-              }}>Force Fetch (dev)</button>
-            )}
+            
             <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
             <span className="mx-2">Page {currentPage}</span>
             <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
-            <button className="btn btn-sm btn-primary" onClick={handleNewDepartment}><CIcon icon={cilPlus} className="me-1" /> New Department</button>
+            <button className="add-agent-btn-minimal btn-sm" onClick={handleNewDepartment}><CIcon icon={cilPlus} className="me-1" /> New Department</button>
           </div>
         </CCardHeader>
         <CCardBody>
-          <CRow className="mb-4">
-            <CCol md={6}>
-              <CInputGroup>
-                <CFormInput
-                  placeholder="Search departments..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </CCol>
-          </CRow>
+          {/* Search moved to header */}
 
-          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
+          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>S.NO</CTableHeaderCell>

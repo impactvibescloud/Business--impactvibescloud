@@ -1,14 +1,19 @@
 .c-header {
   background: #ffffff;
   box-shadow: 0 1px 6px rgba(15, 23, 42, 0.06);
-  height: 64px;
+  height: 40px !important;
+  min-height: 40px !important;
   z-index: 1030;
   padding: 0;
 }
 
 .c-header .c-container {
-  padding-left: 1rem;
-  padding-right: 1rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+  height: 40px !important;
+  min-height: 40px !important;
+  display: flex;
+  align-items: center;
 }
 
 .c-header .c-header-brand h5 {
@@ -24,7 +29,7 @@
 
 /* When sidebar is present, shift main wrapper to the right so content does not sit under the sidebar */
 .c-sidebar + .wrapper {
-  margin-left: 260px; /* match updated sidebar width */
+  margin-left: 256px; /* match updated sidebar width */
   transition: margin-left 0.2s ease;
 }
 
@@ -92,4 +97,118 @@
 
 .credits-add-icon:hover {
   transform: scale(1.2);
+}
+
+/* New header layout to match the provided design */
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+  border: 1px solid #e6e6e6;
+}
+
+/* Hide any leftover header-logo placeholder squares (some pages render a small box before titles) */
+.app-header-logo {
+  display: none !important;
+}
+
+.app-header-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0f1724;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-pill {
+  background: #ffffff;
+  border: 1px solid #e6e6e6;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  color: #0f1724;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.header-pill:hover {
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(15,23,42,0.06);
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: #0f1724;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: rgba(15,23,42,0.02);
+}
+
+.header-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(180deg,#e6eef9,#dfeefc);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f1724;
+  font-weight: 600;
+  border: 2px solid rgba(15,23,42,0.06);
+}
+
+@media (max-width: 767px) {
+  .app-header-title { display: none; }
+  .header-pill { display: none; }
+}
+
+/* Aggressive overrides to ensure header renders at the target height */
+.main-layout .c-header,
+.main-layout .c-header .c-container {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.main-layout .c-header .c-container > * {
+  height: 40px !important;
+  min-height: 40px !important;
+  display: flex;
+  align-items: center;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.main-layout .c-header .app-header-left,
+.main-layout .c-header .app-header-actions {
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+/* Reset any default margins on header children */
+.main-layout .c-header h5,
+.main-layout .c-header h1,
+.main-layout .c-header p,
+.main-layout .c-header div {
+  margin: 0 !important;
 }

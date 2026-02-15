@@ -64,8 +64,8 @@ const AppHeader = () => {
     getUserDetails();
   }, [token]);
   return (
-    <CHeader position="sticky" className="mb-4">
-    <CContainer fluid className="d-flex align-items-center">
+    <CHeader position="sticky">
+    <CContainer fluid className="d-flex align-items-center py-10">
         <CHeaderToggler
           className="ps-1 d-flex align-items-center"
           onClick={() =>
@@ -74,29 +74,25 @@ const AppHeader = () => {
         >
           <CIcon icon={cilMenu} size="lg" />
         </CHeaderToggler>
-        <CHeaderBrand className="mx-auto d-md-none" to="/">
-          <h5 className="m-0">{AppName}</h5>
-        </CHeaderBrand>
-        <CHeaderNav className="d-none d-md-flex me-auto align-items-center">
-          <CNavItem>
-            <CNavLink
-              to="/dashboard"
-              component={NavLink}
-              activeclassname="active"
-            >
-              <h5 className="m-0">{AppName}</h5>
-            </CNavLink>
-          </CNavItem>
-          {/* <CNavItem>
-            <CNavLink href="#">Users</CNavLink>
-          </CNavItem>
-          <CNavItem>
-            <CNavLink href="#">Settings</CNavLink>
-          </CNavItem> */}
-        </CHeaderNav>
-        <CHeaderNav className="d-flex align-items-center">
-          <ConnectionStatus />
-        </CHeaderNav>
+        <div className="app-header-left d-flex align-items-center">
+          <div className="app-header-title">Home</div>
+        </div>
+
+        <div className="app-header-actions d-flex align-items-center ms-auto">
+          <button className="header-pill">Feedback</button>
+          <button className="header-pill">Docs</button>
+          <button className="header-pill d-flex align-items-center">
+            <CIcon icon={cilEnvelopeOpen} className="me-2" />
+            <span>Talk to El</span>
+          </button>
+          <button className="icon-btn ms-2" aria-label="Notifications">
+            <CIcon icon={cilBell} size="lg" />
+          </button>
+          <div className="header-avatar ms-3">I</div>
+          <div className="ms-3 d-none d-md-flex">
+            <ConnectionStatus />
+          </div>
+        </div>
       </CContainer>
       
     </CHeader>

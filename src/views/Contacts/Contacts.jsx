@@ -53,13 +53,8 @@ export default function Contacts() {
           throw new Error('Authentication required. Please login again.');
         }
 
-        // First try to get businessId from user details API
-        const userResponse = await fetch('/api/v1/user/details', {
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          }
-        });
-        const userData = await userResponse.json();
+        // First try to get businessId from user details API using apiCall (ensures correct baseURL)
+        const userData = await apiCall('/v1/user/details', 'GET')
         
         // Get businessId from API response or fall back to localStorage
         const businessId = userData?.user?.businessId || localStorage.getItem('businessId');
@@ -148,11 +143,14 @@ export default function Contacts() {
         return;
       }
 
-      const endpoint = isEditMode
-        ? `/api/contacts/business/${businessId}/${contactForm._id}`
-        : `/api/contacts/business/${businessId}`;
-
-      const savedContact = await apiCall(endpoint, method, { ...contactForm, businessId });
+      // Use central contacts endpoint that accepts businessId in payload
+      const payload = { ...contactForm, businessId }
+      let savedContact
+      if (isEditMode) {
+        savedContact = await apiCall(`/contacts/${contactForm._id}`, 'PUT', payload)
+      } else {
+        savedContact = await apiCall('/contacts', 'POST', payload)
+      }
 
       if (isEditMode) {
         setContacts((prev) =>
@@ -169,29 +167,7 @@ export default function Contacts() {
       alert(err.message);
     }
 
-    const endpoint = isEditMode
-      ? `/api/contacts/business/${businessId}/${contactForm._id}`
-      : `/api/contacts/business/${businessId}`;
-
-    apiCall(endpoint, method, { ...contactForm, businessId })
-      .then((res) => {
-        // apiCall returns parsed response data
-        return res;
-      })
-      .then((savedContact) => {
-        if (isEditMode) {
-          setContacts((prev) =>
-            prev.map((c) =>
-              c.email === savedContact.email ? savedContact : c
-            )
-          );
-        } else {
-          setContacts((prev) => [...prev, savedContact]);
-        }
-        setShowModal(false);
-        resetForm();
-      })
-      .catch((err) => alert(err.message));
+    // Submission handled above with apiCall; duplicate code removed.
   };
 
   const handleEdit = (contact) => {
@@ -209,12 +185,7 @@ export default function Contacts() {
     }
     
     try {
-      const userResponse = await fetch('/api/v1/user/details', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
-      const userData = await userResponse.json();
+      const userData = await apiCall('/v1/user/details', 'GET')
       const businessId = userData?.user?.businessId || localStorage.getItem('businessId');
 
       if (!businessId) {
@@ -222,32 +193,12 @@ export default function Contacts() {
         return;
       }
 
-      const response = await fetch(`${API_BASE}/business/${businessId}/${contactId}`, { 
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${authToken}`
-        }
-      });
-
-      if (!response.ok) throw new Error("Delete failed");
+      await apiCall(`/contacts/business/${businessId}/${contactId}`, 'DELETE')
       setContacts((prev) => prev.filter((c) => c._id !== contactId));
       setDeleteConfirm(null);
     } catch (err) {
       alert(err.message);
     }
-
-    fetch(`${API_BASE}/business/${businessId}/${contactId}`, { 
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${authToken}`
-      }
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Delete failed");
-        setContacts((prev) => prev.filter((c) => c._id !== contactId));
-        setDeleteConfirm(null);
-      })
-      .catch((err) => alert(err.message));
   };
 
   if (loading) {
