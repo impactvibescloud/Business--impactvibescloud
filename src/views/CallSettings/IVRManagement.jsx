@@ -608,9 +608,53 @@ const IVRManagement = () => {
                     }
 
                     const nodeName = (newIvr.node || `menu_${Date.now()}`).toString().toLowerCase()
-                    // Normalize parsedOptions into an array of { key, voice, destination }
+                    // Build options array from editor options (same logic as update path)
                     let optionsArrayFromParsed = []
-                    // parsedOptions flow removed; use editor options only (optionsArrayFromParsed stays [])
+                    if (hasEditorOptions) {
+                      newIvr.options.forEach((o) => {
+                        if (!o.key) return
+                        if (o.type === 'dept') {
+                          if (o.agentId) {
+                            let dept = departments.find(d => d._id === o.target || d.id === o.target)
+                            if (!dept) {
+                              dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
+                            }
+                            const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target || ''
+                            let ext = ''
+                            if (dept && Array.isArray(dept.members) && dept.members.length) {
+                              const member = dept.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId))
+                              if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                            }
+                            if (!ext) {
+                              const members = dept ? (departmentMembers[dept._id] || departmentMembers[dept.id] || []) : []
+                              const member = members.find(m => (m._id === o.agentId || m.id === o.agentId))
+                              if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                            }
+                            if (!ext) {
+                              const allDeps = Object.keys(departmentMembers)
+                              for (let k = 0; k < allDeps.length && !ext; k++) {
+                                const mlist = departmentMembers[allDeps[k]] || []
+                                const member = mlist.find(m => (m._id === o.agentId || m.id === o.agentId))
+                                if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
+                              }
+                            }
+                            const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
+                            optionsArrayFromParsed.push({ key: o.key, voice: o.voice || '', destination: dest })
+                          } else {
+                            const dept = departments.find(d => (
+                              d._id === o.target || d.id === o.target ||
+                              (d.slug && d.slug === o.target) ||
+                              (d.name && d.name.toString().toLowerCase() === (o.target || '').toString().toLowerCase())
+                            ))
+                            const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
+                            const dest = `dept:${String(resolvedName || '').toLowerCase()}`
+                            optionsArrayFromParsed.push({ key: o.key, voice: o.voice || '', destination: dest })
+                          }
+                        } else {
+                          optionsArrayFromParsed.push({ key: o.key, voice: o.voice || '', destination: `node:${o.target || ''}` })
+                        }
+                      })
+                    }
 
                     const savePayload = {
                       businessId: currentBusinessId,
