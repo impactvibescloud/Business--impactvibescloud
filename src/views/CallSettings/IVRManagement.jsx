@@ -404,7 +404,7 @@ const IVRManagement = () => {
       </CCardHeader>
       <CCardBody>
         <div className="mb-3">
-          <div className="alert alert-info mb-0">Note: The primary/main IVR node should be named <strong>main</strong>.</div>
+          <div className="alert alert-info mb-0">Note: The primary/main IVR node should be named <strong>menu</strong>.</div>
         </div>
         {!businessId && (
           <div className="mb-3">
