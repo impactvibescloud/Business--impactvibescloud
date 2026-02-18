@@ -5,6 +5,8 @@ import { isAutheticated, signout as doSignout } from 'src/auth'
 import { useNavigate, useLocation } from 'react-router-dom'
 import routes from 'src/routes'
 import { UserActivityStatus } from './index'
+import CIcon from '@coreui/icons-react'
+import { cilMenu } from '@coreui/icons'
 
 const CustomHeader = () => {
   const [initial, setInitial] = useState('U')
@@ -93,6 +95,16 @@ const CustomHeader = () => {
     <header className="jc-header" role="banner">
       <div className="jc-header-inner">
         <div className="jc-left">
+          <button
+            className="jc-icon-btn"
+            aria-label="Toggle sidebar"
+            onClick={() => {
+              try { window.dispatchEvent(new Event('toggleSidebarCollapsed')) } catch (e) {}
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <CIcon icon={cilMenu} />
+          </button>
           <div className="jc-title">
             {getDisplayTitle(location?.pathname || '/')}
           </div>

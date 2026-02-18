@@ -24,6 +24,9 @@
 .jc-left { display:flex; align-items:center; gap:12px; height:48px }
 .jc-title { font-size:0.95rem; font-weight:600; color:#0f1724 }
 
+.jc-icon-btn { background:transparent; border:none; padding:6px; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; justify-content:center }
+.jc-icon-btn:hover { background: rgba(15,23,42,0.04) }
+
 .jc-actions { display:flex; align-items:center; gap:10px; height:48px }
 .jc-pill { background:#fff; border:1px solid #e6e6e6; padding:6px 10px; border-radius:18px; font-size:0.9rem; cursor:pointer }
 .jc-pill-icon { display:flex; gap:8px; align-items:center }
