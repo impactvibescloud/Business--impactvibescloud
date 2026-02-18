@@ -18,6 +18,8 @@ import {
   CModalFooter,
   CButton,
 } from '@coreui/react'
+import CIcon from '@coreui/icons-react'
+import { cilTrash, cilPencil } from '@coreui/icons'
 import { apiCall } from '../../config/api'
 import '../Branches/Branches.css'
 
@@ -41,6 +43,10 @@ const IVRManagement = () => {
   const [playingAudio, setPlayingAudio] = useState(null)
   const [playingIvrId, setPlayingIvrId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [deletingNode, setDeletingNode] = useState(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [nodeToDelete, setNodeToDelete] = useState(null)
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false)
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -328,35 +334,78 @@ const IVRManagement = () => {
     setPlayingIvrId(null)
   }
 
+  const addOptionWithNextKey = () => {
+    const opts = Array.isArray(newIvr.options) ? [...newIvr.options] : []
+    const numericKeys = opts.map((o) => {
+      const k = (o && (o.key || '')).toString()
+      const n = parseInt(k, 10)
+      return Number.isNaN(n) ? null : n
+    }).filter(n => n !== null)
+    let next = 1
+    if (numericKeys.length) next = Math.max(...numericKeys) + 1
+    else next = opts.length ? (opts.length + 1) : 1
+    const newOpt = { key: String(next), type: 'node', target: '', agentId: '', voice: '' }
+    setNewIvr({ ...newIvr, options: [...opts, newOpt] })
+  }
+
+  const deleteIvrNode = async (node) => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId || !node) return
+    try {
+      setDeletingNode(node)
+      const endpoint = `/ivr/node/${encodeURIComponent(node.toString())}?businessId=${encodeURIComponent(currentBusinessId)}`
+      const res = await apiCall(endpoint, 'DELETE')
+      if (res && (res.success || res.deleted || res.data)) {
+        fetchIvrs(1)
+        setDeleteModalOpen(false)
+        setNodeToDelete(null)
+      } else {
+        console.error('Failed to delete IVR node', res)
+      }
+    } catch (err) {
+      console.error('Error deleting IVR node', err)
+    } finally {
+      setDeletingNode(null)
+    }
+  }
+
+  const deleteAllIvrs = async () => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) return
+    try {
+      setDeletingAll(true)
+      const endpoint = `/ivrs/business/${currentBusinessId}`
+      const res = await apiCall(endpoint, 'DELETE')
+      if (res && (res.success || res.deleted || res.data)) {
+        fetchIvrs(1)
+        setDeleteAllModalOpen(false)
+      } else {
+        console.error('Failed to delete IVRs', res)
+      }
+    } catch (err) {
+      console.error('Error deleting IVRs', err)
+    } finally {
+      setDeletingAll(false)
+    }
+  }
+
   return (
     <CCard className="mb-4">
       <CCardHeader className="d-flex justify-content-between align-items-center">
         <span>IVR Management</span>
         <div>
           <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] }); setAddOpen(true) }}>Add</button>
-          <button className="btn btn-sm btn-outline-danger me-2" onClick={async () => {
+          <button className="btn btn-sm btn-outline-danger me-2" onClick={() => {
             const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
             if (!currentBusinessId) return
-            if (!window.confirm('Delete ALL IVRs for this business? This cannot be undone.')) return
-            try {
-              setDeletingAll(true)
-              const endpoint = `/ivrs/business/${currentBusinessId}`
-              const res = await apiCall(endpoint, 'DELETE')
-              if (res && res.success) {
-                console.log('Deleted all IVRs', res)
-                fetchIvrs(1)
-              } else {
-                console.error('Failed to delete IVRs', res)
-              }
-            } catch (err) {
-              console.error('Error deleting IVRs', err)
-            } finally {
-              setDeletingAll(false)
-            }
+            setDeleteAllModalOpen(true)
           }} disabled={deletingAll || loading}>Delete all</button>
         </div>
       </CCardHeader>
       <CCardBody>
+        <div className="mb-3">
+          <div className="alert alert-info mb-0">Note: The primary/main IVR node should be named <strong>main</strong>.</div>
+        </div>
         {!businessId && (
           <div className="mb-3">
             <div className="alert alert-warning">Missing <code>businessId</code> in localStorage. Set it to view IVRs.</div>
@@ -469,7 +518,7 @@ const IVRManagement = () => {
                   }}>Remove</button>
                 </div>
               ))}
-              <button className="btn btn-sm btn-outline-primary" onClick={() => setNewIvr({ ...newIvr, options: [...newIvr.options, { key: '', type: 'node', target: '', agentId: '', voice: '' }] })}>Add option</button>
+              <button className="btn btn-sm btn-outline-primary" onClick={addOptionWithNextKey}>Add option</button>
             </div>
             {/* Timeout removed per request */}
             {/* Advanced JSON removed per request */}
@@ -689,6 +738,36 @@ const IVRManagement = () => {
             </CModalFooter>
         </CModal>
 
+        <CModal visible={deleteModalOpen} onClose={() => { if (deletingNode !== nodeToDelete) { setDeleteModalOpen(false); setNodeToDelete(null) } }} alignment="center">
+          <CModalHeader>
+            <CModalTitle>Delete IVR</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            Are you sure you want to delete IVR node "{nodeToDelete}"? This action cannot be undone.
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (deletingNode !== nodeToDelete) { setDeleteModalOpen(false); setNodeToDelete(null) } }} disabled={deletingNode === nodeToDelete}>Cancel</CButton>
+            <CButton color="danger" onClick={() => deleteIvrNode(nodeToDelete)} disabled={deletingNode === nodeToDelete}>
+              {deletingNode === nodeToDelete ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}
+            </CButton>
+          </CModalFooter>
+        </CModal>
+
+        <CModal visible={deleteAllModalOpen} onClose={() => { if (!deletingAll) { setDeleteAllModalOpen(false) } }} alignment="center">
+          <CModalHeader>
+            <CModalTitle>Delete All IVRs</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            Are you sure you want to delete ALL IVRs for this business? This action cannot be undone.
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!deletingAll) { setDeleteAllModalOpen(false) } }} disabled={deletingAll}>Cancel</CButton>
+            <CButton color="danger" onClick={deleteAllIvrs} disabled={deletingAll}>
+              {deletingAll ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}
+            </CButton>
+          </CModalFooter>
+        </CModal>
+
         {loading ? (
           <div className="text-center py-4"><CSpinner /></div>
         ) : ivrs.length === 0 ? (
@@ -697,13 +776,13 @@ const IVRManagement = () => {
           <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell style={{ width: '25%' }}>NAME</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '30%' }}>VOICE</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '10%' }}>OPTIONS</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>CREATED AT</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '10%' }}>ACTION</CTableHeaderCell>
-                <CTableHeaderCell className="text-center" style={{ width: '10%' }}>STATUS</CTableHeaderCell>
-              </CTableRow>
+                  <CTableHeaderCell style={{ width: '25%' }}>NAME</CTableHeaderCell>
+                  <CTableHeaderCell style={{ width: '30%' }}>VOICE</CTableHeaderCell>
+                  <CTableHeaderCell style={{ width: '10%' }}>OPTIONS</CTableHeaderCell>
+                  <CTableHeaderCell style={{ width: '15%' }}>CREATED AT</CTableHeaderCell>
+                  <CTableHeaderCell className="text-center" style={{ width: '10%' }}>STATUS</CTableHeaderCell>
+                  <CTableHeaderCell style={{ width: '10%' }}>ACTION</CTableHeaderCell>
+                </CTableRow>
             </CTableHead>
             <CTableBody>
               {ivrs.map((i) => (
@@ -718,12 +797,21 @@ const IVRManagement = () => {
                     <CTableDataCell className="align-middle"><div className="manager-email">{i.voice || '-'}</div></CTableDataCell>
                     <CTableDataCell className="align-middle"><div className="agent-number">{Array.isArray(i.options) ? i.options.length : (i.totalMenuOptions || '-')}</div></CTableDataCell>
                     <CTableDataCell className="align-middle"><div className="department-name">{formatDateTimeShort(i.createdAt)}</div></CTableDataCell>
+                    <CTableDataCell className="text-center align-middle"><CBadge color={i.status === 'active' || i.status === 'on' ? 'success' : 'secondary'}>{i.status || '-'}</CBadge></CTableDataCell>
                     <CTableDataCell className="align-middle">
                       <div>
-                        <button className="btn btn-sm btn-warning" onClick={(e) => { e.stopPropagation(); openEdit(i) }}>Edit</button>
+                        <button className="btn btn-sm btn-warning" onClick={(e) => { e.stopPropagation(); openEdit(i) }} title="Edit IVR" aria-label="Edit IVR"><CIcon icon={cilPencil} /></button>
+                        <button
+                          className="btn btn-sm btn-outline-danger ms-2"
+                          onClick={(e) => { e.stopPropagation(); const nodeId = (i.name || i.node || i._id || i.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }}
+                          disabled={deletingNode === (i.name || i.node || i._id || i.id)}
+                          title="Delete IVR"
+                          aria-label="Delete IVR"
+                        >
+                          {deletingNode === (i.name || i.node || i._id || i.id) ? (<><CSpinner size="sm" />&nbsp;</>) : (<CIcon icon={cilTrash} />)}
+                        </button>
                       </div>
                     </CTableDataCell>
-                    <CTableDataCell className="text-center align-middle"><CBadge color={i.status === 'active' || i.status === 'on' ? 'success' : 'secondary'}>{i.status || '-'}</CBadge></CTableDataCell>
                   </CTableRow>
                   {expandedRows.has(i._id || i.id || i.name) && (
                     <CTableRow>
