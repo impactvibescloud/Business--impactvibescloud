@@ -169,6 +169,17 @@ const AppSidebar = () => {
     } catch (err) {}
   };
 
+  // Listen for header-initiated collapse toggle events (keeps behavior identical to sidebar head logo)
+  useEffect(() => {
+    const onToggle = () => {
+      const next = !collapsed;
+      setCollapsed(next);
+      try { localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false'); } catch (e) {}
+    };
+    window.addEventListener('toggleSidebarCollapsed', onToggle);
+    return () => window.removeEventListener('toggleSidebarCollapsed', onToggle);
+  }, [collapsed]);
+
   // Logo click handler: toggle sidebar unless user used a modifier or middle-click (allow navigation)
   const handleLogoClick = (e) => {
     // React synthetic events wrap nativeEvent
