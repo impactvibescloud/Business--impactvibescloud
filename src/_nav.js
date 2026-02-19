@@ -178,6 +178,14 @@ const _nav = [
     to: "/billing",
     group: "Billing",
   },
+
+  {
+    component: CNavItem,
+    name: "Settings",
+    icon: <Settings className="nav-icon" />,
+    to: "/settings",
+    group: "Settings",
+  },
   
   
   // {
