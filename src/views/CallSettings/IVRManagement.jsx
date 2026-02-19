@@ -19,9 +19,11 @@ import {
   CButton,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilTrash, cilPencil } from '@coreui/icons'
+import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch } from '@coreui/icons'
+import { IoEyeOutline } from 'react-icons/io5'
 import { apiCall } from '../../config/api'
 import '../Branches/Branches.css'
+import './IVRManagement.css'
 
 const IVRManagement = () => {
   const [ivrs, setIvrs] = useState([])
@@ -47,6 +49,24 @@ const IVRManagement = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [nodeToDelete, setNodeToDelete] = useState(null)
   const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false)
+  const [afterHoursMessage, setAfterHoursMessage] = useState('')
+  const [savingAfterHours, setSavingAfterHours] = useState(false)
+  const [activeTab, setActiveTab] = useState('ivr')
+  const [afterHoursList, setAfterHoursList] = useState([])
+  const [editingAfterId, setEditingAfterId] = useState(null)
+  const [afterModalOpen, setAfterModalOpen] = useState(false)
+  const [deletingAfterAll, setDeletingAfterAll] = useState(false)
+  const [afterToDelete, setAfterToDelete] = useState(null)
+  const [afterDeleteModalOpen, setAfterDeleteModalOpen] = useState(false)
+  const [deletingAfterItem, setDeletingAfterItem] = useState(false)
+  const [afterDetailsOpen, setAfterDetailsOpen] = useState(false)
+  const [afterSelected, setAfterSelected] = useState(null)
+  const [languages, setLanguages] = useState([])
+  const [langCode, setLangCode] = useState('')
+  const [langName, setLangName] = useState('')
+  const [savingLang, setSavingLang] = useState(false)
+  const [langModalOpen, setLangModalOpen] = useState(false)
+  const [editingLangId, setEditingLangId] = useState(null)
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -83,9 +103,88 @@ const IVRManagement = () => {
         setDepartments([])
       }
     }
+
     if (businessId) fetchDepartments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId])
+
+  const fetchAfterHours = async () => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) return
+    try {
+      const res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours`, 'GET')
+      let list = []
+      if (Array.isArray(res)) list = res
+      else if (res?.data && Array.isArray(res.data)) list = res.data
+      else if (res?.afterHours && Array.isArray(res.afterHours)) list = res.afterHours
+      else list = []
+      setAfterHoursList(list)
+      if (list.length) {
+        const latest = list[0]
+        const msg = latest?.generatedText || latest?.text || latest?.message || ''
+        setAfterHoursMessage(msg || '')
+      } else {
+        setAfterHoursMessage('')
+      }
+    } catch (err) {
+      console.error('Failed to fetch after-hours', err)
+      setAfterHoursList([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'after') return
+    fetchAfterHours()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, businessId])
+
+  const fetchLanguages = async () => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) {
+      setLanguages([])
+      return
+    }
+    try {
+      const res = await apiCall(`/api/languages/business/${encodeURIComponent(currentBusinessId)}`, 'GET')
+      let list = []
+      if (Array.isArray(res)) list = res
+      else if (res?.data && Array.isArray(res.data)) list = res.data
+      else if (res?.languages && Array.isArray(res.languages)) list = res.languages
+      setLanguages(list)
+    } catch (err) {
+      console.error('Failed to fetch languages', err)
+      setLanguages([])
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'language') return
+    fetchLanguages()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  const saveLanguage = async () => {
+    if (!langCode || !langName) return
+    setSavingLang(true)
+    try {
+      const payload = { code: langCode, name: langName }
+        let res = editingLangId
+          ? await apiCall(`/api/languages/${encodeURIComponent(editingLangId)}`, 'PUT', payload)
+          : await apiCall(`/api/languages/business/${encodeURIComponent(businessId || localStorage.getItem('businessId') || '')}`, 'POST', payload);
+      if (res && (res.success || res.created || res.updated || res.data)) {
+        setLangCode('')
+        setLangName('')
+        setEditingLangId(null)
+        await fetchLanguages()
+      } else {
+        console.error('Failed to save language', res)
+      }
+    } catch (err) {
+      console.error('Error creating language', err)
+    } finally {
+      setSavingLang(false)
+    }
+  }
 
   const fetchIvrs = async (p = 1) => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -156,6 +255,16 @@ const IVRManagement = () => {
   const openDetails = (item) => {
     setSelectedItem(item)
     setDetailsOpen(true)
+  }
+
+  const openAfterDetails = (item) => {
+    setAfterSelected(item)
+    setAfterDetailsOpen(true)
+  }
+
+  const closeAfterDetails = () => {
+    setAfterDetailsOpen(false)
+    setAfterSelected(null)
   }
 
   const openEdit = async (item) => {
@@ -334,6 +443,39 @@ const IVRManagement = () => {
     setPlayingIvrId(null)
   }
 
+  const playAfterHours = async (doc) => {
+    try {
+      const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+      if (!currentBusinessId || !doc) return
+      let endpoint = ''
+      if (doc._id) endpoint = `/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours/play?audioId=${encodeURIComponent(doc._id)}`
+      else if (doc.fileName || doc.name) endpoint = `/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours/play?name=${encodeURIComponent(doc.fileName || doc.name)}`
+      else return
+      const data = await apiCall(endpoint, 'GET', null, { responseType: 'arraybuffer' })
+      if (!data) return
+      const mime = 'audio/wav'
+      const blob = new Blob([data], { type: mime })
+      const url = window.URL.createObjectURL(blob)
+      if (playingAudio) {
+        try { playingAudio.pause() } catch (e) {}
+        try { window.URL.revokeObjectURL(playingUrl) } catch (e) {}
+      }
+      const audio = new Audio(url)
+      setPlayingUrl(url)
+      setPlayingAudio(audio)
+      setPlayingIvrId(`after-${doc._id || doc.name}`)
+      audio.play().catch((e) => { console.error('Audio play failed', e) })
+      audio.onended = () => {
+        try { window.URL.revokeObjectURL(url) } catch (e) {}
+        setPlayingUrl(null)
+        setPlayingAudio(null)
+        setPlayingIvrId(null)
+      }
+    } catch (err) {
+      console.error('Failed to play after-hours audio', err)
+    }
+  }
+
   const addOptionWithNextKey = () => {
     const opts = Array.isArray(newIvr.options) ? [...newIvr.options] : []
     const numericKeys = opts.map((o) => {
@@ -389,22 +531,105 @@ const IVRManagement = () => {
     }
   }
 
+  const saveAfterHours = async () => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) return
+    setSavingAfterHours(true)
+    try {
+      const payload = { text: afterHoursMessage }
+      let res
+      if (editingAfterId) {
+        res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours/${encodeURIComponent(editingAfterId)}`, 'PUT', payload)
+      } else {
+        res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours`, 'POST', payload)
+      }
+      if (res && (res.success || res.updated || res.created || res.data)) {
+        // refresh list and close modal
+        await fetchAfterHours()
+        setAfterHoursMessage('')
+        setEditingAfterId(null)
+        setAfterModalOpen(false)
+      } else {
+        console.error('Failed to save after-hours', res)
+      }
+    } catch (err) {
+      console.error('Error saving after-hours', err)
+    } finally {
+      setSavingAfterHours(false)
+    }
+  }
+
+  const deleteAfterHours = async (audioId) => {
+    // deprecated - use modal-driven delete
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId || !audioId) return
+    try {
+      const res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours/${encodeURIComponent(audioId)}`, 'DELETE')
+      if (res && (res.success || res.deleted || res.data)) {
+        await fetchAfterHours()
+      } else {
+        console.error('Failed to delete after-hours', res)
+      }
+    } catch (err) {
+      console.error('Error deleting after-hours', err)
+    }
+  }
+
+  const confirmDeleteAfterHours = (audioId) => {
+    setAfterToDelete(audioId)
+    setAfterDeleteModalOpen(true)
+  }
+
+  const deleteAfterHoursConfirmed = async () => {
+    const audioId = afterToDelete
+    if (!audioId) return
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) return
+    setDeletingAfterItem(true)
+    try {
+      const res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours/${encodeURIComponent(audioId)}`, 'DELETE')
+      if (res && (res.success || res.deleted || res.data)) {
+        setAfterDeleteModalOpen(false)
+        setAfterToDelete(null)
+        await fetchAfterHours()
+      } else {
+        console.error('Failed to delete after-hours', res)
+      }
+    } catch (err) {
+      console.error('Error deleting after-hours', err)
+    } finally {
+      setDeletingAfterItem(false)
+    }
+  }
+
   return (
-    <CCard className="mb-4">
-      <CCardHeader className="d-flex justify-content-between align-items-center">
-        <span>IVR Management</span>
-        <div>
-          <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] }); setAddOpen(true) }}>Add</button>
-          <button className="btn btn-sm btn-outline-danger me-2" onClick={() => {
-            const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
-            if (!currentBusinessId) return
-            setDeleteAllModalOpen(true)
-          }} disabled={deletingAll || loading}>Delete all</button>
-        </div>
-      </CCardHeader>
+    <CCard className="mb-4 ivr-no-focus">
+    
+      <div className="p-2 border-bottom ivr-tabs-wrap">
+        <ul className="nav nav-tabs card-header-tabs mb-0">
+          <li className="nav-item">
+            <button type="button" className={`nav-link btn btn-link ${activeTab === 'ivr' ? 'active' : ''}`} onClick={() => setActiveTab('ivr')}>Menu</button>
+          </li>
+          <li className="nav-item">
+            <button type="button" className={`nav-link btn btn-link ${activeTab === 'after' ? 'active' : ''}`} onClick={() => setActiveTab('after')}>After Hours</button>
+          </li>
+          <li className="nav-item">
+            <button type="button" className={`nav-link btn btn-link ${activeTab === 'language' ? 'active' : ''}`} onClick={() => setActiveTab('language')}>Language</button>
+          </li>
+        </ul>
+      </div>
       <CCardBody>
-        <div className="mb-3">
-          <div className="alert alert-info mb-0">Note: The primary/main IVR node should be named <strong>menu</strong>.</div>
+        <div style={{ display: activeTab === 'ivr' ? 'block' : 'none' }}>
+        <div className="ivr-header mb-3">
+          <div className="ivr-note">Note: The primary/main IVR node should be named{' '}<strong>menu</strong>.</div>
+          <div className="ivr-actions">
+            <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] }); setAddOpen(true) }}>Add</button>
+            <button className="btn btn-sm btn-outline-danger" onClick={() => {
+              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+              if (!currentBusinessId) return
+              setDeleteAllModalOpen(true)
+            }} disabled={deletingAll || loading}>Delete all</button>
+          </div>
         </div>
         {!businessId && (
           <div className="mb-3">
@@ -412,48 +637,110 @@ const IVRManagement = () => {
           </div>
         )}
 
-        <CModal visible={detailsOpen} onClose={closeDetails} alignment="center">
-          <CModalHeader>
-            <CModalTitle>IVR Details</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            {!selectedItem ? (<div>No item selected</div>) : (
-              <div>
-                <div className="mb-2"><strong>Name:</strong> {selectedItem.name || selectedItem.title || '-'}</div>
-                <div className="mb-2"><strong>Virtual Number:</strong> {selectedItem.virtualNumber || selectedItem.number || '-'}</div>
-                <div className="mb-2"><strong>Created By:</strong> {selectedItem.createdBy?.email || selectedItem.createdBy?.name || '-'}</div>
-                <div className="mb-2"><strong>Created At:</strong> {formatDateTimeShort(selectedItem.createdAt || selectedItem.created)}</div>
-                <div className="mb-2"><strong>Status:</strong> <CBadge color={selectedItem.active ? 'success' : 'secondary'}>{selectedItem.active ? 'Active' : 'Inactive'}</CBadge></div>
-                <hr />
-                <h6>Routing / Menu</h6>
-                <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(selectedItem.menu || selectedItem.routing || selectedItem, null, 2)}</pre>
-              </div>
-            )}
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={closeDetails}>Close</CButton>
-          </CModalFooter>
+        <CModal visible={detailsOpen} onClose={closeDetails} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(16,24,40,0.06)', maxWidth: 960, width: '100%' }}>
+            <CModalHeader style={{ borderBottom: 'none', padding: '1rem 1.25rem', background: '#ffffff' }}>
+              <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>IVR Details</CModalTitle>
+            </CModalHeader>
+            <CModalBody style={{ background: '#fbfdff', padding: '1rem 1.25rem', maxHeight: '360px', overflowY: 'auto' }}>
+              {!selectedItem ? (
+                <div className="text-muted">No item selected</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+                  <div>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Name</div>
+                      <div style={{ fontWeight: 700, color: '#102a43' }}>{selectedItem.name || selectedItem.title || '-'}</div>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Voice Text</div>
+                      <div style={{ color: '#374151', whiteSpace: 'pre-wrap' }}>{selectedItem.voice || selectedItem.menu?.voice || ''}</div>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Routing / Menu</div>
+                      <div style={{ background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid rgba(16,24,40,0.04)', maxHeight: 240, overflowY: 'auto' }}>
+                        {(() => {
+                          const menuObj = selectedItem.menu || selectedItem.routing || selectedItem || {}
+                          const opts = Array.isArray(menuObj.options) ? menuObj.options : (Array.isArray(selectedItem.options) ? selectedItem.options : [])
+                          if (!opts || opts.length === 0) return (<div style={{ color: '#6b7280' }}>No routing options available</div>)
+                          return (
+                            <div>
+                              {opts.map((o) => {
+                                const dest = (o.destination || o.destinationType || o.target || '').toString()
+                                let kind = 'default'
+                                if (dest.startsWith('dept:')) kind = 'dept'
+                                else if (dest.startsWith('node:')) kind = 'node'
+                                else if (dest.startsWith('agent:')) kind = 'agent'
+                                const colorMap = {
+                                  dept: { accent: '#fff7ed', border: '#f6ad55', badgeBg: '#fff2e8', badgeColor: '#7a4100' },
+                                  node: { accent: '#eff6ff', border: '#60a5fa', badgeBg: '#eef6ff', badgeColor: '#0b4ea2' },
+                                  agent: { accent: '#ecfdf5', border: '#34d399', badgeBg: '#f0fdf4', badgeColor: '#065f46' },
+                                  default: { accent: '#f8fafc', border: '#e5e7eb', badgeBg: '#f3f4f6', badgeColor: '#111827' },
+                                }
+                                const styles = colorMap[kind] || colorMap.default
+                                return (
+                                  <div key={o._id || o.key || Math.random()} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(16,24,40,0.03)', background: styles.accent, borderLeft: `4px solid ${styles.border}`, borderRadius: 6, marginBottom: 8 }}>
+                                    <div style={{ flex: '0 0 46px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <div style={{ background: styles.badgeBg, color: styles.badgeColor, padding: '0.25rem 0.45rem', fontSize: '0.85rem', borderRadius: 6, fontWeight: 600 }}>{o.key}</div>
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontWeight: 600, color: '#102a43' }}>{o.voice || o.text || '—'}</div>
+                                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, wordBreak: 'break-word' }}>{dest || ''}</div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Virtual Number</div>
+                      <div style={{ fontWeight: 600 }}>{selectedItem.virtualNumber || selectedItem.number || '-'}</div>
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Created By</div>
+                      <div>{selectedItem.createdBy?.email || selectedItem.createdBy?.name || '-'}</div>
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Created At</div>
+                      <div>{formatDateTimeShort(selectedItem.createdAt || selectedItem.created)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Status</div>
+                      <div><CBadge color={selectedItem.active ? 'success' : 'secondary'}>{selectedItem.active ? 'Active' : 'Inactive'}</CBadge></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CModalBody>
+            <CModalFooter style={{ borderTop: 'none', padding: '0.75rem 1.25rem', background: '#ffffff' }} />
+          </div>
         </CModal>
 
-        <CModal visible={addOpen} onClose={() => { setAddOpen(false); setEditingNode(null) }} alignment="center" size="lg">
-          <CModalHeader>
-            <CModalTitle>{editingNode ? `Edit IVR (${editingNode})` : 'Add IVR'}</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
+        <CModal visible={addOpen} onClose={() => { setAddOpen(false); setEditingNode(null) }} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(16,24,40,0.06)', maxWidth: 960, width: '100%' }}>
+            <CModalHeader style={{ borderBottom: 'none', padding: '1rem 1.25rem', background: '#ffffff' }}>
+              <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>{editingNode ? `Edit IVR (${editingNode})` : 'Add IVR'}</CModalTitle>
+            </CModalHeader>
+            <CModalBody style={{ background: '#fbfdff', padding: '1rem 1.25rem', maxHeight: '420px', overflowY: 'auto' }}>
             <div className="row mb-2">
               <div className="col-12 col-md-4">
-                <label className="form-label">Node (identifier)</label>
+                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Node (identifier)</label>
                 <input className="form-control" value={newIvr.node} placeholder="e.g. menu, sales" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
               </div>
               <div className="col-12 col-md-8">
-                <label className="form-label">Voice Text</label>
+                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Voice Text</label>
                 <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
               </div>
             </div>
             <div className="mb-2">
-              <label className="form-label">Options (press {'>'} target)</label>
+              <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Options (press {'>'} target)</label>
               {newIvr.options.map((opt, idx) => (
-                <div key={idx} className="d-flex mb-2">
+                <div key={idx} className="d-flex mb-2" style={{ gap: 8 }}>
                   <input style={{ width: 80 }} className="form-control me-2" value={opt.key} onChange={(e) => {
                     const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], key: e.target.value }; setNewIvr({ ...newIvr, options: copy })
                   }} />
@@ -520,48 +807,37 @@ const IVRManagement = () => {
               ))}
               <button className="btn btn-sm btn-outline-primary" onClick={addOptionWithNextKey}>Add option</button>
             </div>
-            {/* Timeout removed per request */}
-            {/* Advanced JSON removed per request */}
-            {/* Active toggle removed */}
-          </CModalBody>
-            <CModalFooter>
+            </CModalBody>
+            <CModalFooter style={{ borderTop: 'none', padding: '0.75rem 1.25rem', background: '#ffffff' }}>
               <CButton color="secondary" onClick={() => { setAddOpen(false); setEditingNode(null) }} disabled={saving}>Cancel</CButton>
               <CButton color="primary" onClick={async () => {
                 const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
                 if (!currentBusinessId) return
                 setSaving(true)
                 try {
-                  // Build options from the friendly editor if it has entries, otherwise fall back to Advanced JSON
                   const hasEditorOptions = Array.isArray(newIvr.options) && newIvr.options.some(o => o.key && (o.target || o.voice))
-
                   if (editingNode) {
-                    // Build payload for PUT /ivr/:node using array format
                     let optionsArray = []
                     if (hasEditorOptions) {
                       newIvr.options.forEach((o) => {
                         if (!o.key) return
                         if (o.type === 'dept') {
-                          // if an agent was selected for this department option, prefer dept:<department>:<didExtension>
                           if (o.agentId) {
-                            // try to resolve department from o.target first, otherwise find department containing this agent
                             let dept = departments.find(d => d._id === o.target || d.id === o.target)
                             if (!dept) {
                               dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
                             }
                             const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target || ''
                             let ext = ''
-                            // prefer explicit member info on dept.members
                             if (dept && Array.isArray(dept.members) && dept.members.length) {
                               const member = dept.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId))
                               if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
                             }
-                            // fallback to fetched departmentMembers cache
                             if (!ext) {
                               const members = dept ? (departmentMembers[dept._id] || departmentMembers[dept.id] || []) : []
                               const member = members.find(m => (m._id === o.agentId || m.id === o.agentId))
                               if (member) ext = member.didExtension || member.did_extension || member.didNumber || ''
                             }
-                            // as last resort, search departmentMembers across all departments for this agent
                             if (!ext) {
                               const allDeps = Object.keys(departmentMembers)
                               for (let k = 0; k < allDeps.length && !ext; k++) {
@@ -586,9 +862,7 @@ const IVRManagement = () => {
                           optionsArray.push({ key: o.key, voice: o.voice || '', destination: `node:${o.target || ''}` })
                         }
                       })
-                    // Advanced JSON removed: rely on editor options only
                     }
-
                     const putPayload = {
                       businessId: currentBusinessId,
                       menu: {
@@ -606,14 +880,12 @@ const IVRManagement = () => {
                       console.error('Failed to update IVR', res)
                     }
                   } else {
-                    // Create (existing generate flow)
                     let parsedOptions = {}
                     if (hasEditorOptions) {
                       newIvr.options.forEach((o) => {
                         if (!o.key) return
                         if (o.type === 'dept') {
                           if (o.agentId) {
-                            // resolve department and extension similarly to update path
                             let dept = departments.find(d => d._id === o.target || d.id === o.target)
                             if (!dept) {
                               dept = departments.find(d => Array.isArray(d.members) && d.members.find(m => (m._id === o.agentId || m.userId === o.agentId || m.id === o.agentId)))
@@ -653,11 +925,8 @@ const IVRManagement = () => {
                           parsedOptions[o.key] = { destination: `node:${o.target || ''}`, voice: o.voice || '' }
                         }
                       })
-                      // Advanced JSON removed: rely on editor options only
                     }
-
                     const nodeName = (newIvr.node || `menu_${Date.now()}`).toString().toLowerCase()
-                    // Build options array from editor options (same logic as update path)
                     let optionsArrayFromParsed = []
                     if (hasEditorOptions) {
                       newIvr.options.forEach((o) => {
@@ -704,7 +973,6 @@ const IVRManagement = () => {
                         }
                       })
                     }
-
                     const savePayload = {
                       businessId: currentBusinessId,
                       node: nodeName,
@@ -716,7 +984,6 @@ const IVRManagement = () => {
                     try {
                       const saveRes = await apiCall('/ivr/create', 'POST', deepLowercase(savePayload))
                       if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
-                        // Creation succeeded; generation/upload are handled server-side now
                         setAddOpen(false)
                         setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
                         fetchIvrs(1)
@@ -736,9 +1003,10 @@ const IVRManagement = () => {
                 {saving ? (<><CSpinner size="sm" />&nbsp;Saving</>) : (editingNode ? 'Save' : 'Create')}
               </CButton>
             </CModalFooter>
+          </div>
         </CModal>
 
-        <CModal visible={deleteModalOpen} onClose={() => { if (deletingNode !== nodeToDelete) { setDeleteModalOpen(false); setNodeToDelete(null) } }} alignment="center">
+        <CModal visible={deleteModalOpen} onClose={() => { if (deletingNode !== nodeToDelete) { setDeleteModalOpen(false); setNodeToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
           <CModalHeader>
             <CModalTitle>Delete IVR</CModalTitle>
           </CModalHeader>
@@ -753,7 +1021,7 @@ const IVRManagement = () => {
           </CModalFooter>
         </CModal>
 
-        <CModal visible={deleteAllModalOpen} onClose={() => { if (!deletingAll) { setDeleteAllModalOpen(false) } }} alignment="center">
+        <CModal visible={deleteAllModalOpen} onClose={() => { if (!deletingAll) { setDeleteAllModalOpen(false) } }} alignment="center" className="ivr-no-focus-modal">
           <CModalHeader>
             <CModalTitle>Delete All IVRs</CModalTitle>
           </CModalHeader>
@@ -768,97 +1036,252 @@ const IVRManagement = () => {
           </CModalFooter>
         </CModal>
 
+        <CModal visible={afterModalOpen} onClose={() => { if (!savingAfterHours) { setAfterModalOpen(false); setEditingAfterId(null) } }} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>{editingAfterId ? 'Edit After Hours' : 'Add After Hours'}</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <div className="mb-2">
+              <label className="form-label">Message</label>
+              <textarea className="form-control" rows={8} value={afterHoursMessage} onChange={(e) => setAfterHoursMessage(e.target.value)} placeholder="Enter the after-hours voice/text here" />
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!savingAfterHours) { setAfterModalOpen(false); setEditingAfterId(null) } }} disabled={savingAfterHours}>Cancel</CButton>
+            <CButton color="primary" onClick={async () => { await saveAfterHours() }} disabled={savingAfterHours}>{savingAfterHours ? (<><CSpinner size="sm" />&nbsp;Saving</>) : (editingAfterId ? 'Update' : 'Save')}</CButton>
+          </CModalFooter>
+        </CModal>
+
+        <CModal visible={langModalOpen} onClose={() => { if (!savingLang) { setLangModalOpen(false); setEditingLangId(null) } }} alignment="center" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>{editingLangId ? 'Edit Language' : 'Add Language'}</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <div className="mb-2">
+              <label className="form-label">Code</label>
+              <input className="form-control" value={langCode} placeholder="e.g. en" onChange={(e) => setLangCode(e.target.value)} />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Name</label>
+              <input className="form-control" value={langName} placeholder="e.g. English" onChange={(e) => setLangName(e.target.value)} />
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!savingLang) { setLangModalOpen(false); setEditingLangId(null) } }} disabled={savingLang}>Cancel</CButton>
+            <CButton color="primary" onClick={async () => {
+              // Support edit via PUT if editingLangId looks like an id
+              setSavingLang(true)
+              try {
+                const payload = { code: langCode, name: langName }
+                if (editingLangId) {
+                  await apiCall(`/api/languages/${encodeURIComponent(editingLangId)}`, 'PUT', payload)
+                } else {
+                  const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+                  if (!currentBusinessId) {
+                    console.error('Missing businessId for creating language')
+                  } else {
+                    await apiCall(`/api/languages/business/${encodeURIComponent(currentBusinessId)}`, 'POST', payload)
+                  }
+                }
+                setLangModalOpen(false)
+                setEditingLangId(null)
+                setLangCode('')
+                setLangName('')
+                await fetchLanguages()
+              } catch (e) {
+                console.error('Failed to save language', e)
+              } finally { setSavingLang(false) }
+            }} disabled={savingLang}>{savingLang ? 'Saving...' : (editingLangId ? 'Update' : 'Save')}</CButton>
+          </CModalFooter>
+        </CModal>
+
+        {/* After Hours tab handled in tab content below */}
+
         {loading ? (
           <div className="text-center py-4"><CSpinner /></div>
         ) : ivrs.length === 0 ? (
           <div className="text-center py-3">No IVRs found</div>
         ) : (
-          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
-            <CTableHead>
-              <CTableRow>
-                  <CTableHeaderCell style={{ width: '25%' }}>NAME</CTableHeaderCell>
-                  <CTableHeaderCell style={{ width: '30%' }}>VOICE</CTableHeaderCell>
-                  <CTableHeaderCell style={{ width: '10%' }}>OPTIONS</CTableHeaderCell>
-                  <CTableHeaderCell style={{ width: '15%' }}>CREATED AT</CTableHeaderCell>
-                  <CTableHeaderCell className="text-center" style={{ width: '10%' }}>STATUS</CTableHeaderCell>
-                  <CTableHeaderCell style={{ width: '10%' }}>ACTION</CTableHeaderCell>
-                </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {ivrs.map((i) => (
-                <React.Fragment key={i._id || i.id || i.name}>
-                  <CTableRow onClick={() => toggleRow(i._id || i.id || i.name)} style={{ cursor: 'pointer', backgroundColor: expandedRows.has(i._id || i.id || i.name) ? '#f8f9fa' : 'transparent' }} role="button" tabIndex={0}>
-                    <CTableDataCell className="align-middle">
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <div style={{ fontSize: '1.1rem', marginRight: 10 }}>{expandedRows.has(i._id || i.id || i.name) ? '▼' : '▶'}</div>
-                        <div className="agent-name">{i.name || '-'}</div>
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell className="align-middle"><div className="manager-email">{i.voice || '-'}</div></CTableDataCell>
-                    <CTableDataCell className="align-middle"><div className="agent-number">{Array.isArray(i.options) ? i.options.length : (i.totalMenuOptions || '-')}</div></CTableDataCell>
-                    <CTableDataCell className="align-middle"><div className="department-name">{formatDateTimeShort(i.createdAt)}</div></CTableDataCell>
-                    <CTableDataCell className="text-center align-middle"><CBadge color={i.status === 'active' || i.status === 'on' ? 'success' : 'secondary'}>{i.status || '-'}</CBadge></CTableDataCell>
-                    <CTableDataCell className="align-middle">
-                      <div>
-                        <button className="btn btn-sm btn-warning" onClick={(e) => { e.stopPropagation(); openEdit(i) }} title="Edit IVR" aria-label="Edit IVR"><CIcon icon={cilPencil} /></button>
-                        <button
-                          className="btn btn-sm btn-outline-danger ms-2"
-                          onClick={(e) => { e.stopPropagation(); const nodeId = (i.name || i.node || i._id || i.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }}
-                          disabled={deletingNode === (i.name || i.node || i._id || i.id)}
-                          title="Delete IVR"
-                          aria-label="Delete IVR"
-                        >
-                          {deletingNode === (i.name || i.node || i._id || i.id) ? (<><CSpinner size="sm" />&nbsp;</>) : (<CIcon icon={cilTrash} />)}
-                        </button>
-                      </div>
-                    </CTableDataCell>
-                  </CTableRow>
-                  {expandedRows.has(i._id || i.id || i.name) && (
-                    <CTableRow>
-                      <CTableDataCell colSpan={6} style={{ padding: '1rem', backgroundColor: '#f8f9fa' }}>
-                        <div className="d-flex justify-content-between align-items-start">
-                          <div style={{ flex: 1 }}>
-                            <h6 className="mb-2">IVR Details</h6>
-                            {/* Welcome removed (not used anymore) */}
-                            <div className="mb-2"><strong>File:</strong> {i.fileName || i.audioFile || i._id || '-'}
-                              { (i.fileName || i.audioFile || i._id) && (
-                                <>
-                                  {playingIvrId === (i._id || i.id || (i.fileName || i.audioFile)) ? (
-                                    <button className="btn btn-sm btn-outline-danger ms-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }}>Stop</button>
-                                  ) : (
-                                    <button className="btn btn-sm btn-outline-primary ms-2" onClick={(e) => { e.stopPropagation(); playIvrFile(i) }}>Play</button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                            <div className="mb-2"><strong>Menu Options:</strong></div>
-                            <div>
-                              {Array.isArray(i.options) && i.options.length > 0 ? (
-                                i.options.map((opt) => (
-                                  <div key={opt._id || opt.key} className="mb-1 p-2" style={{ backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
-                                    <div><strong>Key:</strong> {opt.key}</div>
-                                    <div><strong>Voice:</strong> {opt.voice || opt.text || '-'}</div>
-                                    <div><strong>Destination:</strong> {opt.destination || opt.destinationType || opt.destination || '-'}</div>
-                                  </div>
-                                ))
-                              ) : (
-                                <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(i.menu || i.raw || {}, null, 2)}</pre>
-                              )}
-                            </div>
-                          </div>
-                          <div className="ms-3">
-                            <div>
-                              <CButton size="sm" color="primary" onClick={(e) => { e.stopPropagation(); openDetails(i) }}>Details</CButton>
-                            </div>
-                          </div>
-                        </div>
-                      </CTableDataCell>
-                    </CTableRow>
+          <div>
+            {ivrs.map((i) => (
+              <div key={i._id || i.id || i.name} className="d-flex align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600 }}>
+                    {i.name || i._id || '(ivr)'}
+                    {((String(i.name || i.node || '')).toLowerCase() === 'menu') && (
+                      <CBadge className="ms-2" style={{ fontSize: '0.7rem', padding: '0.15rem 0.35rem', backgroundColor: '#e67e22', color: '#ffffff' }}>Entry IVR</CBadge>
+                    )}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: 12, wordBreak: 'break-word' }}>{i.voice || ''}</div>
+                  <div className="text-muted" style={{ fontSize: 12 }}>{Array.isArray(i.options) ? `${i.options.length} options` : '-'}</div>
+                </div>
+                <div style={{ width: 140, textAlign: 'center' }}>
+                  <CBadge color={i.status === 'active' || i.status === 'on' ? 'success' : 'secondary'}>{i.status || '-'}</CBadge>
+                </div>
+                <div>
+                    {playingIvrId === (i._id || i.id || (i.fileName || i.audioFile)) ? (
+                    <button className="btn btn-sm btn-outline-danger me-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
+                  ) : (
+                    (i.fileName || i.audioFile || i._id) && (
+                      <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playIvrFile(i) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
+                    )
                   )}
-                </React.Fragment>
-              ))}
-            </CTableBody>
-          </CTable>
+                  <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); openDetails(i) }} title="View"><IoEyeOutline style={{fontSize: '1em', verticalAlign: 'middle', lineHeight: 1}} /></button>
+                  <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation(); openEdit(i) }} title="Edit"><CIcon icon={cilPencil} /></button>
+                  <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); const nodeId = (i.name || i.node || i._id || i.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }} title="Delete"><CIcon icon={cilTrash} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        </div>
+
+        {activeTab === 'after' && (
+          <div>
+            <div className="ivr-header mb-3">
+              <div className="ivr-note">Manage the after-hours message for this business.</div>
+              <div className="ivr-actions">
+                <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingAfterId(null); setAfterHoursMessage(''); setAfterModalOpen(true) }}>Add</button>
+                <button className="btn btn-sm btn-outline-danger" onClick={async () => {
+                  if (!afterHoursList || afterHoursList.length === 0) return
+                  const ok = window.confirm('Delete ALL after-hours audios for this business? This cannot be undone.')
+                  if (!ok) return
+                  setDeletingAfterAll(true)
+                  try {
+                    for (let i = 0; i < afterHoursList.length; i++) {
+                      const id = afterHoursList[i]._id || afterHoursList[i].id
+                      if (!id) continue
+                      try {
+                        await apiCall(`/api/businesses/${encodeURIComponent(businessId)}/after-hours/${encodeURIComponent(id)}`, 'DELETE')
+                      } catch (e) {
+                        console.error('Failed to delete after-hours item', id, e)
+                      }
+                    }
+                    await fetchAfterHours()
+                  } finally {
+                    setDeletingAfterAll(false)
+                  }
+                }} disabled={deletingAfterAll}>{deletingAfterAll ? 'Deleting...' : 'Delete all'}</button>
+              </div>
+            </div>
+            {!businessId && (
+              <div className="mb-3">
+                <div className="alert alert-warning">Missing <code>businessId</code> in localStorage. Set it to manage after-hours.</div>
+              </div>
+            )}
+            
+            <h6>Saved After Hours Audios</h6>
+            {afterHoursList.length === 0 ? (
+              <div className="text-muted">No saved after-hours audio for this business.</div>
+            ) : (
+              <div>
+                {afterHoursList.map((a) => (
+                  <div key={a._id || a.id || a.name} className="d-flex align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{a.name || a._id || '(audio)'}</div>
+                      <div className="text-muted" style={{ fontSize: 12, wordBreak: 'break-word' }}>{a.text || a.message || ''}</div>
+                      <div className="text-muted" style={{ fontSize: 12 }}>{a.createdAt ? (new Date(a.createdAt)).toLocaleString() : ''}</div>
+                    </div>
+                    <div>
+                      {playingIvrId === `after-${a._id || a.name}` ? (
+                        <button className="btn btn-sm btn-outline-danger me-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
+                      ) : (
+                        <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playAfterHours(a) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
+                      )}
+                      <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); openAfterDetails(a) }} title="View"><IoEyeOutline style={{fontSize: '1em', verticalAlign: 'middle', lineHeight: 1}} /></button>
+                      <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation(); setEditingAfterId(a._id || a.id); setAfterHoursMessage(a.generatedText || a.text || a.message || ''); setAfterModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></button>
+                      <button className="btn btn-sm btn-outline-danger me-2" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteAfterHours(a._id || a.id) }}><CIcon icon={cilTrash} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <CModal visible={afterDeleteModalOpen} onClose={() => { if (!deletingAfterItem) { setAfterDeleteModalOpen(false); setAfterToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>Delete After Hours</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            Are you sure you want to delete this after-hours audio? This action cannot be undone.
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!deletingAfterItem) { setAfterDeleteModalOpen(false); setAfterToDelete(null) } }} disabled={deletingAfterItem}>Cancel</CButton>
+            <CButton color="danger" onClick={deleteAfterHoursConfirmed} disabled={deletingAfterItem}>{deletingAfterItem ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}</CButton>
+          </CModalFooter>
+        </CModal>
+
+        <CModal visible={afterDetailsOpen} onClose={closeAfterDetails} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 12px 30px rgba(16,24,40,0.08)', maxWidth: 920, width: '100%', background: '#f8fbff' }}>
+            <CModalHeader style={{ borderBottom: 'none', padding: '1rem 1.25rem', background: '#ffffff' }}>
+              <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>After Hours Details</CModalTitle>
+            </CModalHeader>
+            <CModalBody style={{ padding: '1rem', maxHeight: '420px', overflowY: 'auto', background: '#f8fbff' }}>
+              {!afterSelected ? (
+                <div className="text-muted">No item selected</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Message</div>
+                    <div style={{ background: '#f0f9ff', padding: 16, borderRadius: 10, border: '1px solid rgba(96,165,250,0.12)', minHeight: 80, whiteSpace: 'pre-wrap', color: '#334155' }}>{afterSelected.generatedText || afterSelected.text || afterSelected.message || '-'}</div>
+                  </div>
+                  <div>
+                    <div style={{ background: '#ffffff', padding: 12, borderRadius: 10, border: '1px solid rgba(16,24,40,0.04)' }}>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>File</div>
+                      <div style={{ fontWeight: 600, marginTop: 6 }}>{afterSelected.fileName || '-'}</div>
+                      <div style={{ fontSize: 13, color: '#6b7280' }}>{afterSelected.mimeType ? `${afterSelected.mimeType} • ${afterSelected.sizeKB ? afterSelected.sizeKB + ' KB' : ''}` : ''}</div>
+                      <hr style={{ border: 'none', height: 1, background: 'rgba(16,24,40,0.04)', margin: '12px 0' }} />
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Uploaded</div>
+                      <div style={{ marginTop: 6 }}>{afterSelected.uploadedToAsterisk ? <CBadge color="success">Uploaded</CBadge> : <CBadge color="secondary">Not uploaded</CBadge>}</div>
+                      <div style={{ marginTop: 12, fontSize: 12, color: '#6b7280' }}>Created</div>
+                      <div>{afterSelected.createdAt ? (new Date(afterSelected.createdAt)).toLocaleString() : '-'}</div>
+                      <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>Updated</div>
+                      <div>{afterSelected.updatedAt ? (new Date(afterSelected.updatedAt)).toLocaleString() : '-'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CModalBody>
+            <CModalFooter style={{ borderTop: 'none', padding: '0.75rem 1rem', background: '#ffffff' }} />
+          </div>
+        </CModal>
+        {activeTab === 'language' && (
+          <div>
+            <div className="ivr-header mb-3">
+              <div className="ivr-note">Create a new language for the system.</div>
+              <div className="ivr-actions">
+                <button className="btn btn-sm btn-success me-2" onClick={() => { setLangCode(''); setLangName(''); setEditingLangId(null); setLangModalOpen(true) }}>Add</button>
+              </div>
+            </div>
+            <h6>Available Languages</h6>
+            {languages.length === 0 ? (
+              <div className="text-muted">No languages found.</div>
+            ) : (
+              <div>
+                {languages.map((l) => (
+                  <div key={l.code || l._id || l.id} className="d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{l.name || l.title || l.code}</div>
+                      <div className="text-muted" style={{ fontSize: 12 }}>{l.code}</div>
+                    </div>
+                    <div>
+                      <button className="btn btn-sm btn-outline-primary me-2" title="Edit" onClick={(e) => { e.stopPropagation(); setEditingLangId(l.code || l._id || l.id); setLangCode(l.code || ''); setLangName(l.name || ''); setLangModalOpen(true) }}><CIcon icon={cilPencil} /></button>
+                      <button className="btn btn-sm btn-outline-danger" title="Delete" onClick={async (e) => {
+                        e.stopPropagation();
+                        const id = l.code || l._id || l.id
+                        if (!id) return
+                        if (!window.confirm('Delete this language? This cannot be undone.')) return
+                        try {
+                          await apiCall(`/api/languages/${encodeURIComponent(id)}`, 'DELETE')
+                        } catch (e) { console.error('Failed to delete language', e) }
+                        await fetchLanguages()
+                      }}><CIcon icon={cilTrash} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </CCardBody>
     </CCard>

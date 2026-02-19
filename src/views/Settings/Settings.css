@@ -1,3 +1,60 @@
+/* Modern SaaS / Minimalist (Soft UI) styles for Settings page */
+.settings-container { padding: 20px; }
+.settings-container .ccard { border: none; box-shadow: none }
+
+.settings-tab-content { display: grid; gap: 20px; grid-template-columns: 1fr; }
+
+.card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; color: #0f1724 }
+
+.general-card, .account-card { background: linear-gradient(180deg, #ffffff, #fbfdff); border: 1px solid rgba(15,23,42,0.06); border-radius: 12px; padding: 16px; box-shadow: 0 6px 20px rgba(2,6,23,0.04); }
+
+.profile-card .profile-form, .business-hours-card .business-hours-form, .account-card .account-section-content { display: flex; flex-direction: column; gap: 12px }
+
+.form-row { display: flex; gap: 12px }
+.form-col { flex: 1 }
+.form-label { display:block; font-weight:600; margin-bottom:6px; color:#0f1724 }
+.form-input { border-radius: 8px; border:1px solid rgba(15,23,42,0.06); padding: 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6) }
+
+.phone-input-group { display:flex; gap:8px }
+.country-code-select, .phone-number-input { border-radius:8px; border:1px solid rgba(15,23,42,0.06); padding:8px }
+
+.days-container { display:flex; gap:8px; flex-wrap:wrap }
+.day-btn { border:1px solid rgba(15,23,42,0.06); background:#fff; padding:8px 10px; border-radius:8px; cursor:pointer; color:#0f1724 }
+.day-btn.active { background: linear-gradient(180deg,#eef2ff,#eef4ff); border-color: rgba(59,130,246,0.14); box-shadow: 0 6px 18px rgba(59,130,246,0.06); }
+
+.time-container { display:flex; align-items:center; gap:12px }
+.time-control { border-radius:8px; padding:8px; border:1px solid rgba(15,23,42,0.06) }
+
+.save-changes-container { display:flex; justify-content:flex-end }
+.save-changes-btn { border-radius:10px; padding:8px 14px }
+
+.virtual-numbers-table { width:100%; border-collapse:collapse }
+.type-badge { background: rgba(14,165,233,0.08); color:#0369a1; padding:6px 10px; border-radius:999px }
+
+.integration-card { background:#fff; border-radius:12px; padding:14px; box-shadow: 0 6px 18px rgba(2,6,23,0.03); display:flex; flex-direction:column; gap:8px; align-items:center }
+.integration-image { width:64px; height:64px; object-fit:contain; border-radius:8px; background:#fbfdff; padding:8px }
+.integration-connect-btn { border-radius:10px }
+
+.account-card-header { display:flex; align-items:center; gap:12px; margin-bottom:12px }
+.account-section-title { font-size:1rem; font-weight:700 }
+
+.toggle-switch { position:relative; display:inline-block; width:44px; height:24px }
+.toggle-switch input { display:none }
+.toggle-switch .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#e6eef9; transition:.2s; border-radius:34px }
+.toggle-switch .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; transition:.2s; border-radius:50%; box-shadow:0 2px 8px rgba(2,6,23,0.08) }
+.toggle-switch input:checked + .slider { background: linear-gradient(90deg,#f97316,#fb923c) }
+.toggle-switch input:checked + .slider:before { transform: translateX(20px) }
+
+.success-message { background: rgba(34,197,94,0.08); color:#065f46; padding:8px 12px; border-radius:8px; font-weight:600 }
+
+/* Responsive adjustments */
+@media (min-width: 992px) {
+  .settings-tab-content { grid-template-columns: 1fr 380px }
+  .integrations-grid { grid-column: 1 / -1 }
+}
+
+/* Minimal override to keep coreui look consistent */
+.settings-container .c-card, .settings-container .c-card-body { background: transparent; box-shadow: none }
 .settings-container {
   padding: 20px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;

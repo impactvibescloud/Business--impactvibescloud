@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   CCard,
   CCardBody,
@@ -43,6 +43,8 @@ import {
   cilLink
 } from '@coreui/icons'
 import './Settings.css'
+import axios from 'axios'
+import { isAutheticated } from 'src/auth'
 
 function Settings() {
   const [activeKey, setActiveKey] = useState(1)
@@ -51,6 +53,21 @@ function Settings() {
   const [workEndTime, setWorkEndTime] = useState('00:00')
   const [breakStartTime, setBreakStartTime] = useState('00:00')
   const [breakEndTime, setBreakEndTime] = useState('00:00')
+  // Business fields to PATCH
+  const [businessName, setBusinessName] = useState('')
+  const [contactPersonName, setContactPersonName] = useState('')
+  const [contactPersonEmail, setContactPersonEmail] = useState('')
+  const [contactPersonPhone, setContactPersonPhone] = useState('')
+  const [gstNumber, setGstNumber] = useState('')
+  const [country, setCountry] = useState('')
+  const [stateName, setStateName] = useState('')
+  const [city, setCity] = useState('')
+  const [address1, setAddress1] = useState('')
+  const [address2, setAddress2] = useState('')
+  const [pincode, setPincode] = useState('')
+  const [status, setStatus] = useState('Active')
+  const [ivrEnabled, setIvrEnabled] = useState(true)
+  const [savingBusiness, setSavingBusiness] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
@@ -226,6 +243,62 @@ function Settings() {
   const handleCategoryChange = (e) => {
     setSelectedCategory(e.target.value)
   }
+
+  // Fetch existing business details and prefill form
+  useEffect(() => {
+    const load = async () => {
+      const businessId = localStorage.getItem('businessId') || ''
+      if (!businessId) return
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      try {
+        const res = await axios.get(`/api/businesses/get_one/${encodeURIComponent(businessId)}`, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' },
+        })
+        const data = res?.data?.data || res?.data || null
+        if (!data) return
+        // map contact person to form values
+        const contact = data.contactPerson || {}
+        const fullName = contact.name || ''
+        const parts = fullName.trim().split(' ')
+        const first = parts.length ? parts[0] : ''
+        const last = parts.length > 1 ? parts.slice(1).join(' ') : ''
+        setFormValues((prev) => ({ ...prev, firstName: first, lastName: last, email: contact.email || '', phoneNumber: contact.phone || '' }))
+
+        setBusinessName(data.businessName || '')
+        setGstNumber(data.gstNumber || '')
+        setCountry(data.country || '')
+        setStateName(data.state || '')
+        setCity(data.city || '')
+        setAddress1(data.address1 || '')
+        setAddress2(data.address2 || '')
+        setPincode(data.pincode || '')
+        setStatus(data.status || 'Active')
+        setIvrEnabled(Boolean(data.ivrEnabled))
+
+        // business hours
+        try {
+          const bh = data.businessHours || {}
+          if (bh.start) setWorkStartTime(bh.start)
+          if (bh.end) setWorkEndTime(bh.end)
+        } catch (e) {}
+
+        // business days -> selectedDays array
+        try {
+          const bd = data.businessDays || {}
+          const revMap = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }
+          const days = []
+          Object.keys(revMap).forEach(k => {
+            const v = bd[k]
+            if (v === '1' || v === 1 || v === true || String(v) === 'true') days.push(revMap[k])
+          })
+          setSelectedDays(days)
+        } catch (e) {}
+      } catch (err) {
+        console.error('Failed to load business settings', err)
+      }
+    }
+    load()
+  }, [])
   
   // Clear all filters and search
   const clearFilters = () => {
@@ -336,21 +409,63 @@ function Settings() {
   }
   
   const handleSaveChanges = () => {
-    // Handle saving changes here
-    console.log({
-      formValues,
-      selectedDays,
-      workTimes: { start: workStartTime, end: workEndTime },
-      breakTimes: { start: breakStartTime, end: breakEndTime }
+    // Save to API
+    saveBusinessSettings()
+  }
+
+  const buildBusinessDaysPayload = () => {
+    const map = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri', Saturday: 'sat', Sunday: 'sun' }
+    const out = {}
+    Object.keys(map).forEach((day) => {
+      out[map[day]] = selectedDays.includes(day) ? '1' : '0'
     })
-    
-    // Show success message
-    setShowSuccessMessage(true)
-    
-    // Hide the success message after 3 seconds
-    setTimeout(() => {
-      setShowSuccessMessage(false)
-    }, 3000)
+    return out
+  }
+
+  const saveBusinessSettings = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      console.error('Missing businessId in localStorage')
+      return
+    }
+    const token = localStorage.getItem('authToken') || isAutheticated()
+    const payload = {
+      businessName: businessName || formValues.firstName || '',
+      contactPersonName: contactPersonName || `${formValues.firstName || ''} ${formValues.lastName || ''}`.trim(),
+      contactPersonEmail: contactPersonEmail || formValues.email || '',
+      contactPersonPhone: contactPersonPhone || formValues.phoneNumber || '',
+      gstNumber: gstNumber || '',
+      country: country || '',
+      state: stateName || '',
+      city: city || '',
+      address1: address1 || '',
+      address2: address2 || '',
+      pincode: pincode || '',
+      status: status || 'Active',
+      ivrEnabled: !!ivrEnabled,
+      businessHours: { start: workStartTime, end: workEndTime },
+      businessDays: buildBusinessDaysPayload(),
+    }
+
+    try {
+      setSavingBusiness(true)
+      const res = await axios.patch(`/api/businesses/edit/${encodeURIComponent(businessId)}`, payload, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+      })
+      if (res && (res.data && (res.data.success || res.data.updated) || res.status === 200)) {
+        setShowSuccessMessage(true)
+        setTimeout(() => setShowSuccessMessage(false), 3000)
+      } else {
+        console.error('Failed to save business settings', res)
+      }
+    } catch (err) {
+      console.error('Error saving business settings', err)
+    } finally {
+      setSavingBusiness(false)
+    }
   }
   
   const handleFormChange = (field, value) => {
