@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import {
   CCard,
   CCardBody,
@@ -19,7 +19,7 @@ import {
   CButton,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch, cilPlus, cilCloudDownload } from '@coreui/icons'
+import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch, cilPlus, cilCloudDownload, cilCheck } from '@coreui/icons'
 import { IoEyeOutline } from 'react-icons/io5'
 import { apiCall } from '../../config/api'
 import '../Branches/Branches.css'
@@ -94,6 +94,18 @@ const IVRManagement = () => {
   const [audioDeleteModalOpen, setAudioDeleteModalOpen] = useState(false)
   const [deletingAudio, setDeletingAudio] = useState(false)
   const [downloadingFileId, setDownloadingFileId] = useState(null)
+  const [elevenVoices, setElevenVoices] = useState([])
+  const [loadingElevenVoices, setLoadingElevenVoices] = useState(false)
+  const [selectedElevenVoiceId, setSelectedElevenVoiceId] = useState('')
+  const [filterLanguage, setFilterLanguage] = useState('')
+  const [filterGender, setFilterGender] = useState('')
+  const [filterAccent, setFilterAccent] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [voiceNameSetting, setVoiceNameSetting] = useState('')
+  const [voiceGenderSetting, setVoiceGenderSetting] = useState('')
+  const [voiceAccentSetting, setVoiceAccentSetting] = useState('')
+  const [loadingVoiceSettings, setLoadingVoiceSettings] = useState(false)
+  const [savingVoiceSettings, setSavingVoiceSettings] = useState(false)
 
   const fetchLanguageFiles = async (langCode) => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -116,6 +128,25 @@ const IVRManagement = () => {
     }
   }
 
+    const fetchElevenVoices = async () => {
+      try {
+        setLoadingElevenVoices(true)
+        const res = await apiCall('/api/elevenlabs/voices', 'GET')
+        if (res && res.voices && Array.isArray(res.voices)) {
+          setElevenVoices(res.voices)
+        } else if (Array.isArray(res)) {
+          setElevenVoices(res)
+        } else {
+          setElevenVoices([])
+        }
+      } catch (err) {
+        console.error('Failed to fetch ElevenLabs voices', err)
+        setElevenVoices([])
+      } finally {
+        setLoadingElevenVoices(false)
+      }
+    }
+
   const fetchVoiceFiles = async (langCode) => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
     if (!currentBusinessId || !langCode) {
@@ -136,6 +167,58 @@ const IVRManagement = () => {
       console.error('Failed to fetch voice files', err)
       setVoiceFiles([])
       return []
+    }
+  }
+
+  const fetchVoiceSettings = async () => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) return
+    try {
+      setLoadingVoiceSettings(true)
+      const endpoint = `/api/voice-settings/${encodeURIComponent(currentBusinessId)}`
+      const res = await apiCall(endpoint, 'GET')
+      const data = res && (res.data || res.setting || res || {})
+      const vid = data.voiceId || data.voiceID || data.voice_id || ''
+      const perKey = currentBusinessId ? `elevenVoiceId_${currentBusinessId}` : 'elevenVoiceId'
+      const localSaved = currentBusinessId ? (localStorage.getItem(perKey) || '') : (localStorage.getItem('elevenVoiceId') || '')
+      setSelectedElevenVoiceId(vid || localSaved)
+      setVoiceNameSetting(data.voiceName || data.voiceName || '')
+      setVoiceGenderSetting(data.gender || data.voiceGender || '')
+      setVoiceAccentSetting(data.accent || data.locale || '')
+    } catch (err) {
+      console.error('Failed to fetch saved voice settings', err)
+    } finally {
+      setLoadingVoiceSettings(false)
+    }
+  }
+
+  const saveVoiceSettings = async () => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) return
+    try {
+      setSavingVoiceSettings(true)
+      const payload = {
+        voiceId: selectedElevenVoiceId || '',
+        voiceName: voiceNameSetting || '',
+        gender: voiceGenderSetting || '',
+        accent: voiceAccentSetting || '',
+      }
+      const endpoint = `/api/voice-settings/${encodeURIComponent(currentBusinessId)}`
+      const res = await apiCall(endpoint, 'POST', payload)
+      if (res && (res.success || res.created || res.data)) {
+        try {
+          const perKey = businessId ? `elevenVoiceId_${businessId}` : 'elevenVoiceId'
+          localStorage.setItem(perKey, selectedElevenVoiceId || '')
+        } catch (e) {}
+      } else {
+        console.error('Failed to save voice settings', res)
+      }
+      return res
+    } catch (err) {
+      console.error('Error saving voice settings', err)
+      throw err
+    } finally {
+      setSavingVoiceSettings(false)
     }
   }
 
@@ -382,6 +465,106 @@ const IVRManagement = () => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  useEffect(() => {
+    // when user opens Settings tab, load ElevenLabs voices
+    if (activeTab !== 'settings') return
+    const load = async () => {
+      try {
+        await fetchElevenVoices()
+        // fetch saved settings from backend (and per-business local fallback)
+        await fetchVoiceSettings()
+      } catch (e) {
+        console.error('Failed to load ElevenLabs voices', e)
+      }
+    }
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  const availableVoiceLanguages = useMemo(() => {
+    const s = new Set()
+    ;(elevenVoices || []).forEach((v) => {
+      if (v.labels && v.labels.language) s.add(v.labels.language)
+      ;(v.verified_languages || []).forEach((rl) => { if (rl.language) s.add(rl.language) })
+    })
+    return Array.from(s).filter(Boolean).sort()
+  }, [elevenVoices])
+
+  const getLanguageDisplayName = (code) => {
+    if (!code) return ''
+    // prefer business languages list if available
+    try {
+      const found = (languages || []).find(l => (l.code === code || l._id === code || l.id === code))
+      if (found && (found.name || found.title)) return found.name || found.title
+    } catch (e) {}
+    // try Intl.DisplayNames for language
+    try {
+      if (typeof Intl !== 'undefined' && Intl.DisplayNames) {
+        const dn = new Intl.DisplayNames([navigator?.language || 'en'], { type: 'language' })
+        const pretty = dn.of(code)
+        if (pretty) return pretty
+      }
+    } catch (e) {}
+    return code
+  }
+
+  const availableVoiceGenders = useMemo(() => {
+    const s = new Set()
+    ;(elevenVoices || []).forEach((v) => { if (v.labels && v.labels.gender) s.add(v.labels.gender) })
+    return Array.from(s).filter(Boolean).sort()
+  }, [elevenVoices])
+
+  const availableVoiceAccents = useMemo(() => {
+    const s = new Set()
+    ;(elevenVoices || []).forEach((v) => {
+      if (v.labels && v.labels.accent) s.add(v.labels.accent)
+      ;(v.verified_languages || []).forEach((rl) => { if (rl.accent) s.add(rl.accent) })
+    })
+    return Array.from(s).filter(Boolean).sort()
+  }, [elevenVoices])
+
+  const availableVoiceCategories = useMemo(() => {
+    const s = new Set()
+    ;(elevenVoices || []).forEach((v) => { if (v.category) s.add(v.category) })
+    return Array.from(s).filter(Boolean).sort()
+  }, [elevenVoices])
+
+  const filteredElevenVoices = useMemo(() => {
+    return (elevenVoices || []).filter((v) => {
+      if (filterLanguage) {
+        const labelLang = v.labels && v.labels.language
+        const verified = (v.verified_languages || []).some(rl => rl.language === filterLanguage)
+        if (!(labelLang === filterLanguage || verified)) return false
+      }
+      if (filterGender) {
+        if (!((v.labels && v.labels.gender) === filterGender)) return false
+      }
+      if (filterAccent) {
+        const labelAccent = v.labels && v.labels.accent
+        const verifiedAccent = (v.verified_languages || []).some(rl => rl.accent === filterAccent)
+        if (!(labelAccent === filterAccent || verifiedAccent)) return false
+      }
+      if (filterCategory) {
+        if (!v.category || v.category !== filterCategory) return false
+      }
+      return true
+    })
+  }, [elevenVoices, filterLanguage, filterGender, filterAccent, filterCategory])
+
+  const displayedElevenVoices = useMemo(() => {
+    const list = Array.isArray(filteredElevenVoices) ? [...filteredElevenVoices] : []
+    if (!selectedElevenVoiceId) return list
+    const sel = String(selectedElevenVoiceId)
+    list.sort((a, b) => {
+      const aid = String(a.voice_id || a.id || a.name || '')
+      const bid = String(b.voice_id || b.id || b.name || '')
+      if (aid === sel && bid !== sel) return -1
+      if (bid === sel && aid !== sel) return 1
+      return 0
+    })
+    return list
+  }, [filteredElevenVoices, selectedElevenVoiceId])
 
   useEffect(() => {
     // When modal is open and language selection changes, fetch available voice files
@@ -788,6 +971,38 @@ const IVRManagement = () => {
     }
   }
 
+  const playElevenPreview = async (v) => {
+    try {
+      if (!v) return
+      const idKey = v.voice_id || v.id || v.name
+      const playingKey = `eleven-${idKey}`
+      if (playingIvrId === playingKey) {
+        stopPlaying()
+        return
+      }
+      // stop previous
+      if (playingAudio) {
+        try { playingAudio.pause() } catch (e) {}
+        try { window.URL.revokeObjectURL(playingUrl) } catch (e) {}
+      }
+      const url = v.preview_url || v.url || ''
+      if (!url) return
+      const audio = new Audio(url)
+      setPlayingUrl(url)
+      setPlayingAudio(audio)
+      setPlayingIvrId(playingKey)
+      audio.play().catch((e) => { console.error('Eleven preview play failed', e) })
+      audio.onended = () => {
+        try { window.URL.revokeObjectURL(url) } catch (e) {}
+        setPlayingUrl(null)
+        setPlayingAudio(null)
+        setPlayingIvrId(null)
+      }
+    } catch (err) {
+      console.error('Failed to play eleven preview', err)
+    }
+  }
+
   const downloadLanguageFile = async (file) => {
     try {
       const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -954,6 +1169,9 @@ const IVRManagement = () => {
           <li className="nav-item">
             <button type="button" className={`nav-link btn btn-link ${activeTab === 'audio' ? 'active' : ''}`} onClick={() => setActiveTab('audio')}>Audio</button>
           </li>
+          <li className="nav-item">
+            <button type="button" className={`nav-link btn btn-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>Settings</button>
+          </li>
         </ul>
       </div>
       <CCardBody>
@@ -995,12 +1213,17 @@ const IVRManagement = () => {
           </CModalBody>
           <CModalFooter>
             <CButton color="secondary" onClick={() => { if (!generating) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName('') } }} disabled={generating}>Cancel</CButton>
-            <CButton color="primary" onClick={async () => {
+              <CButton color="primary" onClick={async () => {
               const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
               if (!currentBusinessId || !generateLangCode || !generateText || !generateFileName) return
               setGenerating(true)
               try {
                 const payload = { text: generateText, fileName: generateFileName }
+                // include ElevenLabs voice selection when available
+                if (selectedElevenVoiceId) {
+                  payload.voiceProvider = 'elevenlabs'
+                  payload.voiceId = selectedElevenVoiceId
+                }
                 const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(generateLangCode)}/generate`
                 const res = await apiCall(endpoint, 'POST', payload)
                 if (res && (res.success || res.created || res.data)) {
@@ -1018,7 +1241,7 @@ const IVRManagement = () => {
               } finally {
                 setGenerating(false)
               }
-            }} disabled={generating}>{generating ? (<><CSpinner size="sm" />&nbsp;Generating</>) : 'Generate'}</CButton>
+            }} disabled={generating}>{generating ? ((<><CSpinner size="sm" />&nbsp;Generating</>)) : 'Generate'}</CButton>
           </CModalFooter>
         </CModal>
         <CModal visible={audioDeleteModalOpen} onClose={() => { if (!deletingAudio) { setAudioDeleteModalOpen(false); setAudioToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
@@ -1914,7 +2137,9 @@ const IVRManagement = () => {
                       ))}
                     </div>
                   ))}
-                </div>
+                    </div>
+                  )}
+                  
               </CModalBody>
               <CModalFooter>
                 <CButton color="secondary" onClick={() => { if (!loadingFiles) { setFilesModalOpen(false); setFilesLangCode(''); setFilesList([]) } }}>Close</CButton>
@@ -2003,6 +2228,127 @@ const IVRManagement = () => {
                 ))}
               </div>
             ))}
+          </div>
+        )}
+        {activeTab === 'settings' && (
+          <div>
+            <div className="ivr-header mb-3">
+              <div className="ivr-note">IVR Settings</div>
+            </div>
+
+            <h6>Available Voices</h6>
+            {loadingElevenVoices && (
+              <div className="text-center"><CSpinner /></div>
+            )}
+            {!loadingElevenVoices && elevenVoices.length === 0 && (
+              <div className="text-muted">No voices found.</div>
+            )}
+            {!loadingElevenVoices && elevenVoices.length > 0 && (
+              <div>
+                <div className="soft-filter-bar d-flex mb-3" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 160 }}>
+                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Language</label>
+                    <select className="form-select" value={filterLanguage} onChange={(e) => setFilterLanguage(e.target.value)}>
+                      <option value="">All</option>
+                      {availableVoiceLanguages.map((l) => (<option key={l} value={l}>{getLanguageDisplayName(l)}</option>))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: 140 }}>
+                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Gender</label>
+                    <select className="form-select" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+                      <option value="">All</option>
+                      {availableVoiceGenders.map((g) => (<option key={g} value={g}>{g}</option>))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: 140 }}>
+                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Accent</label>
+                    <select className="form-select" value={filterAccent} onChange={(e) => setFilterAccent(e.target.value)}>
+                      <option value="">All</option>
+                      {availableVoiceAccents.map((a) => (<option key={a} value={a}>{a}</option>))}
+                    </select>
+                  </div>
+                  <div style={{ minWidth: 140 }}>
+                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Category</label>
+                    <select className="form-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                      <option value="">All</option>
+                      {availableVoiceCategories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div style={{ fontSize: 12, color: '#556270', marginBottom: 6 }}>Clear</div>
+                      <button className="btn btn-sm btn-outline-secondary" title="Clear filters" onClick={() => { setFilterLanguage(''); setFilterGender(''); setFilterAccent(''); setFilterCategory('') }}><span style={{fontSize:14,lineHeight:1}}>✖</span></button>
+                    </div>
+                  </div>
+                </div>
+
+                {displayedElevenVoices.length === 0 && (
+                  <div className="text-muted">No voices match the selected filters.</div>
+                )}
+                {displayedElevenVoices.length > 0 && (
+                  displayedElevenVoices.map((v) => {
+                    const idKey = v.voice_id || v.id || v.name || ''
+                    const isSelected = selectedElevenVoiceId && String(selectedElevenVoiceId) === String(idKey)
+                    return (
+                      <div key={idKey} className="soft-voice-card d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: isSelected ? '2px solid #16a34a' : '1px solid #e9ecef', background: isSelected ? '#ecfdf5' : 'transparent' }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{v.name || idKey}</div>
+                          <div className="text-muted" style={{ fontSize: 12 }}>
+                            {(() => {
+                              const labelLang = (v.labels && v.labels.language) || (v.verified_languages && v.verified_languages[0] && v.verified_languages[0].language) || ''
+                              const genderLabel = (v.labels && v.labels.gender) || ''
+                              const labelAccent = (v.labels && v.labels.accent) || (v.verified_languages && v.verified_languages[0] && v.verified_languages[0].accent) || ''
+                              const parts = []
+                              if (labelLang) parts.push(getLanguageDisplayName(labelLang))
+                              if (genderLabel) parts.push(genderLabel)
+                              if (labelAccent) parts.push(labelAccent)
+                              if (v.category) parts.push(v.category)
+                              return parts.join(' • ')
+                            })()}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          {v.preview_url ? (
+                            playingIvrId === `eleven-${idKey}` ? (
+                              <button className="btn btn-sm btn-outline-danger me-2" title="Stop" onClick={(e) => { e.stopPropagation(); playElevenPreview(v) }}><CIcon icon={cilMediaStop} /></button>
+                            ) : (
+                              <button className="btn btn-sm btn-light me-2" title="Preview" onClick={(e) => { e.stopPropagation(); playElevenPreview(v) }}><CIcon icon={cilMediaPlay} /></button>
+                            )
+                          ) : null}
+                          {isSelected ? (
+                            <button className="btn btn-sm btn-success" title="Selected" disabled><CIcon icon={cilCheck} /></button>
+                          ) : (
+                            <button className="btn btn-sm btn-outline-primary" title="Select" onClick={async () => {
+                              const vid = idKey
+                              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+                              try {
+                                setSavingVoiceSettings(true)
+                                if (currentBusinessId && vid) {
+                                  const endpoint = `/api/voice-settings/${encodeURIComponent(currentBusinessId)}`
+                                  await apiCall(endpoint, 'POST', { voiceId: vid })
+                                  try {
+                                    const perKey = currentBusinessId ? `elevenVoiceId_${currentBusinessId}` : 'elevenVoiceId'
+                                    localStorage.setItem(perKey, vid)
+                                  } catch (e) {}
+                                }
+                                setSelectedElevenVoiceId(vid)
+                                setVoiceNameSetting(v.name || '')
+                                setVoiceAccentSetting((v.verified_languages && v.verified_languages[0] && v.verified_languages[0].locale) || '')
+                                setVoiceGenderSetting((v.labels && v.labels.gender) || '')
+                              } catch (err) {
+                                console.error('Failed to save selected voice for business', err)
+                              } finally {
+                                setSavingVoiceSettings(false)
+                              }
+                            }}><CIcon icon={cilCheck} /></button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </div>
         )}
       </CCardBody>
