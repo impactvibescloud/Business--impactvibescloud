@@ -19,7 +19,7 @@ import {
   CButton,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch } from '@coreui/icons'
+import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch, cilPlus, cilCloudDownload } from '@coreui/icons'
 import { IoEyeOutline } from 'react-icons/io5'
 import { apiCall } from '../../config/api'
 import '../Branches/Branches.css'
@@ -35,7 +35,7 @@ const IVRManagement = () => {
   const [selectedItem, setSelectedItem] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [newIvr, setNewIvr] = useState({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] })
+  const [newIvr, setNewIvr] = useState({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
   const [departments, setDepartments] = useState([])
   const [deletingAll, setDeletingAll] = useState(false)
   const [editingNode, setEditingNode] = useState(null)
@@ -61,12 +61,199 @@ const IVRManagement = () => {
   const [deletingAfterItem, setDeletingAfterItem] = useState(false)
   const [afterDetailsOpen, setAfterDetailsOpen] = useState(false)
   const [afterSelected, setAfterSelected] = useState(null)
+  const [afterLanguage, setAfterLanguage] = useState('')
   const [languages, setLanguages] = useState([])
   const [langCode, setLangCode] = useState('')
   const [langName, setLangName] = useState('')
   const [savingLang, setSavingLang] = useState(false)
   const [langModalOpen, setLangModalOpen] = useState(false)
   const [editingLangId, setEditingLangId] = useState(null)
+  const [langToDelete, setLangToDelete] = useState(null)
+  const [langDeleteModalOpen, setLangDeleteModalOpen] = useState(false)
+  const [deletingLang, setDeletingLang] = useState(false)
+  const [generateModalOpen, setGenerateModalOpen] = useState(false)
+  const [generateLangCode, setGenerateLangCode] = useState('')
+  const [generateText, setGenerateText] = useState('')
+  const [generateFileName, setGenerateFileName] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [filesModalOpen, setFilesModalOpen] = useState(false)
+  const [filesLangCode, setFilesLangCode] = useState('')
+  const [filesList, setFilesList] = useState([])
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [voiceMode, setVoiceMode] = useState('text')
+  const [voiceFiles, setVoiceFiles] = useState([])
+  const [ivrAudioFile, setIvrAudioFile] = useState(null)
+  const [ivrAudioBase64, setIvrAudioBase64] = useState('')
+  const [ivrAudioFileName, setIvrAudioFileName] = useState('')
+  const [editingAudioFile, setEditingAudioFile] = useState(null)
+  const [editAudioModalOpen, setEditAudioModalOpen] = useState(false)
+  const [editAudioText, setEditAudioText] = useState('')
+  const [editAudioFileName, setEditAudioFileName] = useState('')
+  const [savingEditAudio, setSavingEditAudio] = useState(false)
+  const [audioToDelete, setAudioToDelete] = useState(null)
+  const [audioDeleteModalOpen, setAudioDeleteModalOpen] = useState(false)
+  const [deletingAudio, setDeletingAudio] = useState(false)
+  const [downloadingFileId, setDownloadingFileId] = useState(null)
+
+  const fetchLanguageFiles = async (langCode) => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId || !langCode) return setFilesList([])
+    try {
+      setLoadingFiles(true)
+      const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(langCode)}/files`
+      const res = await apiCall(endpoint, 'GET')
+      let list = []
+      if (Array.isArray(res)) list = res
+      else if (Array.isArray(res.data)) list = res.data
+      else if (Array.isArray(res.files)) list = res.files
+      else if (res?.files && Array.isArray(res.files)) list = res.files
+      setFilesList(list)
+    } catch (err) {
+      console.error('Failed to fetch language files', err)
+      setFilesList([])
+    } finally {
+      setLoadingFiles(false)
+    }
+  }
+
+  const fetchVoiceFiles = async (langCode) => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId || !langCode) {
+      setVoiceFiles([])
+      return []
+    }
+    try {
+      const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(langCode)}/files`
+      const res = await apiCall(endpoint, 'GET')
+      let list = []
+      if (Array.isArray(res)) list = res
+      else if (Array.isArray(res.data)) list = res.data
+      else if (Array.isArray(res.files)) list = res.files
+      else if (res?.files && Array.isArray(res.files)) list = res.files
+      setVoiceFiles(list)
+      return list
+    } catch (err) {
+      console.error('Failed to fetch voice files', err)
+      setVoiceFiles([])
+      return []
+    }
+  }
+
+  const fetchAllVoiceFiles = async () => {
+    try {
+      const langs = await fetchLanguages()
+      const allLangs = Array.isArray(langs) ? langs : []
+      const agg = []
+      for (let i = 0; i < allLangs.length; i++) {
+        const code = allLangs[i].code || allLangs[i]._id || allLangs[i].id
+        if (!code) continue
+        const list = await fetchFilesForLang(code)
+        if (Array.isArray(list) && list.length) list.forEach((f) => { agg.push({ ...(f || {}), _lang: code }) })
+      }
+      setVoiceFiles(agg)
+      return agg
+    } catch (e) {
+      console.error('Failed to fetch all voice files', e)
+      setVoiceFiles([])
+      return []
+    }
+  }
+
+  const fetchFilesForLang = async (langCode) => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId || !langCode) return []
+    try {
+      const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(langCode)}/files`
+      const res = await apiCall(endpoint, 'GET')
+      let list = []
+      if (Array.isArray(res)) list = res
+      else if (Array.isArray(res.data)) list = res.data
+      else if (Array.isArray(res.files)) list = res.files
+      else if (res?.files && Array.isArray(res.files)) list = res.files
+      return list
+    } catch (err) {
+      console.error('Failed to fetch files for language', langCode, err)
+      return []
+    }
+  }
+
+  const fetchLanguageFileAsBase64 = async (bizId, langCode, fileName) => {
+    if (!bizId || !fileName) return null
+    try {
+      let endpoint = ''
+      let attemptedLang = langCode
+      // try to resolve a file id first for the given language
+      try {
+        const list = await fetchFilesForLang(langCode)
+        const match = (list || []).find(f => ((f.fileName || f.name || f._id || f.id || '').toString() === fileName.toString()))
+        const fileId = match ? (match._id || match.id) : null
+        if (fileId) {
+          endpoint = `/api/languages/business/${encodeURIComponent(bizId)}/${encodeURIComponent(langCode)}/files/play?fileId=${encodeURIComponent(fileId)}`
+        }
+      } catch (e) {
+        // ignore and continue to broader search
+      }
+      // if we couldn't resolve and lang is 'default' or not found, search across all languages
+      if (!endpoint) {
+        const allLangs = await fetchLanguages()
+        const langsArr = Array.isArray(allLangs) ? allLangs : []
+        for (let i = 0; i < langsArr.length && !endpoint; i++) {
+          const code = langsArr[i].code || langsArr[i]._id || langsArr[i].id
+          if (!code) continue
+          try {
+            const list = await fetchFilesForLang(code)
+            const match = (list || []).find(f => ((f.fileName || f.name || f._id || f.id || '').toString() === fileName.toString()))
+            const fileId = match ? (match._id || match.id) : null
+            if (fileId) {
+              endpoint = `/api/languages/business/${encodeURIComponent(bizId)}/${encodeURIComponent(code)}/files/play?fileId=${encodeURIComponent(fileId)}`
+              attemptedLang = code
+              break
+            }
+          } catch (e) {
+            // continue searching other languages
+          }
+        }
+      }
+      // final fallback to filename-based call with original langCode
+      if (!endpoint) endpoint = `/api/languages/business/${encodeURIComponent(bizId)}/${encodeURIComponent(langCode || '')}/files/play?fileName=${encodeURIComponent(fileName)}`
+      const data = await apiCall(endpoint, 'GET', null, { responseType: 'arraybuffer' })
+      if (!data) return null
+      const bytes = new Uint8Array(data)
+      let binary = ''
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+      const base64 = btoa(binary)
+      return `data:audio/wav;base64,${base64}`
+    } catch (e) {
+      console.error('Failed to fetch language file as base64', e)
+      return null
+    }
+  }
+
+  const refreshAudioFiles = async () => {
+    // refresh filesList either for a selected language or aggregate all languages
+    if (filesLangCode) {
+      await fetchLanguageFiles(filesLangCode)
+      return
+    }
+    try {
+      setLoadingFiles(true)
+      const langs = await fetchLanguages()
+      const allLangs = Array.isArray(langs) ? langs : []
+      const agg = []
+      for (let i = 0; i < allLangs.length; i++) {
+        const code = allLangs[i].code || allLangs[i]._id || allLangs[i].id
+        if (!code) continue
+        const list = await fetchFilesForLang(code)
+        if (Array.isArray(list) && list.length) list.forEach((f) => { agg.push({ ...(f || {}), _lang: code }) })
+      }
+      setFilesList(agg)
+    } catch (e) {
+      console.error('Failed to refresh audio files', e)
+      setFilesList([])
+    } finally {
+      setLoadingFiles(false)
+    }
+  }
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -142,7 +329,7 @@ const IVRManagement = () => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
     if (!currentBusinessId) {
       setLanguages([])
-      return
+      return []
     }
     try {
       const res = await apiCall(`/api/languages/business/${encodeURIComponent(currentBusinessId)}`, 'GET')
@@ -151,17 +338,63 @@ const IVRManagement = () => {
       else if (res?.data && Array.isArray(res.data)) list = res.data
       else if (res?.languages && Array.isArray(res.languages)) list = res.languages
       setLanguages(list)
+      return list
     } catch (err) {
       console.error('Failed to fetch languages', err)
       setLanguages([])
+      return []
     }
   }
 
   useEffect(() => {
-    if (activeTab !== 'language') return
-    fetchLanguages()
+    if (activeTab !== 'language' && activeTab !== 'audio') return
+    const load = async () => {
+      const langs = await fetchLanguages()
+      // if audio tab opened, load all audio files across languages by default
+      if (activeTab === 'audio') {
+        setLoadingFiles(true)
+        try {
+          const allLangs = Array.isArray(langs) ? langs : []
+          if (allLangs.length === 0) {
+            setFilesList([])
+            setFilesLangCode('')
+            return
+          }
+          const agg = []
+          for (let i = 0; i < allLangs.length; i++) {
+            const code = allLangs[i].code || allLangs[i]._id || allLangs[i].id
+            if (!code) continue
+            const list = await fetchFilesForLang(code)
+            if (Array.isArray(list) && list.length) {
+              list.forEach((f) => { agg.push({ ...(f || {}), _lang: code }) })
+            }
+          }
+          setFilesList(agg)
+          setFilesLangCode('')
+        } catch (e) {
+          console.error('Failed to load audio files for Audio tab', e)
+          setFilesList([])
+        } finally {
+          setLoadingFiles(false)
+        }
+      }
+    }
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  useEffect(() => {
+    // When modal is open and language selection changes, fetch available voice files
+    if (!addOpen) return
+    const lang = newIvr.language || ''
+    if (!lang) {
+      // language default -> show all available audio files across languages
+      fetchAllVoiceFiles()
+      return
+    }
+    fetchVoiceFiles(lang)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newIvr.language, addOpen])
 
   const saveLanguage = async () => {
     if (!langCode || !langName) return
@@ -278,10 +511,14 @@ const IVRManagement = () => {
       const type = parts[0] || 'node'
       // rest contains everything after the type
       const rest = parts.slice(1)
+      if (type === 'lang') {
+        const langCode = rest.join(':') || ''
+        return { key: o.key || o._id || '', type: 'lang', target: langCode }
+      }
       if (type === 'agent') {
         // legacy agent:<id> stored — map to dept editor with agentId populated so user can see agent selection
         const agentId = rest.join(':') || ''
-        return { key: o.key || o._id || '', type: 'dept', target: '', agentId: agentId || '', voice: o.voice || o.text || '' }
+        return { key: o.key || o._id || '', type: 'dept', target: '', agentId: agentId || '' }
       }
       if (type === 'dept') {
         // dest may be like 'dept:sales' or 'dept:sales:1008' or 'dept:<id>:1008'
@@ -307,12 +544,28 @@ const IVRManagement = () => {
             if (memberFromCache) agentId = memberFromCache._id || memberFromCache.id || ''
           }
         }
-        return { key: o.key || o._id || '', type: 'dept', target: targetValue || '', agentId: agentId || '', voice: o.voice || o.text || '', ext: extPart || '' }
+        return { key: o.key || o._id || '', type: 'dept', target: targetValue || '', agentId: agentId || '', ext: extPart || '' }
       }
-      return { key: o.key || o._id || '', type: 'node', target: rest.join(':') || '', agentId: '', voice: o.voice || o.text || '' }
+      return { key: o.key || o._id || '', type: 'node', target: rest.join(':') || '', agentId: '' }
     })
-    setNewIvr({ node, voice, options: options.length ? options : [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] })
+    const language = item.language || item.menu?.language || item.lang || item.languageCode || ''
+    setNewIvr({ node, voice, language, options: options.length ? options : [{ key: '1', type: 'node', target: '', agentId: '' }] })
+    // reset ivr audio upload state
+    setIvrAudioFile(null)
+    setIvrAudioBase64('')
+    setIvrAudioFileName(voice || '')
     setEditingNode(node)
+    // fetch available languages for selection
+    fetchLanguages()
+    // fetch available voice files for this language and set mode if voice matches a file
+    try {
+      const files = await fetchVoiceFiles(language)
+      const matched = (files || []).find(f => (f.fileName || f.name || '').toString() === (voice || '').toString())
+      if (matched) setVoiceMode('upload')
+      else setVoiceMode('text')
+    } catch (e) {
+      setVoiceMode('text')
+    }
     setAddOpen(true)
     // ensure department members are fetched and agent dropdowns populate. If ext present, map it back to agentId.
     options.forEach(async (opt, idx) => {
@@ -486,8 +739,89 @@ const IVRManagement = () => {
     let next = 1
     if (numericKeys.length) next = Math.max(...numericKeys) + 1
     else next = opts.length ? (opts.length + 1) : 1
-    const newOpt = { key: String(next), type: 'node', target: '', agentId: '', voice: '' }
+    const newOpt = { key: String(next), type: 'node', target: '', agentId: '' }
     setNewIvr({ ...newIvr, options: [...opts, newOpt] })
+  }
+
+  const playLanguageFile = async (file) => {
+    try {
+      const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+      if (!currentBusinessId || !file) return
+      // identify resource
+      const id = file._id || file.id || ''
+      const lang = filesLangCode || ''
+      let endpoint = ''
+      // Prefer an explicit download/url if provided by the API
+      if (file.downloadUrl || file.url) {
+        endpoint = file.downloadUrl || file.url
+      } else if (id && lang) {
+        // try a play endpoint by id (best-effort)
+        endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(lang)}/files/play?fileId=${encodeURIComponent(id)}`
+      } else if (file.fileName && lang) {
+        endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(lang)}/files/play?fileName=${encodeURIComponent(file.fileName)}`
+      } else {
+        return
+      }
+
+      const data = await apiCall(endpoint, 'GET', null, { responseType: 'arraybuffer' })
+      if (!data) return
+      const mime = file.mimeType || 'audio/wav'
+      const blob = new Blob([data], { type: mime })
+      const url = window.URL.createObjectURL(blob)
+      if (playingAudio) {
+        try { playingAudio.pause() } catch (e) {}
+        try { window.URL.revokeObjectURL(playingUrl) } catch (e) {}
+      }
+      const audio = new Audio(url)
+      setPlayingUrl(url)
+      setPlayingAudio(audio)
+      setPlayingIvrId(`lang-${lang}-${id || file.fileName}`)
+      audio.play().catch((e) => { console.error('Audio play failed', e) })
+      audio.onended = () => {
+        try { window.URL.revokeObjectURL(url) } catch (e) {}
+        setPlayingUrl(null)
+        setPlayingAudio(null)
+        setPlayingIvrId(null)
+      }
+    } catch (err) {
+      console.error('Failed to play language file', err)
+    }
+  }
+
+  const downloadLanguageFile = async (file) => {
+    try {
+      const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+      if (!currentBusinessId || !file) return
+      const idKey = (file._id || file.id || file.fileName)
+      try { setDownloadingFileId(idKey) } catch (e) {}
+      const lang = filesLangCode || file._lang || ''
+      let endpoint = ''
+      if (file.downloadUrl || file.url) {
+        endpoint = file.downloadUrl || file.url
+      } else if ((file._id || file.id) && lang) {
+        endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(lang)}/files/play?fileId=${encodeURIComponent(file._id || file.id)}`
+      } else if (file.fileName && lang) {
+        endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(lang)}/files/play?fileName=${encodeURIComponent(file.fileName)}`
+      } else {
+        return
+      }
+      const data = await apiCall(endpoint, 'GET', null, { responseType: 'arraybuffer' })
+      if (!data) return
+      const mime = file.mimeType || 'audio/wav'
+      const blob = new Blob([data], { type: mime })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safeName = (file.fileName || file.name || 'audio').toString().replace(/\s+/g, '_')
+      a.download = `${safeName}.wav`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to download language file', err)
+    }
+    try { setDownloadingFileId(null) } catch (e) {}
   }
 
   const deleteIvrNode = async (node) => {
@@ -534,19 +868,20 @@ const IVRManagement = () => {
   const saveAfterHours = async () => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
     if (!currentBusinessId) return
-    setSavingAfterHours(true)
+      setSavingAfterHours(true)
     try {
-      const payload = { text: afterHoursMessage }
+      const payload = { text: afterHoursMessage, language: afterLanguage || '' }
       let res
       if (editingAfterId) {
         res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours/${encodeURIComponent(editingAfterId)}`, 'PUT', payload)
       } else {
         res = await apiCall(`/api/businesses/${encodeURIComponent(currentBusinessId)}/after-hours`, 'POST', payload)
       }
-      if (res && (res.success || res.updated || res.created || res.data)) {
+        if (res && (res.success || res.updated || res.created || res.data)) {
         // refresh list and close modal
         await fetchAfterHours()
         setAfterHoursMessage('')
+          setAfterLanguage('')
         setEditingAfterId(null)
         setAfterModalOpen(false)
       } else {
@@ -616,14 +951,17 @@ const IVRManagement = () => {
           <li className="nav-item">
             <button type="button" className={`nav-link btn btn-link ${activeTab === 'language' ? 'active' : ''}`} onClick={() => setActiveTab('language')}>Language</button>
           </li>
+          <li className="nav-item">
+            <button type="button" className={`nav-link btn btn-link ${activeTab === 'audio' ? 'active' : ''}`} onClick={() => setActiveTab('audio')}>Audio</button>
+          </li>
         </ul>
       </div>
       <CCardBody>
         <div style={{ display: activeTab === 'ivr' ? 'block' : 'none' }}>
-        <div className="ivr-header mb-3">
+            <div className="ivr-header mb-3">
           <div className="ivr-note">Note: The primary/main IVR node should be named{' '}<strong>menu</strong>.</div>
           <div className="ivr-actions">
-            <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '', voice: '' }] }); setAddOpen(true) }}>Add</button>
+            <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] }); fetchLanguages(); setAddOpen(true) }}><CIcon icon={cilPlus} className="me-1" />Add</button>
             <button className="btn btn-sm btn-outline-danger" onClick={() => {
               const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
               if (!currentBusinessId) return
@@ -636,6 +974,127 @@ const IVRManagement = () => {
             <div className="alert alert-warning">Missing <code>businessId</code> in localStorage. Set it to view IVRs.</div>
           </div>
         )}
+        {/* Global Generate Modal - rendered regardless of active tab so Audio tab Add can open it */}
+        <CModal visible={generateModalOpen} onClose={() => { if (!generating) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName('') } }} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>Generate Audio for Language</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <div className="mb-2">
+              <label className="form-label">Language</label>
+              <input className="form-control" value={generateLangCode} disabled />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Text</label>
+              <textarea className="form-control" rows={6} value={generateText} onChange={(e) => setGenerateText(e.target.value)} placeholder="Enter text to generate audio" />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">File name</label>
+              <input className="form-control" value={generateFileName} onChange={(e) => setGenerateFileName(e.target.value)} placeholder="e.g. welcome_hi" />
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!generating) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName('') } }} disabled={generating}>Cancel</CButton>
+            <CButton color="primary" onClick={async () => {
+              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+              if (!currentBusinessId || !generateLangCode || !generateText || !generateFileName) return
+              setGenerating(true)
+              try {
+                const payload = { text: generateText, fileName: generateFileName }
+                const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(generateLangCode)}/generate`
+                const res = await apiCall(endpoint, 'POST', payload)
+                if (res && (res.success || res.created || res.data)) {
+                  setGenerateModalOpen(false)
+                  setGenerateLangCode('')
+                  setGenerateText('')
+                  setGenerateFileName('')
+                  await fetchLanguages()
+                  if (filesLangCode === generateLangCode) await fetchLanguageFiles(filesLangCode)
+                } else {
+                  console.error('Failed to generate language audio', res)
+                }
+              } catch (err) {
+                console.error('Error generating language audio', err)
+              } finally {
+                setGenerating(false)
+              }
+            }} disabled={generating}>{generating ? (<><CSpinner size="sm" />&nbsp;Generating</>) : 'Generate'}</CButton>
+          </CModalFooter>
+        </CModal>
+        <CModal visible={audioDeleteModalOpen} onClose={() => { if (!deletingAudio) { setAudioDeleteModalOpen(false); setAudioToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>Delete Audio File</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            Are you sure you want to delete this audio file? This action cannot be undone.
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!deletingAudio) { setAudioDeleteModalOpen(false); setAudioToDelete(null) } }} disabled={deletingAudio}>Cancel</CButton>
+            <CButton color="danger" onClick={async () => {
+              if (!audioToDelete) return
+              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+              const fileId = (audioToDelete.file && (audioToDelete.file._id || audioToDelete.file.id))
+              const lang = audioToDelete.lang || ''
+              if (!currentBusinessId || !fileId || !lang) return
+              setDeletingAudio(true)
+              try {
+                const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(lang)}/files/${encodeURIComponent(fileId)}`
+                await apiCall(endpoint, 'DELETE')
+              } catch (err) {
+                console.error('Failed to delete audio file', err)
+              }
+              setAudioDeleteModalOpen(false)
+              setAudioToDelete(null)
+              setDeletingAudio(false)
+              await refreshAudioFiles()
+            }} disabled={deletingAudio}>{deletingAudio ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}</CButton>
+          </CModalFooter>
+        </CModal>
+        <CModal visible={editAudioModalOpen} onClose={() => { if (!savingEditAudio) { setEditAudioModalOpen(false); setEditingAudioFile(null); setEditAudioFileName(''); setEditAudioText('') } }} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>Edit Audio File</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <div className="mb-2">
+              <label className="form-label">File name</label>
+              <input className="form-control" value={editAudioFileName} onChange={(e) => setEditAudioFileName(e.target.value)} />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Text</label>
+              <textarea className="form-control" rows={6} value={editAudioText} onChange={(e) => setEditAudioText(e.target.value)} />
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!savingEditAudio) { setEditAudioModalOpen(false); setEditingAudioFile(null); setEditAudioFileName(''); setEditAudioText('') } }} disabled={savingEditAudio}>Cancel</CButton>
+            <CButton color="primary" onClick={async () => {
+              if (!editingAudioFile) return
+              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+              const fileId = editingAudioFile._id || editingAudioFile.id
+              const lang = filesLangCode || editingAudioFile._lang || ''
+              if (!currentBusinessId || !fileId || !lang) return
+              setSavingEditAudio(true)
+              try {
+                const payload = { text: editAudioText, fileName: editAudioFileName }
+                const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(lang)}/files/${encodeURIComponent(fileId)}`
+                const res = await apiCall(endpoint, 'PUT', payload)
+                if (res && (res.success || res.updated || res.data)) {
+                  setEditAudioModalOpen(false)
+                  setEditingAudioFile(null)
+                  setEditAudioFileName('')
+                  setEditAudioText('')
+                  // refresh files list
+                  await refreshAudioFiles()
+                } else {
+                  console.error('Failed to update audio file', res)
+                }
+              } catch (err) {
+                console.error('Error updating audio file', err)
+              } finally {
+                setSavingEditAudio(false)
+              }
+            }} disabled={savingEditAudio}>{savingEditAudio ? (<><CSpinner size="sm" />&nbsp;Saving</>) : 'Save'}</CButton>
+          </CModalFooter>
+        </CModal>
 
         <CModal visible={detailsOpen} onClose={closeDetails} alignment="center" size="lg" className="ivr-no-focus-modal">
           <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(16,24,40,0.06)', maxWidth: 960, width: '100%' }}>
@@ -727,16 +1186,62 @@ const IVRManagement = () => {
               <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>{editingNode ? `Edit IVR (${editingNode})` : 'Add IVR'}</CModalTitle>
             </CModalHeader>
             <CModalBody style={{ background: '#fbfdff', padding: '1rem 1.25rem', maxHeight: '420px', overflowY: 'auto' }}>
-            <div className="row mb-2">
+              <div className="row mb-2">
               <div className="col-12 col-md-4">
                 <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Node (identifier)</label>
                 <input className="form-control" value={newIvr.node} placeholder="e.g. menu, sales" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
               </div>
-              <div className="col-12 col-md-8">
-                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Voice Text</label>
-                <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
+              <div className="col-12 col-md-3">
+                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Language</label>
+                <select className="form-select" value={newIvr.language || ''} onChange={(e) => setNewIvr({ ...newIvr, language: e.target.value })}>
+                  <option value="">Default</option>
+                  {languages.map((ln) => (
+                    <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-12 col-md-5">
+                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Voice</label>
+                <div className="d-flex mb-2" style={{ gap: 8 }}>
+                  <select className="form-select" style={{ width: 160 }} value={voiceMode} onChange={(e) => setVoiceMode(e.target.value)}>
+                    <option value="text">Text</option>
+                    <option value="upload">Upload</option>
+                  </select>
+                  {voiceMode === 'text' ? (
+                    <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                      <input type="file" accept="audio/*" className="form-control" onChange={async (e) => {
+                        const f = e.target.files && e.target.files[0]
+                        if (!f) return
+                        setIvrAudioFile(f)
+                        setIvrAudioFileName(f.name.replace(/\.[^/.]+$/, ""))
+                        // read as data url
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                          const result = reader.result || ''
+                          setIvrAudioBase64(result.toString())
+                        }
+                        reader.readAsDataURL(f)
+                      }} />
+                      <select className="form-select" value={newIvr.voice || ''} onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })}>
+                        <option value="">Select existing audio file</option>
+                        {(voiceFiles || []).map((vf) => (
+                          <option key={vf._id || vf.id || vf.fileName} value={vf.fileName || vf.name || vf.id}>{vf.fileName || vf.name || vf.id}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+            {/* when language changes in the modal, refresh available voice files */}
+            {/* fetch voice files for chosen language to populate Upload dropdown */}
+            {addOpen && (
+              <React.Fragment>
+                {newIvr.language ? null : null}
+              </React.Fragment>
+            )}
             <div className="mb-2">
               <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Options (press {'>'} target)</label>
               {newIvr.options.map((opt, idx) => (
@@ -749,6 +1254,7 @@ const IVRManagement = () => {
                   }}>
                     <option value="node">node</option>
                     <option value="dept">dept</option>
+                    <option value="lang">lang</option>
                   </select>
                   {opt.type === 'dept' ? (
                     <div className="me-2 d-flex" style={{ gap: 8 }}>
@@ -780,6 +1286,15 @@ const IVRManagement = () => {
                         })()}
                       </select>
                     </div>
+                    ) : opt.type === 'lang' ? (
+                      <select className="form-select me-2" style={{ width: 180 }} value={opt.target || ''} onChange={(e) => {
+                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
+                      }}>
+                        <option value="">Select language</option>
+                        {languages.map((ln) => (
+                          <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
+                        ))}
+                      </select>
                     ) : (
                       existingNodes.length > 0 ? (
                       <select className="form-select me-2" style={{ width: 180 }} value={opt.target || ''} onChange={(e) => {
@@ -797,9 +1312,7 @@ const IVRManagement = () => {
                       )
                     )
                   }
-                  <input style={{ width: 260 }} className="form-control me-2" value={opt.voice || ''} onChange={(e) => {
-                    const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], voice: e.target.value }; setNewIvr({ ...newIvr, options: copy })
-                  }} placeholder="Option voice text (e.g. For sales)" />
+                  {/* per-option voice removed - voice is defined at menu level */}
                   <button className="btn btn-sm btn-outline-danger" onClick={() => {
                     const copy = [...newIvr.options]; copy.splice(idx, 1); setNewIvr({ ...newIvr, options: copy })
                   }}>Remove</button>
@@ -821,7 +1334,7 @@ const IVRManagement = () => {
                     if (hasEditorOptions) {
                       newIvr.options.forEach((o) => {
                         if (!o.key) return
-                        if (o.type === 'dept') {
+                            if (o.type === 'dept') {
                           if (o.agentId) {
                             let dept = departments.find(d => d._id === o.target || d.id === o.target)
                             if (!dept) {
@@ -847,7 +1360,7 @@ const IVRManagement = () => {
                               }
                             }
                             const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
-                            optionsArray.push({ key: o.key, voice: o.voice || '', destination: dest })
+                            optionsArray.push({ key: o.key, destination: dest })
                           } else {
                             const dept = departments.find(d => (
                               d._id === o.target || d.id === o.target ||
@@ -856,25 +1369,73 @@ const IVRManagement = () => {
                             ))
                             const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
                             const dest = `dept:${String(resolvedName || '').toLowerCase()}`
-                            optionsArray.push({ key: o.key, voice: o.voice || '', destination: dest })
+                            optionsArray.push({ key: o.key, destination: dest })
                           }
+                        } else if (o.type === 'lang') {
+                          optionsArray.push({ key: o.key, destination: `lang:${o.target || ''}` })
                         } else {
-                          optionsArray.push({ key: o.key, voice: o.voice || '', destination: `node:${o.target || ''}` })
+                          optionsArray.push({ key: o.key, destination: `node:${o.target || ''}` })
                         }
                       })
                     }
+                    const newNodeValue = (newIvr.node || editingNode || '').toString()
                     const putPayload = {
                       businessId: currentBusinessId,
+                      // use the edited node/name when provided (fall back to original)
+                      node: newNodeValue,
+                      name: newIvr.node || newNodeValue,
+                      language: newIvr.language ? newIvr.language : 'default',
                       menu: {
                         voice: newIvr.voice || '',
                         options: optionsArray,
                       }
                     }
-                    const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', deepLowercase(putPayload))
+                    // if voiceMode is upload, include file reference or inline base64 as appropriate
+                    if (voiceMode === 'upload') {
+                      putPayload.type = 'upload'
+                      // prefer inline base64 if user selected a local file
+                      if (ivrAudioBase64) {
+                        putPayload.audioBase64 = ivrAudioBase64
+                        if (ivrAudioFileName) putPayload.fileName = ivrAudioFileName
+                      } else if (newIvr.voice) {
+                        // user selected an existing file from dropdown; send the filename (or id)
+                        putPayload.fileName = newIvr.voice
+                        // if we don't have inline base64, fetch the file as base64 to satisfy backend
+                        try {
+                          const fetched = await fetchLanguageFileAsBase64(currentBusinessId, putPayload.language || newIvr.language, putPayload.fileName)
+                          if (fetched) putPayload.audioBase64 = fetched
+                        } catch (e) {
+                          console.error('Failed to fetch selected file as base64 for update', e)
+                        }
+                      }
+                      // lowercase other fields but keep audioBase64 intact
+                      const finalPayload = deepLowercase({ ...putPayload })
+                      if (putPayload.audioBase64) finalPayload.audioBase64 = putPayload.audioBase64
+                      if (putPayload.fileName && typeof putPayload.fileName === 'string') finalPayload.fileName = putPayload.fileName
+                      const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', finalPayload)
+                      if (res && (res.success || res.updated || res.data)) {
+                        setAddOpen(false)
+                        setEditingNode(null)
+                        setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
+                        fetchIvrs(1)
+                      } else {
+                        console.error('Failed to update IVR', res)
+                      }
+                    } else {
+                      const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', deepLowercase(putPayload))
+                      if (res && (res.success || res.updated || res.data)) {
+                        setAddOpen(false)
+                        setEditingNode(null)
+                        setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
+                        fetchIvrs(1)
+                      } else {
+                        console.error('Failed to update IVR', res)
+                      }
+                    }
                     if (res && (res.success || res.updated || res.data)) {
                       setAddOpen(false)
                       setEditingNode(null)
-                      setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
+                      setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
                       fetchIvrs(1)
                     } else {
                       console.error('Failed to update IVR', res)
@@ -910,7 +1471,7 @@ const IVRManagement = () => {
                               }
                             }
                             const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
-                            parsedOptions[o.key] = { destination: dest, voice: o.voice || '' }
+                            parsedOptions[o.key] = { destination: dest }
                           } else {
                             const dept = departments.find(d => (
                               d._id === o.target || d.id === o.target ||
@@ -919,10 +1480,10 @@ const IVRManagement = () => {
                             ))
                             const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
                             const dest = `dept:${String(resolvedName || '').toLowerCase()}`
-                            parsedOptions[o.key] = { destination: dest, voice: o.voice || '' }
+                            parsedOptions[o.key] = { destination: dest }
                           }
                         } else {
-                          parsedOptions[o.key] = { destination: `node:${o.target || ''}`, voice: o.voice || '' }
+                          parsedOptions[o.key] = { destination: `node:${o.target || ''}` }
                         }
                       })
                     }
@@ -957,7 +1518,7 @@ const IVRManagement = () => {
                               }
                             }
                             const dest = `dept:${String(resolvedName || '').toLowerCase()}${ext ? ':' + String(ext) : ''}`
-                            optionsArrayFromParsed.push({ key: o.key, voice: o.voice || '', destination: dest })
+                            optionsArrayFromParsed.push({ key: o.key, destination: dest })
                           } else {
                             const dept = departments.find(d => (
                               d._id === o.target || d.id === o.target ||
@@ -966,29 +1527,62 @@ const IVRManagement = () => {
                             ))
                             const resolvedName = dept ? (dept.name || dept.departmentName || dept.slug || dept._id) : o.target
                             const dest = `dept:${String(resolvedName || '').toLowerCase()}`
-                            optionsArrayFromParsed.push({ key: o.key, voice: o.voice || '', destination: dest })
+                            optionsArrayFromParsed.push({ key: o.key, destination: dest })
                           }
+                        } else if (o.type === 'lang') {
+                          optionsArrayFromParsed.push({ key: o.key, destination: `lang:${o.target || ''}` })
                         } else {
-                          optionsArrayFromParsed.push({ key: o.key, voice: o.voice || '', destination: `node:${o.target || ''}` })
+                          optionsArrayFromParsed.push({ key: o.key, destination: `node:${o.target || ''}` })
                         }
                       })
                     }
                     const savePayload = {
                       businessId: currentBusinessId,
                       node: nodeName,
+                      name: newIvr.node || nodeName,
+                      language: newIvr.language ? newIvr.language : 'default',
                       menu: {
                         voice: newIvr.voice || ``,
                         options: optionsArrayFromParsed,
                       }
                     }
                     try {
-                      const saveRes = await apiCall('/ivr/create', 'POST', deepLowercase(savePayload))
-                      if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
-                        setAddOpen(false)
-                        setNewIvr({ node: '', voice: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
-                        fetchIvrs(1)
+                      // if voiceMode is upload, include file reference or inline base64 as appropriate
+                      if (voiceMode === 'upload') {
+                        savePayload.type = 'upload'
+                        if (ivrAudioBase64) {
+                          savePayload.audioBase64 = ivrAudioBase64
+                          if (ivrAudioFileName) savePayload.fileName = ivrAudioFileName
+                        } else if (newIvr.voice) {
+                          savePayload.fileName = newIvr.voice
+                          // fetch base64 for selected existing file so backend receives audioBase64
+                          try {
+                            const fetched = await fetchLanguageFileAsBase64(currentBusinessId, savePayload.language || newIvr.language, savePayload.fileName)
+                            if (fetched) savePayload.audioBase64 = fetched
+                          } catch (e) {
+                            console.error('Failed to fetch selected file as base64 for create', e)
+                          }
+                        }
+                        const finalSave = deepLowercase({ ...savePayload })
+                        if (savePayload.audioBase64) finalSave.audioBase64 = savePayload.audioBase64
+                        if (savePayload.fileName && typeof savePayload.fileName === 'string') finalSave.fileName = savePayload.fileName
+                        const saveRes = await apiCall('/ivr/create', 'POST', finalSave)
+                        if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
+                          setAddOpen(false)
+                          setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
+                          fetchIvrs(1)
+                        } else {
+                          console.error('Failed to create IVR', saveRes)
+                        }
                       } else {
-                        console.error('Failed to create IVR', saveRes)
+                        const saveRes = await apiCall('/ivr/create', 'POST', deepLowercase(savePayload))
+                        if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
+                          setAddOpen(false)
+                          setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })
+                          fetchIvrs(1)
+                        } else {
+                          console.error('Failed to create IVR', saveRes)
+                        }
                       }
                     } catch (err) {
                       console.error('Error creating IVR', err)
@@ -1042,8 +1636,15 @@ const IVRManagement = () => {
           </CModalHeader>
           <CModalBody>
             <div className="mb-2">
+              <label className="form-label">Language</label>
+              <select className="form-select mb-2" value={afterLanguage || ''} onChange={(e) => setAfterLanguage(e.target.value)}>
+                <option value="">Default</option>
+                {languages.map((ln) => (
+                  <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
+                ))}
+              </select>
               <label className="form-label">Message</label>
-              <textarea className="form-control" rows={8} value={afterHoursMessage} onChange={(e) => setAfterHoursMessage(e.target.value)} placeholder="Enter the after-hours voice/text here" />
+              <textarea className="form-control" rows={6} value={afterHoursMessage} onChange={(e) => setAfterHoursMessage(e.target.value)} placeholder="Enter the after-hours voice/text here" />
             </div>
           </CModalBody>
           <CModalFooter>
@@ -1141,7 +1742,7 @@ const IVRManagement = () => {
             <div className="ivr-header mb-3">
               <div className="ivr-note">Manage the after-hours message for this business.</div>
               <div className="ivr-actions">
-                <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingAfterId(null); setAfterHoursMessage(''); setAfterModalOpen(true) }}>Add</button>
+                <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingAfterId(null); setAfterHoursMessage(''); setAfterLanguage(''); fetchLanguages(); setAfterModalOpen(true) }}>Add</button>
                 <button className="btn btn-sm btn-outline-danger" onClick={async () => {
                   if (!afterHoursList || afterHoursList.length === 0) return
                   const ok = window.confirm('Delete ALL after-hours audios for this business? This cannot be undone.')
@@ -1189,7 +1790,7 @@ const IVRManagement = () => {
                         <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playAfterHours(a) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
                       )}
                       <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); openAfterDetails(a) }} title="View"><IoEyeOutline style={{fontSize: '1em', verticalAlign: 'middle', lineHeight: 1}} /></button>
-                      <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation(); setEditingAfterId(a._id || a.id); setAfterHoursMessage(a.generatedText || a.text || a.message || ''); setAfterModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></button>
+                      <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation(); setEditingAfterId(a._id || a.id); setAfterHoursMessage(a.generatedText || a.text || a.message || ''); setAfterLanguage(a.language || a.lang || a.languageCode || ''); fetchLanguages(); setAfterModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></button>
                       <button className="btn btn-sm btn-outline-danger me-2" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteAfterHours(a._id || a.id) }}><CIcon icon={cilTrash} /></button>
                     </div>
                   </div>
@@ -1265,22 +1866,143 @@ const IVRManagement = () => {
                       <div className="text-muted" style={{ fontSize: 12 }}>{l.code}</div>
                     </div>
                     <div>
+                        {/* Generate button moved to Audio tab */}
                       <button className="btn btn-sm btn-outline-primary me-2" title="Edit" onClick={(e) => { e.stopPropagation(); setEditingLangId(l.code || l._id || l.id); setLangCode(l.code || ''); setLangName(l.name || ''); setLangModalOpen(true) }}><CIcon icon={cilPencil} /></button>
-                      <button className="btn btn-sm btn-outline-danger" title="Delete" onClick={async (e) => {
+                      <button className="btn btn-sm btn-outline-danger" title="Delete" onClick={(e) => {
                         e.stopPropagation();
                         const id = l.code || l._id || l.id
                         if (!id) return
-                        if (!window.confirm('Delete this language? This cannot be undone.')) return
-                        try {
-                          await apiCall(`/api/languages/${encodeURIComponent(id)}`, 'DELETE')
-                        } catch (e) { console.error('Failed to delete language', e) }
-                        await fetchLanguages()
+                        setLangToDelete(id)
+                        setLangDeleteModalOpen(true)
                       }}><CIcon icon={cilTrash} /></button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+            
+            <CModal visible={filesModalOpen} onClose={() => { if (!loadingFiles) { setFilesModalOpen(false); setFilesLangCode(''); setFilesList([]) } }} alignment="center" size="lg" className="ivr-no-focus-modal">
+              <CModalHeader>
+                <CModalTitle>Language Files</CModalTitle>
+              </CModalHeader>
+              <CModalBody>
+                <div className="mb-2">
+                  <div style={{ fontSize: 13, color: '#556270', marginBottom: 8 }}>Language</div>
+                  <div style={{ fontWeight: 600 }}>{filesLangCode || '-'}</div>
+                </div>
+                <div>
+                  {loadingFiles ? (
+                    <div className="text-center"><CSpinner /></div>
+                  ) : (filesList.length === 0 ? (
+                    <div className="text-muted">No files found for this language.</div>
+                  ) : (
+                    <div>
+                      {filesList.map((f) => (
+                        <div key={f._id || f.id || f.fileName} className="d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{f.fileName || f.name || '-'}</div>
+                            <div className="text-muted" style={{ fontSize: 12 }}>{f.createdAt ? (new Date(f.createdAt)).toLocaleString() : ''}</div>
+                          </div>
+                          <div>
+                            {playingIvrId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
+                              <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
+                            ) : (
+                              <button className="btn btn-sm btn-outline-success" onClick={(e) => { e.stopPropagation(); playLanguageFile(f) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </CModalBody>
+              <CModalFooter>
+                <CButton color="secondary" onClick={() => { if (!loadingFiles) { setFilesModalOpen(false); setFilesLangCode(''); setFilesList([]) } }}>Close</CButton>
+              </CModalFooter>
+            </CModal>
+            <CModal visible={langDeleteModalOpen} onClose={() => { if (!deletingLang) { setLangDeleteModalOpen(false); setLangToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
+              <CModalHeader>
+                <CModalTitle>Delete Language</CModalTitle>
+              </CModalHeader>
+              <CModalBody>
+                Are you sure you want to delete this language? This action cannot be undone.
+              </CModalBody>
+              <CModalFooter>
+                <CButton color="secondary" onClick={() => { if (!deletingLang) { setLangDeleteModalOpen(false); setLangToDelete(null) } }} disabled={deletingLang}>Cancel</CButton>
+                <CButton color="danger" onClick={async () => {
+                  if (!langToDelete) return
+                  setDeletingLang(true)
+                  try {
+                    await apiCall(`/api/languages/${encodeURIComponent(langToDelete)}`, 'DELETE')
+                  } catch (err) { console.error('Failed to delete language', err) }
+                  setLangDeleteModalOpen(false)
+                  setLangToDelete(null)
+                  setDeletingLang(false)
+                  await fetchLanguages()
+                }} disabled={deletingLang}>{deletingLang ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}</CButton>
+              </CModalFooter>
+            </CModal>
+          </div>
+        )}
+        {activeTab === 'audio' && (
+          <div>
+            <div className="ivr-header mb-3">
+              <div className="ivr-note">Manage audio files for languages.</div>
+              <div className="ivr-actions">
+                <button className="btn btn-sm btn-success me-2" onClick={() => {
+                  const code = filesLangCode || (languages[0] && (languages[0].code || languages[0]._id || languages[0].id)) || ''
+                  if (!code) return
+                  setGenerateLangCode(code)
+                  setGenerateText('')
+                  setGenerateFileName(`welcome_${(code||'lang')}`)
+                  setGenerateModalOpen(true)
+                }}><CIcon icon={cilPlus} className="me-1" />Add</button>
+                <select className="form-select me-2" style={{ width: 220 }} value={filesLangCode || ''} onChange={(e) => { const v = e.target.value; setFilesLangCode(v); setFilesList([]); if (v) fetchLanguageFiles(v); }}>
+                  <option value="">Select language</option>
+                  {languages.map((ln) => (
+                    <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
+                  ))}
+                </select>
+                <button className="btn btn-sm btn-outline-primary" onClick={() => { if (filesLangCode) fetchLanguageFiles(filesLangCode) }}>Refresh</button>
+              </div>
+            </div>
+            <h6>Audio Files</h6>
+            {loadingFiles ? (
+              <div className="text-center"><CSpinner /></div>
+            ) : (filesList.length === 0 ? (
+              <div className="text-muted">No files found for selected language.</div>
+            ) : (
+              <div>
+                {filesList.map((f) => (
+                  <div key={f._id || f.id || f.fileName} className="d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{f.fileName || f.name || '-'}</div>
+                      <div className="text-muted" style={{ fontSize: 12 }}>{f.createdAt ? (new Date(f.createdAt)).toLocaleString() : ''}</div>
+                    </div>
+                    <div>
+                      {playingIvrId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
+                        <button className="btn btn-sm btn-outline-danger me-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
+                      ) : (
+                        <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playLanguageFile(f) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
+                      )}
+                      {downloadingFileId === (f._id || f.id || f.fileName) ? (
+                        <button className="btn btn-sm btn-outline-secondary me-2" disabled title="Downloading"><CSpinner size="sm" /></button>
+                      ) : (
+                        <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); downloadLanguageFile(f) }} title="Download"><CIcon icon={cilCloudDownload} /></button>
+                      )}
+                      <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation();
+                        const lang = filesLangCode || f._lang || ''
+                        setEditingAudioFile(f)
+                        setEditAudioFileName(f.fileName || f.name || '')
+                        setEditAudioText(f.text || f.generatedText || '')
+                        setEditAudioModalOpen(true)
+                      }} title="Edit"><CIcon icon={cilPencil} /></button>
+                      <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); setAudioToDelete({ file: f, lang: filesLangCode || f._lang || '' }); setAudioDeleteModalOpen(true) }} title="Delete"><CIcon icon={cilTrash} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         )}
       </CCardBody>
