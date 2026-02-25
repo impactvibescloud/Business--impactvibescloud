@@ -1568,20 +1568,7 @@ const IVRManagement = () => {
                   {voiceMode === 'text' ? (
                     <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
                   ) : (
-                    <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-                      <input type="file" accept="audio/*" className="form-control" onChange={async (e) => {
-                        const f = e.target.files && e.target.files[0]
-                        if (!f) return
-                        setIvrAudioFile(f)
-                        setIvrAudioFileName(f.name.replace(/\.[^/.]+$/, ""))
-                        // read as data url
-                        const reader = new FileReader()
-                        reader.onload = () => {
-                          const result = reader.result || ''
-                          setIvrAudioBase64(result.toString())
-                        }
-                        reader.readAsDataURL(f)
-                      }} />
+                    <div style={{ width: '100%' }}>
                       <select className="form-select" value={newIvr.voice || ''} onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })}>
                         <option value="">Select existing audio file</option>
                         {(voiceFiles || []).map((vf) => (

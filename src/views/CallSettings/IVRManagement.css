@@ -40,6 +40,20 @@
   box-shadow: none !important;
 }
 
+/* Hide the browser's default "Choose file" / "No file chosen" text
+   for file inputs inside IVR modals — keep only the browse button visible. */
+.ivr-no-focus-modal input[type="file"]::-webkit-file-upload-text,
+.ivr-no-focus-modal input[type="file"]::-webkit-file-upload-button {
+  display: none !important;
+}
+.ivr-no-focus-modal input[type="file"]::-moz-file-upload-text,
+.ivr-no-focus-modal input[type="file"]::-ms-browse {
+  display: none !important;
+}
+.ivr-no-focus-modal input[type="file"]::file-selector-button {
+  margin: 0 !important;
+}
+
 /* Modern SaaS / Soft-UI header and action buttons */
 .ivr-header {
   display: flex;
