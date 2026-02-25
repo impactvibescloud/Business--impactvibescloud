@@ -21,7 +21,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch, cilPlus, cilCloudDownload, cilCheck } from '@coreui/icons'
 import { IoEyeOutline } from 'react-icons/io5'
-import { apiCall } from '../../config/api'
+import { apiCall, getAuthToken } from '../../config/api'
 import '../Branches/Branches.css'
 import './IVRManagement.css'
 
@@ -76,6 +76,10 @@ const IVRManagement = () => {
   const [generateText, setGenerateText] = useState('')
   const [generateFileName, setGenerateFileName] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [generateType, setGenerateType] = useState('text')
+  const [generateUploadFile, setGenerateUploadFile] = useState(null)
+  const [generateUploading, setGenerateUploading] = useState(false)
+  const [playLoadingId, setPlayLoadingId] = useState(null)
   const [filesModalOpen, setFilesModalOpen] = useState(false)
   const [filesLangCode, setFilesLangCode] = useState('')
   const [filesList, setFilesList] = useState([])
@@ -831,6 +835,12 @@ const IVRManagement = () => {
 
   const playIvrFile = async (ivr) => {
     try {
+      const playingKey = ivr._id || ivr.id || ivr.fileName || ivr.audioFile || ''
+      if (playingIvrId === playingKey) {
+        stopPlaying()
+        return
+      }
+      setPlayLoadingId(playingKey)
       const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
       const id = ivr._id || ivr.id
       let endpoint = ''
@@ -856,8 +866,10 @@ const IVRManagement = () => {
       const audio = new Audio(url)
       setPlayingUrl(url)
       setPlayingAudio(audio)
-      setPlayingIvrId(ivr._id || ivr.id || name)
-      audio.play().catch((e) => { console.error('Audio play failed', e) })
+      audio.play().then(() => {
+        setPlayingIvrId(ivr._id || ivr.id || name)
+        setPlayLoadingId(null)
+      }).catch((e) => { console.error('Audio play failed', e); setPlayLoadingId(null) })
       audio.onended = () => {
         try { window.URL.revokeObjectURL(url) } catch (e) {}
         setPlayingUrl(null)
@@ -865,6 +877,7 @@ const IVRManagement = () => {
         setPlayingIvrId(null)
       }
     } catch (err) {
+      setPlayLoadingId(null)
       console.error('Failed to play IVR file', err)
     }
   }
@@ -877,10 +890,17 @@ const IVRManagement = () => {
     setPlayingAudio(null)
     setPlayingUrl(null)
     setPlayingIvrId(null)
+    setPlayLoadingId(null)
   }
 
   const playAfterHours = async (doc) => {
     try {
+      const playingKey = `after-${doc._id || doc.fileName || doc.name}`
+      if (playingIvrId === playingKey) {
+        stopPlaying()
+        return
+      }
+      setPlayLoadingId(playingKey)
       const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
       if (!currentBusinessId || !doc) return
       let endpoint = ''
@@ -899,8 +919,10 @@ const IVRManagement = () => {
       const audio = new Audio(url)
       setPlayingUrl(url)
       setPlayingAudio(audio)
-      setPlayingIvrId(`after-${doc._id || doc.name}`)
-      audio.play().catch((e) => { console.error('Audio play failed', e) })
+      audio.play().then(() => {
+        setPlayingIvrId(`after-${doc._id || doc.name}`)
+        setPlayLoadingId(null)
+      }).catch((e) => { console.error('Audio play failed', e); setPlayLoadingId(null) })
       audio.onended = () => {
         try { window.URL.revokeObjectURL(url) } catch (e) {}
         setPlayingUrl(null)
@@ -908,6 +930,7 @@ const IVRManagement = () => {
         setPlayingIvrId(null)
       }
     } catch (err) {
+      setPlayLoadingId(null)
       console.error('Failed to play after-hours audio', err)
     }
   }
@@ -929,6 +952,12 @@ const IVRManagement = () => {
   const playLanguageFile = async (file) => {
     try {
       const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+      const playingKey = `lang-${filesLangCode}-${file._id || file.id || file.fileName}`
+      if (playingIvrId === playingKey) {
+        stopPlaying()
+        return
+      }
+      setPlayLoadingId(playingKey)
       if (!currentBusinessId || !file) return
       // identify resource
       const id = file._id || file.id || ''
@@ -958,8 +987,10 @@ const IVRManagement = () => {
       const audio = new Audio(url)
       setPlayingUrl(url)
       setPlayingAudio(audio)
-      setPlayingIvrId(`lang-${lang}-${id || file.fileName}`)
-      audio.play().catch((e) => { console.error('Audio play failed', e) })
+      audio.play().then(() => {
+        setPlayingIvrId(`lang-${lang}-${id || file.fileName}`)
+        setPlayLoadingId(null)
+      }).catch((e) => { console.error('Audio play failed', e); setPlayLoadingId(null) })
       audio.onended = () => {
         try { window.URL.revokeObjectURL(url) } catch (e) {}
         setPlayingUrl(null)
@@ -967,6 +998,7 @@ const IVRManagement = () => {
         setPlayingIvrId(null)
       }
     } catch (err) {
+      setPlayLoadingId(null)
       console.error('Failed to play language file', err)
     }
   }
@@ -980,6 +1012,7 @@ const IVRManagement = () => {
         stopPlaying()
         return
       }
+      setPlayLoadingId(playingKey)
       // stop previous
       if (playingAudio) {
         try { playingAudio.pause() } catch (e) {}
@@ -990,8 +1023,10 @@ const IVRManagement = () => {
       const audio = new Audio(url)
       setPlayingUrl(url)
       setPlayingAudio(audio)
-      setPlayingIvrId(playingKey)
-      audio.play().catch((e) => { console.error('Eleven preview play failed', e) })
+      audio.play().then(() => {
+        setPlayingIvrId(playingKey)
+        setPlayLoadingId(null)
+      }).catch((e) => { console.error('Eleven preview play failed', e); setPlayLoadingId(null) })
       audio.onended = () => {
         try { window.URL.revokeObjectURL(url) } catch (e) {}
         setPlayingUrl(null)
@@ -999,6 +1034,7 @@ const IVRManagement = () => {
         setPlayingIvrId(null)
       }
     } catch (err) {
+      setPlayLoadingId(null)
       console.error('Failed to play eleven preview', err)
     }
   }
@@ -1051,7 +1087,10 @@ const IVRManagement = () => {
         setDeleteModalOpen(false)
         setNodeToDelete(null)
       } else {
-        console.error('Failed to delete IVR node', res)
+                            const token = getAuthToken()
+                            const headers = { 'Content-Type': 'multipart/form-data' }
+                            if (token) headers.Authorization = `Bearer ${token}`
+                            await apiCall(endpoint, 'POST', form, { headers })
       }
     } catch (err) {
       console.error('Error deleting IVR node', err)
@@ -1242,6 +1281,102 @@ const IVRManagement = () => {
                 setGenerating(false)
               }
             }} disabled={generating}>{generating ? ((<><CSpinner size="sm" />&nbsp;Generating</>)) : 'Generate'}</CButton>
+          </CModalFooter>
+        </CModal>
+        <CModal visible={generateModalOpen} onClose={() => { if (!generating && !generateUploading) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName(''); setGenerateType('text'); setGenerateUploadFile(null); setGenerateUploading(false) } }} alignment="center" size="lg" className="ivr-no-focus-modal">
+          <CModalHeader>
+            <CModalTitle>Generate Audio for Language</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <div className="mb-2">
+              <label className="form-label">Language</label>
+              <input className="form-control" value={generateLangCode} disabled />
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Type</label>
+              <select className="form-select" value={generateType} onChange={(e) => setGenerateType(e.target.value)}>
+                <option value="text">Text (generate)</option>
+                <option value="upload">Upload (device file)</option>
+              </select>
+            </div>
+            {generateType === 'text' ? (
+              <div className="mb-2">
+                <label className="form-label">Text</label>
+                <textarea className="form-control" rows={6} value={generateText} onChange={(e) => setGenerateText(e.target.value)} placeholder="Enter text to generate audio" />
+              </div>
+            ) : (
+              <div className="mb-2">
+                <label className="form-label">Upload file</label>
+                <input type="file" accept="audio/*" className="form-control" onChange={(e) => { const f = e.target.files && e.target.files[0]; setGenerateUploadFile(f || null); if (f && !generateFileName) setGenerateFileName((f.name||'').replace(/\.[^/.]+$/, '')) }} />
+              </div>
+            )}
+            <div className="mb-2">
+              <label className="form-label">File name</label>
+              <input className="form-control" value={generateFileName} onChange={(e) => setGenerateFileName(e.target.value)} placeholder="e.g. welcome_hi" />
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => { if (!generating && !generateUploading) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName(''); setGenerateType('text'); setGenerateUploadFile(null); setGenerateUploading(false) } }} disabled={generating || generateUploading}>Cancel</CButton>
+              <CButton color="primary" onClick={async () => {
+              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+              if (!currentBusinessId || !generateLangCode || !generateFileName) return
+              if (generateType === 'text') {
+                if (!generateText) return
+                setGenerating(true)
+                try {
+                  const payload = { text: generateText, fileName: generateFileName, type: 'text' }
+                  if (selectedElevenVoiceId) {
+                    payload.voiceProvider = 'elevenlabs'
+                    payload.voiceId = selectedElevenVoiceId
+                  }
+                  const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(generateLangCode)}/generate`
+                  const res = await apiCall(endpoint, 'POST', payload)
+                  if (res && (res.success || res.created || res.data)) {
+                    setGenerateModalOpen(false)
+                    setGenerateLangCode('')
+                    setGenerateText('')
+                    setGenerateFileName('')
+                    await fetchLanguages()
+                    if (filesLangCode === generateLangCode) await fetchLanguageFiles(filesLangCode)
+                  } else {
+                    console.error('Failed to generate language audio', res)
+                  }
+                } catch (err) {
+                  console.error('Error generating language audio', err)
+                } finally {
+                  setGenerating(false)
+                }
+              } else {
+                // upload flow
+                if (!generateUploadFile) return alert('Select a file to upload')
+                setGenerateUploading(true)
+                try {
+                  const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(generateLangCode)}/files`
+                  const form = new FormData()
+                  form.append('file', generateUploadFile)
+                  form.append('fileName', generateFileName)
+                  form.append('type', 'upload')
+                  try {
+                    const token = getAuthToken()
+                    const headers = { 'Content-Type': 'multipart/form-data' }
+                    if (token) headers.Authorization = `Bearer ${token}`
+                    await apiCall(endpoint, 'POST', form, { headers })
+                  } catch (err) {
+                    throw err
+                  }
+                  setGenerateModalOpen(false)
+                  setGenerateLangCode('')
+                  setGenerateUploadFile(null)
+                  setGenerateFileName('')
+                  await refreshAudioFiles()
+                } catch (err) {
+                  console.error('Failed to upload generated file', err)
+                  alert('Upload failed')
+                } finally {
+                  setGenerateUploading(false)
+                }
+              }
+            }} disabled={generating || generateUploading}>{(generateType === 'text' ? (generating ? ((<><CSpinner size="sm" />&nbsp;Generating</>)) : 'Generate') : (generateUploading ? ((<><CSpinner size="sm" />&nbsp;Uploading</>)) : 'Upload'))}</CButton>
           </CModalFooter>
         </CModal>
         <CModal visible={audioDeleteModalOpen} onClose={() => { if (!deletingAudio) { setAudioDeleteModalOpen(false); setAudioToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
@@ -2127,7 +2262,9 @@ const IVRManagement = () => {
                             <div className="text-muted" style={{ fontSize: 12 }}>{f.createdAt ? (new Date(f.createdAt)).toLocaleString() : ''}</div>
                           </div>
                           <div>
-                            {playingIvrId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
+                            {playLoadingId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
+                              <button className="btn btn-sm btn-outline-secondary" disabled title="Loading"><CSpinner size="sm" /></button>
+                            ) : playingIvrId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
                               <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
                             ) : (
                               <button className="btn btn-sm btn-outline-success" onClick={(e) => { e.stopPropagation(); playLanguageFile(f) }} title="Play"><CIcon icon={cilMediaPlay} /></button>

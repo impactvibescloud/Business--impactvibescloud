@@ -23,7 +23,8 @@ API_CONFIG.PROD_URL = API_CONFIG.PROD_URL.replace(/\/api$/, '');
 
 // Get authentication token
 export const getAuthToken = () => {
-  return localStorage.getItem('authToken') || '';
+  // Support multiple possible localStorage keys used across the app
+  return localStorage.getItem('authToken') || localStorage.getItem('token') || '';
 }
 
 // Sanitize URL to prevent double /api
@@ -137,14 +138,40 @@ export const apiCall = async (endpoint, method = 'GET', data = null, options = {
       ...options
     }
     
+    // If sending FormData, allow axios to set the correct multipart header
     if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
       config.data = data
+      try {
+        if (typeof FormData !== 'undefined' && data instanceof FormData) {
+          // remove any explicit Content-Type so axios can set the boundary
+          if (config.headers && config.headers['Content-Type']) delete config.headers['Content-Type']
+        }
+      } catch (e) {
+        // ignore (FormData may not be defined in some environments)
+      }
     }
     
     try {
       // Only log API calls in development mode to reduce console noise
       if (process.env.NODE_ENV === 'development') {
         console.log(`🌐 API: ${method} ${endpoint}`)
+      }
+      // Debug Authorization header presence and final request details in development
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          const authHeader = config.headers && (config.headers.Authorization || config.headers.authorization)
+          if (!authHeader) {
+            console.warn('⚠️ API: No Authorization header will be sent for this request', { endpoint: cleanEndpoint, method: method.toUpperCase() })
+          } else {
+            const visible = String(authHeader).slice(0, 12)
+            console.log('🔐 API: Authorization header present, token startsWith:', visible + '...')
+          }
+          // show final resolved URL and headers (mask token)
+          const masked = { ...config.headers }
+          if (masked.Authorization) masked.Authorization = 'Bearer [REDACTED]'
+          if (masked.authorization) masked.authorization = 'Bearer [REDACTED]'
+          console.log('➡️ API Request:', method.toUpperCase(), getBaseURL() + cleanEndpoint, { headers: masked })
+        } catch (e) {}
       }
       const response = await axios(config)
       return response.data
