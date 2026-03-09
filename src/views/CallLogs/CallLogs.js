@@ -795,7 +795,7 @@ const CallLogs = () => {
           csvEscape(log.hangUpBy || ''),
           csvEscape(duration),
           csvEscape(cost),
-          csvEscape(log.notes || ''),
+          csvEscape(log.notes || log.notebyagent || ''),
           csvEscape(formatCallStatus(log.status)),
           csvEscape(log.virtualNumber || ''),
           csvEscape(log.contact || ''),
@@ -1003,10 +1003,10 @@ const CallLogs = () => {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setNotesContent(log.notes || '');
+                              setNotesContent(log.notes || log.notebyagent || '');
                               setShowNotesModal(true);
                             }}
-                            title={log.notes ? 'View notes' : 'No notes'}
+                            title={(log.notes || log.notebyagent) ? 'View notes' : 'No notes'}
                           >
                             <CIcon icon={cilDescription} />
                           </CButton>
@@ -1130,6 +1130,7 @@ const CallLogs = () => {
                 <p>Duration: {formatDuration(selectedLog.callDuration || selectedLog.duration)}</p>
                 <p>Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</p>
                 <p>Status: {formatCallStatus(selectedLog.status)}</p>
+                <p>Notes: {selectedLog.notes || selectedLog.notebyagent || 'N/A'}</p>
               </div>
               
               <div className="mb-3">
