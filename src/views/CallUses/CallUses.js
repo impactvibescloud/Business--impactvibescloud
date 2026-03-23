@@ -168,22 +168,35 @@ const CallUses = () => {
         filteredLogs = filteredLogs.filter((l) => String(l.status || '').toLowerCase() === mappedStatus)
       }
 
-      // Filter by date range (if provided). Compare using Date objects.
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom)
-        filteredLogs = filteredLogs.filter((l) => {
-          const d = new Date(l.callDate || l.createdAt || l.contactedOn || null)
-          return !isNaN(d) && d >= fromDate
-        })
+      // Filter by date range (if provided). Use local calendar date (YYYY-MM-DD)
+      const formatLocalDate = (d) => {
+        const Y = d.getFullYear()
+        const M = String(d.getMonth() + 1).padStart(2, '0')
+        const D = String(d.getDate()).padStart(2, '0')
+        return `${Y}-${M}-${D}`
       }
-      if (dateTo) {
-        // include the entire day of dateTo
-        const toDate = new Date(dateTo)
-        toDate.setHours(23, 59, 59, 999)
+
+      const wantFrom = dateFrom || null
+      const wantTo = dateTo || null
+      if (wantFrom || wantTo) {
+        const beforeCount = filteredLogs.length
         filteredLogs = filteredLogs.filter((l) => {
-          const d = new Date(l.callDate || l.createdAt || l.contactedOn || null)
-          return !isNaN(d) && d <= toDate
+          const raw = l.callDate || l.createdAt || l.contactedOn || null
+          if (!raw) {
+            console.warn('Skipping log with missing date', l)
+            return false
+          }
+          const d = new Date(raw)
+          if (isNaN(d)) {
+            console.warn('Skipping log with invalid date', l)
+            return false
+          }
+          const localDate = formatLocalDate(d)
+          if (wantFrom && localDate < wantFrom) return false
+          if (wantTo && localDate > wantTo) return false
+          return true
         })
+        console.log(`Date filter: ${beforeCount} -> ${filteredLogs.length} logs after applying ${wantFrom || '-'} to ${wantTo || '-'}`)
       }
 
       setCallUses(returnedCallUses)
@@ -444,8 +457,8 @@ const CallUses = () => {
               </CFormSelect>
             </CCol>
             <CCol md={6} className="d-flex align-items-end gap-2 justify-content-end">
-              <CButton color="primary" onClick={fetchData} disabled={loading || !userId}>
-                {loading ? <><CSpinner size="sm" />&nbsp;Loading</> : 'Load'}
+              <CButton color="primary" onClick={handleApplyFilters} disabled={loading || !userId}>
+                {loading ? <><CSpinner size="sm" />&nbsp;Loading</> : 'Load Data'}
               </CButton>
             </CCol>
           </CRow>
@@ -527,14 +540,11 @@ const CallUses = () => {
 
           <CRow className="align-items-center mb-2">
             <CCol md={6} className="mb-2 d-flex gap-2">
-              <CButton color="primary" onClick={handleApplyFilters} disabled={loading}>
-                {loading ? (<><CSpinner size="sm" />&nbsp;Loading</>) : 'Apply Filters'}
+              <CButton color="primary" onClick={handleApplyFilters} disabled={loading || !userId}>
+                {loading ? (<><CSpinner size="sm" />&nbsp;Loading</>) : 'Load Data'}
               </CButton>
               <CButton color="secondary" onClick={handleClearFilters} disabled={loading}>
                 Clear Filters
-              </CButton>
-              <CButton color="info" onClick={fetchData} disabled={loading || !userId}>
-                Refresh Logs
               </CButton>
               <CButton color="success" onClick={handleExport} disabled={exporting || !userId}>
                 {exporting ? (<><CSpinner size="sm" />&nbsp;Exporting</>) : 'Export Excel'}

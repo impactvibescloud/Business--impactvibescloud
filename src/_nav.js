@@ -73,7 +73,7 @@ const _nav = [
   },
   {
     component: CNavItem,
-    name: "Call Dispositions",
+    name: "Call Logs",
     icon: <Clock className="nav-icon" />,
     to: "/callogs",
     group: "Call Logs",

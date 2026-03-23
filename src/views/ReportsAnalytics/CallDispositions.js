@@ -9,7 +9,6 @@ import {
   CTableHeaderCell,
   CTableBody,
   CTableDataCell,
-  CTooltip,
   CBadge,
   CSpinner,
   CAlert,
@@ -19,31 +18,32 @@ import {
   CModalBody,
   CModalFooter,
   CButton,
-  CInputGroup,
-  CFormInput,
-  CPagination,
-  CPaginationItem,
 } from '@coreui/react'
-import axios from 'axios'
 import { apiCall } from '../../config/api'
 import '../Branches/Branches.css'
+import './CallDispositions.css'
 
-const CallDispositions = () => {
-  const [dispositions, setDispositions] = useState([])
+const CallLogsLegacy = () => {
+  const [records, setRecords] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
-  const [limit] = useState(10)
+  const [limit] = useState(20)
 
   const [businessId, setBusinessId] = useState(localStorage.getItem('businessId') || '')
   const [startDateFilter, setStartDateFilter] = useState('')
   const [endDateFilter, setEndDateFilter] = useState('')
-  const [availableLevels, setAvailableLevels] = useState({ level1: false, level2: false, level3: false })
+
   const [expandedRows, setExpandedRows] = useState(new Set())
+  const [openCallFlows, setOpenCallFlows] = useState(new Set())
   const [selectedItem, setSelectedItem] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
 
-  // Try to prefill businessId from current user details when available (same approach as CallUses)
+  // Filter inputs (UI only for now)
+  const [fromNumber, setFromNumber] = useState('')
+  const [toNumber, setToNumber] = useState('')
+  const [agentFilter, setAgentFilter] = useState('')
+
   useEffect(() => {
     const tryPrefill = async () => {
       if (businessId) return
@@ -52,148 +52,17 @@ const CallDispositions = () => {
         const u = res.user || res.data || res
         if (u && u.businessId) {
           setBusinessId(u.businessId)
-          try {
-            localStorage.setItem('businessId', u.businessId)
-          } catch (e) {}
+          try { localStorage.setItem('businessId', u.businessId) } catch (e) {}
         }
-      } catch (err) {
-        // ignore prefill errors
-      }
+      } catch (e) {}
     }
     tryPrefill()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Helpers for optional date filters (do not apply by default)
-  const formatDateISO = (d) => d.toISOString().split('T')[0]
-
-  const fetchDispositions = async (p = 1) => {
-    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
-    if (!currentBusinessId) {
-      console.warn('CallDispositions: missing businessId — attempting to prefill from user details or skip')
-      setDispositions([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    try {
-      // Build query params dynamically — include date filters only when set
-      const params = [`page=${p}`, `limit=${limit}`, `includeDispositions=true`]
-      if (startDateFilter) params.push(`startDate=${encodeURIComponent(startDateFilter)}`)
-      if (endDateFilter) params.push(`endDate=${encodeURIComponent(endDateFilter)}`)
-      const endpoint = `/call-logs/business/${currentBusinessId}?${params.join('&')}`
-      // Debug: log endpoint and token presence to help diagnose "api not calling"
-      try {
-        console.debug('CallDispositions -> Request', {
-          endpoint,
-          businessId: currentBusinessId,
-          startDateFilter,
-          endDateFilter,
-          hasAuth: !!localStorage.getItem('authToken'),
-          axiosBaseURL: axios.defaults.baseURL,
-          fullUrlPreview: `${axios.defaults.baseURL || ''}${endpoint}`,
-        })
-      } catch (e) {
-        // swallow
-      }
-      const res = await apiCall(endpoint, 'GET')
-      if (res && res.success) {
-        // New response: array of call logs with nested dispositions object containing level1/2/3 arrays
-        let items = []
-        const callLogs = res.data || []
-        
-        if (Array.isArray(callLogs)) {
-          // For each call log, extract the deepest disposition level available
-          callLogs.forEach((callLog) => {
-            if (!callLog) return
-            
-            // Try to get the deepest disposition from nested dispositions object
-            let dispositionData = null
-            
-            if (callLog.dispositions) {
-              // Priority: level3 > level2 > level1 (use the most detailed)
-              if (Array.isArray(callLog.dispositions.level3) && callLog.dispositions.level3.length > 0) {
-                dispositionData = callLog.dispositions.level3[0]
-              } else if (Array.isArray(callLog.dispositions.level2) && callLog.dispositions.level2.length > 0) {
-                dispositionData = callLog.dispositions.level2[0]
-              } else if (Array.isArray(callLog.dispositions.level1) && callLog.dispositions.level1.length > 0) {
-                dispositionData = callLog.dispositions.level1[0]
-              }
-            }
-            
-            // If no disposition arrays, check dispositionSnapshot
-            if (!dispositionData && callLog.dispositionSnapshot) {
-              dispositionData = {
-                level1: callLog.dispositionSnapshot.level1,
-                level2: callLog.dispositionSnapshot.level2,
-                level3: callLog.dispositionSnapshot.level3,
-              }
-            }
-            
-            // Merge call log data with disposition data
-            items.push({
-              ...callLog,
-              ...dispositionData,
-              callLog: {
-                callDate: callLog.callDate,
-                contact: callLog.contact,
-                virtualNumber: callLog.virtualNumber,
-                duration: callLog.duration,
-                status: callLog.status,
-              },
-              agent: callLog.agent || (dispositionData && dispositionData.agent),
-              code: dispositionData?.code || null,
-              note: dispositionData?.note || callLog.notes || null,
-              raw: callLog,
-            })
-          })
-        }
-
-        const merged = items
-
-        // Determine which levels are available for this business
-        const levelsPresent = { level1: false, level2: false, level3: false }
-        merged.forEach((it) => {
-          if (it.level1) levelsPresent.level1 = true
-          if (it.level2) levelsPresent.level2 = true
-          if (it.level3) levelsPresent.level3 = true
-        })
-
-        // Items are already normalized in the merge step above
-        const normalized = merged
-
-        setAvailableLevels(levelsPresent)
-        setDispositions(normalized)
-        
-        // If server returned pagination, sync current page (optional)
-        if (res.pagination && res.pagination.page) {
-          try {
-            setPage(res.pagination.page)
-          } catch (e) {}
-        }
-      } else {
-        setDispositions([])
-      }
-    } catch (error) {
-      console.error('Failed to fetch dispositions', error)
-      setDispositions([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDispositions(page)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
-
   const formatDateTime = (iso) => {
     if (!iso) return '-'
-    try {
-      return new Date(iso).toLocaleString()
-    } catch (e) {
-      return iso
-    }
+    try { return new Date(iso).toLocaleString() } catch (e) { return iso }
   }
 
   const formatDateTimeShort = (iso) => {
@@ -201,158 +70,135 @@ const CallDispositions = () => {
     try {
       const d = new Date(iso)
       return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    } catch (e) { return iso }
+  }
+
+  const fetchRecords = async (p = 1) => {
+    const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+    if (!currentBusinessId) {
+      setRecords([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    try {
+      const qp = [`businessId=${encodeURIComponent(currentBusinessId)}`, `page=${p}`, `limit=${limit}`]
+      if (startDateFilter) qp.push(`startDate=${encodeURIComponent(startDateFilter)}`)
+      if (endDateFilter) qp.push(`endDate=${encodeURIComponent(endDateFilter)}`)
+      if (fromNumber) qp.push(`from=${encodeURIComponent(fromNumber)}`)
+      if (toNumber) qp.push(`to=${encodeURIComponent(toNumber)}`)
+      if (agentFilter) qp.push(`agent=${encodeURIComponent(agentFilter)}`)
+      const endpoint = `/call-logs?${qp.join('&')}`
+      const res = await apiCall(endpoint, 'GET')
+      if (res && res.success) {
+        const callLogs = Array.isArray(res.data) ? res.data : []
+        const normalized = callLogs.map((cl) => ({
+          ...cl,
+          callLog: {
+            callDate: cl.callDate,
+            contact: cl.contact,
+            virtualNumber: cl.virtualNumber,
+            duration: cl.callDuration ?? cl.duration ?? 0,
+            status: cl.status,
+          },
+          agent: cl.agent || null,
+          note: cl.notebyagent || cl.cdrImportNote || null,
+          raw: cl,
+        }))
+        setRecords(normalized)
+        if (res.pagination && res.pagination.page) try { setPage(res.pagination.page) } catch (e) {}
+      } else {
+        setRecords([])
+      }
     } catch (e) {
-      return iso
+      console.error('fetchRecords error', e)
+      setRecords([])
+    } finally {
+      setLoading(false)
     }
   }
 
-  const openDetails = (item) => {
-    setSelectedItem(item)
-    setDetailsOpen(true)
+  useEffect(() => { fetchRecords(page) }, [page, businessId])
+
+  const toggleRow = (id) => {
+    const s = new Set(expandedRows)
+    if (s.has(id)) s.delete(id); else s.add(id)
+    setExpandedRows(s)
   }
 
-  const closeDetails = () => {
-    setDetailsOpen(false)
-    setSelectedItem(null)
+  const toggleCallFlow = (id) => {
+    const s = new Set(openCallFlows)
+    if (s.has(id)) s.delete(id); else s.add(id)
+    setOpenCallFlows(s)
   }
 
-  const toggleRow = (itemId) => {
-    const newExpanded = new Set(expandedRows)
-    if (newExpanded.has(itemId)) {
-      newExpanded.delete(itemId)
-    } else {
-      newExpanded.add(itemId)
-    }
-    setExpandedRows(newExpanded)
-  }
+  const openDetails = (item) => { setSelectedItem(item); setDetailsOpen(true) }
+  const closeDetails = () => { setSelectedItem(null); setDetailsOpen(false) }
 
-  const filteredDispositions = dispositions.filter((d) => {
-    const q = searchTerm.trim().toLowerCase()
+  const resetFilters = () => {
+    setFromNumber(''); setToNumber(''); setAgentFilter(''); setStartDateFilter(''); setEndDateFilter(''); fetchRecords(1)
+  }
+  const applyFilters = () => { fetchRecords(1) }
+
+  const filtered = records.filter((r) => {
+    const q = (searchTerm || '').trim().toLowerCase()
     if (!q) return true
-    return (
-      (d.agent?.email || d.agent?._id || '').toString().toLowerCase().includes(q) ||
-      (d.callLog?.contact || d.contact || '').toString().toLowerCase().includes(q) ||
-      (d.callLog?.virtualNumber || d.virtualNumber || '').toString().toLowerCase().includes(q) ||
-      (d.code || '').toString().toLowerCase().includes(q) ||
-      (d.note || '').toString().toLowerCase().includes(q)
-    )
+    return (r.agent?.email || r.agent?.name || '').toString().toLowerCase().includes(q) || (r.callLog?.contact || '').toString().toLowerCase().includes(q) || (r.note || '').toString().toLowerCase().includes(q)
   })
 
   return (
     <CCard className="mb-4">
-      <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
-        <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
-          <CInputGroup>
-            <CFormInput
-              className="w-100"
-              placeholder="Search dispositions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </CInputGroup>
-        </div>
-        <div className="d-flex align-items-center">
-          <input
-            type="date"
-            className="form-control form-control-sm d-inline-block me-2"
-            style={{ width: 150 }}
-            value={startDateFilter}
-            onChange={(e) => setStartDateFilter(e.target.value)}
-            placeholder="Start date"
-          />
-          <input
-            type="date"
-            className="form-control form-control-sm d-inline-block me-2"
-            style={{ width: 150 }}
-            value={endDateFilter}
-            onChange={(e) => setEndDateFilter(e.target.value)}
-            placeholder="End date"
-          />
-          <button
-            className="btn btn-sm btn-outline-success me-2"
-            onClick={() => fetchDispositions(1)}
-            disabled={loading}
-          >
-            Apply
-          </button>
-          <button
-            className="btn btn-sm btn-outline-secondary me-3"
-            onClick={() => {
-              setStartDateFilter('')
-              setEndDateFilter('')
-              fetchDispositions(1)
-            }}
-            disabled={loading}
-          >
-            Clear
-          </button>
-          <div>
-            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1 || loading}>Prev</button>
-            <span className="mx-2">Page {page}</span>
-            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setPage((p) => p + 1)} disabled={loading}>Next</button>
+      <CCardHeader style={{ borderBottom: '0' }}>
+        <div className="filter-tiles">
+          <div className="filter-tile">
+            <label className="form-label">From</label>
+            <input className="form-control form-control-sm" placeholder="From number" value={fromNumber} onChange={(e) => setFromNumber(e.target.value)} />
+          </div>
+          <div className="filter-tile">
+            <label className="form-label">To</label>
+            <input className="form-control form-control-sm" placeholder="To number" value={toNumber} onChange={(e) => setToNumber(e.target.value)} />
+          </div>
+          <div className="filter-tile">
+            <label className="form-label">Agent</label>
+            <input className="form-control form-control-sm" placeholder="Agent" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)} />
+          </div>
+          <div className="filter-tile">
+            <label className="form-label">From Date</label>
+            <input type="date" className="form-control form-control-sm" value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} />
+          </div>
+          <div className="filter-tile">
+            <label className="form-label">To Date</label>
+            <input type="date" className="form-control form-control-sm" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
           </div>
         </div>
+        <div className="filter-actions">
+          <button className="btn btn-sm btn-outline-secondary me-3" onClick={resetFilters} disabled={loading}>Reset</button>
+          <button className="btn btn-sm btn-outline-primary" onClick={applyFilters} disabled={loading}>Search</button>
+        </div>
       </CCardHeader>
+
       <CCardBody>
         {!businessId && (
           <div className="mb-3">
-            <CAlert color="warning">Missing <code>businessId</code> in localStorage. Set it to view dispositions.</CAlert>
+            <CAlert color="warning">Missing <code>businessId</code> in localStorage. Set it to view CDRs.</CAlert>
           </div>
         )}
-        {/* Details modal for clicked disposition */}
+
         <CModal visible={detailsOpen} onClose={closeDetails} alignment="center">
           <CModalHeader>
-            <CModalTitle>Disposition Details</CModalTitle>
+            <CModalTitle>CDR Details</CModalTitle>
           </CModalHeader>
           <CModalBody>
-            {!selectedItem ? (
-              <div>No item selected</div>
-            ) : (
+            {!selectedItem ? (<div>No item selected</div>) : (
               <div>
-                <div className="mb-3">
-                  <strong>Agent:</strong> {selectedItem.agent?.email?.split('@')[0] || selectedItem.agent?._id || '-'}
-                  {selectedItem.agent?.email && <div className="text-muted small">{selectedItem.agent.email}</div>}
-                </div>
-                <div className="mb-2"><strong>Contact:</strong> {selectedItem.callLog?.contact || selectedItem.contact || '-'}</div>
-                <div className="mb-2"><strong>Virtual Number:</strong> {selectedItem.callLog?.virtualNumber || selectedItem.virtualNumber || '-'}</div>
-                <div className="mb-2"><strong>Call Date:</strong> {formatDateTime(selectedItem.callLog?.callDate || selectedItem.callDate)}</div>
-                <div className="mb-2"><strong>Duration:</strong> {selectedItem.callLog?.duration || selectedItem.duration ? `${selectedItem.callLog?.duration || selectedItem.duration}s` : '-'}</div>
-                <div className="mb-2"><strong>Call Type:</strong> {selectedItem.callType || '-'}</div>
+                <div className="mb-3"><strong>Agent:</strong> {selectedItem.agent?.email || selectedItem.agent?.name || '-'}</div>
+                <div className="mb-2"><strong>Contact:</strong> {selectedItem.callLog?.contact || '-'}</div>
+                <div className="mb-2"><strong>Virtual Number:</strong> {selectedItem.callLog?.virtualNumber || '-'}</div>
+                <div className="mb-2"><strong>Call Date:</strong> {formatDateTime(selectedItem.callLog?.callDate)}</div>
+                <div className="mb-2"><strong>Duration:</strong> {selectedItem.callLog?.duration ? `${selectedItem.callLog.duration}s` : '-'}</div>
                 <hr />
-                <h6>Disposition Path</h6>
-                <div className="mb-2">
-                  {availableLevels.level1 && (
-                    <div className="mb-1">
-                      <CBadge color="primary" className="me-1">Level 1</CBadge>
-                      <span>{selectedItem.level1 || '-'}</span>
-                    </div>
-                  )}
-                  {availableLevels.level2 && (
-                    <div className="mb-1">
-                      <CBadge color="info" className="me-1">Level 2</CBadge>
-                      <span>{selectedItem.level2 || '-'}</span>
-                    </div>
-                  )}
-                  {availableLevels.level3 && (
-                    <div className="mb-1">
-                      <CBadge color="secondary" className="me-1">Level 3</CBadge>
-                      <span>{selectedItem.level3 || '-'}</span>
-                    </div>
-                  )}
-                </div>
-                <hr />
-                <div className="mb-2"><strong>Code:</strong> {selectedItem.code || '-'}</div>
                 <div className="mb-2"><strong>Note:</strong> {selectedItem.note || '-'}</div>
-                <div className="mb-2">
-                  <strong>Call Status:</strong>{' '}
-                  <CBadge color={
-                    selectedItem.callLog?.status === 'closed' || selectedItem.status === 'closed' ? 'success' :
-                    selectedItem.callLog?.status === 'completed' || selectedItem.status === 'completed' ? 'info' :
-                    selectedItem.callLog?.status === 'failed' || selectedItem.status === 'failed' ? 'danger' : 'secondary'
-                  }>
-                    {selectedItem.callLog?.status || selectedItem.status || '-'}
-                  </CBadge>
-                </div>
+                <div className="mb-2"><strong>Call Status:</strong> <CBadge color={selectedItem.callLog?.status === 'answered' ? 'success' : selectedItem.callLog?.status === 'missed' ? 'danger' : 'secondary'}>{selectedItem.callLog?.status || '-'}</CBadge></div>
               </div>
             )}
           </CModalBody>
@@ -360,134 +206,107 @@ const CallDispositions = () => {
             <CButton color="secondary" onClick={closeDetails}>Close</CButton>
           </CModalFooter>
         </CModal>
-          {loading ? (
-          <div className="text-center py-4">
-            <CSpinner />
-          </div>
-        ) : filteredDispositions.length === 0 ? (
+
+        {loading ? (
+          <div className="text-center py-4"><CSpinner /></div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-3">No call logs found</div>
         ) : (
-          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
+          <CTable hover responsive className="table-sm compact-table cdr-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell style={{ width: '15%' }}>AGENT</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>CONTACT</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>VIRTUAL NUMBER</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '8%' }}>DURATION</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>CALL DATE</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '10%' }}>CALL TYPE</CTableHeaderCell>
-                <CTableHeaderCell className="text-center" style={{ width: '10%' }}>STATUS</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '50%' }}>TO</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '15%' }}>DATE</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '15%' }}>TIME</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '20%' }}>RESULTS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
-              {filteredDispositions.map((d) => (
-                <React.Fragment key={d._id}>
-                  <CTableRow
-                    onClick={() => toggleRow(d._id)}
-                    style={{ cursor: 'pointer', backgroundColor: expandedRows.has(d._id) ? '#f8f9fa' : 'transparent' }}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <CTableDataCell className="align-middle">
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <div style={{ fontSize: '1.1rem', marginRight: 10 }}>{expandedRows.has(d._id) ? '▼' : '▶'}</div>
-                        <div className="agent-name" title={d.agent?.email || d.agent?._id || '-'}>{d.agent?.email?.split('@')[0] || d.agent?._id || '-'}</div>
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell className="align-middle">
-                      <div className="manager-email">{d.callLog?.contact || d.contact || '-'}</div>
-                    </CTableDataCell>
-                    <CTableDataCell className="align-middle">
-                      <div className="agent-number">{d.callLog?.virtualNumber || d.virtualNumber || '-'}</div>
-                    </CTableDataCell>
-                    <CTableDataCell className="align-middle">
-                      <div className="agent-number">{d.callLog?.duration || d.duration ? `${d.callLog?.duration || d.duration}s` : '-'}</div>
-                    </CTableDataCell>
-                    <CTableDataCell className="align-middle nowrap">
-                      <div className="department-name">{formatDateTimeShort(d.callLog?.callDate || d.callDate)}</div>
-                    </CTableDataCell>
-                    <CTableDataCell className="align-middle">{d.callType || '-'}</CTableDataCell>
-                    <CTableDataCell className="text-center align-middle">
-                      <CBadge color={
-                        d.callLog?.status === 'closed' || d.status === 'closed' ? 'success' : 
-                        d.callLog?.status === 'completed' || d.status === 'completed' ? 'info' : 
-                        d.callLog?.status === 'failed' || d.status === 'failed' ? 'danger' : 'secondary'
-                      }>
-                        {d.callLog?.status || d.status || '-'}
-                      </CBadge>
-                    </CTableDataCell>
-                  </CTableRow>
-                  {expandedRows.has(d._id) && (
-                    <CTableRow>
-                      <CTableDataCell colSpan={8} style={{ padding: '1rem', backgroundColor: '#f8f9fa' }}>
-                        <div className="disposition-details">
-                          <h6 className="mb-3">Disposition Details</h6>
-                          {(!d.level1 && !d.level2 && !d.level3 && (!d.raw?.dispositions || (d.raw.dispositions.level1?.length === 0 && d.raw.dispositions.level2?.length === 0 && d.raw.dispositions.level3?.length === 0))) ? (
-                            <div className="alert alert-warning mb-0">No disposition set for this call</div>
-                          ) : (
-                            <div>
-                              {/* Show Level 1 dispositions */}
-                              {(d.level1 || (d.raw?.dispositions?.level1 && d.raw.dispositions.level1.length > 0)) && (
-                                <div className="mb-3">
-                                  <div className="d-flex align-items-center mb-2">
-                                    <CBadge color="primary" className="me-2">Level 1</CBadge>
-                                    <strong>{d.level1 || d.raw?.dispositions?.level1[0]?.level1 || '-'}</strong>
-                                  </div>
-                                  {d.raw?.dispositions?.level1?.map((l1, idx) => (
-                                    <div key={idx} className="ms-4 mb-2 p-2" style={{ backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
-                                      <div><strong>Agent:</strong> {l1.agent?.name || l1.agent?.email?.split('@')[0] || '-'}</div>
-                                      {l1.code && <div><strong>Code:</strong> {l1.code}</div>}
-                                      {l1.note && <div><strong>Note:</strong> {l1.note}</div>}
-                                      <div className="text-muted small">Created: {formatDateTimeShort(l1.createdAt)}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {/* Show Level 2 dispositions */}
-                              {(d.level2 || (d.raw?.dispositions?.level2 && d.raw.dispositions.level2.length > 0)) && (
-                                <div className="mb-3 ms-3">
-                                  <div className="d-flex align-items-center mb-2">
-                                    <CBadge color="info" className="me-2">Level 2</CBadge>
-                                    <strong>{d.level2 || d.raw?.dispositions?.level2[0]?.level2 || '-'}</strong>
-                                  </div>
-                                  {d.raw?.dispositions?.level2?.map((l2, idx) => (
-                                    <div key={idx} className="ms-4 mb-2 p-2" style={{ backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
-                                      <div><strong>Agent:</strong> {l2.agent?.name || l2.agent?.email?.split('@')[0] || '-'}</div>
-                                      {l2.code && <div><strong>Code:</strong> {l2.code}</div>}
-                                      {l2.note && <div><strong>Note:</strong> {l2.note}</div>}
-                                      <div className="text-muted small">Created: {formatDateTimeShort(l2.createdAt)}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {/* Show Level 3 dispositions */}
-                              {(d.level3 || (d.raw?.dispositions?.level3 && d.raw.dispositions.level3.length > 0)) && (
-                                <div className="mb-3 ms-4">
-                                  <div className="d-flex align-items-center mb-2">
-                                    <CBadge color="secondary" className="me-2">Level 3</CBadge>
-                                    <strong>{d.level3 || d.raw?.dispositions?.level3[0]?.level3 || '-'}</strong>
-                                  </div>
-                                  {d.raw?.dispositions?.level3?.map((l3, idx) => (
-                                    <div key={idx} className="ms-4 mb-2 p-2" style={{ backgroundColor: '#fff', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
-                                      <div><strong>Agent:</strong> {l3.agent?.name || l3.agent?.email?.split('@')[0] || '-'}</div>
-                                      {l3.code && <div><strong>Code:</strong> {l3.code}</div>}
-                                      {l3.note && <div><strong>Note:</strong> {l3.note}</div>}
-                                      {l3.meta && <div><strong>Meta:</strong> {JSON.stringify(l3.meta)}</div>}
-                                      <div className="text-muted small">Created: {formatDateTimeShort(l3.createdAt)} | Updated: {formatDateTimeShort(l3.updatedAt)}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
+              {filtered.map((d) => {
+                const callDate = d.callLog?.callDate || d.callDate
+                const dt = callDate ? new Date(callDate) : null
+                const dateOnly = dt ? dt.toLocaleDateString() : '-'
+                const timeOnly = dt ? dt.toLocaleTimeString() : '-'
+                const resultText = d.note || d.callLog?.status || d.status || '—'
+                return (
+                  <React.Fragment key={d._id}>
+                    <CTableRow onClick={() => toggleRow(d._id)} style={{ cursor: 'pointer', backgroundColor: expandedRows.has(d._id) ? '#f8f9fa' : 'transparent' }} role="button" tabIndex={0} className="cdr-row">
+                      <CTableDataCell className="align-middle">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input type="checkbox" onClick={(e) => e.stopPropagation()} />
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ fontWeight: 600 }}>{d.callLog?.contact || d.contact || 'Unknown'}</div>
+                            <div className="text-muted small"><span className="me-2">{d.callLog?.virtualNumber || d.virtualNumber || ''}</span></div>
+                          </div>
+                        </div>
+                      </CTableDataCell>
+                      <CTableDataCell className="align-middle">{dateOnly}</CTableDataCell>
+                      <CTableDataCell className="align-middle">{timeOnly}</CTableDataCell>
+                      <CTableDataCell className="align-middle">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>{resultText}</div>
+                          <div><CBadge color={d.callLog?.status === 'answered' ? 'success' : d.callLog?.status === 'missed' ? 'danger' : 'secondary'}>{d.callLog?.status || ''}</CBadge></div>
                         </div>
                       </CTableDataCell>
                     </CTableRow>
-                  )}
-                </React.Fragment>
-              ))}
+                    {expandedRows.has(d._id) && (
+                      <CTableRow>
+                        <CTableDataCell colSpan={4} style={{ padding: '1rem', backgroundColor: '#fff' }}>
+                          <div className="cdr-expanded">
+                            <div className="cdr-meta d-flex align-items-center mb-3">
+                              <div className="me-4"><div className="text-muted small">Call ID</div><div className="fw-bold">{d._id}</div></div>
+                              <div className="me-4"><div className="text-muted small">Region</div><div>{d.region || '-'}</div></div>
+                              <div className="me-4"><div className="text-muted small">Duration</div><div>{d.callLog?.duration ? `${d.callLog.duration}s` : '—'}</div></div>
+                              <div style={{ marginLeft: 'auto' }}>
+                                { (d.callRecording || d.callLog?.recordingUrl) ? (
+                                  <div className="audio-player"><audio controls src={d.callLog?.recordingUrl || d.callRecording || ''} />
+                                  <a className="ms-3" href={d.callLog?.recordingUrl || d.callRecording || '#'} download onClick={(e)=>{if(!(d.callLog?.recordingUrl||d.callRecording))e.preventDefault();}} title="Download recording">⬇️</a>
+                                  </div>
+                                ) : null }
+                              </div>
+                            </div>
+
+                            <div className="cdr-actions mb-3">
+                              <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); toggleCallFlow(d._id)}} aria-pressed={openCallFlows.has(d._id)}>Call Flow</button>
+                              <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); openDetails(d)}}>View Note</button>
+                              <button className="btn btn-sm btn-light me-2">View Contact</button>
+                              <button className="btn btn-sm btn-light me-2">Send SMS</button>
+                              <button className="btn btn-sm btn-light me-2">Block</button>
+                              <button className="btn btn-sm btn-light me-2">More Information</button>
+                              <button className="btn btn-sm btn-light">Schedule Call</button>
+                            </div>
+
+                            {openCallFlows.has(d._id) && (
+                            <div className="cdr-callflow">
+                              <div className="flow-step">
+                                <div className="flow-icon caller"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#fff"/></svg></div>
+                                <div className="flow-meta"><div className="flow-title">{d.raw?.fromName || d.agent?.name || 'Caller'}</div><div className="flow-sub">{d.raw?.fromNumber || d.callLog?.contact || ''}</div><div className="flow-time">{formatDateTimeShort(d.raw?.fromAt || d.callLog?.callDate || d.callDate)}</div></div>
+                              </div>
+
+                              <div className="flow-connector"><span className="line"/><span className="arrow"/></div>
+
+                              <div className="flow-step center-step">
+                                <div className="flow-icon mid"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#12323B"/><path d="M8 11h8v2H8z" fill="#fff"/></svg></div>
+                                <div className="flow-meta"><div className="flow-title">Dial-1</div><div className="flow-sub">{d.raw?.dial1Number || d.raw?.via || ''}</div><div className="flow-time">{formatDateTimeShort(d.raw?.dial1At || d.callLog?.callDate || d.callDate)}</div></div>
+                              </div>
+
+                              <div className="flow-connector"><span className="line"/><span className="arrow"/></div>
+
+                              <div className="flow-step">
+                                <div className="flow-icon last"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M16.5 11c-.9 0-1.73.2-2.49.57-.21.11-.34.34-.34.58v3.08c0 .24.13.47.34.58C14.77 16.8 15.6 17 16.5 17c1.38 0 2.5-1.12 2.5-2.5S17.88 11 16.5 11z" fill="#fff"/></svg></div>
+                                <div className="flow-meta"><div className="flow-title">Dial-2</div><div className="flow-sub">{d.callLog?.virtualNumber || d.virtualNumber || ''}</div><div className="flow-time">{formatDateTimeShort(d.raw?.toAt || d.callLog?.callDate || d.callDate)}</div></div>
+                              </div>
+
+                            </div>
+                            )}
+
+                          </div>
+                        </CTableDataCell>
+                      </CTableRow>
+                    )}
+                  </React.Fragment>
+                )
+              })}
             </CTableBody>
           </CTable>
         )}
@@ -496,4 +315,4 @@ const CallDispositions = () => {
   )
 }
 
-export default CallDispositions
+export default CallLogsLegacy

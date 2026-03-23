@@ -1,0 +1,25 @@
+.ap-page { padding: 18px }
+.ap-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px }
+.ap-header h3 { margin:0 }
+.ap-header-controls { display:flex; gap:12px; align-items:center }
+.ap-date-btn { background:#fff; border:1px solid #f59e0b; color:#92400e; padding:8px 14px; border-radius:6px }
+.ap-filter-btn { background:transparent; border:1px solid #f3f4f6; padding:8px 12px; border-radius:6px }
+.ap-icon-btn { background:#fff; border:1px solid #e6e8eb; padding:8px; border-radius:6px }
+
+.ap-stats-grid { display:grid; grid-template-columns: repeat(4,1fr); gap:16px }
+.ap-stat-tile { background:#fff; border-radius:8px; padding:18px; border:1px solid rgba(0,0,0,0.04); box-shadow:0 6px 18px rgba(0,0,0,0.04); display:flex; flex-direction:column; min-height:140px }
+.ap-stat-header { display:flex; align-items:center; justify-content:space-between }
+.ap-stat-title { font-weight:700 }
+.ap-stat-actions svg{ color:#9ca3af }
+.ap-stat-body { margin-top:12px; display:flex; flex-direction:column; gap:8px }
+.ap-stat-value { font-size:28px; font-weight:800 }
+.ap-stat-note { color:#6b7280 }
+.ap-stat-footer { margin-top:auto; color:#6b6b6b; font-size:13px }
+
+.donut-tile .ap-stat-header { justify-content:flex-start }
+.ap-donut-svg { width:120px; height:120px }
+.chart-tile .ap-vol-chart { width:100%; height:120px }
+.ap-vol-chart { width:100%; height:120px }
+.ap-chart-legend text { font-size:10px; fill:#6b7280 }
+
+@media (max-width: 992px) { .ap-stats-grid { grid-template-columns:repeat(2,1fr) } }

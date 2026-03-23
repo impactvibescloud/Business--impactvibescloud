@@ -42,11 +42,51 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* When sidebar is minimized, allow the inner content container to expand
+   so there is less horizontal gap at the edges. The collapsed sidebar width
+   is 72px; subtract a small gutter to keep spacing consistent. */
+.main-layout .c-sidebar.c-sidebar-minimized + .wrapper .body .c-container,
+.main-layout .c-sidebar.c-sidebar-unfoldable + .wrapper .body .c-container {
+  max-width: calc(100% - 92px) !important;
+}
+
+/* Strong override: when sidebar is collapsed, allow content container to
+   span the majority of the viewport. Use !important to beat other rules. */
+.c-sidebar.c-sidebar-minimized + .wrapper .body .c-container,
+.c-sidebar.c-sidebar-unfoldable + .wrapper .body .c-container {
+  max-width: calc(100% - 92px) !important;
+  width: calc(100% - 92px) !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
 /* Page background: ensure main content area uses pure white */
 .main-layout .wrapper,
 .main-layout .body,
 .wrapper .body {
   background-color: #FFFFFF !important;
+}
+
+/* Global container widen: reduce left/right page gaps across layouts.
+   This increases the max-width so pages use more horizontal space. */
+.wrapper .body .c-container {
+  max-width: calc(100% - 110px) !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+/* Highest-specificity overrides to ensure container expands regardless of
+   other stylesheet order (matches selectors found in build CSS). */
+.main-layout .wrapper .body .c-container,
+.main-layout .c-sidebar + .wrapper .body .c-container,
+.main-layout .c-sidebar.c-sidebar-minimized + .wrapper .body .c-container,
+.c-sidebar.c-sidebar-minimized + .wrapper .body .c-container,
+.c-sidebar.c-sidebar-unfoldable + .wrapper .body .c-container {
+  max-width: calc(100% - 92px) !important;
+  width: calc(100% - 92px) !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+  margin-left: 0 !important;
 }
 
 /* Sidebar footer inside the CoreUI sidebar: keep it at the bottom */

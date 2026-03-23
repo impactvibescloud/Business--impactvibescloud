@@ -248,6 +248,37 @@
   }
 }
 
+/* New header controls to match screenshot */
+.calllogs-controls { gap: 8px; }
+.cl-date-range { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid #f59e0b; background:#ffffff; border-radius:6px; color:#92400e; font-weight:600; font-size:0.95rem; box-shadow:0 6px 18px rgba(16,24,32,0.04) }
+.cl-callid-search { display:flex; align-items:center; border:1px solid #f59e0b; border-radius:6px; overflow:hidden; background:#fff }
+.cl-callid-search .form-control { border:0; padding:10px 12px; min-width:180px; font-size:0.95rem; height:40px }
+.cl-callid-search .btn { background:#fff; border-left:1px solid #f59e0b; color:#d97706; padding:0 12px; height:40px; display:inline-flex; align-items:center; justify-content:center; border-top-right-radius:6px; border-bottom-right-radius:6px }
+.cl-callid-search .btn svg{ color:#d97706 }
+.cl-filter-btn { background:#374151; border:1px solid #374151; padding:8px 14px; border-radius:6px; color:#f59e0b; font-weight:700; position:relative; height:40px; display:inline-flex; align-items:center }
+.cl-filter-btn::after { content: '▾'; margin-left:8px; font-size:0.9rem; color:#f59e0b }
+.cl-oldcdr { border:1px solid #f59e0b; color:#d97706; font-weight:700; background:transparent; padding:8px 12px; border-radius:6px; height:40px; display:inline-flex; align-items:center }
+.cl-oldcdr:hover { background:#fff7ed }
+.cl-icon-btn { background:#fff; border:1px solid #e6e8eb; padding:8px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; height:40px }
+
+/* Call type icons inside table */
+.call-type-icon{width:36px;height:36px;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;background:#f3f4f6;color:#065f46}
+.call-type-icon.incoming{background:#ecfdf5;color:#065f46}
+.call-type-icon.missed{background:#fff1f2;color:#9f1239}
+.call-type-icon svg{width:18px;height:18px}
+
+/* Agent badge in calllogs */
+.calllogs-agent-badge{width:34px;height:34px;border-radius:50%;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#374151}
+
+/* Recording column: orange circular play and waveform */
+.cl-icon-btn.play { border:1px solid #f59e0b; color:#d97706 }
+.cl-waveform{width:140px;height:22px;border-radius:4px;background:repeating-linear-gradient(90deg,#e6eef6 0 4px,#e6eef6 4px 6px,#fff 6px 10px);}
+
+@media (max-width: 768px) {
+  .calllogs-controls { flex-direction:column; gap:10px }
+  .cl-callid-search .form-control { min-width:120px }
+}
+
 /* Expandable Row Styles */
 .table-row-expanded {
   background-color: rgba(90, 70, 235, 0.05) !important;
@@ -337,4 +368,82 @@
 
 .call-logs-container .input-group {
   max-width: 220px;
+}
+
+/* Date filter modal styles */
+.date-filter-modal {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+}
+.date-filter-left {
+  width: 220px;
+  border-right: 1px solid #eef2ff;
+  padding-right: 12px;
+}
+.date-filter-left h5 { margin-top: 0; margin-bottom: 8px; font-size: 1rem }
+.date-filter-left ul { list-style: none; padding: 0; margin: 0 }
+.date-filter-left li { margin-bottom: 8px }
+.quick-action { width: 100%; text-align: left; padding: 8px 10px; border-radius: 6px; background: transparent; border: 1px solid transparent; color: #374151 }
+.quick-action:hover { background: #f8fafc; border-color: #e6eefc }
+
+.date-filter-right { flex: 1; display:flex; flex-direction:column; gap:12px }
+.date-filter-panels { display:flex; gap:16px; align-items:flex-start }
+.date-panel { display:flex; flex-direction:column; gap:6px; min-width: 200px }
+.date-panel label { font-size: 0.85rem; color:#374151 }
+.date-panel input[type="date"], .date-panel input[type="time"] { padding:8px 10px; border:1px solid #e6e8eb; border-radius:6px }
+.time-input { width: 120px }
+.date-filter-actions { display:flex; justify-content:flex-end; margin-top: auto }
+
+@media (max-width: 992px) {
+  .date-filter-modal { flex-direction: column }
+  .date-filter-left { width: 100%; border-right: none; border-bottom: 1px solid #eef2ff; padding-bottom: 12px }
+  .date-filter-panels { flex-direction: column }
+}
+
+/* Rich modal styles */
+.date-filter-modal-rich { padding: 12px 12px; max-width: 880px; margin: 8px auto; max-height: 520px; overflow: auto }
+.date-filter-top { margin-bottom: 8px }
+.date-display { display:flex; gap:12px; align-items:center }
+.date-block { flex:1; border-radius:6px; padding:8px; background:#fff; box-shadow:0 2px 8px rgba(16,24,40,0.04); text-align:left }
+.date-title { font-size:0.8rem; color:#6b7280; margin-bottom:4px }
+.date-large { font-size:0.95rem; font-weight:700 }
+.time-large { font-size:1rem; font-weight:700; margin-top:4px; color:#374151 }
+
+.date-filter-panels-rich { display:flex; gap:12px; margin-top:8px }
+.date-panel-rich { flex:1 1 0; display:flex; flex-direction:column; gap:6px }
+.calendar-wrapper { background:#fff; border-radius:6px; padding:8px; box-shadow:0 2px 8px rgba(16,24,40,0.04); max-width:360px }
+.time-row { display:flex; justify-content:center; padding-top:6px }
+.time-row input[type="time"] { padding:6px 8px; border-radius:6px; border:1px solid #e6e8eb; height:34px }
+
+.date-filter-actions-rich { display:flex; justify-content:center; padding-top:12px }
+.date-filter-actions-rich .btn { background:#f59e0b; border-color:#f59e0b; color:#fff; padding:8px 18px; border-radius:8px; font-weight:700 }
+
+/* Calendar grid styles */
+.calendar-panel { width:100% }
+.calendar-header { text-align:center; margin-bottom:8px }
+.calendar-month { font-weight:700 }
+.calendar-grid { display:grid; grid-template-columns: repeat(7, 1fr); gap:4px }
+.calendar-cell { padding:4px; text-align:center; border-radius:6px; color:#9ca3af; font-size:12px; line-height:1 }
+.calendar-cell-header { font-weight:700; color:#6b7280 }
+.calendar-cell.in-month { color:#374151 }
+.calendar-cell.selected { background:#ffedd5; color:#b45309; font-weight:700 }
+.calendar-cell:hover { background:#f8fafc }
+
+.calendar-controls { display:flex; align-items:center; gap:8px }
+.calendar-controls .month-prev, .calendar-controls .month-next { background:transparent; border:0; font-size:13px; padding:4px 6px; border-radius:6px; cursor:pointer }
+.calendar-controls .month-prev:hover, .calendar-controls .month-next:hover { background:#f8fafc }
+.calendar-controls .calendar-month { margin:0 6px; font-size:14px }
+
+/* Ensure calendar wrapper doesn't force modal to expand */
+.calendar-wrapper { max-width: 360px; }
+.date-panel-rich { flex: 1 1 0; min-width: 0 }
+
+@media (max-width: 992px) {
+  .date-filter-panels-rich { flex-direction:column }
+  .date-filter-actions-rich { justify-content:flex-end }
+}
+
+@media (max-height: 700px) {
+  .date-filter-modal-rich { max-height: 440px }
 }

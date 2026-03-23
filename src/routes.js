@@ -22,7 +22,7 @@ const UsersTeams = React.lazy(() => import("./views/UsersTeams/UsersTeams"));
 const VirtualNumbers = React.lazy(() => import("./views/VirtualNumbers/VirtualNumbers"));
 const Billing = React.lazy(() => import("./views/Billing/Billing"));
 const ReportsAnalytics = React.lazy(() => import("./views/ReportsAnalytics/ReportsAnalytics"));
-const CallDispositions = React.lazy(() => import("./views/ReportsAnalytics/CallDispositions"));
+const CallLogsLegacy = React.lazy(() => import("./views/ReportsAnalytics/CallDispositions"));
 const Payments = React.lazy(() => import("./views/Payments/Payments"));
 const Settings = React.lazy(() => import("./views/Settings/Settings"));
 const Department = React.lazy(() => import("./views/Department/Department"));
@@ -144,6 +144,7 @@ const MobileApp = React.lazy(() => import("./views/configuration/MobileApp"));
 
 const OpeningInventoryReports = React.lazy(() => import("./views/Reports/OpeningInventoryReports"));
 const StockReports = React.lazy(() => import("./views/Reports/StockReports "));
+const ReportsLanding = React.lazy(() => import("./views/Reports/ReportsLanding"));
 const Transporter = React.lazy(() => import("./views/Transporter/Transporter"));
 const Menu = React.lazy(() => import("./views/Menu/menu"));
 const AddMenu = React.lazy(() => import("./views/Menu/addMenu"));
@@ -163,7 +164,8 @@ const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagemen
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
-const AgentPerformance = React.lazy(() => import("./views/AgentPerformance"));
+const AgentPerformance = React.lazy(() => import("./views/Reports/AgentPerformance"));
+const DialerRealTime = React.lazy(() => import("./views/Reports/DialerRealTime"));
 const DepartmentPerformance = React.lazy(() => import("./views/DepartmentPerformance"));
 
 const routes = [
@@ -251,6 +253,12 @@ const routes = [
 
   //----------------------- End Product Management Routes------------------------------------------------
   //---------------Reports------------
+  {
+    path: "/reports",
+    name: "Reports",
+    element: ReportsLanding,
+    navName: "Reports",
+  },
   {
     path: "/reports/opening-inventory",
     name: "Reports Opening Inventory",
@@ -382,11 +390,11 @@ const routes = [
 
   //------------------ End customers Route-------------------------
 
-  // Data & Analytics - Call Dispositions
+  // Data & Analytics - Call Logs (legacy route, consider removing if not used)
   {
     path: "/reports/call-dispositions",
-    name: "Call Dispositions",
-    element: CallDispositions,
+    name: "Call Logs",
+    element: CallLogsLegacy,
     navName: "Data & Analytics",
   },
 
@@ -843,9 +851,9 @@ const routes = [
   },
   {
     path: '/callogs',
-    name: 'Call Dispositions',
+    name: 'Call Logs',
     element: CallLogs,
-    navName: "Call Dispositions",
+    navName: "Call Logs",
   },
   {
     path: '/calluses',
@@ -902,6 +910,12 @@ const routes = [
     navName: "Reports & Analytics",
   },
   {
+    path: "/dialer-real-time",
+    name: "Dialer Real Time Report",
+    element: DialerRealTime,
+    navName: "Reports & Analytics",
+  },
+  {
     path: "/settings",
     name: "Settings",
     element: Settings,
@@ -909,7 +923,7 @@ const routes = [
   },
   {
     path: "/agent-performance",
-    name: "Agent Performance",
+    name: "Agent Real Time Report",
     element: AgentPerformance,
     navName: "Reports & Analytics",
   },

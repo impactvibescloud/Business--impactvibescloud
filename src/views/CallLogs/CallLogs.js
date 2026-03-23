@@ -34,7 +34,13 @@ import {
   cilFilter, 
   cilMediaPlay,
   cilCloudDownload,
-  cilDescription
+  cilDescription,
+  cilCalendar,
+  cilReload,
+  cilOptions,
+  cilCheckCircle,
+  cilPhone,
+  cilXCircle
 } from '@coreui/icons'
 import './CallLogs.css'
 import '../Branches/Branches.css'
@@ -75,6 +81,49 @@ const CallLogs = () => {
   const [recordingInfo, setRecordingInfo] = useState(null)
   const [downloadLoading, setDownloadLoading] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [showDateModal, setShowDateModal] = useState(false)
+  const [selectedFromDate, setSelectedFromDate] = useState(null)
+  const [selectedToDate, setSelectedToDate] = useState(null)
+  const [selectedFromTime, setSelectedFromTime] = useState('00:00')
+  const [selectedToTime, setSelectedToTime] = useState('23:59')
+  const [baseLeftDate, setBaseLeftDate] = useState(null)
+  const [baseRightDate, setBaseRightDate] = useState(null)
+
+  const openDateModal = () => {
+    // initialize selected dates/times from current filters or sensible defaults
+    const now = new Date()
+    if (dateFrom) {
+      const fromTs = parseLocalDate(dateFrom, false)
+      if (fromTs !== null) setSelectedFromDate(new Date(fromTs))
+      else setSelectedFromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()))
+    } else {
+      setSelectedFromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()))
+    }
+
+    if (dateTo) {
+      const toTs = parseLocalDate(dateTo, true)
+      if (toTs !== null) {
+        const dt = new Date(toTs)
+        setSelectedToDate(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()))
+      } else setSelectedToDate(now)
+    } else {
+      setSelectedToDate(now)
+    }
+
+    // initialize times
+    if (dateFrom) {
+      const parts = String(dateFrom).split('T')[1]
+      // keep HH:MM if present else 00:00
+      setSelectedFromTime(parts ? parts.slice(0,5) : '00:00')
+    } else setSelectedFromTime('00:00')
+
+    if (dateTo) {
+      const parts = String(dateTo).split('T')[1]
+      setSelectedToTime(parts ? parts.slice(0,5) : `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`)
+    } else setSelectedToTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`)
+
+    setShowDateModal(true)
+  }
   const [callStats, setCallStats] = useState(null)
   const lastDateFilterKeyRef = useRef('')
 
@@ -364,6 +413,119 @@ const CallLogs = () => {
     if (endOfDay) dt.setHours(23, 59, 59, 999)
     else dt.setHours(0, 0, 0, 0)
     return dt.getTime()
+  }
+
+  // Format a Date into YYYY-MM-DD for <input type="date"> controls
+  const formatDateInput = (d) => {
+    if (!d) return ''
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
+  // Apply a quick preset range selected in the date modal
+  const applyQuickRange = (preset) => {
+    const now = new Date()
+    let from = null
+    let to = now
+    switch (preset) {
+      case 'Last 1 hour':
+        from = new Date(now.getTime() - 1 * 60 * 60 * 1000)
+        break
+      case 'Last 24 hour':
+        from = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+        break
+      case 'Today':
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+        break
+      case 'Yesterday':
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+        to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999)
+        break
+      case 'This Week':
+        // Start from Monday
+        const day = now.getDay() || 7
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day - 1))
+        break
+      case 'Last 7 days':
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case 'Last 30 days':
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case 'Last Month':
+        const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const lastMonthLastDay = new Date(firstDayThisMonth.getTime() - 1)
+        from = new Date(lastMonthLastDay.getFullYear(), lastMonthLastDay.getMonth(), 1)
+        to = new Date(lastMonthLastDay.getFullYear(), lastMonthLastDay.getMonth(), lastMonthLastDay.getDate(), 23, 59, 59, 999)
+        break
+      case 'This Month':
+        from = new Date(now.getFullYear(), now.getMonth(), 1)
+        break
+      default:
+        from = null
+    }
+
+    setDateFrom(from ? formatDateInput(from) : '')
+    setDateTo(to ? formatDateInput(to) : '')
+    // set selected states too so modal UI reflects current selection
+    setSelectedFromDate(from ? new Date(from.getFullYear(), from.getMonth(), from.getDate()) : null)
+    setSelectedToDate(to ? new Date(to.getFullYear(), to.getMonth(), to.getDate()) : null)
+    setSelectedFromTime(from ? `${String(from.getHours()).padStart(2,'0')}:${String(from.getMinutes()).padStart(2,'0')}` : '00:00')
+    setSelectedToTime(to ? `${String(to.getHours()).padStart(2,'0')}:${String(to.getMinutes()).padStart(2,'0')}` : '23:59')
+    // Keep modal open so user can review before applying
+    setCurrentPage(1)
+  }
+
+  // Calendar helper component (basic month grid) with navigation
+  const CalendarPanel = ({ valueDate, onSelect, baseDate, onPrev, onNext }) => {
+    const today = new Date()
+    const base = baseDate ? new Date(baseDate.getFullYear(), baseDate.getMonth(), 1) : new Date(today.getFullYear(), today.getMonth(), 1)
+    const year = base.getFullYear()
+    const month = base.getMonth()
+    const firstDay = new Date(year, month, 1).getDay()
+    const weeks = []
+    let day = 1 - firstDay
+    for (let w = 0; w < 6; w++) {
+      const week = []
+      for (let d = 0; d < 7; d++) {
+        const dt = new Date(year, month, day)
+        week.push(dt)
+        day++
+      }
+      weeks.push(week)
+    }
+
+    const isSameDate = (a, b) => {
+      if (!a || !b) return false
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+    }
+
+    return (
+      <div className="calendar-panel">
+        <div className="calendar-header d-flex align-items-center justify-content-between">
+          <div className="calendar-controls">
+            <button type="button" className="month-prev" onClick={onPrev}>◀</button>
+            <span className="calendar-month">{base.toLocaleString('en-US', { month: 'long' })} {year}</span>
+            <button type="button" className="month-next" onClick={onNext}>▶</button>
+          </div>
+        </div>
+        <div className="calendar-grid">
+          {['S','M','T','W','T','F','S'].map((h) => <div key={h} className="calendar-cell calendar-cell-header">{h}</div>)}
+          {weeks.map((week,wi)=> week.map((dt,di)=> {
+            const inMonth = dt.getMonth() === month
+            const selected = valueDate && isSameDate(dt, valueDate)
+            return (
+              <div key={`${wi}-${di}`} className={`calendar-cell ${inMonth ? 'in-month':''} ${selected ? 'selected':''}`} onClick={() => onSelect(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()))}>
+                {dt.getDate()}
+              </div>
+            )
+          }))}
+        </div>
+      </div>
+    )
   }
 
   // When server provides paginated results, the server is expected to apply filters.
@@ -837,114 +999,41 @@ const CallLogs = () => {
     <div className="call-logs-container">
       <CCard className="mb-4">
         <CCardBody>
-          <CRow className="mb-3 align-items-center">
-            <CCol md={6} />
-            <CCol md={6} className="d-flex justify-content-end" />
-          </CRow>
-          <CRow className="mb-4">
-            <CCol md={6}>
-              <CInputGroup>
-                <CFormInput
-                  placeholder="Search dispositions..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end" />
-          </CRow>
-          <CRow className="mb-3">
-            <CCol md={12}>
-              <div className="d-flex flex-wrap gap-2 align-items-center">
-                <CFormSelect value={callTypeFilter} onChange={e => { setCallTypeFilter(e.target.value); setCurrentPage(1); }} style={{ width: 160 }}>
-                  <option value="All">All Call Types</option>
-                  <option value="Incoming">Incoming</option>
-                  <option value="Outgoing">Outgoing</option>
-                </CFormSelect>
-                <CFormInput type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }} style={{ width: 180 }} />
-                <CFormInput type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }} style={{ width: 180 }} />
+          <CRow className="mb-3 align-items-center call-logs-header">
+            <CCol md={8}>
+              <div className="calllogs-controls d-flex align-items-center gap-2">
+                <button className="cl-date-range btn btn-light" onClick={openDateModal}>
+                  <CIcon icon={cilCalendar} className="me-2" />
+                  {dateFrom && dateTo ? `${dateFrom} ${selectedFromTime} - ${dateTo} ${selectedToTime}` : 'Select date range'}
+                </button>
 
-                {/* Status filter dropdown moved here to group with other filters */}
-                <CDropdown>
-                  <CDropdownToggle color="secondary" variant="outline" style={{ minWidth: 150 }}>
-                    <CIcon icon={cilFilter} className="me-2" />
-                    {activeFilter}
-                  </CDropdownToggle>
-                  <CDropdownMenu>
-                    <CDropdownItem 
-                      onClick={() => handleFilterChange('All Calls')} 
-                      active={activeFilter === 'All Calls'}
-                    >
-                      All Calls {activeFilter === 'All Calls' && '✓'}
-                    </CDropdownItem>
-                    <CDropdownItem 
-                      onClick={() => handleFilterChange('Completed')} 
-                      active={activeFilter === 'Completed'}
-                    >
-                      Completed {activeFilter === 'Completed' && '✓'}
-                    </CDropdownItem>
-                    <CDropdownItem 
-                      onClick={() => handleFilterChange('Outgoing')} 
-                      active={activeFilter === 'Outgoing'}
-                    >
-                      Outgoing {activeFilter === 'Outgoing' && '✓'}
-                    </CDropdownItem>
-                    <CDropdownItem 
-                      onClick={() => handleFilterChange('Incoming')} 
-                      active={activeFilter === 'Incoming'}
-                    >
-                      Incoming {activeFilter === 'Incoming' && '✓'}
-                    </CDropdownItem>
-                    <CDropdownItem 
-                      onClick={() => handleFilterChange('Failed')} 
-                      active={activeFilter === 'Failed'}
-                    >
-                      Failed {activeFilter === 'Failed' && '✓'}
-                    </CDropdownItem>
-                  </CDropdownMenu>
-                </CDropdown>
-
-                <CButton color="light" onClick={() => { setDateFrom(''); setDateTo(''); setCallTypeFilter('All'); setSearchTerm(''); setActiveFilter('All Calls'); setCurrentPage(1); }}>
-                  Clear Filters
-                </CButton>
-
-                {/* Improved Export button grouped with filters */}
-                <div style={{ marginLeft: 'auto' }}>
-                  {(() => {
-                    const exportCount = serverPaginated ? totalRecords : clientFilteredCallLogs.length
-                    return (
-                      <CButton color="info" onClick={() => exportAllCallLogs()} disabled={!businessId || exporting}>
-                        {exporting ? (
-                          <>
-                            <CSpinner size="sm" className="me-2" /> Exporting...
-                          </>
-                        ) : (
-                          <>
-                            <CIcon icon={cilCloudDownload} className="me-2" /> Export All ({exportCount})
-                          </>
-                        )}
-                      </CButton>
-                    )
-                  })()}
+                <div className="cl-callid-search input-group">
+                  <CFormInput placeholder="Call ID" value={searchTerm} onChange={handleSearch} />
+                  <CButton type="button" color="primary" variant="outline"><CIcon icon={cilSearch} /></CButton>
                 </div>
+
+                <CButton color="secondary" className="cl-filter-btn"><CIcon icon={cilFilter} className="me-1" />FILTER</CButton>
               </div>
             </CCol>
+            <CCol md={4} className="d-flex justify-content-end align-items-center gap-2">
+              <CButton color="warning" variant="outline" className="cl-oldcdr">OLD CDR</CButton>
+              <CButton color="light" className="cl-icon-btn"><CIcon icon={cilCloudDownload} /></CButton>
+              <CButton color="light" className="cl-icon-btn"><CIcon icon={cilReload} /></CButton>
+              <CButton color="light" className="cl-icon-btn"><CIcon icon={cilOptions} /></CButton>
+            </CCol>
           </CRow>
+          {/* New filters UI (top controls) are used. Old inline filter row removed. */}
           <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell>S.NO</CTableHeaderCell>
-                  <CTableHeaderCell>TYPE</CTableHeaderCell>
-                  <CTableHeaderCell>DATE</CTableHeaderCell>
-                  <CTableHeaderCell>INITIATED BY</CTableHeaderCell>
-                  <CTableHeaderCell>RECEIVED BY</CTableHeaderCell>
-                  {/* Columns removed: REJECTED BY, TEAM, HANG UP BY, DURATION, COST
-                    Their values will be shown inside the call details modal. */}
-                <CTableHeaderCell>NOTES</CTableHeaderCell>
-                <CTableHeaderCell>STATUS</CTableHeaderCell>
+                <CTableHeaderCell style={{width: '48px'}}></CTableHeaderCell>
+                <CTableHeaderCell>Customer No.</CTableHeaderCell>
+                <CTableHeaderCell>DID No.</CTableHeaderCell>
+                <CTableHeaderCell>Duration</CTableHeaderCell>
+                <CTableHeaderCell>Call ID</CTableHeaderCell>
+                <CTableHeaderCell>Solution</CTableHeaderCell>
+                <CTableHeaderCell>Agents Involved</CTableHeaderCell>
+                <CTableHeaderCell>Recording</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -977,53 +1066,74 @@ const CallLogs = () => {
                 </CTableRow>
               ) : (
                 paginatedCallLogs.map((log, index) => {
-                  const callType = log.callType || 'Unknown';
                   const callDate = formatDate(log.callDate || log.createdAt);
-                  const status = formatCallStatus(log.status);
+                  const callType = String((log.callType || log.type || '').toLowerCase())
+                  const isIncoming = callType === 'inbound' || callType === 'incoming'
+                  const isMissed = (log.status || '').toLowerCase().includes('miss') || (log.hangupby || '').toLowerCase() === 'caller'
+                  const duration = formatDuration(log.callDuration || log.duration);
+                  const callId = log.callId || log.call_id || log._id || '';
+                  const solution = log.solution || log.callType || '';
+                  const agents = Array.isArray(log.agents) && log.agents.length ? log.agents : (log.callReceivedBy ? [log.callReceivedBy] : []);
+                  const recording = log.callRecording || log.recording || null;
+
+                  const initials = (name) => {
+                    if (!name) return ''
+                    return name.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()
+                  }
+
                   return (
-                    <CTableRow 
-                      key={log._id} 
-                      onClick={() => {
-                        setSelectedLog(log);
-                        setShowModal(true);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                        <CTableDataCell className="align-middle"><div className="agent-number">{(currentPage - 1) * pageSize + index + 1}</div></CTableDataCell>
-                        <CTableDataCell className="align-middle"><div className="agent-name text-capitalize">{callType}</div></CTableDataCell>
-                        <CTableDataCell className="align-middle"><div className="department-name">{callDate}</div></CTableDataCell>
-                        <CTableDataCell className="align-middle"><div className="agent-name">{log.callInitiatedBy || 'Unknown'}</div></CTableDataCell>
-                        <CTableDataCell className="align-middle"><div className="manager-email">{log.callReceivedBy || 'N/A'}</div></CTableDataCell>
-                      {/* Removed inline columns: these values are shown in modal */}
-                      <CTableDataCell>
-                        <div>
-                          <CButton
-                            size="sm"
-                            color="info"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setNotesContent(log.notes || log.notebyagent || '');
-                              setShowNotesModal(true);
-                            }}
-                            title={(log.notes || log.notebyagent) ? 'View notes' : 'No notes'}
-                          >
-                            <CIcon icon={cilDescription} />
-                          </CButton>
+                    <CTableRow key={log._id || index}>
+                      <CTableDataCell className="align-middle">
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <input type="checkbox" onClick={(e)=>e.stopPropagation()} />
                         </div>
                       </CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge
-                          color={status.toLowerCase() === 'success' || status.toLowerCase() === 'completed' ? 'success'
-                            : status.toLowerCase().includes('fail') ? 'danger'
-                            : status.toLowerCase() === 'missed' ? 'warning' : 'secondary'}
-                          className="status-badge"
-                        >
-                          {status}
-                        </CBadge>
+
+                      <CTableDataCell className="align-middle">
+                        <div style={{display:'flex',alignItems:'center',gap:12}}>
+                          <div className={isIncoming ? 'call-type-icon incoming' : (isMissed ? 'call-type-icon missed' : 'call-type-icon') }>
+                            <CIcon icon={isIncoming ? cilPhone : (isMissed ? cilXCircle : cilPhone)} />
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column'}}>
+                            <div style={{fontWeight:600}}>{log.contact || log.callInitiatedBy || '—'}</div>
+                            <div style={{fontSize:'12px',color:'#6b7280'}}>{callDate}</div>
+                          </div>
+                        </div>
+                      </CTableDataCell>
+
+                      <CTableDataCell className="align-middle">{log.virtualNumber || '—'}</CTableDataCell>
+
+                      <CTableDataCell className="align-middle">{duration}</CTableDataCell>
+
+                      <CTableDataCell className="align-middle">
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <div style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:220}}>{callId}</div>
+                          <a href={`#`} onClick={(e)=>e.preventDefault()} title="Open call" style={{color:'#6b7280'}}>
+                            <CIcon icon={cilOptions} />
+                          </a>
+                        </div>
+                      </CTableDataCell>
+
+                      <CTableDataCell className="align-middle">{solution}</CTableDataCell>
+
+                      <CTableDataCell className="align-middle">
+                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                          {agents.map((a,ii)=> (
+                            <div key={ii} style={{width:34,height:34,borderRadius:17,background:'#e5e7eb',display:'inline-flex',alignItems:'center',justifyContent:'center',fontWeight:600,color:'#374151'}}>{initials(a)}</div>
+                          ))}
+                        </div>
+                      </CTableDataCell>
+
+                      <CTableDataCell className="align-middle">
+                        <div style={{display:'flex',alignItems:'center',gap:10}}>
+                          {recording ? (
+                            <button className="cl-icon-btn" onClick={(e)=>{e.stopPropagation(); handlePlayRecording(recording)}}><CIcon icon={cilMediaPlay} /></button>
+                          ) : <div style={{width:36,height:36}} />}
+                          <div style={{width:120,height:20,background:'linear-gradient(90deg, rgba(0,0,0,0.06) 20%, rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.06) 60%)',borderRadius:4}} />
+                        </div>
                       </CTableDataCell>
                     </CTableRow>
-                  );
+                  )
                 })
               )}
             </CTableBody>
@@ -1292,6 +1402,89 @@ const CallLogs = () => {
             Close
           </CButton>
         </CModalFooter>
+      </CModal>
+
+      {/* Date Range Modal (Quick Actions + Dual Calendar) */}
+      <CModal visible={showDateModal} onClose={() => setShowDateModal(false)} size="lg">
+        <div className="date-filter-modal date-filter-modal-rich">
+          <div className="date-filter-left">
+            <h5>Quick Actions</h5>
+            <ul>
+              {['Last 1 hour','Today','Last 24 hour','Yesterday','This Week','Last 7 days','Last 30 days','Last Month','This Month'].map((q) => (
+                <li key={q}><button type="button" className="quick-action" onClick={() => applyQuickRange(q)}>{q}</button></li>
+              ))}
+            </ul>
+          </div>
+          <div className="date-filter-right">
+            <div className="date-filter-top">
+              <div className="date-display">
+                <div className="date-block">
+                  <div className="date-title">From</div>
+                  <div className="date-large">{selectedFromDate ? selectedFromDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</div>
+                  <div className="time-large">{selectedFromTime}</div>
+                </div>
+                <div className="date-block">
+                  <div className="date-title">To</div>
+                  <div className="date-large">{selectedToDate ? selectedToDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</div>
+                  <div className="time-large">{selectedToTime}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="date-filter-panels-rich">
+              <div className="date-panel-rich">
+                <div className="calendar-wrapper">
+                  <CalendarPanel
+                    valueDate={selectedFromDate}
+                    onSelect={d=>setSelectedFromDate(d)}
+                    baseDate={baseLeftDate || selectedFromDate || new Date()}
+                    onPrev={() => setBaseLeftDate(prev => {
+                      const src = prev || (selectedFromDate || new Date())
+                      return new Date(src.getFullYear(), src.getMonth() - 1, 1)
+                    })}
+                    onNext={() => setBaseLeftDate(prev => {
+                      const src = prev || (selectedFromDate || new Date())
+                      return new Date(src.getFullYear(), src.getMonth() + 1, 1)
+                    })}
+                  />
+                </div>
+                <div className="time-row">
+                  <input type="time" value={selectedFromTime} onChange={e=>setSelectedFromTime(e.target.value)} />
+                </div>
+              </div>
+              <div className="date-panel-rich">
+                <div className="calendar-wrapper">
+                  <CalendarPanel
+                    valueDate={selectedToDate}
+                    onSelect={d=>setSelectedToDate(d)}
+                    baseDate={baseRightDate || selectedToDate || new Date()}
+                    onPrev={() => setBaseRightDate(prev => {
+                      const src = prev || (selectedToDate || new Date())
+                      return new Date(src.getFullYear(), src.getMonth() - 1, 1)
+                    })}
+                    onNext={() => setBaseRightDate(prev => {
+                      const src = prev || (selectedToDate || new Date())
+                      return new Date(src.getFullYear(), src.getMonth() + 1, 1)
+                    })}
+                  />
+                </div>
+                <div className="time-row">
+                  <input type="time" value={selectedToTime} onChange={e=>setSelectedToTime(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="date-filter-actions-rich">
+              <CButton color="warning" onClick={() => {
+                // apply selected values to dateFrom/dateTo (date-only fields expected by backend)
+                setDateFrom(selectedFromDate ? formatDateInput(selectedFromDate) : '')
+                setDateTo(selectedToDate ? formatDateInput(selectedToDate) : '')
+                setShowDateModal(false)
+                setCurrentPage(1)
+              }}>APPLY</CButton>
+            </div>
+          </div>
+        </div>
       </CModal>
       {/* Notes Modal (notepad) */}
       <CModal visible={showNotesModal} scrollable onClose={() => setShowNotesModal(false)} size="md">
