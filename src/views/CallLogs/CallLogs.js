@@ -33,6 +33,7 @@ import {
   cilSearch, 
   cilFilter, 
   cilMediaPlay,
+  cilMediaStop,
   cilCloudDownload,
   cilDescription,
   cilCalendar,
@@ -64,7 +65,6 @@ const CallLogs = () => {
   const [businessId, setBusinessId] = useState(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [callTypeFilter, setCallTypeFilter] = useState('All')
   const [showModal, setShowModal] = useState(false)
   const [selectedLog, setSelectedLog] = useState(null)
   const [showNotesModal, setShowNotesModal] = useState(false)
@@ -72,15 +72,20 @@ const CallLogs = () => {
   const [audioBlobUrl, setAudioBlobUrl] = useState(null)
   const [recordingLoading, setRecordingLoading] = useState(false)
   const [recordingError, setRecordingError] = useState(null)
+  const [playingUrl, setPlayingUrl] = useState(null)
+  const [playingId, setPlayingId] = useState(null)
   const audioRef = useRef(null)
   const [recordingMimeType, setRecordingMimeType] = useState(null)
   const audioContextRef = useRef(null)
   const audioBufferRef = useRef(null)
   const audioSourceRef = useRef(null)
+  const tempAudioRef = useRef(null)
   const [audioCtxPlaying, setAudioCtxPlaying] = useState(false)
   const [recordingInfo, setRecordingInfo] = useState(null)
-  const [downloadLoading, setDownloadLoading] = useState(null)
+  const [downloadLoadingMap, setDownloadLoadingMap] = useState({})
   const [exporting, setExporting] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [showDateModal, setShowDateModal] = useState(false)
   const [selectedFromDate, setSelectedFromDate] = useState(null)
   const [selectedToDate, setSelectedToDate] = useState(null)
@@ -193,15 +198,6 @@ const CallLogs = () => {
       }
     }
 
-  // Normalize call type filter to backend values
-    if (callTypeFilter && callTypeFilter !== 'All') {
-      const ct = String(callTypeFilter)
-      let mapped = ct.toLowerCase()
-      if (ct === 'Outgoing') mapped = 'outbound'
-      else if (ct === 'Incoming') mapped = 'inbound'
-      endpoint += `&callType=${encodeURIComponent(mapped)}`
-    }
-
     // Normalize active filter to backend parameters (status / callType)
     if (activeFilter && activeFilter !== 'All Calls') {
       if (activeFilter === 'Completed') endpoint += `&status=completed`
@@ -312,60 +308,67 @@ const CallLogs = () => {
       }
     };
       fetchCallLogs();
-    }, [businessId, currentPage, searchTerm, pageSize, dateFrom, dateTo, callTypeFilter, activeFilter]);
+    }, [businessId, currentPage, searchTerm, pageSize, dateFrom, dateTo, activeFilter, refreshTrigger]);
+
+  // Auto-refresh interval: when enabled, increment `refreshTrigger` every 3s
+  useEffect(() => {
+    if (!autoRefresh) return undefined
+    const id = setInterval(() => setRefreshTrigger(t => t + 1), 5000)
+    return () => clearInterval(id)
+  }, [autoRefresh])
 
   // Fetch available audio recordings once businessId is known
-  useEffect(() => {
-    const fetchAudioFiles = async () => {
-      if (!businessId) return;
-      setAudioLoading(true)
-      setAudioError(null)
-      try {
-        // Try several possible endpoints/response shapes to be tolerant of backend differences
-        const tryEndpoints = [
-          `/v1/audio-recordings`,
-          `/audio-recordings`,
-          `/audio-recordings/business/${businessId}`,
-          `/v1/audio-recordings/business/${businessId}`,
-        ];
-        let files = []
-        for (let ep of tryEndpoints) {
-          try {
-            const r = await apiCall(ep, 'GET')
-            // possible shapes: array of filenames, { files: [...] }, { data: [...] }, { recordings: [...] }
-            if (Array.isArray(r)) {
-              files = r
-            } else if (Array.isArray(r?.files)) {
-              files = r.files
-            } else if (Array.isArray(r?.data)) {
-              files = r.data
-            } else if (Array.isArray(r?.recordings)) {
-              files = r.recordings
-            }
-            if (files && files.length > 0) break
-          } catch (e) {
-            // try next endpoint
-            console.debug('audio recordings endpoint failed', ep, e.message)
+  const fetchAudioFiles = async () => {
+    if (!businessId) return;
+    setAudioLoading(true)
+    setAudioError(null)
+    try {
+      // Try several possible endpoints/response shapes to be tolerant of backend differences
+      const tryEndpoints = [
+        `/v1/audio-recordings`,
+        `/audio-recordings`,
+        `/audio-recordings/business/${businessId}`,
+        `/v1/audio-recordings/business/${businessId}`,
+      ];
+      let files = []
+      for (let ep of tryEndpoints) {
+        try {
+          const r = await apiCall(ep, 'GET')
+          // possible shapes: array of filenames, { files: [...] }, { data: [...] }, { recordings: [...] }
+          if (Array.isArray(r)) {
+            files = r
+          } else if (Array.isArray(r?.files)) {
+            files = r.files
+          } else if (Array.isArray(r?.data)) {
+            files = r.data
+          } else if (Array.isArray(r?.recordings)) {
+            files = r.recordings
           }
+          if (files && files.length > 0) break
+        } catch (e) {
+          // try next endpoint
+          console.debug('audio recordings endpoint failed', ep, e.message)
         }
-
-        // Normalize entries to simple filename strings when objects are returned
-        const normalized = (files || []).map(f => {
-          if (!f) return ''
-          if (typeof f === 'string') return f
-          if (typeof f === 'object') return f.filename || f.fileName || f.name || f.key || JSON.stringify(f)
-          return String(f)
-        }).filter(Boolean)
-        setAudioFiles(normalized)
-      } catch (err) {
-        console.error('Failed to fetch audio recordings', err)
-        setAudioError('Failed to load audio recordings')
-        setAudioFiles([])
-      } finally {
-        setAudioLoading(false)
       }
-    }
 
+      // Normalize entries to simple filename strings when objects are returned
+      const normalized = (files || []).map(f => {
+        if (!f) return ''
+        if (typeof f === 'string') return f
+        if (typeof f === 'object') return f.filename || f.fileName || f.name || f.key || JSON.stringify(f)
+        return String(f)
+      }).filter(Boolean)
+      setAudioFiles(normalized)
+    } catch (err) {
+      console.error('Failed to fetch audio recordings', err)
+      setAudioError('Failed to load audio recordings')
+      setAudioFiles([])
+    } finally {
+      setAudioLoading(false)
+    }
+  }
+
+  useEffect(() => {
     fetchAudioFiles()
   }, [businessId])
 
@@ -548,15 +551,7 @@ const CallLogs = () => {
       }
     }
 
-    // callTypeFilter UI select (All, Incoming, Outgoing)
-    if (matches && callTypeFilter && callTypeFilter !== 'All') {
-      const ctVal = callTypeFilter.toLowerCase()
-      if (ctVal === 'outgoing') {
-        matches = callType === 'outbound' || callType === 'outgoing'
-      } else if (ctVal === 'incoming') {
-        matches = callType === 'inbound' || callType === 'incoming'
-      }
-    }
+    // callTypeFilter removed: rely on `activeFilter` for call type/status filtering
 
     // dateFrom / dateTo client-side filtering when server didn't paginate
     if (matches && (dateFrom || dateTo)) {
@@ -601,96 +596,121 @@ const CallLogs = () => {
     setCurrentPage(1) // Reset to first page when filter changes
   }
 
-  const handlePlayRecording = async (recordingUrl) => {
+  const handlePlayRecording = async (recordingUrl, rowId) => {
+    // mark this row and URL as the currently requested playing resource
+    setPlayingId(rowId != null ? String(rowId) : null)
+    setPlayingUrl(recordingUrl)
     if (!recordingUrl) {
       alert('No recording available for this call');
+      setPlayingId(null)
+      setPlayingUrl(null)
       return;
     }
     setRecordingError(null)
     setRecordingLoading(true)
     try {
-      const token = localStorage.getItem('authToken') || '';
+      const token = localStorage.getItem('authToken') || ''
       // Normalize recording URL: if it's just a filename, build full download path
       let fetchUrl = recordingUrl
       try {
         const u = new URL(recordingUrl)
         fetchUrl = u.href
       } catch (e) {
-        // not a full URL — build from filename
         if (!recordingUrl.startsWith('/')) {
           fetchUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(recordingUrl)}`
         }
       }
 
-      const response = await fetch(fetchUrl, {
-        method: 'GET',
-        headers: {
-          Authorization: token ? `Bearer ${token}` : '',
-        },
-      });
-
-      console.debug('Recording fetch response', { url: recordingUrl, ok: response.ok, status: response.status, headers: Array.from(response.headers.entries()) })
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`Failed to fetch recording: ${response.status} ${text}`);
+      // Try direct fetch first; if it fails (CORS/auth), fallback to axios via apiCall
+      let arrayBuffer = null
+      let contentType = ''
+      try {
+        const resp = await fetch(fetchUrl, {
+          method: 'GET',
+          headers: { Authorization: token ? `Bearer ${token}` : '' },
+        })
+        console.debug('Recording fetch response', { url: fetchUrl, ok: resp.ok, status: resp.status })
+        if (resp.ok) {
+          contentType = resp.headers.get('Content-Type') || ''
+          arrayBuffer = await resp.arrayBuffer()
+        } else {
+          console.warn('fetch failed, will try axios fallback')
+        }
+      } catch (e) {
+        console.warn('fetch threw, will try axios fallback', e)
       }
 
-      // Determine MIME type
-      let contentType = response.headers.get('Content-Type') || ''
-      if (!contentType || contentType === 'application/octet-stream') {
-        contentType = recordingUrl.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg'
+      if (!arrayBuffer || (arrayBuffer && arrayBuffer.byteLength === 0)) {
+        // axios fallback using apiCall which includes Authorization via getHeaders
+        try {
+          const data = await apiCall(fetchUrl, 'GET', null, { responseType: 'arraybuffer' })
+          arrayBuffer = data
+          contentType = recordingUrl.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg'
+        } catch (e) {
+          throw new Error('Failed to download recording (fetch and axios attempts failed): ' + (e.message || e))
+        }
       }
 
-      // Use arrayBuffer to ensure we can set the correct type on the resulting blob
-      const arrayBuffer = await response.arrayBuffer()
-      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        throw new Error('Empty audio file received')
-      }
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error('Empty audio file received')
 
-      const blob = new Blob([arrayBuffer], { type: contentType })
+      const blob = new Blob([arrayBuffer], { type: contentType || (recordingUrl.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg') })
       const blobUrl = URL.createObjectURL(blob)
-
-      // Clean up previous blob if any
       if (audioBlobUrl) {
-        try { URL.revokeObjectURL(audioBlobUrl) } catch (e) { /* ignore */ }
+        try { URL.revokeObjectURL(audioBlobUrl) } catch (e) {}
       }
+      setAudioBlobUrl(blobUrl)
+      setRecordingMimeType(contentType)
+      setRecordingInfo({ status: 200, contentType, size: blob.size })
 
-  setAudioBlobUrl(blobUrl)
-  setRecordingMimeType(contentType)
-  setRecordingInfo({ status: response.status, contentType, size: blob.size })
-
-      // Try to play via <audio>. If that fails, fallback to WebAudio API.
+      // Play via audio element, fallback to WebAudio if needed
       setTimeout(async () => {
         try {
-          if (audioRef.current) {
-            // clear previous handlers
-            audioRef.current.onerror = null
-            // set src and try play
-            audioRef.current.src = blobUrl
-            audioRef.current.load()
-            const playPromise = audioRef.current.play()
-            if (playPromise && typeof playPromise.then === 'function') {
-              playPromise.catch((err) => {
-                console.warn('Autoplay prevented or playback failed on audio element, will try WebAudio fallback', err)
-                // fallback: decode and play via AudioContext
+            if (audioRef.current) {
+            try {
+              audioRef.current.onerror = null
+              audioRef.current.src = blobUrl
+              audioRef.current.load()
+              audioRef.current.onended = () => { setPlayingId(null); setPlayingUrl(null) }
+              const playPromise = audioRef.current.play()
+              if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.catch((err) => {
+                  console.warn('Playback failed on audio element, using WebAudio fallback', err)
+                  fallbackPlayViaWebAudio(arrayBuffer, contentType)
+                })
+              }
+              audioRef.current.onerror = (ev) => { console.warn('Audio element error, WebAudio fallback', ev); fallbackPlayViaWebAudio(arrayBuffer, contentType) }
+            } catch (e) {
+              console.warn('audioRef play failed, will try temporary Audio object', e)
+            }
+          } else {
+            // If no audio element is mounted (we're playing inline), use a temporary Audio object
+            try {
+              if (tempAudioRef.current) {
+                try { tempAudioRef.current.pause() } catch (e) {}
+                try { tempAudioRef.current.src = '' } catch (e) {}
+                tempAudioRef.current = null
+              }
+              const a = new Audio(blobUrl)
+              tempAudioRef.current = a
+              a.onended = () => { setPlayingId(null); setPlayingUrl(null); tempAudioRef.current = null }
+              a.play().catch((err) => {
+                console.warn('Temporary Audio playback failed, using WebAudio fallback', err)
                 fallbackPlayViaWebAudio(arrayBuffer, contentType)
               })
-            }
-            // also listen for immediate decode errors
-            audioRef.current.onerror = (ev) => {
-              console.warn('Audio element error, attempting WebAudio fallback', ev)
+            } catch (e) {
+              console.warn('Temporary Audio creation failed, using WebAudio fallback', e)
               fallbackPlayViaWebAudio(arrayBuffer, contentType)
             }
           }
         } catch (e) {
-          console.warn('Error attempting to play audio element, trying WebAudio fallback', e)
-          try { fallbackPlayViaWebAudio(arrayBuffer, contentType) } catch(err) { console.warn(err) }
+          console.warn('Audio play attempt failed, using WebAudio', e)
+          try { fallbackPlayViaWebAudio(arrayBuffer, contentType) } catch (err) { console.warn(err) }
         }
       }, 50)
     } catch (err) {
-      console.error('Failed to play recording', err);
+      console.error('Failed to play recording', err)
       setRecordingError(err.message || 'Failed to play recording')
+      setPlayingUrl(null)
     } finally {
       setRecordingLoading(false)
     }
@@ -733,6 +753,7 @@ const CallLogs = () => {
       audioSourceRef.current = source
       source.onended = () => {
         setAudioCtxPlaying(false)
+        setPlayingUrl(null)
       }
       source.start(0)
       setAudioCtxPlaying(true)
@@ -750,25 +771,55 @@ const CallLogs = () => {
         audioSourceRef.current = null
       }
       setAudioCtxPlaying(false)
+      setPlayingUrl(null)
     } catch (e) {
       console.warn('Error stopping WebAudio', e)
     }
+  }
+
+  const handleStopPlayback = () => {
+    try {
+      if (audioRef.current) {
+        try { audioRef.current.pause() } catch (e) {}
+        try { audioRef.current.currentTime = 0 } catch (e) {}
+        try { audioRef.current.src = '' } catch (e) {}
+      }
+    } catch (e) {}
+    try { stopWebAudio() } catch (e) {}
+    // also stop temporary Audio if present
+    try {
+      if (tempAudioRef.current) {
+        try { tempAudioRef.current.pause() } catch (e) {}
+        try { tempAudioRef.current.src = '' } catch (e) {}
+        tempAudioRef.current = null
+      }
+    } catch (e) {}
+    setPlayingUrl(null)
+    setPlayingId(null)
+    setRecordingLoading(false)
   }
 
   const handleDownloadRecording = async (recordingUrl, fileName) => {
     // Use authenticated download endpoint to include Authorization header and stream the file
     const download = async (urlOrName, providedName) => {
       try {
+        // Normalize filename: prefer providedName, else extract last path segment from URL-or-name
         let filename = providedName || ''
-        // If passed a full URL, extract filename from pathname
-        try {
-          const maybeUrl = new URL(urlOrName)
-          const parts = maybeUrl.pathname.split('/')
-          filename = filename || decodeURIComponent(parts.pop() || parts.pop())
-        } catch (e) {
-          // not a full URL, treat urlOrName as filename if filename still empty
-          if (!filename) filename = urlOrName
+        if (!filename) {
+          try {
+            const maybeUrl = new URL(String(urlOrName))
+            const parts = maybeUrl.pathname.split('/')
+            filename = decodeURIComponent(parts.pop() || parts.pop() || '')
+          } catch (e) {
+            // urlOrName may be a relative path or plain filename
+            const s = String(urlOrName || '')
+            const parts = s.split('/')
+            filename = decodeURIComponent(parts.pop() || parts.pop() || '')
+          }
         }
+
+        // strip query params if present
+        if (filename && filename.indexOf('?') !== -1) filename = filename.split('?')[0]
 
         if (!filename) {
           alert('No recording available for download')
@@ -776,7 +827,7 @@ const CallLogs = () => {
         }
 
         const token = localStorage.getItem('authToken') || ''
-  const downloadUrl = `${getBaseURL()}/api/v1/audio-recordings/download/${encodeURIComponent(filename)}`
+        const downloadUrl = `${getBaseURL()}/api/v1/audio-recordings/download/${encodeURIComponent(filename)}`
 
         const resp = await fetch(downloadUrl, {
           method: 'GET',
@@ -805,12 +856,16 @@ const CallLogs = () => {
       }
     }
     // set download loading indicator for this filename
-    const loadingKey = fileName || recordingUrl
+    const loadingKey = (fileName && String(fileName)) || String(recordingUrl)
     try {
-      setDownloadLoading(loadingKey)
+      setDownloadLoadingMap(m => ({ ...m, [loadingKey]: true }))
       await download(recordingUrl, fileName)
     } finally {
-      setDownloadLoading(null)
+      setDownloadLoadingMap(m => {
+        const nm = { ...m }
+        delete nm[loadingKey]
+        return nm
+      })
     }
   }
 
@@ -1008,17 +1063,42 @@ const CallLogs = () => {
                 </button>
 
                 <div className="cl-callid-search input-group">
-                  <CFormInput placeholder="Call ID" value={searchTerm} onChange={handleSearch} />
+                  <CFormInput placeholder="Search (Customer No. / Caller)" value={searchTerm} onChange={handleSearch} />
                   <CButton type="button" color="primary" variant="outline"><CIcon icon={cilSearch} /></CButton>
                 </div>
+                
 
-                <CButton color="secondary" className="cl-filter-btn"><CIcon icon={cilFilter} className="me-1" />FILTER</CButton>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <CFormSelect value={activeFilter} onChange={e=>{setActiveFilter(e.target.value); setCurrentPage(1)}} style={{width:170}} aria-label="Status filter">
+                    <option>All Calls</option>
+                    <option>Completed</option>
+                    <option>Failed</option>
+                    <option>Outgoing</option>
+                    <option>Incoming</option>
+                  </CFormSelect>
+                  
+                </div>
               </div>
             </CCol>
             <CCol md={4} className="d-flex justify-content-end align-items-center gap-2">
               <CButton color="warning" variant="outline" className="cl-oldcdr">OLD CDR</CButton>
-              <CButton color="light" className="cl-icon-btn"><CIcon icon={cilCloudDownload} /></CButton>
-              <CButton color="light" className="cl-icon-btn"><CIcon icon={cilReload} /></CButton>
+              <CButton color="light" className="cl-icon-btn" onClick={exportAllCallLogs} disabled={exporting}>
+                {exporting ? <CSpinner size="sm" /> : <CIcon icon={cilCloudDownload} />}
+              </CButton>
+              <CButton
+                color={autoRefresh ? 'primary' : 'light'}
+                className="cl-icon-btn"
+                onClick={() => {
+                  setAutoRefresh(prev => {
+                    const next = !prev
+                    if (next) setRefreshTrigger(t => t + 1) // immediate refresh when enabling
+                    return next
+                  })
+                }}
+                title={autoRefresh ? 'Auto-refresh ON (click to stop)' : 'Start auto-refresh (5s)'}
+              >
+                <CIcon icon={cilReload} className={autoRefresh ? 'reload-animate' : ''} />
+              </CButton>
               <CButton color="light" className="cl-icon-btn"><CIcon icon={cilOptions} /></CButton>
             </CCol>
           </CRow>
@@ -1032,6 +1112,7 @@ const CallLogs = () => {
                 <CTableHeaderCell>Duration</CTableHeaderCell>
                 <CTableHeaderCell>Call ID</CTableHeaderCell>
                 <CTableHeaderCell>Solution</CTableHeaderCell>
+                <CTableHeaderCell>Status</CTableHeaderCell>
                 <CTableHeaderCell>Agents Involved</CTableHeaderCell>
                 <CTableHeaderCell>Recording</CTableHeaderCell>
               </CTableRow>
@@ -1075,6 +1156,101 @@ const CallLogs = () => {
                   const solution = log.solution || log.callType || '';
                   const agents = Array.isArray(log.agents) && log.agents.length ? log.agents : (log.callReceivedBy ? [log.callReceivedBy] : []);
                   const recording = log.callRecording || log.recording || null;
+                  // try to find a single best matching audio filename from `audioFiles` when inline recording not present
+                  let matchedFiles = []
+                  try {
+                    if (!recording && audioFiles && audioFiles.length > 0) {
+                      const vn = String(log.virtualNumber || '').replace(/[^0-9]/g, '')
+                      const contactNum = String(log.contact || log.callInitiatedBy || '').replace(/[^0-9]/g, '')
+                      const makeVariants = (s) => {
+                        const v = []
+                        if (!s) return v
+                        v.push(s)
+                        if (s.length > 10) v.push(s.slice(-10))
+                        if (s.length > 8) v.push(s.slice(-8))
+                        if (s.length > 6) v.push(s.slice(-6))
+                        return v
+                      }
+                      const vnVariants = makeVariants(vn)
+                      const contactVariants = makeVariants(contactNum)
+
+                      const logTs = (() => {
+                        const t = log.callDate || log.createdAt || log.timestamp
+                        const dt = t ? new Date(t) : null
+                        return dt && !Number.isNaN(dt.getTime()) ? dt.getTime() : null
+                      })()
+
+                      // helper: extract timestamp from filename if it follows YYYYMMDD_HHMMSS
+                      const extractTsFromFilename = (fname) => {
+                        try {
+                          const m = fname.match(/(\d{8})[_-]?(\d{6})/)
+                          if (!m) return null
+                          const d = m[1] // YYYYMMDD
+                          const t = m[2] // HHMMSS
+                          const year = Number(d.slice(0,4))
+                          const month = Number(d.slice(4,6)) - 1
+                          const day = Number(d.slice(6,8))
+                          const hour = Number(t.slice(0,2))
+                          const minute = Number(t.slice(2,4))
+                          const second = Number(t.slice(4,6))
+                          const dt = new Date(year, month, day, hour, minute, second)
+                          if (Number.isNaN(dt.getTime())) return null
+                          return dt.getTime()
+                        } catch (e) { return null }
+                      }
+
+                      const candidates = audioFiles.map(f => {
+                        const lower = String(f)
+                        const containsVn = vnVariants.some(v => v && lower.includes(v))
+                        const containsContact = contactVariants.some(c => c && lower.includes(c))
+                        const matchesCount = (containsVn ? 1 : 0) + (containsContact ? 1 : 0)
+                        const fileTs = extractTsFromFilename(lower)
+                        const tsDiff = (logTs && fileTs) ? Math.abs(logTs - fileTs) : Number.MAX_SAFE_INTEGER
+                        return { fname: f, matchesCount, tsDiff, fileTs }
+                      }).filter(Boolean)
+
+                      if (candidates.length === 0) {
+                        matchedFiles = []
+                      } else {
+                        // prefer candidates that match both numbers, then closest timestamp
+                        candidates.sort((a,b) => {
+                          if (b.matchesCount !== a.matchesCount) return b.matchesCount - a.matchesCount
+                          return a.tsDiff - b.tsDiff
+                        })
+                        const best = candidates[0]
+                        // sanity threshold: ignore if timestamp diff > 10 minutes unless it's the only match
+                        const TEN_MIN = 10 * 60 * 1000
+                        if (best) {
+                          if (best.tsDiff <= TEN_MIN || candidates.length === 1) matchedFiles = [best.fname]
+                          else {
+                            // if no good time match, still allow best candidate if it matches both numbers
+                            if (best.matchesCount === 2) matchedFiles = [best.fname]
+                            else matchedFiles = []
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    matchedFiles = []
+                  }
+
+                  // compute static bar heights for visual variation
+                  const computeBarHeights = () => {
+                    // if we have a matching file or inline recording, derive a seed
+                    const seedSource = recording || (matchedFiles && matchedFiles[0]) || callId || String(Math.random())
+                    // simple hash to deterministic number
+                    let h = 0
+                    for (let i = 0; i < seedSource.length; i++) h = ((h << 5) - h) + seedSource.charCodeAt(i)
+                    h = Math.abs(h)
+                    // produce 5 heights between 6 and 18
+                    const out = []
+                    for (let i = 0; i < 5; i++) {
+                      const v = 6 + ( (h >> (i*3)) % 13 ) // 6..18
+                      out.push(v)
+                    }
+                    return out
+                  }
+                  const barHeights = computeBarHeights()
 
                   const initials = (name) => {
                     if (!name) return ''
@@ -1108,13 +1284,11 @@ const CallLogs = () => {
                       <CTableDataCell className="align-middle">
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
                           <div style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:220}}>{callId}</div>
-                          <a href={`#`} onClick={(e)=>e.preventDefault()} title="Open call" style={{color:'#6b7280'}}>
-                            <CIcon icon={cilOptions} />
-                          </a>
                         </div>
                       </CTableDataCell>
 
                       <CTableDataCell className="align-middle">{solution}</CTableDataCell>
+                      <CTableDataCell className="align-middle">{formatCallStatus(log.status)}</CTableDataCell>
 
                       <CTableDataCell className="align-middle">
                         <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -1125,11 +1299,64 @@ const CallLogs = () => {
                       </CTableDataCell>
 
                       <CTableDataCell className="align-middle">
-                        <div style={{display:'flex',alignItems:'center',gap:10}}>
-                          {recording ? (
-                            <button className="cl-icon-btn" onClick={(e)=>{e.stopPropagation(); handlePlayRecording(recording)}}><CIcon icon={cilMediaPlay} /></button>
-                          ) : <div style={{width:36,height:36}} />}
-                          <div style={{width:120,height:20,background:'linear-gradient(90deg, rgba(0,0,0,0.06) 20%, rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.06) 60%)',borderRadius:4}} />
+                        {/** Unified recording control: show voice-loader + play/download buttons. Disabled when no recording. **/}
+                        <div className="recording-control">
+                          <div className={`voice-loader ${(!recording && (!matchedFiles || matchedFiles.length === 0)) ? 'disabled' : ''}`} aria-hidden>
+                            {(barHeights || [12,12,12,12,12]).map((h, idx) => (
+                              <div key={idx} className="voice-bar" style={{ height: `${h}px` }} />
+                            ))}
+                          </div>
+                          <div style={{display:'flex',gap:6}}>
+                            {(() => {
+                              const rowKey = log._id || callId || index
+                              const rowUrl = recording || (matchedFiles && matchedFiles[0] ? `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(matchedFiles[0])}` : null)
+                              const isPlayingRow = playingId === String(rowKey)
+                              return (
+                                <button
+                                  type="button"
+                                  className={`rec-btn play ${isPlayingRow ? 'playing' : ''}`}
+                                  onClick={(e) => { e.stopPropagation();
+                                    const url = rowUrl
+                                    if (!url) return
+                                    if (isPlayingRow) {
+                                      handleStopPlayback()
+                                    } else {
+                                      handlePlayRecording(url, rowKey)
+                                    }
+                                  }}
+                                  disabled={!rowUrl}
+                                  title={isPlayingRow ? 'Stop playback' : 'Play recording'}
+                                >
+                                  {recordingLoading && isPlayingRow ? (
+                                    <CSpinner size="sm" />
+                                  ) : (
+                                    <CIcon icon={isPlayingRow ? cilMediaStop : cilMediaPlay} />
+                                  )}
+                                </button>
+                              )
+                            })()}
+
+                            {(() => {
+                              const fname = recording && String(recording).split('/').pop() || (matchedFiles && matchedFiles[0])
+                              const rowUrl = recording || (matchedFiles && matchedFiles[0] ? `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(matchedFiles[0])}` : null)
+                              const downloadKey = fname || rowUrl
+                              const isDownloading = Boolean(downloadLoadingMap && downloadKey && downloadLoadingMap[String(downloadKey)])
+                              return (
+                                <button
+                                  type="button"
+                                  className="rec-btn"
+                                  onClick={(e) => { e.stopPropagation();
+                                    if (!rowUrl) return
+                                    handleDownloadRecording(rowUrl, fname)
+                                  }}
+                                  disabled={!rowUrl || isDownloading}
+                                  title={isDownloading ? 'Downloading...' : 'Download recording'}
+                                >
+                                  {isDownloading ? <CSpinner size="sm" /> : <CIcon icon={cilCloudDownload} />}
+                                </button>
+                              )
+                            })()}
+                          </div>
                         </div>
                       </CTableDataCell>
                     </CTableRow>
@@ -1248,22 +1475,35 @@ const CallLogs = () => {
                 <div className="d-flex gap-2 flex-wrap mt-2">
                   {selectedLog.callRecording ? (
                     <>
-                      <CButton
-                        color="primary"
-                        onClick={() => handlePlayRecording(selectedLog.callRecording)}
-                      >
-                        <CIcon icon={cilMediaPlay} className="me-2" />
-                        Play Recording
-                      </CButton>
+                      {(() => {
+                        const modalPlayKey = selectedLog._id ? String(selectedLog._id) : `modal-${selectedLog.callId || 'sel'}`
+                        const isPlayingModal = playingId === String(modalPlayKey)
+                        return (
+                          <CButton
+                            color="primary"
+                            onClick={() => {
+                              if (isPlayingModal) handleStopPlayback()
+                              else handlePlayRecording(selectedLog.callRecording, modalPlayKey)
+                            }}
+                          >
+                            {recordingLoading && isPlayingModal ? (
+                              <CSpinner size="sm" className="me-2" />
+                            ) : (
+                              <CIcon icon={isPlayingModal ? cilMediaStop : cilMediaPlay} className="me-2" />
+                            )}
+                            {isPlayingModal ? 'Stop' : 'Play Recording'}
+                          </CButton>
+                        )
+                      })()}
                       <CButton
                         color="success"
                         onClick={() => handleDownloadRecording(
                           selectedLog.callRecording,
                           `call-recording-${selectedLog._id}.mp3`
                         )}
-                        disabled={downloadLoading !== null}
+                        disabled={Boolean(downloadLoadingMap && downloadLoadingMap[`call-recording-${selectedLog._id}.mp3`])}
                       >
-                        {downloadLoading === `call-recording-${selectedLog._id}.mp3` ? (
+                        {downloadLoadingMap && downloadLoadingMap[`call-recording-${selectedLog._id}.mp3`] ? (
                           <>
                             <CSpinner size="sm" className="me-2" />
                             Downloading...
@@ -1300,40 +1540,74 @@ const CallLogs = () => {
                         return vnVariants.some(v => v && f.includes(v)) && contactVariants.some(c => c && f.includes(c))
                       })
 
-                      if (strictMatches.length === 0) return <p className="text-muted">No recording available for this call.</p>
-
-                      const seen = new Set()
-                      const dedup = strictMatches.filter(fname => {
-                        if (seen.has(fname)) return false
-                        seen.add(fname)
-                        return true
-                      })
+                      if (strictMatches.length === 0) {
+                        // Try a looser match: either VN or contact present (not necessarily both)
+                        const loose = audioFiles.filter(f => {
+                          return vnVariants.some(v => v && f.includes(v)) || contactVariants.some(c => c && f.includes(c))
+                        })
+                        if (loose.length === 0) return (
+                          <div>
+                            <p className="text-muted">No recording available for this call.</p>
+                            <div className="mt-2">
+                              <CButton size="sm" color="secondary" onClick={() => fetchAudioFiles()}>
+                                Refresh recordings ({audioLoading ? '...' : (audioFiles.length)})
+                              </CButton>
+                            </div>
+                          </div>
+                        )
+                        // prefer looser unique list
+                        const seenLoose = new Set()
+                        const dedup = loose.filter(fname => {
+                          if (seenLoose.has(fname)) return false
+                          seenLoose.add(fname)
+                          return true
+                        })
+                        // assign back to strictMatches variable name to reuse rendering code below
+                        strictMatches = dedup
+                      } else {
+                        const seen = new Set()
+                        const dedup = strictMatches.filter(fname => {
+                          if (seen.has(fname)) return false
+                          seen.add(fname)
+                          return true
+                        })
+                        strictMatches = dedup
+                      }
 
                       return (
                         <div>
                           <p className="mb-2">Available recordings:</p>
                           <div className="d-flex flex-column gap-2">
-                            {dedup.map((fname, i) => {
+                            {strictMatches.map((fname, i) => {
                               const fileUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(fname)}`;
                               return (
                                 <div key={i} className="d-flex align-items-center gap-2 p-2 border rounded">
                                   <span className="flex-grow-1 text-truncate" title={fname}>{fname}</span>
-                                  <CButton
-                                    size="sm"
-                                    color="primary"
-                                    variant="outline"
-                                    onClick={() => handlePlayRecording(fileUrl)}
-                                  >
-                                    <CIcon icon={cilMediaPlay} size="sm" />
-                                  </CButton>
+                                        {(() => {
+                                          const modalKey = `modal-${fname}`
+                                          const isPlaying = playingId === String(modalKey)
+                                          return (
+                                            <CButton
+                                              size="sm"
+                                              color="primary"
+                                              variant="outline"
+                                              onClick={() => {
+                                                if (isPlaying) handleStopPlayback()
+                                                else handlePlayRecording(fileUrl, modalKey)
+                                              }}
+                                            >
+                                              {recordingLoading && isPlaying ? <CSpinner size="sm" /> : <CIcon icon={isPlaying ? cilMediaStop : cilMediaPlay} size="sm" />}
+                                            </CButton>
+                                          )
+                                        })()}
                                   <CButton
                                     size="sm"
                                     color="success"
                                     variant="outline"
                                     onClick={() => handleDownloadRecording(fileUrl, fname)}
-                                    disabled={downloadLoading !== null}
+                                    disabled={Boolean(downloadLoadingMap && downloadLoadingMap[fname])}
                                   >
-                                    {downloadLoading === fname ? (
+                                    {downloadLoadingMap && downloadLoadingMap[fname] ? (
                                       <>
                                         <CSpinner size="sm" className="me-1" />
                                         DL
@@ -1486,6 +1760,7 @@ const CallLogs = () => {
           </div>
         </div>
       </CModal>
+      {/* Filters moved inline; modal removed */}
       {/* Notes Modal (notepad) */}
       <CModal visible={showNotesModal} scrollable onClose={() => setShowNotesModal(false)} size="md">
         <CModalHeader>

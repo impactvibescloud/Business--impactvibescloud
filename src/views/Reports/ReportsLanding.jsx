@@ -69,7 +69,7 @@ const ReportsLanding = () => {
                 <CCardBody>
                   <div className="section-title">Call Details</div>
                   <CRow className="cards-row">
-                    <CCol xs={12} md={3}><ReportCard title="Call Detail Records (CDR)" description="Get detailed information on all calls." href="/reports/call-dispositions" /></CCol>
+                    <CCol xs={12} md={3}><ReportCard title="Call Detail Records (CDR)" description="Get detailed information on all calls." href="/reports/cdr" /></CCol>
                   </CRow>
                 </CCardBody>
               </CCard>

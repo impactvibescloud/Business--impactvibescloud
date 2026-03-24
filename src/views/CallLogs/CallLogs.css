@@ -3,6 +3,17 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Reload icon: rotate once every 3s while auto-refresh is enabled */
+@keyframes reloadSpin {
+  0% { transform: rotate(0deg); }
+  80% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.reload-animate {
+  display: inline-block;
+  animation: reloadSpin 5s linear infinite;
+}
+
 .call-logs-title {
   font-size: 1rem; /* match agent page title size */
   font-weight: 600;
@@ -273,6 +284,18 @@
 /* Recording column: orange circular play and waveform */
 .cl-icon-btn.play { border:1px solid #f59e0b; color:#d97706 }
 .cl-waveform{width:140px;height:22px;border-radius:4px;background:repeating-linear-gradient(90deg,#e6eef6 0 4px,#e6eef6 4px 6px,#fff 6px 10px);}
+
+/* Recording control: consistent loader + play/download buttons */
+.recording-control { display:flex; align-items:center; gap:8px }
+.voice-loader { width:44px; height:28px; display:inline-flex; align-items:center; gap:3px }
+.voice-bar { width:4px; background:#f59e0b; border-radius:2px; }
+.voice-loader.disabled .voice-bar { background:#e5e7eb }
+
+.rec-btn { background:#fff; border:1px solid #e6e8eb; padding:6px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; height:36px; width:36px }
+.rec-btn.play { border-color:#f59e0b; color:#d97706 }
+.rec-btn:disabled { opacity:0.45; cursor:not-allowed }
+
+/* animation removed: static voice bars only */
 
 @media (max-width: 768px) {
   .calllogs-controls { flex-direction:column; gap:10px }

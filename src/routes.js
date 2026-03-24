@@ -392,8 +392,8 @@ const routes = [
 
   // Data & Analytics - Call Logs (legacy route, consider removing if not used)
   {
-    path: "/reports/call-dispositions",
-    name: "Call Logs",
+    path: "/reports/cdr",
+    name: "CDR",
     element: CallLogsLegacy,
     navName: "Data & Analytics",
   },
@@ -905,15 +905,15 @@ const routes = [
   },
   {
     path: "/reports-analytics",
-    name: "Reports & Analytics",
+    name: "Reports",
     element: ReportsAnalytics,
-    navName: "Reports & Analytics",
+    navName: "Reports",
   },
   {
     path: "/dialer-real-time",
     name: "Dialer Real Time Report",
     element: DialerRealTime,
-    navName: "Reports & Analytics",
+    navName: "Reports",
   },
   {
     path: "/settings",
@@ -925,13 +925,13 @@ const routes = [
     path: "/agent-performance",
     name: "Agent Real Time Report",
     element: AgentPerformance,
-    navName: "Reports & Analytics",
+    navName: "Reports",
   },
   {
     path: "/department-performance",
     name: "Department Performance",
     element: DepartmentPerformance,
-    navName: "Reports & Analytics",
+    navName: "Reports",
   },
 ];
 

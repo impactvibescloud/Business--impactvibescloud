@@ -18,6 +18,7 @@ import {
   CModalBody,
   CModalFooter,
   CButton,
+  CFormSelect,
 } from '@coreui/react'
 import { apiCall } from '../../config/api'
 import '../Branches/Branches.css'
@@ -38,11 +39,13 @@ const CallLogsLegacy = () => {
   const [openCallFlows, setOpenCallFlows] = useState(new Set())
   const [selectedItem, setSelectedItem] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [openMoreInfo, setOpenMoreInfo] = useState(new Set())
 
   // Filter inputs (UI only for now)
   const [fromNumber, setFromNumber] = useState('')
   const [toNumber, setToNumber] = useState('')
   const [agentFilter, setAgentFilter] = useState('')
+  const [availableAgents, setAvailableAgents] = useState([])
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -120,6 +123,57 @@ const CallLogsLegacy = () => {
 
   useEffect(() => { fetchRecords(page) }, [page, businessId])
 
+  const fetchAgents = async () => {
+    try {
+      let bid = businessId || localStorage.getItem('businessId') || ''
+      if (!bid) {
+        try { const ud = await apiCall('/v1/user/details','GET'); const u = ud?.user || ud?.data || ud; bid = u?.businessId || u?.businessid || '' } catch (e) {}
+      }
+      if (!bid) return
+      let agents = []
+      try {
+        const br = await apiCall(`/branch/${encodeURIComponent(bid)}/branches`, 'GET')
+        let list = []
+        if (Array.isArray(br)) list = br
+        else if (br?.data && Array.isArray(br.data)) list = br.data
+        else if (Array.isArray(br.branches)) list = br.branches
+        else if (br?.data?.data && Array.isArray(br.data.data)) list = br.data.data
+        else list = []
+        list.forEach((branch) => {
+          const u = branch.user || branch.manager || branch.owner || null
+          if (u && (u._id || u.id || u.email)) {
+            const id = u._id || u.id || u.email
+            const name = u.name || u.fullName || `${u.firstName || u.first_name || ''} ${u.lastName || u.last_name || ''}`.trim() || u.email || branch.branchName || `Agent ${id}`
+            agents.push({ id, name })
+          }
+        })
+        const seen = {}
+        agents = agents.filter((a) => { if (!a.id) return false; if (seen[a.id]) return false; seen[a.id]=true; return true })
+      } catch (e) { agents = [] }
+      if (!agents || agents.length === 0) {
+        try {
+          const res = await apiCall(`/users?businessId=${encodeURIComponent(bid)}`)
+          let data = []
+          if (Array.isArray(res)) data = res
+          else if (res?.data && Array.isArray(res.data)) data = res.data
+          else if (res?.data?.data && Array.isArray(res.data.data)) data = res.data.data
+          else if (res && typeof res === 'object') data = [res]
+          agents = (data || []).map((a, idx) => {
+            const first = a.firstName || a.first_name || ''
+            const last = a.lastName || a.last_name || ''
+            const combined = (first || last) ? `${first} ${last}`.trim() : ''
+            const name = a.name || a.fullName || combined || a.email || a.username || `Agent ${idx+1}`
+            const id = a._id || a.id || a.email || `${idx}`
+            return { id, name }
+          })
+        } catch (e) { agents = [] }
+      }
+      setAvailableAgents(agents)
+    } catch (e) { setAvailableAgents([]) }
+  }
+
+  useEffect(() => { fetchAgents() }, [businessId])
+
   const toggleRow = (id) => {
     const s = new Set(expandedRows)
     if (s.has(id)) s.delete(id); else s.add(id)
@@ -130,6 +184,12 @@ const CallLogsLegacy = () => {
     const s = new Set(openCallFlows)
     if (s.has(id)) s.delete(id); else s.add(id)
     setOpenCallFlows(s)
+  }
+
+  const toggleMoreInfo = (id) => {
+    const s = new Set(openMoreInfo)
+    if (s.has(id)) s.delete(id); else s.add(id)
+    setOpenMoreInfo(s)
   }
 
   const openDetails = (item) => { setSelectedItem(item); setDetailsOpen(true) }
@@ -159,8 +219,13 @@ const CallLogsLegacy = () => {
             <input className="form-control form-control-sm" placeholder="To number" value={toNumber} onChange={(e) => setToNumber(e.target.value)} />
           </div>
           <div className="filter-tile">
-            <label className="form-label">Agent</label>
-            <input className="form-control form-control-sm" placeholder="Agent" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)} />
+            <label className="form-label">Agent / Branch</label>
+            <CFormSelect className="form-control form-control-sm" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
+              <option value="">All agents</option>
+              {availableAgents.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </CFormSelect>
           </div>
           <div className="filter-tile">
             <label className="form-label">From Date</label>
@@ -269,11 +334,7 @@ const CallLogsLegacy = () => {
                             <div className="cdr-actions mb-3">
                               <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); toggleCallFlow(d._id)}} aria-pressed={openCallFlows.has(d._id)}>Call Flow</button>
                               <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); openDetails(d)}}>View Note</button>
-                              <button className="btn btn-sm btn-light me-2">View Contact</button>
-                              <button className="btn btn-sm btn-light me-2">Send SMS</button>
-                              <button className="btn btn-sm btn-light me-2">Block</button>
-                              <button className="btn btn-sm btn-light me-2">More Information</button>
-                              <button className="btn btn-sm btn-light">Schedule Call</button>
+                              <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); toggleMoreInfo(d._id)}} aria-pressed={openMoreInfo.has(d._id)}>More Information</button>
                             </div>
 
                             {openCallFlows.has(d._id) && (
@@ -298,6 +359,25 @@ const CallLogsLegacy = () => {
                               </div>
 
                             </div>
+                            )}
+
+                            {openMoreInfo.has(d._id) && (
+                              <div className="cdr-moreinfo mt-3">
+                                <div className="row">
+                                  <div className="col-md-4"><strong>Agent</strong><div>{d.agent?.email || d.agent?.name || '-'}</div></div>
+                                  <div className="col-md-4"><strong>Initiated By</strong><div>{d.raw?.callInitiatedBy || d.callLog?.initiatedBy || '-'}</div></div>
+                                  <div className="col-md-4"><strong>Received By</strong><div>{d.raw?.callReceivedBy || d.callLog?.receivedBy || '-'}</div></div>
+                                </div>
+                                <div className="row mt-2">
+                                  <div className="col-md-4"><strong>Rejected By</strong><div>{d.raw?.callRejectedBy || d.callLog?.rejectedBy || '-'}</div></div>
+                                  <div className="col-md-4"><strong>Hang Up By</strong><div>{d.raw?.hangUpBy || d.callLog?.hangUpBy || '-'}</div></div>
+                                  <div className="col-md-4"><strong>Team</strong><div>{d.team || '-'}</div></div>
+                                </div>
+                                <div className="row mt-2">
+                                  <div className="col-md-4"><strong>Cost</strong><div>{d.cost != null ? `$${Number(d.cost).toFixed(2)}` : '-'}</div></div>
+                                  <div className="col-md-8"><strong>Notes</strong><div>{d.note || d.callLog?.note || '-'}</div></div>
+                                </div>
+                              </div>
                             )}
 
                           </div>

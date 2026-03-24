@@ -6,6 +6,10 @@
 .ap-filter-btn { background:transparent; border:1px solid #f3f4f6; padding:8px 12px; border-radius:6px }
 .ap-icon-btn { background:#fff; border:1px solid #e6e8eb; padding:8px; border-radius:6px }
 
+/* Agent select should visually match other header controls */
+.ap-agent-select { background:#fff; border:1px solid #e6e8eb; padding:6px 10px; border-radius:6px; color:#111; display:inline-block; width:auto; max-width:220px }
+.ap-agent-select option { color:#111 }
+
 .ap-stats-grid { display:grid; grid-template-columns: repeat(4,1fr); gap:16px }
 .ap-stat-tile { background:#fff; border-radius:8px; padding:18px; border:1px solid rgba(0,0,0,0.04); box-shadow:0 6px 18px rgba(0,0,0,0.04); display:flex; flex-direction:column; min-height:140px }
 .ap-stat-header { display:flex; align-items:center; justify-content:space-between }
@@ -23,3 +27,9 @@
 .ap-chart-legend text { font-size:10px; fill:#6b7280 }
 
 @media (max-width: 992px) { .ap-stats-grid { grid-template-columns:repeat(2,1fr) } }
+
+@keyframes ap-reload-spin {
+	from { transform: rotate(0deg) }
+	to { transform: rotate(360deg) }
+}
+.reload-animate svg { animation: ap-reload-spin 0.8s linear infinite }

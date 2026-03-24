@@ -1,5 +1,9 @@
 import axios from 'axios';
 
+// Temporary local override to ignore the remote features API.
+// Set to `false` to re-enable calling `/api/features/check/{businessId}`.
+const IGNORE_FEATURE_API = true;
+
 /**
  * Fetch allowed features for a business
  * @param {string} businessId - The business ID
@@ -8,6 +12,10 @@ import axios from 'axios';
  */
 export const getBusinessFeatures = async (businessId, token) => {
   try {
+    if (IGNORE_FEATURE_API) {
+      console.info('featureCheck: ignoring remote /api/features/check/ per local override');
+      return { featuresMap: {}, featuresMenu: [] };
+    }
     if (!businessId) {
       console.warn('featureCheck: No businessId provided');
       return { featuresMap: {}, featuresMenu: [] };
