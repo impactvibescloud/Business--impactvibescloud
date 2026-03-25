@@ -27,6 +27,7 @@ import {
   CModalHeader,
   CModalBody,
   CModalFooter
+  ,CFormCheck
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { 
@@ -93,6 +94,25 @@ const CallLogs = () => {
   const [selectedToTime, setSelectedToTime] = useState('23:59')
   const [baseLeftDate, setBaseLeftDate] = useState(null)
   const [baseRightDate, setBaseRightDate] = useState(null)
+  // Customize Columns modal state
+  const [showColumnsModal, setShowColumnsModal] = useState(false)
+  const columnsAvailable = [
+    { key: 'sno', label: 'S.NO' },
+    { key: 'type', label: 'TYPE' },
+    { key: 'date', label: 'DATE' },
+    { key: 'initiated_by', label: 'INITIATED BY' },
+    { key: 'received_by', label: 'RECEIVED BY' },
+    { key: 'rejected_by', label: 'REJECTED BY' },
+    { key: 'team', label: 'TEAM' },
+    { key: 'hangup_by', label: 'HANG UP BY' },
+    { key: 'duration', label: 'DURATION' },
+    { key: 'cost', label: 'COST' },
+    { key: 'notes', label: 'NOTES' },
+    { key: 'status', label: 'STATUS' },
+    { key: 'virtual_number', label: 'VIRTUAL NUMBER' },
+    { key: 'contact', label: 'CONTACT' },
+  ]
+  const [selectedColumns, setSelectedColumns] = useState(columnsAvailable.map(c=>c.key))
 
   const openDateModal = () => {
     // initialize selected dates/times from current filters or sensible defaults
@@ -371,6 +391,17 @@ const CallLogs = () => {
   useEffect(() => {
     fetchAudioFiles()
   }, [businessId])
+
+  // Load saved columns selection from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('callLogsSelectedColumns')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) setSelectedColumns(parsed)
+      }
+    } catch (e) {}
+  }, [])
 
   // Format the call status from API data
   const formatCallStatus = (status) => {
@@ -879,6 +910,34 @@ const CallLogs = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
+  // Map column key to CSV cell value
+  const getColumnValue = (colKey, log, idx) => {
+    switch (colKey) {
+      case 'sno': return idx + 1
+      case 'type': return log.callType || log.type || ''
+      case 'date': return formatDate(log.callDate || log.createdAt)
+      case 'initiated_by': return log.callInitiatedBy || ''
+      case 'received_by': return log.callReceivedBy || ''
+      case 'rejected_by': return log.callRejectedBy || ''
+      case 'team': return log.team || ''
+      case 'hangup_by': return log.hangUpBy || log.hangupBy || ''
+      case 'duration': return formatDuration(log.callDuration || log.duration)
+      case 'cost': return log.cost != null ? Number(log.cost).toFixed(2) : ''
+      case 'notes': return log.notes || log.notebyagent || ''
+      case 'status': return formatCallStatus(log.status)
+      case 'virtual_number': return log.virtualNumber || ''
+      case 'contact': return log.contact || log.callInitiatedBy || ''
+      default: return ''
+    }
+  }
+
+    const applyColumns = () => {
+      try {
+        localStorage.setItem('callLogsSelectedColumns', JSON.stringify(selectedColumns || []))
+      } catch (e) {}
+      setShowColumnsModal(false)
+    }
+
   // Export all call logs as CSV (spreadsheet-friendly)
   const exportAllCallLogs = async () => {
     if (!businessId) {
@@ -989,34 +1048,36 @@ const CallLogs = () => {
         return
       }
 
-      // Prepare CSV headers and rows
-      const headers = [
-        'S.NO', 'TYPE', 'DATE', 'INITIATED BY', 'RECEIVED BY', 'REJECTED BY', 'TEAM', 'HANG UP BY', 'DURATION', 'COST', 'NOTES', 'STATUS', 'VIRTUAL NUMBER', 'CONTACT'
-      ]
+      // Prepare CSV headers and rows using user-selected columns
+      const headers = (selectedColumns && selectedColumns.length)
+        ? selectedColumns.map(k => {
+            const m = (Array.isArray(columnsAvailable) ? columnsAvailable.find(c=> (c.key || c) === k) : null)
+            return (m && m.label) ? m.label : (typeof k === 'string' ? k : String(k))
+          })
+        : ['S.NO', 'TYPE', 'DATE', 'INITIATED BY', 'RECEIVED BY', 'REJECTED BY', 'TEAM', 'HANG UP BY', 'DURATION', 'COST', 'NOTES', 'STATUS', 'VIRTUAL NUMBER', 'CONTACT']
 
       const csvRows = []
       csvRows.push(headers.join(','))
 
       logs.forEach((log, idx) => {
-        const callDate = formatDate(log.callDate || log.createdAt)
-        const duration = formatDuration(log.callDuration || log.duration)
-        const cost = log.cost != null ? Number(log.cost).toFixed(2) : ''
-        const row = [
-          idx + 1,
-          csvEscape(log.callType || ''),
-          csvEscape(callDate),
-          csvEscape(log.callInitiatedBy || ''),
-          csvEscape(log.callReceivedBy || ''),
-          csvEscape(log.callRejectedBy || ''),
-          csvEscape(log.team || ''),
-          csvEscape(log.hangUpBy || ''),
-          csvEscape(duration),
-          csvEscape(cost),
-          csvEscape(log.notes || log.notebyagent || ''),
-          csvEscape(formatCallStatus(log.status)),
-          csvEscape(log.virtualNumber || ''),
-          csvEscape(log.contact || ''),
-        ]
+        const row = (selectedColumns && selectedColumns.length) ?
+          selectedColumns.map(colKey => csvEscape(getColumnValue(colKey, log, idx))) :
+          [
+            idx + 1,
+            csvEscape(log.callType || ''),
+            csvEscape(formatDate(log.callDate || log.createdAt)),
+            csvEscape(log.callInitiatedBy || ''),
+            csvEscape(log.callReceivedBy || ''),
+            csvEscape(log.callRejectedBy || ''),
+            csvEscape(log.team || ''),
+            csvEscape(log.hangUpBy || ''),
+            csvEscape(formatDuration(log.callDuration || log.duration)),
+            csvEscape(log.cost != null ? Number(log.cost).toFixed(2) : ''),
+            csvEscape(log.notes || log.notebyagent || ''),
+            csvEscape(formatCallStatus(log.status)),
+            csvEscape(log.virtualNumber || ''),
+            csvEscape(log.contact || ''),
+          ]
         csvRows.push(row.join(','))
       })
 
@@ -1099,7 +1160,7 @@ const CallLogs = () => {
               >
                 <CIcon icon={cilReload} className={autoRefresh ? 'reload-animate' : ''} />
               </CButton>
-              <CButton color="light" className="cl-icon-btn"><CIcon icon={cilOptions} /></CButton>
+              <CButton color="light" className="cl-icon-btn" onClick={() => setShowColumnsModal(true)} title="Customize columns"><CIcon icon={cilOptions} /></CButton>
             </CCol>
           </CRow>
           {/* New filters UI (top controls) are used. Old inline filter row removed. */}
@@ -1438,6 +1499,64 @@ const CallLogs = () => {
           )}
         </CCardBody>
       </CCard>
+
+        {/* Customize Columns Modal */}
+        <CModal visible={showColumnsModal} onClose={() => setShowColumnsModal(false)} size="xl">
+          <CModalHeader>
+            <h5>Customize Columns</h5>
+          </CModalHeader>
+          <CModalBody>
+            <div className="d-flex flex-column" style={{gap:8}}>
+              <div>
+                <strong>Preview (first 3 rows):</strong>
+                <div className="mt-2" style={{overflowX:'auto'}}>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        {(selectedColumns && selectedColumns.length ? selectedColumns : (columnsAvailable||[]).map(c=> (c.key||c))).map((k) => {
+                          const m = (columnsAvailable||[]).find(cc => (cc.key||cc) === k)
+                          return <th key={k}>{(m && m.label) ? m.label : String(k)}</th>
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(clientFilteredCallLogs || []).slice(0,3).map((log, ridx) => (
+                        <tr key={ridx}>
+                          {(selectedColumns && selectedColumns.length ? selectedColumns : (columnsAvailable||[]).map(c=> (c.key||c))).map((k) => (
+                            <td key={k} style={{whiteSpace:'nowrap',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis'}}>{String(getColumnValue(k, log, ridx) || '')}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {(Array.isArray(columnsAvailable) ? columnsAvailable : []).map((c, i) => {
+                const key = (typeof c === 'string') ? c : c.key
+                const label = (typeof c === 'string') ? c : c.label || c.key
+                const checked = selectedColumns && selectedColumns.indexOf(key) !== -1
+                return (
+                  <CFormCheck
+                    key={key}
+                    label={label}
+                    checked={checked}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedColumns(s => Array.from(new Set([...(s||[]), key])))
+                      else setSelectedColumns(s => (s||[]).filter(x=>x!==key))
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="light" onClick={() => { setSelectedColumns((columnsAvailable||[]).map(c => (c.key || c))); }}>Select All</CButton>
+            <CButton color="light" onClick={() => { setSelectedColumns([]); }}>Clear All</CButton>
+            <CButton color="primary" onClick={() => applyColumns()}>Apply</CButton>
+            <CButton color="secondary" onClick={() => setShowColumnsModal(false)}>Close</CButton>
+          </CModalFooter>
+        </CModal>
 
       {/* Recording Modal */}
       <CModal visible={showModal} scrollable onClose={() => {

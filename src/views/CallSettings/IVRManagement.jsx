@@ -110,6 +110,9 @@ const IVRManagement = () => {
   const [voiceAccentSetting, setVoiceAccentSetting] = useState('')
   const [loadingVoiceSettings, setLoadingVoiceSettings] = useState(false)
   const [savingVoiceSettings, setSavingVoiceSettings] = useState(false)
+  // DID numbers for IVR assignment
+  const [availableDids, setAvailableDids] = useState([])
+  const [selectedDid, setSelectedDid] = useState('')
 
   const fetchLanguageFiles = async (langCode) => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -360,6 +363,30 @@ const IVRManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // fetch assigned virtual numbers (DIDs) for business to populate DID dropdown
+  useEffect(() => {
+    const fetchDids = async () => {
+      const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+      if (!currentBusinessId) return
+      try {
+        const res = await apiCall(`/numbers/assigned-to/${encodeURIComponent(currentBusinessId)}`, 'GET')
+        let list = []
+        if (Array.isArray(res)) list = res
+        else if (Array.isArray(res.data)) list = res.data
+        else if (Array.isArray(res.numbers)) list = res.numbers
+        else if (Array.isArray(res.results)) list = res.results
+        else list = []
+        // normalize to objects with id and number
+        const normalized = (list || []).map((it) => ({ id: it._id || it.id || it.numberId || '', number: it.number || it.extension || it.virtualNumber || it.number }))
+        setAvailableDids(normalized.filter(Boolean))
+      } catch (e) {
+        console.error('Failed to fetch DIDs for IVR', e)
+        setAvailableDids([])
+      }
+    }
+    if (businessId) fetchDids()
+  }, [businessId])
+
   useEffect(() => {
     const fetchDepartments = async () => {
       const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -381,6 +408,11 @@ const IVRManagement = () => {
     if (businessId) fetchDepartments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId])
+
+  // reset selected DID whenever the add modal closes
+  useEffect(() => {
+    if (!addOpen) setSelectedDid('')
+  }, [addOpen])
 
   const fetchAfterHours = async () => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -754,6 +786,11 @@ const IVRManagement = () => {
       setVoiceMode('text')
     }
     setAddOpen(true)
+    // prefill selected DID when editing if present on item
+    try {
+      const candidateDid = item.did || item.number || item.virtualNumber || (item.numberId && item.numberId.number) || ''
+      setSelectedDid(candidateDid || '')
+    } catch (e) {}
     // ensure department members are fetched and agent dropdowns populate. If ext present, map it back to agentId.
     options.forEach(async (opt, idx) => {
       if (opt.type === 'dept' && opt.target) {
@@ -1549,6 +1586,15 @@ const IVRManagement = () => {
                 <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Node (identifier)</label>
                 <input className="form-control" value={newIvr.node} placeholder="e.g. menu, sales" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
               </div>
+              <div className="col-12 col-md-4">
+                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>DID Number (optional)</label>
+                <select className="form-select" value={selectedDid || ''} onChange={(e) => setSelectedDid(e.target.value)}>
+                  <option value="">(No DID)</option>
+                  {availableDids.map(d => (
+                    <option key={d.id || d.number} value={d.number}>{d.number}</option>
+                  ))}
+                </select>
+              </div>
               <div className="col-12 col-md-3">
                 <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Language</label>
                 <select className="form-select" value={newIvr.language || ''} onChange={(e) => setNewIvr({ ...newIvr, language: e.target.value })}>
@@ -1735,6 +1781,8 @@ const IVRManagement = () => {
                         options: optionsArray,
                       }
                     }
+                    // include optional DID if selected
+                    if (selectedDid) putPayload.did = selectedDid
                     // if voiceMode is upload, include file reference or inline base64 as appropriate
                     if (voiceMode === 'upload') {
                       putPayload.type = 'upload'
@@ -1891,6 +1939,8 @@ const IVRManagement = () => {
                         options: optionsArrayFromParsed,
                       }
                     }
+                    // include optional DID if selected
+                    if (selectedDid) savePayload.did = selectedDid
                     try {
                       // if voiceMode is upload, include file reference or inline base64 as appropriate
                       if (voiceMode === 'upload') {

@@ -18,6 +18,7 @@ import {
   CModalBody,
   CModalFooter,
   CButton,
+  CFormCheck,
   CFormSelect,
 } from '@coreui/react'
 import { apiCall } from '../../config/api'
@@ -46,6 +47,21 @@ const CallLogsLegacy = () => {
   const [toNumber, setToNumber] = useState('')
   const [agentFilter, setAgentFilter] = useState('')
   const [availableAgents, setAvailableAgents] = useState([])
+  // Columns customization state
+  const columnsList = [
+    { key: 'sno', label: 'S.NO' },
+    { key: 'contact', label: 'CONTACT' },
+    { key: 'virtualNumber', label: 'VIRTUAL NUMBER' },
+    { key: 'date', label: 'DATE' },
+    { key: 'time', label: 'TIME' },
+    { key: 'duration', label: 'DURATION' },
+    { key: 'agent', label: 'AGENT' },
+    { key: 'status', label: 'STATUS' },
+    { key: 'notes', label: 'NOTES' },
+  ]
+  const [selectedColumns, setSelectedColumns] = useState(columnsList.map(c=>c.key))
+  const [showColumnsModal, setShowColumnsModal] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     const tryPrefill = async () => {
@@ -122,6 +138,17 @@ const CallLogsLegacy = () => {
   }
 
   useEffect(() => { fetchRecords(page) }, [page, businessId])
+
+  // load saved columns selection
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem('cdrSelectedColumns')
+      if (s) {
+        const parsed = JSON.parse(s)
+        if (Array.isArray(parsed) && parsed.length) setSelectedColumns(parsed)
+      }
+    } catch (e) {}
+  }, [])
 
   const fetchAgents = async () => {
     try {
@@ -200,6 +227,21 @@ const CallLogsLegacy = () => {
   }
   const applyFilters = () => { fetchRecords(1) }
 
+  const getColumnValue = (key, item, idx) => {
+    switch (key) {
+      case 'sno': return idx + 1
+      case 'contact': return item.callLog?.contact || item.contact || ''
+      case 'virtualNumber': return item.callLog?.virtualNumber || item.virtualNumber || ''
+      case 'date': return formatDateTimeShort(item.callLog?.callDate || item.callDate)
+      case 'time': return item.callLog?.callDate ? new Date(item.callLog.callDate).toLocaleTimeString() : ''
+      case 'duration': return item.callLog?.duration ? `${item.callLog.duration}s` : ''
+      case 'agent': return item.agent?.name || item.agent?.email || ''
+      case 'status': return item.callLog?.status || ''
+      case 'notes': return item.note || ''
+      default: return ''
+    }
+  }
+
   const filtered = records.filter((r) => {
     const q = (searchTerm || '').trim().toLowerCase()
     if (!q) return true
@@ -238,7 +280,9 @@ const CallLogsLegacy = () => {
         </div>
         <div className="filter-actions">
           <button className="btn btn-sm btn-outline-secondary me-3" onClick={resetFilters} disabled={loading}>Reset</button>
-          <button className="btn btn-sm btn-outline-primary" onClick={applyFilters} disabled={loading}>Search</button>
+          <button className="btn btn-sm btn-outline-primary me-2" onClick={applyFilters} disabled={loading}>Search</button>
+          <button className="btn btn-sm btn-outline-success me-2" onClick={() => exportAllCDR()} disabled={loading || exporting}>{exporting ? 'Exporting...' : 'Export'}</button>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowColumnsModal(true)}>Columns</button>
         </div>
       </CCardHeader>
 
@@ -390,6 +434,51 @@ const CallLogsLegacy = () => {
             </CTableBody>
           </CTable>
         )}
+        {/* Columns Modal */}
+        <CModal visible={showColumnsModal} onClose={() => setShowColumnsModal(false)} size="xl">
+          <CModalHeader>
+            <CModalTitle>Customize Columns</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <div><strong>Preview (first 3 rows):</strong></div>
+            <div style={{overflowX:'auto', marginTop:8}}>
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    {(selectedColumns && selectedColumns.length ? selectedColumns : columnsList.map(c=>c.key)).map(k => {
+                      const m = columnsList.find(c=>c.key===k)
+                      return <th key={k}>{(m && m.label) ? m.label : k}</th>
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(filtered||[]).slice(0,3).map((r,ri)=> (
+                    <tr key={ri}>
+                      {(selectedColumns && selectedColumns.length ? selectedColumns : columnsList.map(c=>c.key)).map(k=> (
+                        <td key={k} style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:200}}>{String(getColumnValue(k,r,ri) || '')}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-3 d-flex flex-column" style={{gap:8}}>
+              {columnsList.map(c => (
+                <CFormCheck key={c.key} label={c.label} checked={selectedColumns.indexOf(c.key) !== -1} onChange={(e)=>{
+                  if (e.target.checked) setSelectedColumns(s => Array.from(new Set([...(s||[]), c.key])))
+                  else setSelectedColumns(s => (s||[]).filter(x=>x!==c.key))
+                }} />
+              ))}
+            </div>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="light" onClick={() => setSelectedColumns(columnsList.map(c=>c.key))}>Select All</CButton>
+            <CButton color="light" onClick={() => setSelectedColumns([])}>Clear All</CButton>
+            <CButton color="primary" onClick={() => { try { localStorage.setItem('cdrSelectedColumns', JSON.stringify(selectedColumns||[])) } catch(e){}; setShowColumnsModal(false) }}>Apply</CButton>
+            <CButton color="secondary" onClick={() => setShowColumnsModal(false)}>Close</CButton>
+          </CModalFooter>
+        </CModal>
       </CCardBody>
     </CCard>
   )

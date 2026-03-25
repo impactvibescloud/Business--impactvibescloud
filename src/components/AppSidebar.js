@@ -44,6 +44,7 @@ const AppSidebar = () => {
   const [userdata, setUserData] = useState(null);
   const [featuresMap, setFeaturesMap] = useState({});
   const [featuresMenu, setFeaturesMenu] = useState([]);
+  const [featuresLabels, setFeaturesLabels] = useState({});
   const [featuresLoading, setFeaturesLoading] = useState(false);
   const token = isAutheticated();
   // console.log("userDatt", userdata);
@@ -100,8 +101,10 @@ const AppSidebar = () => {
       // businessFeatures now: { featuresMap, featuresMenu }
       const map = businessFeatures.featuresMap || {};
       const menu = Array.isArray(businessFeatures.featuresMenu) ? businessFeatures.featuresMenu : [];
+      const labels = businessFeatures.featuresLabels || {};
       setFeaturesMap(map);
       setFeaturesMenu(menu);
+      setFeaturesLabels(labels);
       setFeaturesLoading(false);
       console.log('Business features loaded:', { map, menu });
     };
@@ -136,9 +139,9 @@ const AppSidebar = () => {
     // Step 2: Filter by business features (if features are loaded)
     if (!featuresLoading) {
       if (Array.isArray(featuresMenu) && featuresMenu.length > 0) {
-        filtered = filterNavigationByFeaturesMenu(filtered, featuresMenu, featuresMap);
-      } else if (Object.keys(featuresMap || {}).length > 0) {
-        filtered = filterNavigationByFeatures(filtered, featuresMap);
+        filtered = filterNavigationByFeaturesMenu(filtered, featuresMenu, featuresMap, featuresLabels);
+      } else if (Object.keys(featuresMap || {}).length > 0 || Object.keys(featuresLabels || {}).length > 0) {
+        filtered = filterNavigationByFeatures(filtered, featuresMap, featuresLabels);
       }
     }
 
