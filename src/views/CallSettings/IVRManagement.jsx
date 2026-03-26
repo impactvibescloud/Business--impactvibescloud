@@ -20,10 +20,33 @@ import {
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch, cilPlus, cilCloudDownload, cilCheck } from '@coreui/icons'
-import { IoEyeOutline } from 'react-icons/io5'
+import { IoEyeOutline, IoChevronDownOutline, IoChevronUpOutline } from 'react-icons/io5'
 import { apiCall, getAuthToken } from '../../config/api'
 import '../Branches/Branches.css'
 import './IVRManagement.css'
+import '../Leads/CallLogsWebpage.css'
+
+// Material-UI
+import Box from '@mui/material/Box'
+import Grid from '@mui/material/Grid'
+import Button from '@mui/material/Button'
+import Paper from '@mui/material/Paper'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import CircularProgress from '@mui/material/CircularProgress'
+import Typography from '@mui/material/Typography'
+import Chip from '@mui/material/Chip'
+import IconButton from '@mui/material/IconButton'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import TextField from '@mui/material/TextField'
+import Stack from '@mui/material/Stack'
+import Collapse from '@mui/material/Collapse'
+import Alert from '@mui/material/Alert'
 
 const IVRManagement = () => {
   const [ivrs, setIvrs] = useState([])
@@ -113,6 +136,89 @@ const IVRManagement = () => {
   // DID numbers for IVR assignment
   const [availableDids, setAvailableDids] = useState([])
   const [selectedDid, setSelectedDid] = useState('')
+
+  // Expand/collapse state for showing root node children
+  const [expandedRoots, setExpandedRoots] = useState(new Set())
+
+  const nodeMap = useMemo(() => {
+    const map = {}
+    ivrs.forEach((it) => {
+      if (it && it.name) {
+        try {
+          const key = String(it.name).toLowerCase().trim()
+          map[key] = it
+        } catch (e) {
+          map[it.name] = it
+        }
+      }
+    })
+    return map
+  }, [ivrs])
+
+  const referencedNodes = useMemo(() => {
+    const s = new Set()
+    ivrs.forEach((it) => {
+      const opts = Array.isArray(it.options) ? it.options : (it.menu?.options || [])
+      if (Array.isArray(opts)) {
+        opts.forEach((o) => {
+          const dest = (o && (o.destination || o.destinationType || o.target || '')).toString()
+          if (dest && dest.startsWith('node:')) {
+            const parts = dest.split(':')
+            if (parts.length >= 2 && parts[1]) s.add(parts[1].toString().toLowerCase().trim())
+          }
+        })
+      }
+    })
+    return s
+  }, [ivrs])
+
+  const roots = useMemo(() => {
+    let r = ivrs.filter((it) => it && it.name && !referencedNodes.has(String(it.name).toLowerCase()))
+    if (!r || r.length === 0) {
+      const mainCandidates = ivrs.filter((it) => it && it.name && it.name.toLowerCase().includes('main'))
+      r = mainCandidates.length ? mainCandidates : ivrs
+    }
+    return r
+  }, [ivrs, referencedNodes])
+
+  const toggleRootExpand = (name) => {
+    setExpandedRoots((prev) => {
+      const copy = new Set(prev)
+      if (copy.has(name)) copy.delete(name)
+      else copy.add(name)
+      return copy
+    })
+  }
+
+  const getDescendants = (rootName) => {
+    const results = []
+    const visited = new Set()
+    const dfs = (name, depth = 1) => {
+      if (!name) return
+      const key = String(name).toLowerCase()
+      if (visited.has(key)) return
+      visited.add(key)
+      const node = nodeMap[key]
+      if (!node) return
+      const opts = Array.isArray(node.options) ? node.options : (node.menu?.options || [])
+      if (Array.isArray(opts)) {
+        for (const o of opts) {
+          const dest = (o && (o.destination || o.destinationType || o.target || '')).toString()
+          if (dest && dest.startsWith('node:')) {
+            const childName = (dest.split(':')[1] || '').toString()
+            const childKey = childName.toLowerCase().trim()
+            const child = nodeMap[childKey]
+            if (child) {
+              results.push({ node: child, depth })
+              dfs(childName, depth + 1)
+            }
+          }
+        }
+      }
+    }
+    dfs(rootName)
+    return results
+  }
 
   const fetchLanguageFiles = async (langCode) => {
     const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
@@ -1253,14 +1359,16 @@ const IVRManagement = () => {
       <CCardBody>
         <div style={{ display: activeTab === 'ivr' ? 'block' : 'none' }}>
             <div className="ivr-header mb-3">
-          <div className="ivr-note">Note: The primary/main IVR node should be named{' '}<strong>menu</strong>.</div>
+            
           <div className="ivr-actions">
-            <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] }); fetchLanguages(); setAddOpen(true) }}><CIcon icon={cilPlus} className="me-1" />Add</button>
-            <button className="btn btn-sm btn-outline-danger" onClick={() => {
-              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
-              if (!currentBusinessId) return
-              setDeleteAllModalOpen(true)
-            }} disabled={deletingAll || loading}>Delete all</button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button size="small" variant="contained" color="primary" startIcon={<CIcon icon={cilPlus} />} onClick={() => { setEditingNode(null); setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] }); fetchLanguages(); setAddOpen(true) }} className="filter-btn">Add</Button>
+              <Button size="small" variant="outlined" color="error" onClick={() => {
+                const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
+                if (!currentBusinessId) return
+                setDeleteAllModalOpen(true)
+              }} disabled={deletingAll || loading} className="filter-btn">{deletingAll ? 'Deleting...' : 'Delete all'}</Button>
+            </Box>
           </div>
         </div>
         {!businessId && (
@@ -1268,93 +1376,43 @@ const IVRManagement = () => {
             <div className="alert alert-warning">Missing <code>businessId</code> in localStorage. Set it to view IVRs.</div>
           </div>
         )}
-        {/* Global Generate Modal - rendered regardless of active tab so Audio tab Add can open it */}
-        <CModal visible={generateModalOpen} onClose={() => { if (!generating) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName('') } }} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <CModalHeader>
-            <CModalTitle>Generate Audio for Language</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <div className="mb-2">
-              <label className="form-label">Language</label>
-              <input className="form-control" value={generateLangCode} disabled />
-            </div>
-            <div className="mb-2">
-              <label className="form-label">Text</label>
-              <textarea className="form-control" rows={6} value={generateText} onChange={(e) => setGenerateText(e.target.value)} placeholder="Enter text to generate audio" />
-            </div>
-            <div className="mb-2">
-              <label className="form-label">File name</label>
-              <input className="form-control" value={generateFileName} onChange={(e) => setGenerateFileName(e.target.value)} placeholder="e.g. welcome_hi" />
-            </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { if (!generating) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName('') } }} disabled={generating}>Cancel</CButton>
-              <CButton color="primary" onClick={async () => {
-              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
-              if (!currentBusinessId || !generateLangCode || !generateText || !generateFileName) return
-              setGenerating(true)
-              try {
-                const payload = { text: generateText, fileName: generateFileName }
-                // include ElevenLabs voice selection when available
-                if (selectedElevenVoiceId) {
-                  payload.voiceProvider = 'elevenlabs'
-                  payload.voiceId = selectedElevenVoiceId
-                }
-                const endpoint = `/api/languages/business/${encodeURIComponent(currentBusinessId)}/${encodeURIComponent(generateLangCode)}/generate`
-                const res = await apiCall(endpoint, 'POST', payload)
-                if (res && (res.success || res.created || res.data)) {
-                  setGenerateModalOpen(false)
-                  setGenerateLangCode('')
-                  setGenerateText('')
-                  setGenerateFileName('')
-                  await fetchLanguages()
-                  if (filesLangCode === generateLangCode) await fetchLanguageFiles(filesLangCode)
-                } else {
-                  console.error('Failed to generate language audio', res)
-                }
-              } catch (err) {
-                console.error('Error generating language audio', err)
-              } finally {
-                setGenerating(false)
-              }
-            }} disabled={generating}>{generating ? ((<><CSpinner size="sm" />&nbsp;Generating</>)) : 'Generate'}</CButton>
-          </CModalFooter>
-        </CModal>
-        <CModal visible={generateModalOpen} onClose={() => { if (!generating && !generateUploading) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName(''); setGenerateType('text'); setGenerateUploadFile(null); setGenerateUploading(false) } }} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <CModalHeader>
-            <CModalTitle>Generate Audio for Language</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <div className="mb-2">
-              <label className="form-label">Language</label>
-              <input className="form-control" value={generateLangCode} disabled />
-            </div>
-            <div className="mb-2">
-              <label className="form-label">Type</label>
-              <select className="form-select" value={generateType} onChange={(e) => setGenerateType(e.target.value)}>
-                <option value="text">Text (generate)</option>
-                <option value="upload">Upload (device file)</option>
-              </select>
-            </div>
-            {generateType === 'text' ? (
-              <div className="mb-2">
-                <label className="form-label">Text</label>
-                <textarea className="form-control" rows={6} value={generateText} onChange={(e) => setGenerateText(e.target.value)} placeholder="Enter text to generate audio" />
-              </div>
-            ) : (
-              <div className="mb-2">
-                <label className="form-label">Upload file</label>
-                <input type="file" accept="audio/*" className="form-control" onChange={(e) => { const f = e.target.files && e.target.files[0]; setGenerateUploadFile(f || null); if (f && !generateFileName) setGenerateFileName((f.name||'').replace(/\.[^/.]+$/, '')) }} />
-              </div>
-            )}
-            <div className="mb-2">
-              <label className="form-label">File name</label>
-              <input className="form-control" value={generateFileName} onChange={(e) => setGenerateFileName(e.target.value)} placeholder="e.g. welcome_hi" />
-            </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { if (!generating && !generateUploading) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName(''); setGenerateType('text'); setGenerateUploadFile(null); setGenerateUploading(false) } }} disabled={generating || generateUploading}>Cancel</CButton>
-              <CButton color="primary" onClick={async () => {
+        {/* Generate Audio Dialog (replaces CModal) */}
+        <Dialog open={generateModalOpen} onClose={() => { if (!generating && !generateUploading) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName(''); setGenerateType('text'); setGenerateUploadFile(null); setGenerateUploading(false) } }} maxWidth="md" className="ivr-no-focus-modal">
+          <DialogTitle>Generate Audio for Language</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2} sx={{ mt: 0 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>Language</Typography>
+                <TextField fullWidth size="small" value={generateLangCode} disabled />
+              </Box>
+
+              <FormControl fullWidth size="small">
+                <InputLabel>Type</InputLabel>
+                <Select label="Type" value={generateType} onChange={(e) => setGenerateType(e.target.value)}>
+                  <MenuItem value="text">Text (generate)</MenuItem>
+                  <MenuItem value="upload">Upload (device file)</MenuItem>
+                </Select>
+              </FormControl>
+
+              {generateType === 'text' ? (
+                <TextField fullWidth multiline rows={6} size="small" label="Text" value={generateText} onChange={(e) => setGenerateText(e.target.value)} placeholder="Enter text to generate audio" />
+              ) : (
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1 }}>Upload file</Typography>
+                  <input id="generate-upload-file" type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; setGenerateUploadFile(f || null); if (f && !generateFileName) setGenerateFileName((f.name||'').replace(/\.[^/.]+$/, '')) }} />
+                  <label htmlFor="generate-upload-file" style={{ display: 'inline-block' }}>
+                    <Button component="span" size="small" variant="outlined" className="filter-btn">Choose file</Button>
+                  </label>
+                  <Typography variant="body2" sx={{ ml: 1, display: 'inline-block' }}>{generateUploadFile ? generateUploadFile.name : ''}</Typography>
+                </Box>
+              )}
+
+              <TextField fullWidth size="small" label="File name" value={generateFileName} onChange={(e) => setGenerateFileName(e.target.value)} placeholder="e.g. welcome_hi" />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { if (!generating && !generateUploading) { setGenerateModalOpen(false); setGenerateLangCode(''); setGenerateText(''); setGenerateFileName(''); setGenerateType('text'); setGenerateUploadFile(null); setGenerateUploading(false) } }} disabled={generating || generateUploading}>Cancel</Button>
+            <Button className="filter-btn" variant="contained" color="primary" onClick={async () => {
               const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
               if (!currentBusinessId || !generateLangCode || !generateFileName) return
               if (generateType === 'text') {
@@ -1413,9 +1471,11 @@ const IVRManagement = () => {
                   setGenerateUploading(false)
                 }
               }
-            }} disabled={generating || generateUploading}>{(generateType === 'text' ? (generating ? ((<><CSpinner size="sm" />&nbsp;Generating</>)) : 'Generate') : (generateUploading ? ((<><CSpinner size="sm" />&nbsp;Uploading</>)) : 'Upload'))}</CButton>
-          </CModalFooter>
-        </CModal>
+            }} disabled={generating || generateUploading}>
+              {generateType === 'text' ? (generating ? (<><CircularProgress size={16} />&nbsp;Generating</>) : 'Generate') : (generateUploading ? (<><CircularProgress size={16} />&nbsp;Uploading</>) : 'Upload')}
+            </Button>
+          </DialogActions>
+        </Dialog>
         <CModal visible={audioDeleteModalOpen} onClose={() => { if (!deletingAudio) { setAudioDeleteModalOpen(false); setAudioToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
           <CModalHeader>
             <CModalTitle>Delete Audio File</CModalTitle>
@@ -1445,23 +1505,17 @@ const IVRManagement = () => {
             }} disabled={deletingAudio}>{deletingAudio ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}</CButton>
           </CModalFooter>
         </CModal>
-        <CModal visible={editAudioModalOpen} onClose={() => { if (!savingEditAudio) { setEditAudioModalOpen(false); setEditingAudioFile(null); setEditAudioFileName(''); setEditAudioText('') } }} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <CModalHeader>
-            <CModalTitle>Edit Audio File</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <div className="mb-2">
-              <label className="form-label">File name</label>
-              <input className="form-control" value={editAudioFileName} onChange={(e) => setEditAudioFileName(e.target.value)} />
-            </div>
-            <div className="mb-2">
-              <label className="form-label">Text</label>
-              <textarea className="form-control" rows={6} value={editAudioText} onChange={(e) => setEditAudioText(e.target.value)} />
-            </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { if (!savingEditAudio) { setEditAudioModalOpen(false); setEditingAudioFile(null); setEditAudioFileName(''); setEditAudioText('') } }} disabled={savingEditAudio}>Cancel</CButton>
-            <CButton color="primary" onClick={async () => {
+        <Dialog open={editAudioModalOpen} onClose={() => { if (!savingEditAudio) { setEditAudioModalOpen(false); setEditingAudioFile(null); setEditAudioFileName(''); setEditAudioText('') } }} maxWidth="sm" className="ivr-no-focus-modal">
+          <DialogTitle>Edit Audio File</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <TextField label="File name" fullWidth size="small" value={editAudioFileName} onChange={(e) => setEditAudioFileName(e.target.value)} />
+              <TextField label="Text" fullWidth multiline rows={6} size="small" value={editAudioText} onChange={(e) => setEditAudioText(e.target.value)} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { if (!savingEditAudio) { setEditAudioModalOpen(false); setEditingAudioFile(null); setEditAudioFileName(''); setEditAudioText('') } }} disabled={savingEditAudio}>Cancel</Button>
+            <Button className="filter-btn" variant="contained" color="primary" onClick={async () => {
               if (!editingAudioFile) return
               const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
               const fileId = editingAudioFile._id || editingAudioFile.id
@@ -1487,141 +1541,142 @@ const IVRManagement = () => {
               } finally {
                 setSavingEditAudio(false)
               }
-            }} disabled={savingEditAudio}>{savingEditAudio ? (<><CSpinner size="sm" />&nbsp;Saving</>) : 'Save'}</CButton>
-          </CModalFooter>
-        </CModal>
+            }} disabled={savingEditAudio}>{savingEditAudio ? (<><CircularProgress size={16} />&nbsp;Saving</>) : 'Save'}</Button>
+          </DialogActions>
+        </Dialog>
 
-        <CModal visible={detailsOpen} onClose={closeDetails} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(16,24,40,0.06)', maxWidth: 960, width: '100%' }}>
-            <CModalHeader style={{ borderBottom: 'none', padding: '1rem 1.25rem', background: '#ffffff' }}>
-              <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>IVR Details</CModalTitle>
-            </CModalHeader>
-            <CModalBody style={{ background: '#fbfdff', padding: '1rem 1.25rem', maxHeight: '360px', overflowY: 'auto' }}>
-              {!selectedItem ? (
-                <div className="text-muted">No item selected</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
-                  <div>
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Name</div>
-                      <div style={{ fontWeight: 700, color: '#102a43' }}>{selectedItem.name || selectedItem.title || '-'}</div>
-                    </div>
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Voice Text</div>
-                      <div style={{ color: '#374151', whiteSpace: 'pre-wrap' }}>{selectedItem.voice || selectedItem.menu?.voice || ''}</div>
-                    </div>
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Routing / Menu</div>
-                      <div style={{ background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid rgba(16,24,40,0.04)', maxHeight: 240, overflowY: 'auto' }}>
-                        {(() => {
-                          const menuObj = selectedItem.menu || selectedItem.routing || selectedItem || {}
-                          const opts = Array.isArray(menuObj.options) ? menuObj.options : (Array.isArray(selectedItem.options) ? selectedItem.options : [])
-                          if (!opts || opts.length === 0) return (<div style={{ color: '#6b7280' }}>No routing options available</div>)
-                          return (
-                            <div>
-                              {opts.map((o) => {
-                                const dest = (o.destination || o.destinationType || o.target || '').toString()
-                                let kind = 'default'
-                                if (dest.startsWith('dept:')) kind = 'dept'
-                                else if (dest.startsWith('node:')) kind = 'node'
-                                else if (dest.startsWith('agent:')) kind = 'agent'
-                                const colorMap = {
-                                  dept: { accent: '#fff7ed', border: '#f6ad55', badgeBg: '#fff2e8', badgeColor: '#7a4100' },
-                                  node: { accent: '#eff6ff', border: '#60a5fa', badgeBg: '#eef6ff', badgeColor: '#0b4ea2' },
-                                  agent: { accent: '#ecfdf5', border: '#34d399', badgeBg: '#f0fdf4', badgeColor: '#065f46' },
-                                  default: { accent: '#f8fafc', border: '#e5e7eb', badgeBg: '#f3f4f6', badgeColor: '#111827' },
-                                }
-                                const styles = colorMap[kind] || colorMap.default
-                                return (
-                                  <div key={o._id || o.key || Math.random()} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '1px solid rgba(16,24,40,0.03)', background: styles.accent, borderLeft: `4px solid ${styles.border}`, borderRadius: 6, marginBottom: 8 }}>
-                                    <div style={{ flex: '0 0 46px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <div style={{ background: styles.badgeBg, color: styles.badgeColor, padding: '0.25rem 0.45rem', fontSize: '0.85rem', borderRadius: 6, fontWeight: 600 }}>{o.key}</div>
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontWeight: 600, color: '#102a43' }}>{o.voice || o.text || '—'}</div>
-                                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, wordBreak: 'break-word' }}>{dest || ''}</div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Virtual Number</div>
-                      <div style={{ fontWeight: 600 }}>{selectedItem.virtualNumber || selectedItem.number || '-'}</div>
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Created By</div>
-                      <div>{selectedItem.createdBy?.email || selectedItem.createdBy?.name || '-'}</div>
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Created At</div>
-                      <div>{formatDateTimeShort(selectedItem.createdAt || selectedItem.created)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Status</div>
-                      <div><CBadge color={selectedItem.active ? 'success' : 'secondary'}>{selectedItem.active ? 'Active' : 'Inactive'}</CBadge></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CModalBody>
-            <CModalFooter style={{ borderTop: 'none', padding: '0.75rem 1.25rem', background: '#ffffff' }} />
-          </div>
-        </CModal>
+        <Dialog open={detailsOpen} onClose={closeDetails} maxWidth="md" className="ivr-no-focus-modal">
+          <DialogTitle>IVR Details</DialogTitle>
+          <DialogContent dividers>
+            {!selectedItem ? (
+              <Typography color="text.secondary">No item selected</Typography>
+            ) : (
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={8}>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Name</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{selectedItem.name || selectedItem.title || '-'}</Typography>
+                  </Box>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Voice Text</Typography>
+                    <Box sx={{ color: '#374151', whiteSpace: 'pre-wrap' }}>{selectedItem.voice || selectedItem.menu?.voice || ''}</Box>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Routing / Menu</Typography>
+                    <Box sx={{ background: '#ffffff', p: 1.5, borderRadius: 1, border: '1px solid rgba(16,24,40,0.04)', maxHeight: 240, overflowY: 'auto' }}>
+                      {(() => {
+                        const menuObj = selectedItem.menu || selectedItem.routing || selectedItem || {}
+                        const opts = Array.isArray(menuObj.options) ? menuObj.options : (Array.isArray(selectedItem.options) ? selectedItem.options : [])
+                        if (!opts || opts.length === 0) return (<Typography color="text.secondary">No routing options available</Typography>)
+                        return (
+                          <div>
+                            {opts.map((o) => {
+                              const dest = (o.destination || o.destinationType || o.target || '').toString()
+                              let kind = 'default'
+                              if (dest.startsWith('dept:')) kind = 'dept'
+                              else if (dest.startsWith('node:')) kind = 'node'
+                              else if (dest.startsWith('agent:')) kind = 'agent'
+                              const colorMap = {
+                                dept: { accent: '#fff7ed', border: '#f6ad55', badgeBg: '#fff2e8', badgeColor: '#7a4100' },
+                                node: { accent: '#eff6ff', border: '#60a5fa', badgeBg: '#eef6ff', badgeColor: '#0b4ea2' },
+                                agent: { accent: '#ecfdf5', border: '#34d399', badgeBg: '#f0fdf4', badgeColor: '#065f46' },
+                                default: { accent: '#f8fafc', border: '#e5e7eb', badgeBg: '#f3f4f6', badgeColor: '#111827' },
+                              }
+                              const styles = colorMap[kind] || colorMap.default
+                              return (
+                                <Box key={o._id || o.key || Math.random()} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 1, borderBottom: '1px solid rgba(16,24,40,0.03)', background: styles.accent, borderLeft: `4px solid ${styles.border}`, borderRadius: 1, mb: 1 }}>
+                                  <Box sx={{ flex: '0 0 46px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Box sx={{ background: styles.badgeBg, color: styles.badgeColor, px: 0.5, py: 0.25, fontSize: '0.85rem', borderRadius: 1, fontWeight: 600 }}>{o.key}</Box>
+                                  </Box>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography sx={{ fontWeight: 600, color: '#102a43' }}>{o.voice || o.text || '—'}</Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: 'break-word' }}>{dest || ''}</Typography>
+                                  </Box>
+                                </Box>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
+                    </Box>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary">Virtual Number</Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>{selectedItem.did || selectedItem.virtualNumber || selectedItem.number || '-'}</Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary">Created By</Typography>
+                      <Typography>{selectedItem.createdBy?.email || selectedItem.createdBy?.name || '-'}</Typography>
+                    </Box>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary">Created At</Typography>
+                      <Typography>{formatDateTimeShort(selectedItem.createdAt || selectedItem.created)}</Typography>
+                    </Box>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary">Status</Typography>
+                      <Box sx={{ mt: 0.5 }}><CBadge color={selectedItem.active ? 'success' : 'secondary'}>{selectedItem.active ? 'Active' : 'Inactive'}</CBadge></Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
+            )}
+          </DialogContent>
+          <DialogActions />
+        </Dialog>
 
-        <CModal visible={addOpen} onClose={() => { setAddOpen(false); setEditingNode(null) }} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 8px 24px rgba(16,24,40,0.06)', maxWidth: 960, width: '100%' }}>
-            <CModalHeader style={{ borderBottom: 'none', padding: '1rem 1.25rem', background: '#ffffff' }}>
-              <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>{editingNode ? `Edit IVR (${editingNode})` : 'Add IVR'}</CModalTitle>
-            </CModalHeader>
-            <CModalBody style={{ background: '#fbfdff', padding: '1rem 1.25rem', maxHeight: '420px', overflowY: 'auto' }}>
+        <Dialog open={addOpen} onClose={() => { setAddOpen(false); setEditingNode(null) }} maxWidth="md" className="ivr-no-focus-modal">
+          <DialogTitle>{editingNode ? `Edit IVR (${editingNode})` : 'Add IVR'}</DialogTitle>
+          <DialogContent dividers>
+            <div style={{ background: '#fbfdff', padding: '1rem 1.25rem', maxHeight: '420px', overflowY: 'auto' }}>
               <div className="row mb-2">
               <div className="col-12 col-md-4">
-                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Node (identifier)</label>
-                <input className="form-control" value={newIvr.node} placeholder="e.g. menu, sales" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
+                <TextField label="Node (identifier)" fullWidth size="small" value={newIvr.node} placeholder="e.g. menu, sales" onChange={(e) => setNewIvr({ ...newIvr, node: e.target.value })} />
               </div>
               <div className="col-12 col-md-4">
-                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>DID Number (optional)</label>
-                <select className="form-select" value={selectedDid || ''} onChange={(e) => setSelectedDid(e.target.value)}>
-                  <option value="">(No DID)</option>
-                  {availableDids.map(d => (
-                    <option key={d.id || d.number} value={d.number}>{d.number}</option>
-                  ))}
-                </select>
+                <FormControl fullWidth size="small">
+                  <InputLabel>DID Number (optional)</InputLabel>
+                  <Select label="DID Number (optional)" value={selectedDid || ''} onChange={(e) => setSelectedDid(e.target.value)}>
+                    <MenuItem value="">(No DID)</MenuItem>
+                    {availableDids.map(d => (
+                      <MenuItem key={d.id || d.number} value={d.number}>{d.number}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </div>
               <div className="col-12 col-md-3">
-                <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Language</label>
-                <select className="form-select" value={newIvr.language || ''} onChange={(e) => setNewIvr({ ...newIvr, language: e.target.value })}>
-                  <option value="">Default</option>
-                  {languages.map((ln) => (
-                    <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
-                  ))}
-                </select>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Language</InputLabel>
+                  <Select label="Language" value={newIvr.language || ''} onChange={(e) => setNewIvr({ ...newIvr, language: e.target.value })}>
+                    <MenuItem value="">Default</MenuItem>
+                    {languages.map((ln) => (
+                      <MenuItem key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </div>
               <div className="col-12 col-md-5">
                 <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Voice</label>
                 <div className="d-flex mb-2" style={{ gap: 8 }}>
-                  <select className="form-select" style={{ width: 160 }} value={voiceMode} onChange={(e) => setVoiceMode(e.target.value)}>
-                    <option value="text">Text</option>
-                    <option value="upload">Upload</option>
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <InputLabel>Mode</InputLabel>
+                    <Select label="Mode" value={voiceMode} onChange={(e) => setVoiceMode(e.target.value)}>
+                      <MenuItem value="text">Text</MenuItem>
+                      <MenuItem value="upload">Upload</MenuItem>
+                    </Select>
+                  </FormControl>
                   {voiceMode === 'text' ? (
-                    <input className="form-control" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
+                    <TextField fullWidth size="small" value={newIvr.voice} placeholder="e.g. Welcome to Acme." onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })} />
                   ) : (
-                    <div style={{ width: '100%' }}>
-                      <select className="form-select" value={newIvr.voice || ''} onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })}>
-                        <option value="">Select existing audio file</option>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Existing file</InputLabel>
+                      <Select label="Existing file" value={newIvr.voice || ''} onChange={(e) => setNewIvr({ ...newIvr, voice: e.target.value })}>
+                        <MenuItem value="">Select existing audio file</MenuItem>
                         {(voiceFiles || []).map((vf) => (
-                          <option key={vf._id || vf.id || vf.fileName} value={vf.fileName || vf.name || vf.id}>{vf.fileName || vf.name || vf.id}</option>
+                          <MenuItem key={vf._id || vf.id || vf.fileName} value={vf.fileName || vf.name || vf.id}>{vf.fileName || vf.name || vf.id}</MenuItem>
                         ))}
-                      </select>
-                    </div>
+                      </Select>
+                    </FormControl>
                   )}
                 </div>
               </div>
@@ -1636,85 +1691,99 @@ const IVRManagement = () => {
             <div className="mb-2">
               <label className="form-label" style={{ fontSize: 13, color: '#556270' }}>Options (press {'>'} target)</label>
               {newIvr.options.map((opt, idx) => (
-                <div key={idx} className="d-flex mb-2" style={{ gap: 8 }}>
-                  <input style={{ width: 80 }} className="form-control me-2" value={opt.key} onChange={(e) => {
+                <Box key={idx} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                  <TextField size="small" sx={{ width: 80 }} value={opt.key} onChange={(e) => {
                     const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], key: e.target.value }; setNewIvr({ ...newIvr, options: copy })
                   }} />
-                  <select className="form-select me-2" style={{ width: 140 }} value={opt.type || 'node'} onChange={(e) => {
-                    const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], type: e.target.value, target: '' }; setNewIvr({ ...newIvr, options: copy })
-                  }}>
-                    <option value="node">node</option>
-                    <option value="dept">dept</option>
-                    <option value="lang">lang</option>
-                  </select>
+                  <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <InputLabel>Type</InputLabel>
+                    <Select label="Type" value={opt.type || 'node'} onChange={(e) => {
+                      const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], type: e.target.value, target: '' }; setNewIvr({ ...newIvr, options: copy })
+                    }}>
+                      <MenuItem value="node">node</MenuItem>
+                      <MenuItem value="dept">dept</MenuItem>
+                      <MenuItem value="lang">lang</MenuItem>
+                    </Select>
+                  </FormControl>
                   {opt.type === 'dept' ? (
-                    <div className="me-2 d-flex" style={{ gap: 8 }}>
-                      <select className="form-select" value={opt.target || ''} onChange={(e) => {
-                        const val = e.target.value;
-                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: val, agentId: '' }; setNewIvr({ ...newIvr, options: copy })
-                        // fetch members for this department so agent dropdown can populate
-                        fetchDepartmentMembers(val)
-                      }}>
-                        <option value="">Select department</option>
-                        {departments.map((d) => (
-                          <option key={d._id || d.id} value={d._id || d.id}>{d.name || d.departmentName || d.title || d.slug || d._id}</option>
-                        ))}
-                      </select>
-                      <select className="form-select" value={opt.agentId || ''} onChange={(e) => {
-                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], agentId: e.target.value }; setNewIvr({ ...newIvr, options: copy });
-                      }}>
-                        <option value="">Select agent (optional)</option>
-                        {(() => {
-                          const dep = departments.find(d => (d._id === opt.target || d.id === opt.target))
-                          if (!dep) return null
-                          const members = departmentMembers[dep._id] || departmentMembers[dep.id] || []
-                          const headId = dep.departmentHead || dep.head || dep.userId || dep.departmentHeadId || dep.department_head
-                          const headAgent = members.find(a => a._id === headId || a.id === headId)
-                          const merged = headAgent ? ([headAgent, ...members.filter(a => a._id !== headAgent._id)]) : members
-                          return merged.map((ag) => (
-                            <option key={ag._id || ag.id} value={ag._id || ag.id}>{ag.name || ag.email || ag._id}</option>
-                          ))
-                        })()}
-                      </select>
-                    </div>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Department</InputLabel>
+                        <Select value={opt.target || ''} label="Department" onChange={(e) => {
+                          const val = e.target.value;
+                          const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: val, agentId: '' }; setNewIvr({ ...newIvr, options: copy })
+                          fetchDepartmentMembers(val)
+                        }}>
+                          <MenuItem value="">Select department</MenuItem>
+                          {departments.map((d) => (
+                            <MenuItem key={d._id || d.id} value={d._id || d.id}>{d.name || d.departmentName || d.title || d.slug || d._id}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Agent (optional)</InputLabel>
+                        <Select value={opt.agentId || ''} label="Agent (optional)" onChange={(e) => {
+                          const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], agentId: e.target.value }; setNewIvr({ ...newIvr, options: copy });
+                        }}>
+                          <MenuItem value="">Select agent (optional)</MenuItem>
+                          {(() => {
+                            const dep = departments.find(d => (d._id === opt.target || d.id === opt.target))
+                            if (!dep) return null
+                            const members = departmentMembers[dep._id] || departmentMembers[dep.id] || []
+                            const headId = dep.departmentHead || dep.head || dep.userId || dep.departmentHeadId || dep.department_head
+                            const headAgent = members.find(a => a._id === headId || a.id === headId)
+                            const merged = headAgent ? ([headAgent, ...members.filter(a => a._id !== headAgent._id)]) : members
+                            return merged.map((ag) => (
+                              <MenuItem key={ag._id || ag.id} value={ag._id || ag.id}>{ag.name || ag.email || ag._id}</MenuItem>
+                            ))
+                          })()}
+                        </Select>
+                      </FormControl>
+                    </Box>
                     ) : opt.type === 'lang' ? (
-                      <select className="form-select me-2" style={{ width: 180 }} value={opt.target || ''} onChange={(e) => {
-                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
-                      }}>
-                        <option value="">Select language</option>
-                        {languages.map((ln) => (
-                          <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
-                        ))}
-                      </select>
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Language</InputLabel>
+                        <Select value={opt.target || ''} label="Language" onChange={(e) => {
+                          const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
+                        }}>
+                          <MenuItem value="">Select language</MenuItem>
+                          {languages.map((ln) => (
+                            <MenuItem key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     ) : (
                       existingNodes.length > 0 ? (
-                      <select className="form-select me-2" style={{ width: 180 }} value={opt.target || ''} onChange={(e) => {
-                        const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
-                      }}>
-                        <option value="">Select node</option>
-                        {existingNodes.map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Node</InputLabel>
+                        <Select value={opt.target || ''} label="Node" onChange={(e) => {
+                          const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
+                        }}>
+                          <MenuItem value="">Select node</MenuItem>
+                          {existingNodes.map((n) => (
+                            <MenuItem key={n} value={n}>{n}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                       ) : (
-                        <input className="form-control me-2" style={{ maxWidth: 220 }} value={opt.target} onChange={(e) => {
+                        <TextField size="small" sx={{ maxWidth: 220 }} value={opt.target} onChange={(e) => {
                           const copy = [...newIvr.options]; copy[idx] = { ...copy[idx], target: e.target.value }; setNewIvr({ ...newIvr, options: copy })
                         }} placeholder="e.g. sales" />
                       )
-                    )
-                  }
+                    )}
                   {/* per-option voice removed - voice is defined at menu level */}
-                  <button className="btn btn-sm btn-outline-danger" onClick={() => {
+                  <Button size="small" variant="outlined" color="error" onClick={() => {
                     const copy = [...newIvr.options]; copy.splice(idx, 1); setNewIvr({ ...newIvr, options: copy })
-                  }}>Remove</button>
-                </div>
+                  }}>Remove</Button>
+                </Box>
               ))}
-              <button className="btn btn-sm btn-outline-primary" onClick={addOptionWithNextKey}>Add option</button>
+              <Button size="small" variant="outlined" className="filter-btn" onClick={addOptionWithNextKey}>Add option</Button>
             </div>
-            </CModalBody>
-            <CModalFooter style={{ borderTop: 'none', padding: '0.75rem 1.25rem', background: '#ffffff' }}>
-              <CButton color="secondary" onClick={() => { setAddOpen(false); setEditingNode(null) }} disabled={saving}>Cancel</CButton>
-              <CButton color="primary" onClick={async () => {
+            </div>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { setAddOpen(false); setEditingNode(null) }} disabled={saving}>Cancel</Button>
+            <Button variant="contained" color="primary" onClick={async () => {
                 const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
                 if (!currentBusinessId) return
                 setSaving(true)
@@ -1988,12 +2057,11 @@ const IVRManagement = () => {
                 } finally {
                   setSaving(false)
                 }
-              }} disabled={saving}>
-                {saving ? (<><CSpinner size="sm" />&nbsp;Saving</>) : (editingNode ? 'Save' : 'Create')}
-              </CButton>
-            </CModalFooter>
-          </div>
-        </CModal>
+              }} disabled={saving} className="filter-btn">
+                {saving ? (<><CircularProgress size={16} />&nbsp;Saving</>) : (editingNode ? 'Save' : 'Create')}
+              </Button>
+          </DialogActions>
+        </Dialog>
 
         <CModal visible={deleteModalOpen} onClose={() => { if (deletingNode !== nodeToDelete) { setDeleteModalOpen(false); setNodeToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
           <CModalHeader>
@@ -2025,47 +2093,39 @@ const IVRManagement = () => {
           </CModalFooter>
         </CModal>
 
-        <CModal visible={afterModalOpen} onClose={() => { if (!savingAfterHours) { setAfterModalOpen(false); setEditingAfterId(null) } }} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <CModalHeader>
-            <CModalTitle>{editingAfterId ? 'Edit After Hours' : 'Add After Hours'}</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <div className="mb-2">
-              <label className="form-label">Language</label>
-              <select className="form-select mb-2" value={afterLanguage || ''} onChange={(e) => setAfterLanguage(e.target.value)}>
-                <option value="">Default</option>
-                {languages.map((ln) => (
-                  <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
-                ))}
-              </select>
-              <label className="form-label">Message</label>
-              <textarea className="form-control" rows={6} value={afterHoursMessage} onChange={(e) => setAfterHoursMessage(e.target.value)} placeholder="Enter the after-hours voice/text here" />
-            </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { if (!savingAfterHours) { setAfterModalOpen(false); setEditingAfterId(null) } }} disabled={savingAfterHours}>Cancel</CButton>
-            <CButton color="primary" onClick={async () => { await saveAfterHours() }} disabled={savingAfterHours}>{savingAfterHours ? (<><CSpinner size="sm" />&nbsp;Saving</>) : (editingAfterId ? 'Update' : 'Save')}</CButton>
-          </CModalFooter>
-        </CModal>
+        <Dialog open={afterModalOpen} onClose={() => { if (!savingAfterHours) { setAfterModalOpen(false); setEditingAfterId(null) } }} maxWidth="md" className="ivr-no-focus-modal">
+          <DialogTitle>{editingAfterId ? 'Edit After Hours' : 'Add After Hours'}</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Language</InputLabel>
+                <Select value={afterLanguage || ''} label="Language" onChange={(e) => setAfterLanguage(e.target.value)}>
+                  <MenuItem value="">Default</MenuItem>
+                  {languages.map((ln) => (
+                    <MenuItem key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField label="Message" multiline rows={6} fullWidth size="small" value={afterHoursMessage} placeholder="Enter the after-hours voice/text here" onChange={(e) => setAfterHoursMessage(e.target.value)} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { if (!savingAfterHours) { setAfterModalOpen(false); setEditingAfterId(null) } }} disabled={savingAfterHours}>Cancel</Button>
+            <Button className="filter-btn" variant="contained" color="primary" onClick={async () => { await saveAfterHours() }} disabled={savingAfterHours}>{savingAfterHours ? (<><CircularProgress size={16} />&nbsp;Saving</>) : (editingAfterId ? 'Update' : 'Save')}</Button>
+          </DialogActions>
+        </Dialog>
 
-        <CModal visible={langModalOpen} onClose={() => { if (!savingLang) { setLangModalOpen(false); setEditingLangId(null) } }} alignment="center" className="ivr-no-focus-modal">
-          <CModalHeader>
-            <CModalTitle>{editingLangId ? 'Edit Language' : 'Add Language'}</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <div className="mb-2">
-              <label className="form-label">Code</label>
-              <input className="form-control" value={langCode} placeholder="e.g. en" onChange={(e) => setLangCode(e.target.value)} />
-            </div>
-            <div className="mb-2">
-              <label className="form-label">Name</label>
-              <input className="form-control" value={langName} placeholder="e.g. English" onChange={(e) => setLangName(e.target.value)} />
-            </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { if (!savingLang) { setLangModalOpen(false); setEditingLangId(null) } }} disabled={savingLang}>Cancel</CButton>
-            <CButton color="primary" onClick={async () => {
-              // Support edit via PUT if editingLangId looks like an id
+        <Dialog open={langModalOpen} onClose={() => { if (!savingLang) { setLangModalOpen(false); setEditingLangId(null) } }} maxWidth="sm" className="ivr-no-focus-modal">
+          <DialogTitle>{editingLangId ? 'Edit Language' : 'Add Language'}</DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <TextField label="Code" fullWidth size="small" value={langCode} placeholder="e.g. en" onChange={(e) => setLangCode(e.target.value)} />
+              <TextField label="Name" fullWidth size="small" value={langName} placeholder="e.g. English" onChange={(e) => setLangName(e.target.value)} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { if (!savingLang) { setLangModalOpen(false); setEditingLangId(null) } }} disabled={savingLang}>Cancel</Button>
+            <Button className="filter-btn" variant="contained" color="primary" onClick={async () => {
               setSavingLang(true)
               try {
                 const payload = { code: langCode, name: langName }
@@ -2087,9 +2147,9 @@ const IVRManagement = () => {
               } catch (e) {
                 console.error('Failed to save language', e)
               } finally { setSavingLang(false) }
-            }} disabled={savingLang}>{savingLang ? 'Saving...' : (editingLangId ? 'Update' : 'Save')}</CButton>
-          </CModalFooter>
-        </CModal>
+            }} disabled={savingLang}>{savingLang ? (<><CircularProgress size={16} />&nbsp;Saving</>) : (editingLangId ? 'Update' : 'Save')}</Button>
+          </DialogActions>
+        </Dialog>
 
         {/* After Hours tab handled in tab content below */}
 
@@ -2098,184 +2158,210 @@ const IVRManagement = () => {
         ) : ivrs.length === 0 ? (
           <div className="text-center py-3">No IVRs found</div>
         ) : (
-          <div>
-            {ivrs.map((i) => (
-              <div key={i._id || i.id || i.name} className="d-flex align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600 }}>
-                    {i.name || i._id || '(ivr)'}
-                    {((String(i.name || i.node || '')).toLowerCase() === 'menu') && (
-                      <CBadge className="ms-2" style={{ fontSize: '0.7rem', padding: '0.15rem 0.35rem', backgroundColor: '#e67e22', color: '#ffffff' }}>Entry IVR</CBadge>
-                    )}
-                  </div>
-                  <div className="text-muted" style={{ fontSize: 12, wordBreak: 'break-word' }}>{i.voice || ''}</div>
-                  <div className="text-muted" style={{ fontSize: 12 }}>{Array.isArray(i.options) ? `${i.options.length} options` : '-'}</div>
-                </div>
-                <div style={{ width: 140, textAlign: 'center' }}>
-                  <CBadge color={i.status === 'active' || i.status === 'on' ? 'success' : 'secondary'}>{i.status || '-'}</CBadge>
-                </div>
-                <div>
-                    {playingIvrId === (i._id || i.id || (i.fileName || i.audioFile)) ? (
-                    <button className="btn btn-sm btn-outline-danger me-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
-                  ) : (
-                    (i.fileName || i.audioFile || i._id) && (
-                      <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playIvrFile(i) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
-                    )
-                  )}
-                  <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); openDetails(i) }} title="View"><IoEyeOutline style={{fontSize: '1em', verticalAlign: 'middle', lineHeight: 1}} /></button>
-                  <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation(); openEdit(i) }} title="Edit"><CIcon icon={cilPencil} /></button>
-                  <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); const nodeId = (i.name || i.node || i._id || i.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }} title="Delete"><CIcon icon={cilTrash} /></button>
-                </div>
-              </div>
+          <Grid container spacing={2}>
+            {roots.map((root) => (
+              <Grid item xs={12} key={root._id || root.id || root.name}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography sx={{ fontWeight: 600 }}>{root.name || root._id || '(ivr)'}</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>{root.menu?.voice || root.voice || ''}</Typography>
+                      <Typography variant="body2" color="text.secondary">{Array.isArray(root.menu?.options) ? `${root.menu.options.length} options` : (Array.isArray(root.options) ? `${root.options.length} options` : '-')}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <CBadge color={root.status === 'active' || root.status === 'on' ? 'success' : 'secondary'}>{root.status || '-'}</CBadge>
+                      <IconButton size="small" onClick={() => toggleRootExpand(root.name)} title={expandedRoots.has(root.name) ? 'Collapse' : 'Expand'}>
+                        {expandedRoots.has(root.name) ? <IoChevronUpOutline style={{ fontSize: '1em' }} /> : <IoChevronDownOutline style={{ fontSize: '1em' }} />}
+                      </IconButton>
+                      {playingIvrId === (root._id || root.id || (root.fileName || root.audioFile)) ? (
+                        <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></IconButton>
+                      ) : (
+                        (root.fileName || root.audioFile || root._id) && (
+                          <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); playIvrFile(root) }} title="Play"><CIcon icon={cilMediaPlay} /></IconButton>
+                        )
+                      )}
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); openDetails(root) }} title="View"><IoEyeOutline style={{ fontSize: '1em', verticalAlign: 'middle', lineHeight: 1 }} /></IconButton>
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); openEdit(root) }} title="Edit"><CIcon icon={cilPencil} /></IconButton>
+                      <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); const nodeId = (root.name || root.node || root._id || root.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }} title="Delete"><CIcon icon={cilTrash} /></IconButton>
+                    </Box>
+                  </Box>
+                  <Collapse in={expandedRoots.has(root.name)} timeout="auto" unmountOnExit>
+                    <Box sx={{ mt: 1 }}>
+                      {getDescendants(root.name).map(({ node, depth }) => (
+                        <Paper key={node._id || node.id || node.name} variant="outlined" sx={{ p: 1, mt: 1, ml: depth * 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 1 }}>
+                          <Box>
+                            <Typography sx={{ fontWeight: 600 }}>{node.name || node._id}</Typography>
+                            <Typography variant="body2" color="text.secondary">{node.menu?.voice || node.voice || ''}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            {playingIvrId === (node._id || node.id || (node.fileName || node.audioFile)) ? (
+                              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></IconButton>
+                            ) : (
+                              (node.fileName || node.audioFile || node._id) && (
+                                <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); playIvrFile(node) }} title="Play"><CIcon icon={cilMediaPlay} /></IconButton>
+                              )
+                            )}
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); openDetails(node) }} title="View"><IoEyeOutline style={{ fontSize: '1em', verticalAlign: 'middle', lineHeight: 1 }} /></IconButton>
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); openEdit(node) }} title="Edit"><CIcon icon={cilPencil} /></IconButton>
+                            <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); const nodeId = (node.name || node.node || node._id || node.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }} title="Delete"><CIcon icon={cilTrash} /></IconButton>
+                          </Box>
+                        </Paper>
+                      ))}
+                    </Box>
+                  </Collapse>
+                </Paper>
+              </Grid>
             ))}
-          </div>
+          </Grid>
         )}
         </div>
-
-        {activeTab === 'after' && (
-          <div>
-            <div className="ivr-header mb-3">
-              <div className="ivr-note">Manage the after-hours message for this business.</div>
-              <div className="ivr-actions">
-                <button className="btn btn-sm btn-success me-2" onClick={() => { setEditingAfterId(null); setAfterHoursMessage(''); setAfterLanguage(''); fetchLanguages(); setAfterModalOpen(true) }}>Add</button>
-                <button className="btn btn-sm btn-outline-danger" onClick={async () => {
-                  if (!afterHoursList || afterHoursList.length === 0) return
-                  const ok = window.confirm('Delete ALL after-hours audios for this business? This cannot be undone.')
-                  if (!ok) return
-                  setDeletingAfterAll(true)
-                  try {
-                    for (let i = 0; i < afterHoursList.length; i++) {
-                      const id = afterHoursList[i]._id || afterHoursList[i].id
-                      if (!id) continue
-                      try {
-                        await apiCall(`/api/businesses/${encodeURIComponent(businessId)}/after-hours/${encodeURIComponent(id)}`, 'DELETE')
-                      } catch (e) {
-                        console.error('Failed to delete after-hours item', id, e)
+          {activeTab === 'after' && (
+            <Box className="page-container">
+              <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="ivr-header">
+                <Box>
+                  <Typography variant="h6">After Hours</Typography>
+                  <Typography variant="body2" color="text.secondary">Manage the after-hours message for this business.</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button size="small" variant="contained" color="primary" onClick={() => { setEditingAfterId(null); setAfterHoursMessage(''); setAfterLanguage(''); fetchLanguages(); setAfterModalOpen(true) }} startIcon={<CIcon icon={cilPlus} />}>Add</Button>
+                  <Button size="small" variant="outlined" color="error" onClick={async () => {
+                    if (!afterHoursList || afterHoursList.length === 0) return
+                    const ok = window.confirm('Delete ALL after-hours audios for this business? This cannot be undone.')
+                    if (!ok) return
+                    setDeletingAfterAll(true)
+                    try {
+                      for (let i = 0; i < afterHoursList.length; i++) {
+                        const id = afterHoursList[i]._id || afterHoursList[i].id
+                        if (!id) continue
+                        try {
+                          await apiCall(`/api/businesses/${encodeURIComponent(businessId)}/after-hours/${encodeURIComponent(id)}`, 'DELETE')
+                        } catch (e) {
+                          console.error('Failed to delete after-hours item', id, e)
+                        }
                       }
+                      await fetchAfterHours()
+                    } finally {
+                      setDeletingAfterAll(false)
                     }
-                    await fetchAfterHours()
-                  } finally {
-                    setDeletingAfterAll(false)
-                  }
-                }} disabled={deletingAfterAll}>{deletingAfterAll ? 'Deleting...' : 'Delete all'}</button>
-              </div>
-            </div>
-            {!businessId && (
-              <div className="mb-3">
-                <div className="alert alert-warning">Missing <code>businessId</code> in localStorage. Set it to manage after-hours.</div>
-              </div>
-            )}
-            
-            <h6>Saved After Hours Audios</h6>
-            {afterHoursList.length === 0 ? (
-              <div className="text-muted">No saved after-hours audio for this business.</div>
-            ) : (
-              <div>
-                {afterHoursList.map((a) => (
-                  <div key={a._id || a.id || a.name} className="d-flex align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600 }}>{a.name || a._id || '(audio)'}</div>
-                      <div className="text-muted" style={{ fontSize: 12, wordBreak: 'break-word' }}>{a.text || a.message || ''}</div>
-                      <div className="text-muted" style={{ fontSize: 12 }}>{a.createdAt ? (new Date(a.createdAt)).toLocaleString() : ''}</div>
-                    </div>
-                    <div>
-                      {playingIvrId === `after-${a._id || a.name}` ? (
-                        <button className="btn btn-sm btn-outline-danger me-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
-                      ) : (
-                        <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playAfterHours(a) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
-                      )}
-                      <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); openAfterDetails(a) }} title="View"><IoEyeOutline style={{fontSize: '1em', verticalAlign: 'middle', lineHeight: 1}} /></button>
-                      <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation(); setEditingAfterId(a._id || a.id); setAfterHoursMessage(a.generatedText || a.text || a.message || ''); setAfterLanguage(a.language || a.lang || a.languageCode || ''); fetchLanguages(); setAfterModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></button>
-                      <button className="btn btn-sm btn-outline-danger me-2" title="Delete" onClick={(e) => { e.stopPropagation(); confirmDeleteAfterHours(a._id || a.id) }}><CIcon icon={cilTrash} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        <CModal visible={afterDeleteModalOpen} onClose={() => { if (!deletingAfterItem) { setAfterDeleteModalOpen(false); setAfterToDelete(null) } }} alignment="center" className="ivr-no-focus-modal">
-          <CModalHeader>
-            <CModalTitle>Delete After Hours</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            Are you sure you want to delete this after-hours audio? This action cannot be undone.
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => { if (!deletingAfterItem) { setAfterDeleteModalOpen(false); setAfterToDelete(null) } }} disabled={deletingAfterItem}>Cancel</CButton>
-            <CButton color="danger" onClick={deleteAfterHoursConfirmed} disabled={deletingAfterItem}>{deletingAfterItem ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}</CButton>
-          </CModalFooter>
-        </CModal>
+                  }} disabled={deletingAfterAll} className="filter-btn">{deletingAfterAll ? 'Deleting...' : 'Delete all'}</Button>
+                </Box>
+              </Box>
 
-        <CModal visible={afterDetailsOpen} onClose={closeAfterDetails} alignment="center" size="lg" className="ivr-no-focus-modal">
-          <div style={{ borderRadius: 12, overflow: 'hidden', boxShadow: '0 12px 30px rgba(16,24,40,0.08)', maxWidth: 920, width: '100%', background: '#f8fbff' }}>
-            <CModalHeader style={{ borderBottom: 'none', padding: '1rem 1.25rem', background: '#ffffff' }}>
-              <CModalTitle style={{ fontWeight: 700, fontSize: '1.05rem', color: '#102a43' }}>After Hours Details</CModalTitle>
-            </CModalHeader>
-            <CModalBody style={{ padding: '1rem', maxHeight: '420px', overflowY: 'auto', background: '#f8fbff' }}>
-              {!afterSelected ? (
-                <div className="text-muted">No item selected</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Message</div>
-                    <div style={{ background: '#f0f9ff', padding: 16, borderRadius: 10, border: '1px solid rgba(96,165,250,0.12)', minHeight: 80, whiteSpace: 'pre-wrap', color: '#334155' }}>{afterSelected.generatedText || afterSelected.text || afterSelected.message || '-'}</div>
-                  </div>
-                  <div>
-                    <div style={{ background: '#ffffff', padding: 12, borderRadius: 10, border: '1px solid rgba(16,24,40,0.04)' }}>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>File</div>
-                      <div style={{ fontWeight: 600, marginTop: 6 }}>{afterSelected.fileName || '-'}</div>
-                      <div style={{ fontSize: 13, color: '#6b7280' }}>{afterSelected.mimeType ? `${afterSelected.mimeType} • ${afterSelected.sizeKB ? afterSelected.sizeKB + ' KB' : ''}` : ''}</div>
-                      <hr style={{ border: 'none', height: 1, background: 'rgba(16,24,40,0.04)', margin: '12px 0' }} />
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>Uploaded</div>
-                      <div style={{ marginTop: 6 }}>{afterSelected.uploadedToAsterisk ? <CBadge color="success">Uploaded</CBadge> : <CBadge color="secondary">Not uploaded</CBadge>}</div>
-                      <div style={{ marginTop: 12, fontSize: 12, color: '#6b7280' }}>Created</div>
-                      <div>{afterSelected.createdAt ? (new Date(afterSelected.createdAt)).toLocaleString() : '-'}</div>
-                      <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>Updated</div>
-                      <div>{afterSelected.updatedAt ? (new Date(afterSelected.updatedAt)).toLocaleString() : '-'}</div>
-                    </div>
-                  </div>
-                </div>
+              {!businessId && (
+                <Box sx={{ mb: 2 }}>
+                  <Alert severity="warning">Missing <code>businessId</code> in localStorage. Set it to manage after-hours.</Alert>
+                </Box>
               )}
-            </CModalBody>
-            <CModalFooter style={{ borderTop: 'none', padding: '0.75rem 1rem', background: '#ffffff' }} />
-          </div>
-        </CModal>
+
+              <Typography variant="subtitle1" sx={{ mb: 1 }}>Saved After Hours Audios</Typography>
+
+              {afterHoursList.length === 0 ? (
+                <Typography color="text.secondary">No saved after-hours audio for this business.</Typography>
+              ) : (
+                <Grid container spacing={2}>
+                  {afterHoursList.map((a) => (
+                    <Grid item xs={12} sm={6} key={a._id || a.id || a.name}>
+                      <Paper variant="outlined" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 1 }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 600 }}>{a.name || a._id || '(audio)'}</Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>{a.generatedText || a.text || a.message || ''}</Typography>
+                          <Typography variant="body2" color="text.secondary">{a.createdAt ? (new Date(a.createdAt)).toLocaleString() : ''}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          {playingIvrId === `after-${a._id || a.name}` ? (
+                            <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></IconButton>
+                          ) : (
+                            <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); playAfterHours(a) }} title="Play"><CIcon icon={cilMediaPlay} /></IconButton>
+                          )}
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); openAfterDetails(a) }} title="View"><IoEyeOutline style={{fontSize: '1em', verticalAlign: 'middle', lineHeight: 1}} /></IconButton>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setEditingAfterId(a._id || a.id); setAfterHoursMessage(a.generatedText || a.text || a.message || ''); setAfterLanguage(a.language || a.lang || a.languageCode || ''); fetchLanguages(); setAfterModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></IconButton>
+                          <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); confirmDeleteAfterHours(a._id || a.id) }} title="Delete"><CIcon icon={cilTrash} /></IconButton>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </Box>
+          )}
+        <Dialog open={afterDeleteModalOpen} onClose={() => { if (!deletingAfterItem) { setAfterDeleteModalOpen(false); setAfterToDelete(null) } }} className="ivr-no-focus-modal">
+          <DialogTitle>Delete After Hours</DialogTitle>
+          <DialogContent dividers>
+            <Typography>Are you sure you want to delete this after-hours audio? This action cannot be undone.</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { if (!deletingAfterItem) { setAfterDeleteModalOpen(false); setAfterToDelete(null) } }} disabled={deletingAfterItem}>Cancel</Button>
+            <Button color="error" variant="contained" onClick={deleteAfterHoursConfirmed} disabled={deletingAfterItem}>{deletingAfterItem ? (<><CircularProgress size={16} />&nbsp;Deleting</>) : 'Delete'}</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={afterDetailsOpen} onClose={closeAfterDetails} maxWidth="md" className="ivr-no-focus-modal">
+          <DialogTitle>After Hours Details</DialogTitle>
+          <DialogContent dividers>
+            {!afterSelected ? (
+              <Typography color="text.secondary">No item selected</Typography>
+            ) : (
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={8}>
+                  <Typography variant="caption" color="text.secondary">Message</Typography>
+                  <Box sx={{ background: '#f0f9ff', p: 2, borderRadius: 1.25, border: '1px solid rgba(96,165,250,0.12)', minHeight: 80, whiteSpace: 'pre-wrap', color: '#334155' }}>
+                    {afterSelected.generatedText || afterSelected.text || afterSelected.message || '-'}
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary">File</Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>{afterSelected.fileName || '-'}</Typography>
+                    <Typography variant="body2" color="text.secondary">{afterSelected.mimeType ? `${afterSelected.mimeType} • ${afterSelected.sizeKB ? afterSelected.sizeKB + ' KB' : ''}` : ''}</Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="caption" color="text.secondary">Uploaded</Typography>
+                      <Box sx={{ mt: 0.5 }}>{afterSelected.uploadedToAsterisk ? <CBadge color="success">Uploaded</CBadge> : <CBadge color="secondary">Not uploaded</CBadge>}</Box>
+                    </Box>
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="caption" color="text.secondary">Created</Typography>
+                      <Typography>{afterSelected.createdAt ? (new Date(afterSelected.createdAt)).toLocaleString() : '-'}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>Updated</Typography>
+                      <Typography>{afterSelected.updatedAt ? (new Date(afterSelected.updatedAt)).toLocaleString() : '-'}</Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
+            )}
+          </DialogContent>
+          <DialogActions />
+        </Dialog>
         {activeTab === 'language' && (
           <div>
-            <div className="ivr-header mb-3">
-              <div className="ivr-note">Create a new language for the system.</div>
-              <div className="ivr-actions">
-                <button className="btn btn-sm btn-success me-2" onClick={() => { setLangCode(''); setLangName(''); setEditingLangId(null); setLangModalOpen(true) }}>Add</button>
-              </div>
-            </div>
-            <h6>Available Languages</h6>
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="ivr-header">
+              <Box>
+                <Typography variant="h6">Languages</Typography>
+                <Typography variant="body2" color="text.secondary">Create a new language for the system.</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button size="small" variant="contained" className="filter-btn" onClick={() => { setLangCode(''); setLangName(''); setEditingLangId(null); setLangModalOpen(true) }}>Add</Button>
+              </Box>
+            </Box>
+
             {languages.length === 0 ? (
-              <div className="text-muted">No languages found.</div>
+              <Typography color="text.secondary">No languages found.</Typography>
             ) : (
-              <div>
+              <Grid container spacing={2}>
                 {languages.map((l) => (
-                  <div key={l.code || l._id || l.id} className="d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600 }}>{l.name || l.title || l.code}</div>
-                      <div className="text-muted" style={{ fontSize: 12 }}>{l.code}</div>
-                    </div>
-                    <div>
-                        {/* Generate button moved to Audio tab */}
-                      <button className="btn btn-sm btn-outline-primary me-2" title="Edit" onClick={(e) => { e.stopPropagation(); setEditingLangId(l.code || l._id || l.id); setLangCode(l.code || ''); setLangName(l.name || ''); setLangModalOpen(true) }}><CIcon icon={cilPencil} /></button>
-                      <button className="btn btn-sm btn-outline-danger" title="Delete" onClick={(e) => {
-                        e.stopPropagation();
-                        const id = l.code || l._id || l.id
-                        if (!id) return
-                        setLangToDelete(id)
-                        setLangDeleteModalOpen(true)
-                      }}><CIcon icon={cilTrash} /></button>
-                    </div>
-                  </div>
+                  <Grid item xs={12} sm={6} md={4} key={l.code || l._id || l.id}>
+                    <Paper variant="outlined" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: 600 }}>{l.name || l.title || l.code}</Typography>
+                        <Typography variant="body2" color="text.secondary">{l.code}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); setEditingLangId(l.code || l._id || l.id); setLangCode(l.code || ''); setLangName(l.name || ''); setLangModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></IconButton>
+                        <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); const id = l.code || l._id || l.id; if (!id) return; setLangToDelete(id); setLangDeleteModalOpen(true) }} title="Delete"><CIcon icon={cilTrash} /></IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
                 ))}
-              </div>
+              </Grid>
             )}
-            
             <CModal visible={filesModalOpen} onClose={() => { if (!loadingFiles) { setFilesModalOpen(false); setFilesLangCode(''); setFilesList([]) } }} alignment="center" size="lg" className="ivr-no-focus-modal">
               <CModalHeader>
                 <CModalTitle>Language Files</CModalTitle>
@@ -2288,7 +2374,7 @@ const IVRManagement = () => {
                 <div>
                   {loadingFiles ? (
                     <div className="text-center"><CSpinner /></div>
-                  ) : (filesList.length === 0 ? (
+                  ) : filesList.length === 0 ? (
                     <div className="text-muted">No files found for this language.</div>
                   ) : (
                     <div>
@@ -2310,9 +2396,8 @@ const IVRManagement = () => {
                         </div>
                       ))}
                     </div>
-                  ))}
-                    </div>
                   )}
+                </div>
                   
               </CModalBody>
               <CModalFooter>
@@ -2340,190 +2425,217 @@ const IVRManagement = () => {
                   await fetchLanguages()
                 }} disabled={deletingLang}>{deletingLang ? (<><CSpinner size="sm" />&nbsp;Deleting</>) : 'Delete'}</CButton>
               </CModalFooter>
-            </CModal>
-          </div>
+              </CModal>
+            </div>
         )}
         {activeTab === 'audio' && (
-          <div>
-            <div className="ivr-header mb-3">
-              <div className="ivr-note">Manage audio files for languages.</div>
-              <div className="ivr-actions">
-                <button className="btn btn-sm btn-success me-2" onClick={() => {
+          <Box className="page-container">
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }} className="ivr-header">
+              <Box>
+                <Typography variant="h6">Manage audio files</Typography>
+                <Typography variant="body2" color="text.secondary">for languages.</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Button size="small" variant="contained" color="primary" onClick={() => {
                   const code = filesLangCode || (languages[0] && (languages[0].code || languages[0]._id || languages[0].id)) || ''
                   if (!code) return
                   setGenerateLangCode(code)
                   setGenerateText('')
                   setGenerateFileName(`welcome_${(code||'lang')}`)
                   setGenerateModalOpen(true)
-                }}><CIcon icon={cilPlus} className="me-1" />Add</button>
-                <select className="form-select me-2" style={{ width: 220 }} value={filesLangCode || ''} onChange={(e) => { const v = e.target.value; setFilesLangCode(v); setFilesList([]); if (v) fetchLanguageFiles(v); }}>
-                  <option value="">Select language</option>
-                  {languages.map((ln) => (
-                    <option key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</option>
-                  ))}
-                </select>
-                <button className="btn btn-sm btn-outline-primary" onClick={() => { if (filesLangCode) fetchLanguageFiles(filesLangCode) }}>Refresh</button>
-              </div>
-            </div>
-            <h6>Audio Files</h6>
+                }} startIcon={<CIcon icon={cilPlus} />}>Add</Button>
+
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <InputLabel>Language</InputLabel>
+                  <Select label="Language" value={filesLangCode || ''} onChange={(e) => { const v = e.target.value; setFilesLangCode(v); setFilesList([]); if (v) fetchLanguageFiles(v); }}>
+                    <MenuItem value="">Select language</MenuItem>
+                    {languages.map((ln) => (
+                      <MenuItem key={ln.code || ln._id || ln.id} value={ln.code || ln._id || ln.id}>{ln.name || ln.code}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <Button size="small" variant="outlined" className="filter-btn" onClick={() => { if (filesLangCode) fetchLanguageFiles(filesLangCode) }}>Refresh</Button>
+              </Box>
+            </Box>
+
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>Audio Files</Typography>
+
             {loadingFiles ? (
-              <div className="text-center"><CSpinner /></div>
-            ) : (filesList.length === 0 ? (
-              <div className="text-muted">No files found for selected language.</div>
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress /></Box>
+            ) : (!loadingFiles && filesList.length === 0) ? (
+              <Typography color="text.secondary">No files found for selected language.</Typography>
             ) : (
-              <div>
+              <Grid container spacing={2}>
                 {filesList.map((f) => (
-                  <div key={f._id || f.id || f.fileName} className="d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: '1px solid #e9ecef', borderRadius: 6 }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{f.fileName || f.name || '-'}</div>
-                      <div className="text-muted" style={{ fontSize: 12 }}>{f.createdAt ? (new Date(f.createdAt)).toLocaleString() : ''}</div>
-                    </div>
-                    <div>
-                      {playingIvrId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
-                        <button className="btn btn-sm btn-outline-danger me-2" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></button>
-                      ) : (
-                        <button className="btn btn-sm btn-outline-success me-2" onClick={(e) => { e.stopPropagation(); playLanguageFile(f) }} title="Play"><CIcon icon={cilMediaPlay} /></button>
-                      )}
-                      {downloadingFileId === (f._id || f.id || f.fileName) ? (
-                        <button className="btn btn-sm btn-outline-secondary me-2" disabled title="Downloading"><CSpinner size="sm" /></button>
-                      ) : (
-                        <button className="btn btn-sm btn-outline-secondary me-2" onClick={(e) => { e.stopPropagation(); downloadLanguageFile(f) }} title="Download"><CIcon icon={cilCloudDownload} /></button>
-                      )}
-                      <button className="btn btn-sm btn-outline-primary me-2" onClick={(e) => { e.stopPropagation();
-                        const lang = filesLangCode || f._lang || ''
-                        setEditingAudioFile(f)
-                        setEditAudioFileName(f.fileName || f.name || '')
-                        setEditAudioText(f.text || f.generatedText || '')
-                        setEditAudioModalOpen(true)
-                      }} title="Edit"><CIcon icon={cilPencil} /></button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); setAudioToDelete({ file: f, lang: filesLangCode || f._lang || '' }); setAudioDeleteModalOpen(true) }} title="Delete"><CIcon icon={cilTrash} /></button>
-                    </div>
-                  </div>
+                  <Grid item xs={12} sm={6} key={f._id || f.id || f.fileName}>
+                    <Paper variant="outlined" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 1 }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: 600 }}>{f.fileName || f.name || '-'}</Typography>
+                        <Typography variant="body2" color="text.secondary">{f.createdAt ? (new Date(f.createdAt)).toLocaleString() : ''}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        {playLoadingId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
+                          <IconButton size="small" disabled title="Loading"><CSpinner size="sm" /></IconButton>
+                        ) : playingIvrId === (`lang-${filesLangCode}-${f._id || f.id || f.fileName}`) ? (
+                          <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); stopPlaying() }} title="Stop"><CIcon icon={cilMediaStop} /></IconButton>
+                        ) : (
+                          <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); playLanguageFile(f) }} title="Play"><CIcon icon={cilMediaPlay} /></IconButton>
+                        )}
+
+                        {downloadingFileId === (f._id || f.id || f.fileName) ? (
+                          <IconButton size="small" disabled title="Downloading"><CSpinner size="sm" /></IconButton>
+                        ) : (
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); downloadLanguageFile(f) }} title="Download"><CIcon icon={cilCloudDownload} /></IconButton>
+                        )}
+
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); const lang = filesLangCode || f._lang || ''; setEditingAudioFile(f); setEditAudioFileName(f.fileName || f.name || ''); setEditAudioText(f.text || f.generatedText || ''); setEditAudioModalOpen(true) }} title="Edit"><CIcon icon={cilPencil} /></IconButton>
+
+                        <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); setAudioToDelete({ file: f, lang: filesLangCode || f._lang || '' }); setAudioDeleteModalOpen(true) }} title="Delete"><CIcon icon={cilTrash} /></IconButton>
+                      </Box>
+                    </Paper>
+                  </Grid>
                 ))}
-              </div>
-            ))}
-          </div>
+              </Grid>
+            )}
+          </Box>
         )}
         {activeTab === 'settings' && (
-          <div>
-            <div className="ivr-header mb-3">
-              <div className="ivr-note">IVR Settings</div>
-            </div>
+          <Box className="page-container">
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6">IVR Settings</Typography>
+            </Box>
 
-            <h6>Available Voices</h6>
-            {loadingElevenVoices && (
-              <div className="text-center"><CSpinner /></div>
-            )}
-            {!loadingElevenVoices && elevenVoices.length === 0 && (
-              <div className="text-muted">No voices found.</div>
-            )}
-            {!loadingElevenVoices && elevenVoices.length > 0 && (
-              <div>
-                <div className="soft-filter-bar d-flex mb-3" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 160 }}>
-                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Language</label>
-                    <select className="form-select" value={filterLanguage} onChange={(e) => setFilterLanguage(e.target.value)}>
-                      <option value="">All</option>
-                      {availableVoiceLanguages.map((l) => (<option key={l} value={l}>{getLanguageDisplayName(l)}</option>))}
-                    </select>
-                  </div>
-                  <div style={{ minWidth: 140 }}>
-                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Gender</label>
-                    <select className="form-select" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
-                      <option value="">All</option>
-                      {availableVoiceGenders.map((g) => (<option key={g} value={g}>{g}</option>))}
-                    </select>
-                  </div>
-                  <div style={{ minWidth: 140 }}>
-                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Accent</label>
-                    <select className="form-select" value={filterAccent} onChange={(e) => setFilterAccent(e.target.value)}>
-                      <option value="">All</option>
-                      {availableVoiceAccents.map((a) => (<option key={a} value={a}>{a}</option>))}
-                    </select>
-                  </div>
-                  <div style={{ minWidth: 140 }}>
-                    <label className="form-label" style={{ fontSize: 12, marginBottom: 6 }}>Category</label>
-                    <select className="form-select" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                      <option value="">All</option>
-                      {availableVoiceCategories.map((c) => (<option key={c} value={c}>{c}</option>))}
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div style={{ fontSize: 12, color: '#556270', marginBottom: 6 }}>Clear</div>
-                      <button className="btn btn-sm btn-outline-secondary" title="Clear filters" onClick={() => { setFilterLanguage(''); setFilterGender(''); setFilterAccent(''); setFilterCategory('') }}><span style={{fontSize:14,lineHeight:1}}>✖</span></button>
-                    </div>
-                  </div>
-                </div>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>Available Voices</Typography>
 
-                {displayedElevenVoices.length === 0 && (
-                  <div className="text-muted">No voices match the selected filters.</div>
-                )}
-                {displayedElevenVoices.length > 0 && (
-                  displayedElevenVoices.map((v) => {
-                    const idKey = v.voice_id || v.id || v.name || ''
-                    const isSelected = selectedElevenVoiceId && String(selectedElevenVoiceId) === String(idKey)
-                    return (
-                      <div key={idKey} className="soft-voice-card d-flex justify-content-between align-items-center mb-2 p-2" style={{ border: isSelected ? '2px solid #16a34a' : '1px solid #e9ecef', background: isSelected ? '#ecfdf5' : 'transparent' }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{v.name || idKey}</div>
-                          <div className="text-muted" style={{ fontSize: 12 }}>
-                            {(() => {
-                              const labelLang = (v.labels && v.labels.language) || (v.verified_languages && v.verified_languages[0] && v.verified_languages[0].language) || ''
-                              const genderLabel = (v.labels && v.labels.gender) || ''
-                              const labelAccent = (v.labels && v.labels.accent) || (v.verified_languages && v.verified_languages[0] && v.verified_languages[0].accent) || ''
-                              const parts = []
-                              if (labelLang) parts.push(getLanguageDisplayName(labelLang))
-                              if (genderLabel) parts.push(genderLabel)
-                              if (labelAccent) parts.push(labelAccent)
-                              if (v.category) parts.push(v.category)
-                              return parts.join(' • ')
-                            })()}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          {v.preview_url ? (
-                            playingIvrId === `eleven-${idKey}` ? (
-                              <button className="btn btn-sm btn-outline-danger me-2" title="Stop" onClick={(e) => { e.stopPropagation(); playElevenPreview(v) }}><CIcon icon={cilMediaStop} /></button>
-                            ) : (
-                              <button className="btn btn-sm btn-light me-2" title="Preview" onClick={(e) => { e.stopPropagation(); playElevenPreview(v) }}><CIcon icon={cilMediaPlay} /></button>
-                            )
-                          ) : null}
-                          {isSelected ? (
-                            <button className="btn btn-sm btn-success" title="Selected" disabled><CIcon icon={cilCheck} /></button>
-                          ) : (
-                            <button className="btn btn-sm btn-outline-primary" title="Select" onClick={async () => {
-                              const vid = idKey
-                              const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
-                              try {
-                                setSavingVoiceSettings(true)
-                                if (currentBusinessId && vid) {
-                                  const endpoint = `/api/voice-settings/${encodeURIComponent(currentBusinessId)}`
-                                  await apiCall(endpoint, 'POST', { voiceId: vid })
+            {loadingElevenVoices ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress /></Box>
+            ) : (!loadingElevenVoices && elevenVoices.length === 0) ? (
+              <Typography color="text.secondary">No voices found.</Typography>
+            ) : (
+              <Box>
+                <Grid container spacing={2} alignItems="center" className="filter-container" sx={{ mb: 2 }}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Language</InputLabel>
+                      <Select label="Language" value={filterLanguage} onChange={(e) => setFilterLanguage(e.target.value)}>
+                        <MenuItem value="">All</MenuItem>
+                        {availableVoiceLanguages.map((l) => (<MenuItem key={l} value={l}>{getLanguageDisplayName(l)}</MenuItem>))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Gender</InputLabel>
+                      <Select label="Gender" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+                        <MenuItem value="">All</MenuItem>
+                        {availableVoiceGenders.map((g) => (<MenuItem key={g} value={g}>{g}</MenuItem>))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Accent</InputLabel>
+                      <Select label="Accent" value={filterAccent} onChange={(e) => setFilterAccent(e.target.value)}>
+                        <MenuItem value="">All</MenuItem>
+                        {availableVoiceAccents.map((a) => (<MenuItem key={a} value={a}>{a}</MenuItem>))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Category</InputLabel>
+                      <Select label="Category" value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                        <MenuItem value="">All</MenuItem>
+                        {availableVoiceCategories.map((c) => (<MenuItem key={c} value={c}>{c}</MenuItem>))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Button size="small" className="filter-btn" onClick={() => { setFilterLanguage(''); setFilterGender(''); setFilterAccent(''); setFilterCategory('') }}>Clear</Button>
+                  </Grid>
+                </Grid>
+
+                {displayedElevenVoices.length === 0 ? (
+                  <Typography color="text.secondary">No voices match the selected filters.</Typography>
+                ) : (
+                  <Grid container spacing={2}>
+                    {displayedElevenVoices.map((v) => {
+                      const idKey = v.voice_id || v.id || v.name || ''
+                      const isSelected = selectedElevenVoiceId && String(selectedElevenVoiceId) === String(idKey)
+                      return (
+                        <Grid item xs={12} sm={6} md={6} key={idKey}>
+                          <Paper variant="outlined" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: isSelected ? '2px solid var(--completed)' : '1px solid #e9ecef', background: isSelected ? '#ecfdf5' : 'transparent' }}>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography sx={{ fontWeight: 600 }}>{v.name || idKey}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {(() => {
+                                  const labelLang = (v.labels && v.labels.language) || (v.verified_languages && v.verified_languages[0] && v.verified_languages[0].language) || ''
+                                  const genderLabel = (v.labels && v.labels.gender) || ''
+                                  const labelAccent = (v.labels && v.labels.accent) || (v.verified_languages && v.verified_languages[0] && v.verified_languages[0].accent) || ''
+                                  const parts = []
+                                  if (labelLang) parts.push(getLanguageDisplayName(labelLang))
+                                  if (genderLabel) parts.push(genderLabel)
+                                  if (labelAccent) parts.push(labelAccent)
+                                  if (v.category) parts.push(v.category)
+                                  return parts.join(' • ')
+                                })()}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              {v.preview_url ? (
+                                playingIvrId === `eleven-${idKey}` ? (
+                                  <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); playElevenPreview(v) }} aria-label="stop">
+                                    <CIcon icon={cilMediaStop} />
+                                  </IconButton>
+                                ) : (
+                                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); playElevenPreview(v) }} aria-label="play">
+                                    <CIcon icon={cilMediaPlay} />
+                                  </IconButton>
+                                )
+                              ) : null}
+                              {isSelected ? (
+                                <IconButton size="small" color="success" disabled aria-label="selected">
+                                  <CIcon icon={cilCheck} />
+                                </IconButton>
+                              ) : (
+                                <IconButton size="small" color="primary" onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const vid = idKey
+                                  const currentBusinessId = businessId || localStorage.getItem('businessId') || ''
                                   try {
-                                    const perKey = currentBusinessId ? `elevenVoiceId_${currentBusinessId}` : 'elevenVoiceId'
-                                    localStorage.setItem(perKey, vid)
-                                  } catch (e) {}
-                                }
-                                setSelectedElevenVoiceId(vid)
-                                setVoiceNameSetting(v.name || '')
-                                setVoiceAccentSetting((v.verified_languages && v.verified_languages[0] && v.verified_languages[0].locale) || '')
-                                setVoiceGenderSetting((v.labels && v.labels.gender) || '')
-                              } catch (err) {
-                                console.error('Failed to save selected voice for business', err)
-                              } finally {
-                                setSavingVoiceSettings(false)
-                              }
-                            }}><CIcon icon={cilCheck} /></button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })
+                                    setSavingVoiceSettings(true)
+                                    if (currentBusinessId && vid) {
+                                      const endpoint = `/api/voice-settings/${encodeURIComponent(currentBusinessId)}`
+                                      await apiCall(endpoint, 'POST', { voiceId: vid })
+                                      try {
+                                        const perKey = currentBusinessId ? `elevenVoiceId_${currentBusinessId}` : 'elevenVoiceId'
+                                        localStorage.setItem(perKey, vid)
+                                      } catch (e) {}
+                                    }
+                                    setSelectedElevenVoiceId(vid)
+                                    setVoiceNameSetting(v.name || '')
+                                    setVoiceAccentSetting((v.verified_languages && v.verified_languages[0] && v.verified_languages[0].locale) || '')
+                                    setVoiceGenderSetting((v.labels && v.labels.gender) || '')
+                                  } catch (err) {
+                                    console.error('Failed to save selected voice for business', err)
+                                  } finally {
+                                    setSavingVoiceSettings(false)
+                                  }
+                                }} aria-label="select">
+                                  <CIcon icon={cilCheck} />
+                                </IconButton>
+                              )}
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      )
+                    })}
+                  </Grid>
                 )}
-              </div>
+              </Box>
             )}
-          </div>
+          </Box>
         )}
       </CCardBody>
     </CCard>

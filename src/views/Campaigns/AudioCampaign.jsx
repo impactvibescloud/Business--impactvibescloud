@@ -1,25 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react'
-import {
-  CCard,
-  CCardBody,
-  CRow,
-  CCol,
-  CButton,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CFormLabel,
-  CFormInput,
-  CFormSelect,
-  CSpinner,
-  CFormText,
-  CProgress
-} from '@coreui/react'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import { apiCall, getBaseURL } from '../../config/api'
+import {
+  Box,
+  Paper,
+  Grid,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
+  LinearProgress,
+  Typography,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Chip,
+  IconButton,
+  Tooltip
+} from '@mui/material'
+import DeleteIcon from '@mui/icons-material/Delete'
+import UploadFileIcon from '@mui/icons-material/UploadFile'
+import '../Leads/CallLogsWebpage.css'
 
 const AudioCampaign = () => {
   const [name, setName] = useState('')
@@ -201,120 +212,111 @@ const AudioCampaign = () => {
         setProgress(0)
       }
   }
-
   return (
-    <div className="p-3">
-      <CCard>
-        <CCardBody>
-          <CRow className="align-items-center mb-3">
-            <CCol>
-              <h3>Audio Campaigns</h3>
-              <p className="text-muted">Create and manage your audio campaigns here.</p>
-            </CCol>
-            <CCol className="text-end">
-              <CButton color="primary" onClick={() => setShowNewCampaign(true)}>New Campaign</CButton>
-            </CCol>
-          </CRow>
+    <Box className="page-container p-3">
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Grid container alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Typography variant="h5">Audio Campaigns</Typography>
+            <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>Create and manage your audio campaigns here.</Typography>
+          </Grid>
+          <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="contained" onClick={() => setShowNewCampaign(true)} sx={{ backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#5a46eb' } }}>New Campaign</Button>
+          </Grid>
+        </Grid>
 
-          {/* New Campaign Modal (form moved inside modal) */}
-          <CModal visible={showNewCampaign} onClose={() => setShowNewCampaign(false)} backdrop="static">
-            <CModalHeader closeButton>
-              <CModalTitle>New Audio Campaign</CModalTitle>
-            </CModalHeader>
-            <CModalBody>
-              <div className="mb-3">
-                <CFormLabel htmlFor="campaignName">Campaign Name</CFormLabel>
-                <CFormInput id="campaignName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter audio campaign name" />
-              </div>
+        {/* New Campaign Dialog */}
+        <Dialog open={showNewCampaign} onClose={() => setShowNewCampaign(false)} fullWidth maxWidth="sm">
+          <DialogTitle>New Audio Campaign</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField label="Campaign Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" />
 
-              <div className="mb-3">
-                <CFormLabel htmlFor="didNumber">DID Number</CFormLabel>
-                <CFormSelect id="didNumber" value={didNumber} onChange={(e) => setDidNumber(e.target.value)} aria-label="Select DID Number">
-                  <option value="">Select DID Number</option>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="did-label">DID Number</InputLabel>
+                <Select labelId="did-label" value={didNumber} label="DID Number" onChange={(e) => setDidNumber(e.target.value)}>
+                  <MenuItem value="">Select DID Number</MenuItem>
                   {loadingDids ? (
-                    <option disabled>Loading...</option>
+                    <MenuItem disabled>Loading...</MenuItem>
                   ) : (
-                    didOptions.map(d => (
-                      <option key={d.id} value={d.number}>{d.number}</option>
-                    ))
+                    didOptions.map(d => (<MenuItem key={d.id} value={d.number}>{d.number}</MenuItem>))
                   )}
-                </CFormSelect>
-                <CFormText className="text-muted">Destination DID number for outbound calls.</CFormText>
-              </div>
+                </Select>
+                <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>Destination DID number for outbound calls.</Typography>
+              </FormControl>
 
-              <div className="mb-3">
-                <CFormLabel htmlFor="scheduledAt">Schedule (UTC)</CFormLabel>
-                <CFormInput id="scheduledAt" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-                <CFormText className="text-muted">Set scheduled start time for the campaign.</CFormText>
-              </div>
+              <TextField label="Schedule (UTC)" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} InputLabelProps={{ shrink: true }} size="small" />
 
-              <div className="mb-3">
-                <CFormLabel htmlFor="numbersFile">Contacts File (CSV/XLSX)</CFormLabel>
-                <CFormInput type="file" id="numbersFile" accept=".csv,.xls,.xlsx" onChange={(e) => setNumbersFile(e.target.files?.[0] || null)} ref={fileRef} />
-              </div>
+              <Box>
+                <Typography variant="body2">Contacts File (CSV/XLSX)</Typography>
+                <input type="file" accept=".csv,.xls,.xlsx" onChange={(e) => setNumbersFile(e.target.files?.[0] || null)} ref={fileRef} />
+              </Box>
 
-              <div className="mb-3">
-                <CFormLabel htmlFor="audioFile">Audio File (optional)</CFormLabel>
-                <CFormInput type="file" id="audioFile" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} ref={audioRef} />
-              </div>
+              <Box>
+                <Typography variant="body2">Audio File (optional)</Typography>
+                <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} ref={audioRef} />
+              </Box>
 
               {uploading && (
-                <div className="mb-3">
-                  <CProgress value={progress}>{progress}%</CProgress>
-                </div>
+                <Box>
+                  <LinearProgress variant="determinate" value={progress} />
+                  <Typography variant="caption">{progress}%</Typography>
+                </Box>
               )}
-            </CModalBody>
-            <CModalFooter>
-              <CButton color="secondary" onClick={() => setShowNewCampaign(false)} disabled={uploading}>Cancel</CButton>
-              <CButton color="primary" onClick={async () => {
-                const success = await handleSubmit()
-                if (success) setShowNewCampaign(false)
-              }} disabled={uploading}>{uploading ? 'Uploading...' : 'Create Campaign'}</CButton>
-            </CModalFooter>
-          </CModal>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowNewCampaign(false)} disabled={uploading}>Cancel</Button>
+            <Button onClick={async () => { const ok = await handleSubmit(); if (ok) setShowNewCampaign(false) }} disabled={uploading} variant="contained" sx={{ backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#5a46eb' } }}>{uploading ? 'Uploading...' : 'Create Campaign'}</Button>
+          </DialogActions>
+        </Dialog>
 
-        </CCardBody>
-      </CCard>
-      <div className="mt-4">
-        <h5>Campaigns</h5>
+      </Paper>
+
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h6">Campaigns</Typography>
         {loadingCampaigns ? (
-          <div className="py-3 text-center"><CSpinner /></div>
+          <Box sx={{ py: 3, textAlign: 'center' }}><CircularProgress /></Box>
         ) : campaigns.length === 0 ? (
-          <p className="text-muted">No campaigns found for this business.</p>
+          <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>No campaigns found for this business.</Typography>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-striped">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>DID</th>
-                  <th>Numbers</th>
-                  <th>Scheduled</th>
-                  <th>Completed</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Box className="calllogs-table-container" sx={{ mt: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>DID</TableCell>
+                  <TableCell>Numbers</TableCell>
+                  <TableCell>Scheduled</TableCell>
+                  <TableCell>Completed</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {campaigns.map((c) => (
-                  <tr key={c._id || c.id || c.name}>
-                    <td>{c.name || c.title || 'Untitled Campaign'}</td>
-                    <td>{c.didNumber || c.did || '-'}</td>
-                    <td>{Array.isArray(c.numbers) ? c.numbers.length : (c.numbers ? c.numbers : '-')}</td>
-                    <td>{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : '-'}</td>
-                    <td>{c.result?.completedAt ? new Date(c.result.completedAt).toLocaleString() : '-'}</td>
-                    <td>{c.status || c.state || 'N/A'}</td>
-                    <td>
-                      <CButton color="danger" size="sm" onClick={() => handleDelete(c)} className="me-2">Delete</CButton>
-                    </td>
-                  </tr>
+                  <TableRow key={c._id || c.id || c.name}>
+                    <TableCell>{c.name || c.title || 'Untitled Campaign'}</TableCell>
+                    <TableCell>{c.didNumber || c.did || '-'}</TableCell>
+                    <TableCell>{Array.isArray(c.numbers) ? c.numbers.length : (c.numbers ? c.numbers : '-')}</TableCell>
+                    <TableCell>{c.scheduledAt ? new Date(c.scheduledAt).toLocaleString() : '-'}</TableCell>
+                    <TableCell>{c.result?.completedAt ? new Date(c.result.completedAt).toLocaleString() : '-'}</TableCell>
+                    <TableCell>{c.status || c.state || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Tooltip title="Delete campaign">
+                        <IconButton color="error" size="small" onClick={() => handleDelete(c)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Box>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   )
 }
 

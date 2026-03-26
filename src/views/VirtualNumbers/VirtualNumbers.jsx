@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react'
-import {
-  CCard,
-  CCardBody,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CButton,
-  CInputGroup,
-  CFormInput,
-  CFormSelect,
-  CBadge,
-  CAlert,
-  CSpinner,
-  CTooltip,
-  CRow,
-  CCol,
-  CPagination,
-  CPaginationItem
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilSearch, cilPhone, cilTrash, cilPlus } from '@coreui/icons'
 import { apiCall } from '../../config/api'
 import { isAutheticated } from '../../auth'
-import './VirtualNumbers.css'
+import {
+  Box,
+  Paper,
+  Grid,
+  TextField,
+  InputAdornment,
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+  CircularProgress,
+  Tooltip,
+  Pagination,
+  Typography,
+  Alert
+} from '@mui/material'
+import SearchIcon from '@mui/icons-material/Search'
+import PhoneIcon from '@mui/icons-material/Phone'
+import DeleteIcon from '@mui/icons-material/Delete'
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
+import '../Leads/CallLogsWebpage.css'
 
 function VirtualNumbers() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -376,181 +380,134 @@ function VirtualNumbers() {
   }
   
   return (
-    <div className="contact-list-container">
+    <Box className="page-container contact-list-container">
       {successMessage && (
-        <CAlert color="success" className="mb-4" dismissible onClose={() => setSuccessMessage('')}>
-          {successMessage}
-        </CAlert>
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMessage('')}>{successMessage}</Alert>
       )}
-      
-      <CCard className="mb-4">
-        <CCardBody>
-          <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
-              <h1 className="contact-list-title">Virtual Numbers</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              <CButton
-                color="primary"
-                className="add-contact-btn"
-                onClick={handleClearFilters}
-              >
-                <CIcon icon={cilTrash} className="me-2" />
-                Clear Filters
-              </CButton>
-            </CCol>
-          </CRow>
-          
-          <CRow className="mb-4">
-            <CCol md={4}>
-              <CInputGroup>
-                <CFormInput
-                  placeholder="Search numbers..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </CCol>
-            <CCol md={4}>
-              <CFormSelect
-                value={activeFilter}
-                onChange={(e) => handleFilterSelect(e.target.value)}
-              >
-                <option value="All Numbers">All Numbers</option>
-                <option value="Toll-Free">Toll-Free</option>
-                <option value="Local">Local</option>
-                <option value="International">International</option>
-              </CFormSelect>
-            </CCol>
-          </CRow>
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Typography variant="h5" className="contact-list-title">Virtual Numbers</Typography>
+          </Grid>
+          <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="outlined" startIcon={<DeleteSweepIcon />} onClick={handleClearFilters} className="filter-btn">Clear Filters</Button>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search numbers..."
+              value={searchTerm}
+              onChange={handleSearch}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small"><SearchIcon /></IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Filter</InputLabel>
+              <Select label="Filter" value={activeFilter} onChange={(e) => handleFilterSelect(e.target.value)}>
+                <MenuItem value="All Numbers">All Numbers</MenuItem>
+                <MenuItem value="Toll-Free">Toll-Free</MenuItem>
+                <MenuItem value="Local">Local</MenuItem>
+                <MenuItem value="International">International</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
 
           {error && (
-            <CAlert color="danger" className="my-3">
-              {error}
-            </CAlert>
+            <Grid item xs={12}>
+              <Alert severity="error">{error}</Alert>
+            </Grid>
           )}
 
-          <CTable hover responsive className="contact-table">
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>NUMBER</CTableHeaderCell>
-                <CTableHeaderCell>LOCATION</CTableHeaderCell>
-                <CTableHeaderCell>TYPE</CTableHeaderCell>
-                <CTableHeaderCell>TAGS</CTableHeaderCell>
-                <CTableHeaderCell>ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {isLoading ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="6" className="text-center py-5">
-                    <CSpinner color="primary" />
-                    <div className="mt-3">Loading virtual numbers...</div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : currentNumbers.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="6" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilPhone} size="xl" />
-                      </div>
-                      <h4>No virtual numbers found</h4>
-                      <p>No virtual numbers are currently assigned to your account.</p>
-                    </div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                currentNumbers.map((num, index) => (
-                  <CTableRow key={num._id || `num-${num.number}`}>
-                    <CTableDataCell>
-                      <div className="contact-number">{indexOfFirstItem + index + 1}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-name">
-                        <CIcon icon={cilPhone} className="me-2" />
-                        {num.number || '-'}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-phone">{num.city || '-'}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge color="primary">
-                        {num.type || (Array.isArray(num.tag) && num.tag.length > 0 ? num.tag[0] : 'Standard')}
-                      </CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="d-flex gap-1 flex-wrap">
-                        {Array.isArray(num.tag) && num.tag.length > 0 ? (
-                          num.tag.map((tag, tagIndex) => (
-                            <CBadge key={tagIndex} color="info" className="text-capitalize" style={{fontSize: '0.75rem'}}>
-                              {tag}
-                            </CBadge>
-                          ))
-                        ) : (
-                          <span className="text-muted fst-italic">No tags</span>
-                        )}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <CTooltip content="Release this number">
-                        <CButton 
-                          color="danger"
-                          size="sm"
-                          variant="ghost" 
-                          onClick={() => releaseNumber(num._id)}
-                          disabled={releasingNumber === num._id}
-                        >
-                          {releasingNumber === num._id ? (
-                            <CSpinner size="sm" />
+          <Grid item xs={12}>
+            <Box className="calllogs-table-container">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>S.NO</TableCell>
+                    <TableCell>NUMBER</TableCell>
+                    <TableCell>LOCATION</TableCell>
+                    <TableCell>TYPE</TableCell>
+                    <TableCell>TAGS</TableCell>
+                    <TableCell>ACTIONS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <CircularProgress size={24} />
+                        <Box sx={{ mt: 2 }}>Loading virtual numbers...</Box>
+                      </TableCell>
+                    </TableRow>
+                  ) : currentNumbers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <Box className="empty-state">
+                          <Box className="empty-state-icon"><PhoneIcon sx={{ fontSize: 48 }} /></Box>
+                          <Typography variant="h6">No virtual numbers found</Typography>
+                          <Typography variant="body2">No virtual numbers are currently assigned to your account.</Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentNumbers.map((num, index) => (
+                      <TableRow key={num._id || `num-${num.number}`}>
+                        <TableCell>{indexOfFirstItem + index + 1}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <PhoneIcon fontSize="small" />
+                            <span>{num.number || '-'}</span>
+                          </Box>
+                        </TableCell>
+                        <TableCell>{num.city || '-'}</TableCell>
+                        <TableCell>
+                          <Chip label={num.type || (Array.isArray(num.tag) && num.tag.length > 0 ? num.tag[0] : 'Standard')} size="small" sx={{ backgroundColor: 'var(--primary-500)', color: '#fff' }} />
+                        </TableCell>
+                        <TableCell>
+                          {Array.isArray(num.tag) && num.tag.length > 0 ? (
+                            num.tag.map((tag, tagIndex) => (
+                              <Chip key={tagIndex} label={tag} size="small" className="custom-chip" sx={{ mr: 0.5 }} />
+                            ))
                           ) : (
-                            <CIcon icon={cilTrash} />
+                            <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}><em>No tags</em></Typography>
                           )}
-                        </CButton>
-                      </CTooltip>
-                    </CTableDataCell>
-                  </CTableRow>
-                ))
-              )}
-            </CTableBody>
-          </CTable>
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip title="Release this number">
+                            <span>
+                              <IconButton color="error" size="small" onClick={() => releaseNumber(num._id)} disabled={releasingNumber === num._id}>
+                                {releasingNumber === num._id ? <CircularProgress size={16} /> : <DeleteIcon fontSize="small" />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
 
-          {totalPages > 1 && (
-            <CPagination 
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
-                  onClick={() => handlePageChange(i + 1)}
-                >
-                  {i + 1}
-                </CPaginationItem>
-              ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
-          )}
-        </CCardBody>
-      </CCard>
-    </div>
+              {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Pagination count={totalPages} page={currentPage} onChange={(e, p) => handlePageChange(p)} color="primary" />
+                </Box>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+    </Box>
   )
 }
 

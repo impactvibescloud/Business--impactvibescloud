@@ -123,6 +123,20 @@ const _nav = [
     to: "/contacts",
     group: "Contacts",
   },
+  {
+    component: CNavItem,
+    name: "Leads",
+    icon: <Users className="nav-icon" />,
+    to: "/leads",
+    group: "Contacts",
+  },
+  {
+    component: CNavItem,
+    name: "Lead Fields",
+    icon: <Users className="nav-icon" />,
+    to: "/leads/fields",
+    group: "Contacts",
+  },
   // {
   //   component: CNavItem,
   //   name: "Contact Lists",

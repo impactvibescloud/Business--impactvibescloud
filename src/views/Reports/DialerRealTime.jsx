@@ -93,14 +93,59 @@ const DialerRealTime = () => {
         }
         const res = await apiCall(`/call-logs?businessId=${encodeURIComponent(businessId)}&page=1&limit=200`)
         if (process.env.NODE_ENV === 'development') console.debug('DialerRealTime: call-logs response', res)
-        const data = (res && res.data) || []
-        const callsToday = data.length
-        const outgoingAnswered = data.filter(d => d.callType === 'outbound' && d.status === 'answered').length
-        const outgoingMissed = data.filter(d => d.callType === 'outbound' && d.status === 'missed').length
-        const incomingAnswered = data.filter(d => d.callType === 'inbound' && d.status === 'answered').length
-        const incomingMissed = data.filter(d => d.callType === 'inbound' && d.status === 'missed').length
-        // Active calls heuristic: duration > 0 and recent
-        const active = data.filter(d => (d.callDuration || d.duration || 0) > 0).length
+
+        // Normalize response shapes (similar to CallLogs component)
+        const raw = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.callLogs) ? res.callLogs : []))
+
+        // Helpers to interpret call records robustly across backends
+        const getCallTs = (c) => {
+          const t = c.callDate || c.createdAt || c.call_date || c.timestamp
+          if (!t) return null
+          const ms = Number(t) || new Date(t).getTime()
+          return Number.isFinite(ms) ? ms : null
+        }
+        const normalizeStatus = (s) => String(s || '').toLowerCase()
+        const isAnsweredStatus = (s) => {
+          const st = normalizeStatus(s)
+          return st === 'answered' || st === 'success' || st === 'completed' || st === 'connected'
+        }
+        const isMissedRecord = (r) => {
+          const st = normalizeStatus(r.status)
+          if (st.includes('miss')) return true
+          const hb = String(r.hangupBy || r.hangupby || r.hangup_by || '').toLowerCase()
+          if (hb === 'caller') return true
+          return false
+        }
+        const isOutbound = (r) => {
+          const ct = String((r.callType || r.type || '').toLowerCase())
+          return ct === 'outbound' || ct === 'outgoing'
+        }
+        const isInbound = (r) => {
+          const ct = String((r.callType || r.type || '').toLowerCase())
+          return ct === 'inbound' || ct === 'incoming'
+        }
+
+        // Compute today's local range and filter by call timestamp when available
+        const now = new Date()
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime()
+
+        const callsTodayList = raw.filter((d) => {
+          const ts = getCallTs(d)
+          if (ts === null) return false
+          return ts >= startOfToday && ts <= endOfToday
+        })
+
+        const callsToday = callsTodayList.length
+
+        // Count answered/missed for today's calls (robust to status values)
+        const outgoingAnswered = raw.filter(d => isOutbound(d) && isAnsweredStatus(d.status) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
+        const outgoingMissed = raw.filter(d => isOutbound(d) && isMissedRecord(d) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
+        const incomingAnswered = raw.filter(d => isInbound(d) && isAnsweredStatus(d.status) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
+        const incomingMissed = raw.filter(d => isInbound(d) && isMissedRecord(d) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
+
+        // Active calls heuristic: keep to duration > 0 as a fallback; UI prefers liveCalls.length
+        const active = raw.filter(d => (d.callDuration || d.duration || 0) > 0).length
         if (!mounted) return
         setStats([
           { value: active, label: 'Active Calls', icon: cilPhone },

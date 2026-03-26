@@ -163,6 +163,8 @@ const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"
 const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagement"));
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
+const Leads = React.lazy(() => import("./views/Leads/Leads"));
+const LeadFields = React.lazy(() => import("./views/Leads/LeadFields"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
 const AgentPerformance = React.lazy(() => import("./views/Reports/AgentPerformance"));
 const DialerRealTime = React.lazy(() => import("./views/Reports/DialerRealTime"));
@@ -847,6 +849,18 @@ const routes = [
     path: "/contacts",
     name: "Contacts",
     element: Contacts,
+    navName: "Contacts",
+  },
+  {
+    path: "/leads",
+    name: "Leads",
+    element: Leads,
+    navName: "Contacts",
+  },
+  {
+    path: "/leads/fields",
+    name: "Lead Fields",
+    element: LeadFields,
     navName: "Contacts",
   },
   {
