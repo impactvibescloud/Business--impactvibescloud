@@ -1,40 +1,47 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from 'react'
 import {
-  CRow,
-  CCol,
-  CCard,
-  CCardBody,
-  CButton,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CForm,
-  CFormInput,
-  CFormLabel,
-  CFormSelect,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CCardHeader,
-  CBadge,
-  CSpinner,
-  CAlert,
-  CInputGroup,
-  CPagination,
-  CPaginationItem
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilPlus, cilPencil, cilTrash, cilSearch } from '@coreui/icons'
-import axios from "axios";
-import { apiCall, getBaseURL } from '../../config/api';
-import Swal from "sweetalert2";
-import './Branches.css'
-import { API_CONFIG } from '../../config/api';
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  IconButton,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  CircularProgress,
+  Alert,
+  Grid,
+  Collapse,
+  Pagination,
+  LinearProgress,
+  InputAdornment
+} from '@mui/material'
+import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
+import BlockIcon from '@mui/icons-material/Block'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import SearchIcon from '@mui/icons-material/Search'
+import axios from 'axios'
+import { apiCall, getBaseURL } from '../../config/api'
+import Swal from 'sweetalert2'
+import '../Leads/CallLogsWebpage.css'
+import { API_CONFIG } from '../../config/api'
 
 const isAuthenticated = () => localStorage.getItem("authToken");
 
@@ -223,6 +230,19 @@ const Branches = () => {
     }
   };
 
+  // Helper: fetch extension for a DID number using the numbers service
+  const fetchDidExtension = async (didNumber) => {
+    if (!didNumber) return null;
+    try {
+      const res = await apiCall(`/api/v1/numbers/business/by-number/${encodeURIComponent(didNumber)}`, 'GET');
+      const ext = res?.data?.extension ?? res?.data?.sip_endpoint ?? res?.data?.extensionNumber ?? res?.data?.ext ?? null;
+      return ext ?? null;
+    } catch (err) {
+      console.warn('Failed to fetch DID extension for', didNumber, err);
+      return null;
+    }
+  };
+
   const handleAddBranch = () => {
     setOpenAddBranch(true);
   };
@@ -249,6 +269,13 @@ const Branches = () => {
         didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
         timeGroup: timeGroup
       };
+      // Fetch DID extension and include it in payload if available
+      if (didNumberValue) {
+        const extension = await fetchDidExtension(didNumberValue);
+        if (extension) {
+          requestBody.extension = String(extension);
+        }
+      }
       // Only include start/end times if they have values
       if (startTime && startTime.trim() !== '') requestBody.startTime = startTime;
       if (endTime && endTime.trim() !== '') requestBody.endTime = endTime;
@@ -368,6 +395,11 @@ const Branches = () => {
         timeGroup: timeGroup,
         ...(department ? { department } : {})
       };
+  // Fetch DID extension and include it in payload if available
+  if (didNumberValue) {
+    const extension = await fetchDidExtension(didNumberValue);
+    if (extension) updatePayload.extension = String(extension);
+  }
   if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
   if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
   const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
@@ -625,520 +657,336 @@ const Branches = () => {
   };
 
   return (
-    <div className="branches-container">
-      {successAlert.show && (
-        <CAlert color="success" dismissible onClose={() => setSuccessAlert({ show: false, message: '' })}>
-          {successAlert.message}
-        </CAlert>
-      )}
-      
-      <CCard className="mb-4">
-        <style>{`
-          /* Compact table tweaks scoped to this component */
-          .compact-table th, .compact-table td {
-            padding: 0.25rem 0.4rem !important;
-            vertical-align: middle !important;
-            line-height: 1.15 !important;
-          }
-          .compact-table td { overflow: hidden; text-overflow: ellipsis; }
-          .compact-table .note-col { white-space: normal !important; }
-          .compact-table .nowrap { white-space: nowrap !important; }
-        `}</style>
-          <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
-            <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
-              <CInputGroup>
-                <CFormInput
-                  className="w-100"
+    <Box className="page-container" sx={{ p: 2 }}>
+      <div className="branches-container">
+        {successAlert.show && (
+          <Alert severity="success" onClose={() => setSuccessAlert({ show: false, message: '' })} sx={{ mb: 2 }}>
+            {successAlert.message}
+          </Alert>
+        )}
+
+        <Card className="mb-4" sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box>
+                <Typography variant="h6">Agents</Typography>
+                <Typography variant="body2" color="text.secondary">Create and manage agents</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TextField
                   placeholder="Search agents..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  size="small"
+                  sx={{ minWidth: 200 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
-              </CInputGroup>
-            </div>
-            <div>
-              <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
-              <span className="mx-2">Page {currentPage}</span>
-              <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
-              <button className="add-agent-btn-minimal btn-sm" onClick={handleAddBranch}><CIcon icon={cilPlus} className="me-1" /> Add Agent</button>
-            </div>
-          </CCardHeader>
-        <CCardBody>
-          
-          {/* Search moved to header */}
+                <Button variant="outlined" size="small" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</Button>
+                <Typography variant="body2" sx={{ mx: 1 }}>Page {currentPage}</Typography>
+                <Button variant="outlined" size="small" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</Button>
+                <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleAddBranch} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>
+                  Add Agent
+                </Button>
+              </Box>
+            </Box>
 
-          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>AGENT NAME</CTableHeaderCell>
-                <CTableHeaderCell>EMAIL ADDRESS</CTableHeaderCell>
-                <CTableHeaderCell>DEPARTMENT</CTableHeaderCell>
-                <CTableHeaderCell>STATUS</CTableHeaderCell>
-                <CTableHeaderCell>ASSIGNED NUMBER</CTableHeaderCell>
-                <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {loading ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <CSpinner color="primary" />
-                    <div className="mt-3">Loading agents...</div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : currentBranches.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilPlus} size="xl" />
-                      </div>
-                      <h4>No agents found</h4>
-                      <p>Create your first agent to get started.</p>
-                      <CButton color="primary" className="mt-3" onClick={handleAddBranch}>
-                        Add Agent
-                      </CButton>
-                    </div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                currentBranches.map((branch, index) => (
-                  <React.Fragment key={branch._id}>
-                    <CTableRow 
-                      onClick={() => handleAgentRowClick(branch)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <CTableDataCell>
-                        <div className="agent-number">{indexOfFirstItem + index + 1}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="agent-name">{branch.branchName}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="manager-email">{branch.manager?.email || "-"}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="department-name">
-                          {branch.department 
-                            ? (typeof branch.department === 'object' 
-                               ? (branch.department.name || "No Name") 
-                               : String(branch.department))
-                            : "Not Assigned"}
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge 
-                          color={branch.isSuspended ? "warning" : "success"}
-                          className="status-badge"
-                        >
-                          {branch.isSuspended ? "Suspended" : "Active"}
-                        </CBadge>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="assigned-number">
-                          {Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0
-                            ? branch.didNumbers[0]
-                            : "Not Assigned"}
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell className="text-center">
-                        <CButton 
-                          color="light"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditBranch(branch);
-                          }}
-                          className="me-2"
-                          size="sm"
-                        >
-                          <CIcon icon={cilPencil} />
-                        </CButton>
-                        <CButton 
-                          color={branch.isSuspended ? "success" : "warning"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSuspendBranch(branch.id);
-                          }}
-                          className="me-2"
-                          size="sm"
-                        >
-                          {branch.isSuspended ? "Activate" : "Suspend"}
-                        </CButton>
-                        <CButton 
-                          color="info"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleResetPassword(branch.manager.email);
-                          }}
-                          size="sm"
-                        >
-                          Reset
-                        </CButton>
-                      </CTableDataCell>
-                    </CTableRow>
-                    {/* Expanded Details Row */}
-                    {expandedAgent === branch._id && (
-                      <CTableRow>
-                        <CTableDataCell colSpan="8" style={{ padding: 0, backgroundColor: '#f8f9fa' }}>
-                          <div style={{ padding: '20px' }}>
-                            <CRow className="mb-4">
-                              <CCol>
-                                <h5 className="mb-3">Agent Details - {branch.branchName}</h5>
-                              </CCol>
-                            </CRow>
-                            
-                            {/* Call Details Section */}
-                            <CRow className="mb-4">
-                              <CCol>
-                                <h6 className="mb-3">Call Details</h6>
-                                {(() => {
-                                  // Get the user ID for state management consistency
-                                  const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
-                                  return loadingCallDetails[userId] ? (
-                                    <div className="text-center py-4">
-                                      <CSpinner color="primary" />
-                                      <div className="mt-2">Loading call details...</div>
-                                    </div>
-                                  ) : (
-                                    <CRow>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-primary mb-1">
-                                            {callDetails[userId]?.outboundCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Outbound Calls</small>
-                                        </div>
-                                      </CCol>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-success mb-1">
-                                            {callDetails[userId]?.inboundCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Inbound Calls</small>
-                                        </div>
-                                      </CCol>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-warning mb-1">
-                                            {callDetails[userId]?.missedCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Missed Calls</small>
-                                        </div>
-                                      </CCol>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-danger mb-1">
-                                            {callDetails[userId]?.hangCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Hang Calls</small>
-                                        </div>
-                                      </CCol>
-                                    </CRow>
-                                  );
-                                })()}
-                              </CCol>
-                            </CRow>
-
-                            {/* Working Hours Section */}
-                            <CRow className="mb-4">
-                              <CCol>
-                                <h6 className="mb-3">Working Hours</h6>
-                                <div className="p-3 border rounded bg-white">
-                                  <CRow>
-                                    <CCol md={6}>
-                                      <div className="mb-2">
-                                        <strong>Start Time:</strong> 9:00 AM
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>End Time:</strong> 6:00 PM
-                                      </div>
-                                    </CCol>
-                                    <CCol md={6}>
-                                      <div className="mb-2">
-                                        <strong>Break Time:</strong> 1:00 PM - 2:00 PM
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Total Hours:</strong> 8 hours
-                                      </div>
-                                    </CCol>
-                                  </CRow>
-                                </div>
-                              </CCol>
-                            </CRow>
-
-                            {/* Active Hours Section */}
-                            <CRow>
-                              <CCol>
-                                <h6 className="mb-3">Active Hours (Today)</h6>
-                                <div className="p-3 border rounded bg-white">
-                                  <CRow>
-                                    <CCol md={4}>
-                                      <div className="mb-2">
-                                        <strong>Login Time:</strong> 9:15 AM
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Total Active Time:</strong> 6h 45m
-                                      </div>
-                                    </CCol>
-                                    <CCol md={4}>
-                                      <div className="mb-2">
-                                        <strong>Break Duration:</strong> 1h 15m
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Idle Time:</strong> 30m
-                                      </div>
-                                    </CCol>
-                                    <CCol md={4}>
-                                      <div className="mb-2">
-                                        <strong>Current Status:</strong> 
-                                        <CBadge color="success" className="ms-2">Online</CBadge>
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Last Activity:</strong> 2 minutes ago
-                                      </div>
-                                    </CCol>
-                                  </CRow>
-                                </div>
-                              </CCol>
-                            </CRow>
+            <TableContainer component={Paper} className="calllogs-table-container">
+              <Table size="small" className="compact-table" sx={{ minWidth: 650 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>S.NO</TableCell>
+                    <TableCell>AGENT NAME</TableCell>
+                    <TableCell>EMAIL ADDRESS</TableCell>
+                    <TableCell>DEPARTMENT</TableCell>
+                    <TableCell>STATUS</TableCell>
+                    <TableCell>ASSIGNED NUMBER</TableCell>
+                    <TableCell align="center">ACTIONS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                        <CircularProgress />
+                        <div className="mt-3">Loading agents...</div>
+                      </TableCell>
+                    </TableRow>
+                  ) : currentBranches.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon">
+                            <AddIcon style={{ fontSize: 40 }} />
                           </div>
-                        </CTableDataCell>
-                      </CTableRow>
-                    )}
-                  </React.Fragment>
-                ))
-              )}
-            </CTableBody>
-          </CTable>
+                          <h4>No agents found</h4>
+                          <p>Create your first agent to get started.</p>
+                          <Button variant="contained" color="primary" onClick={handleAddBranch} sx={{ mt: 2 }}>
+                            Add Agent
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentBranches.map((branch, index) => (
+                      <React.Fragment key={branch._id}>
+                        <TableRow hover onClick={() => handleAgentRowClick(branch)} sx={{ cursor: 'pointer' }}>
+                          <TableCell>{indexOfFirstItem + index + 1}</TableCell>
+                          <TableCell>{branch.branchName}</TableCell>
+                          <TableCell>{branch.manager?.email || '-'}</TableCell>
+                          <TableCell>{branch.department ? (typeof branch.department === 'object' ? (branch.department.name || 'No Name') : String(branch.department)) : 'Not Assigned'}</TableCell>
+                          <TableCell>
+                            <Chip label={branch.isSuspended ? 'Suspended' : 'Active'} color={branch.isSuspended ? 'warning' : 'success'} size="small" />
+                          </TableCell>
+                          <TableCell>{Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers[0] : 'Not Assigned'}</TableCell>
+                          <TableCell align="center">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditBranch(branch); }}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <Button size="small" variant="outlined" color={branch.isSuspended ? 'success' : 'warning'} onClick={(e) => { e.stopPropagation(); handleSuspendBranch(branch.id); }} sx={{ mx: 1 }}>
+                              {branch.isSuspended ? 'Activate' : 'Suspend'}
+                            </Button>
+                            <Button size="small" variant="outlined" color="info" onClick={(e) => { e.stopPropagation(); handleResetPassword(branch.manager?.email); }}>
+                              Reset
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                            <Collapse in={expandedAgent === branch._id} timeout="auto" unmountOnExit>
+                              <Box sx={{ margin: 2, backgroundColor: '#f8f9fa', p: 2, borderRadius: 1 }}>
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle1">Agent Details - {branch.branchName}</Typography>
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle2">Call Details</Typography>
+                                    {(() => {
+                                      const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
+                                      return loadingCallDetails[userId] ? (
+                                        <Box sx={{ textAlign: 'center', py: 2 }}>
+                                          <CircularProgress size={24} />
+                                          <Typography variant="body2">Loading call details...</Typography>
+                                        </Box>
+                                      ) : (
+                                        <Grid container spacing={2}>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="primary">{callDetails[userId]?.outboundCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Outbound Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="success.main">{callDetails[userId]?.inboundCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Inbound Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="warning.main">{callDetails[userId]?.missedCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Missed Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="error.main">{callDetails[userId]?.hangCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Hang Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                        </Grid>
+                                      );
+                                    })()}
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Working Hours</Typography>
+                                    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                                      <Grid container>
+                                        <Grid item xs={12} sm={6}>
+                                          <Typography><strong>Start Time:</strong> 9:00 AM</Typography>
+                                          <Typography><strong>End Time:</strong> 6:00 PM</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                          <Typography><strong>Break Time:</strong> 1:00 PM - 2:00 PM</Typography>
+                                          <Typography><strong>Total Hours:</strong> 8 hours</Typography>
+                                        </Grid>
+                                      </Grid>
+                                    </Paper>
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Active Hours (Today)</Typography>
+                                    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                                      <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography><strong>Login Time:</strong> 9:15 AM</Typography>
+                                          <Typography><strong>Total Active Time:</strong> 6h 45m</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography><strong>Break Duration:</strong> 1h 15m</Typography>
+                                          <Typography><strong>Idle Time:</strong> 30m</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography><strong>Current Status:</strong> <Chip label="Online" color="success" sx={{ ml: 1 }} /></Typography>
+                                          <Typography variant="body2"><strong>Last Activity:</strong> 2 minutes ago</Typography>
+                                        </Grid>
+                                      </Grid>
+                                    </Paper>
+                                  </Grid>
+                                </Grid>
+                              </Box>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-          {totalPages > 1 && (
-            <CPagination 
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
-                  onClick={() => handlePageChange(i + 1)}
-                >
-                  {i + 1}
-                </CPaginationItem>
-              ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
-          )}
-        </CCardBody>
-      </CCard>
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                <Pagination count={totalPages} page={currentPage} onChange={(e, page) => handlePageChange(page)} color="primary" />
+              </Box>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Add Agent Modal */}
-      <CModal visible={openAddBranch} onClose={handleCloseAddBranch} size="lg">
-        <CModalHeader>
-          <CModalTitle>Add New Agent</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <CForm>
-            <div className="mb-3">
-              <CFormLabel htmlFor="agentName">Agent Name</CFormLabel>
-              <CFormInput
-                type="text"
-                id="agentName"
-                value={branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                placeholder="Enter agent name"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="agentPhone">Agent Phone Number</CFormLabel>
-              <CFormInput
-                type="text"
-                id="agentPhone"
-                value={agentPhone}
-                onChange={e => setAgentPhone(e.target.value)}
-                placeholder="Enter agent phone number"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="managerEmail">Email Address</CFormLabel>
-              <CFormInput
-                type="email"
-                id="managerEmail"
-                value={managerEmail}
-                onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="Enter email address"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="department">Department</CFormLabel>
-              <CFormSelect
-                id="department"
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                required
-              >
-                <option value="">Select Department</option>
-                {departments.length === 0 ? (
-                  <option value="" disabled>Loading departments...</option>
-                ) : (
-                  departments.map((dept) => (
-                    <option key={dept._id} value={dept._id || dept.id}>
-                      {typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}
-                    </option>
-                  ))
-                )}
-              </CFormSelect>
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="timeGroup">Shift</CFormLabel>
-              <CFormSelect
-                id="timeGroup"
-                value={timeGroup}
-                onChange={e => handleTimeGroupChange(e.target.value)}
-                required
-              >
-                <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (9 AM - 12 PM)</option>
-                <option value="afternoon">Afternoon Shift (12 PM - 6 PM)</option>
-                <option value="full">Full Shift (9 AM - 6 PM)</option>
-                <option value="night">Night Shift (6 PM - 12 AM)</option>
-                <option value="custom">Custom Shift</option>
-              </CFormSelect>
-              
-            </div>
-            
-            <div className="mb-3">
-              <CFormLabel htmlFor="assignDid">Assign DID</CFormLabel>
-              <CFormSelect
-                id="assignDid"
-                value={selectedDid}
-                onChange={(e) => setSelectedDid(e.target.value)}
-                required
-              >
-                <option value="">Select DID Number</option>
-                {getAvailableDidNumbers().map((did) => (
-                  <option key={did.id} value={did.id}>
-                    {did.number}
-                  </option>
-                ))}
-              </CFormSelect>
-            </div>
-          </CForm>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseAddBranch}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSaveBranch}>
-            Save Agent
-          </CButton>
-        </CModalFooter>
-      </CModal>
+        {/* Add Agent Dialog */}
+        <Dialog open={openAddBranch} onClose={handleCloseAddBranch} maxWidth="md" fullWidth>
+          <DialogTitle>Add New Agent</DialogTitle>
+          <DialogContent dividers>
+            <Box component="form" sx={{ display: 'grid', gap: 2 }}>
+              <TextField label="Agent Name" value={branchName} onChange={(e) => setBranchName(e.target.value)} fullWidth />
+              <TextField label="Agent Phone Number" value={agentPhone} onChange={(e) => setAgentPhone(e.target.value)} fullWidth />
+              <TextField label="Email Address" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel id="department-label">Department</InputLabel>
+                <Select labelId="department-label" id="department" value={department} label="Department" onChange={e => setDepartment(e.target.value)}>
+                  {departments.length === 0 ? <MenuItem value=""><em>Loading departments...</em></MenuItem> : departments.map(dept => (
+                    <MenuItem key={dept._id} value={dept._id || dept.id}>{typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="timegroup-label">Shift</InputLabel>
+                <Select labelId="timegroup-label" id="timeGroup" value={timeGroup} label="Shift" onChange={e => handleTimeGroupChange(e.target.value)}>
+                  <MenuItem value=""><em>Select Shift</em></MenuItem>
+                  <MenuItem value="morning">Morning Shift (9 AM - 12 PM)</MenuItem>
+                  <MenuItem value="afternoon">Afternoon Shift (12 PM - 6 PM)</MenuItem>
+                  <MenuItem value="full">Full Shift (9 AM - 6 PM)</MenuItem>
+                  <MenuItem value="night">Night Shift (6 PM - 12 AM)</MenuItem>
+                  <MenuItem value="custom">Custom Shift</MenuItem>
+                </Select>
+              </FormControl>
+              {/* Start / End time — editable when Custom is selected, read-only for presets */}
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Start Time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+                <TextField
+                  label="End Time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+              </Box>
+              <FormControl fullWidth>
+                <InputLabel id="assignDid-label">Assign DID</InputLabel>
+                <Select labelId="assignDid-label" id="assignDid" value={selectedDid} label="Assign DID" onChange={e => setSelectedDid(e.target.value)}>
+                  {getAvailableDidNumbers().map(did => <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseAddBranch}>Cancel</Button>
+            <Button variant="contained" onClick={handleSaveBranch} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>Save Agent</Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Edit Agent Modal */}
-      <CModal visible={openEditBranch} onClose={handleCloseEditBranch} size="lg">
-        <CModalHeader>
-          <CModalTitle>Edit Agent</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <CForm>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editAgentName">Agent Name</CFormLabel>
-              <CFormInput
-                type="text"
-                id="editAgentName"
-                value={branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                placeholder="Enter agent name"
-                required
-              />
-            </div>
-            {/* Manager Name removed per request */}
-            <div className="mb-3">
-              <CFormLabel htmlFor="editManagerEmail">Email Address</CFormLabel>
-              <CFormInput
-                type="email"
-                id="editManagerEmail"
-                value={managerEmail}
-                onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="Enter email address"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editDepartment">Department</CFormLabel>
-              <CFormSelect
-                id="editDepartment"
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                required
-              >
-                <option value="">Select Department</option>
-                {departments.map((dept) => (
-                  <option key={dept._id} value={dept._id || dept.id}>
-                    {typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}
-                  </option>
-                ))}
-              </CFormSelect>
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editTimeGroup">Shift</CFormLabel>
-              <CFormSelect
-                id="editTimeGroup"
-                value={timeGroup}
-                onChange={e => handleTimeGroupChange(e.target.value)}
-                required
-              >
-                <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (9 AM - 12 PM)</option>
-                <option value="afternoon">Afternoon Shift (12 PM - 6 PM)</option>
-                <option value="full">Full Shift (9 AM - 6 PM)</option>
-                <option value="night">Night Shift (6 PM - 12 AM)</option>
-                <option value="custom">Custom Shift</option>
-              </CFormSelect>
-              
-            </div>
-            
-            <div className="mb-3">
-              <CFormLabel htmlFor="editAssignDid">Assign DID</CFormLabel>
-              <CFormSelect
-                id="editAssignDid"
-                value={selectedDid}
-                onChange={(e) => setSelectedDid(e.target.value)}
-              >
-                <option value="">Select DID Number</option>
-                {getAvailableDidNumbers(selectedBranch?._id).map((did) => (
-                  <option key={did.id} value={did.id}>
-                    {did.number}
-                  </option>
-                ))}
-              </CFormSelect>
-            </div>
-          </CForm>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseEditBranch}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleUpdateBranch}>
-            Update Agent
-          </CButton>
-        </CModalFooter>
-      </CModal>
-    </div>
+        {/* Edit Agent Dialog */}
+        <Dialog open={openEditBranch} onClose={handleCloseEditBranch} maxWidth="md" fullWidth>
+          <DialogTitle>Edit Agent</DialogTitle>
+          <DialogContent dividers>
+            <Box component="form" sx={{ display: 'grid', gap: 2 }}>
+              <TextField label="Agent Name" value={branchName} onChange={(e) => setBranchName(e.target.value)} fullWidth />
+              <TextField label="Email Address" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel id="edit-department-label">Department</InputLabel>
+                <Select labelId="edit-department-label" id="editDepartment" value={department} label="Department" onChange={e => setDepartment(e.target.value)}>
+                  {departments.map(dept => <MenuItem key={dept._id} value={dept._id || dept.id}>{typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="edit-timegroup-label">Shift</InputLabel>
+                <Select labelId="edit-timegroup-label" id="editTimeGroup" value={timeGroup} label="Shift" onChange={e => handleTimeGroupChange(e.target.value)}>
+                  <MenuItem value=""><em>Select Shift</em></MenuItem>
+                  <MenuItem value="morning">Morning Shift (9 AM - 12 PM)</MenuItem>
+                  <MenuItem value="afternoon">Afternoon Shift (12 PM - 6 PM)</MenuItem>
+                  <MenuItem value="full">Full Shift (9 AM - 6 PM)</MenuItem>
+                  <MenuItem value="night">Night Shift (6 PM - 12 AM)</MenuItem>
+                  <MenuItem value="custom">Custom Shift</MenuItem>
+                </Select>
+              </FormControl>
+              {/* Start / End time — editable when Custom is selected, read-only for presets */}
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Start Time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+                <TextField
+                  label="End Time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+              </Box>
+              <FormControl fullWidth>
+                <InputLabel id="edit-assignDid-label">Assign DID</InputLabel>
+                <Select labelId="edit-assignDid-label" id="editAssignDid" value={selectedDid} label="Assign DID" onChange={e => setSelectedDid(e.target.value)}>
+                  {getAvailableDidNumbers(selectedBranch?._id).map(did => <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseEditBranch}>Cancel</Button>
+            <Button variant="contained" onClick={handleUpdateBranch} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>Update Agent</Button>
+          </DialogActions>
+        </Dialog>
+      </div>
+    </Box>
   );
 };
 

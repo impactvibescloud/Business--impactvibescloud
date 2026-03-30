@@ -1852,6 +1852,10 @@ const IVRManagement = () => {
                     }
                     // include optional DID if selected
                     if (selectedDid) putPayload.did = selectedDid
+                    // when mode is text, explicitly include type=text so backend knows
+                    if (voiceMode === 'text') {
+                      putPayload.type = 'text'
+                    }
                     // if voiceMode is upload, include file reference or inline base64 as appropriate
                     if (voiceMode === 'upload') {
                       putPayload.type = 'upload'
@@ -1874,6 +1878,8 @@ const IVRManagement = () => {
                       const finalPayload = deepLowercase({ ...putPayload })
                       if (putPayload.audioBase64) finalPayload.audioBase64 = putPayload.audioBase64
                       if (putPayload.fileName && typeof putPayload.fileName === 'string') finalPayload.fileName = putPayload.fileName
+                      // debug: log final payload being sent for upload mode
+                      console.debug('IVR update finalPayload (upload):', finalPayload)
                       const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', finalPayload)
                       if (res && (res.success || res.updated || res.data)) {
                         setAddOpen(false)
@@ -1884,7 +1890,10 @@ const IVRManagement = () => {
                         console.error('Failed to update IVR', res)
                       }
                     } else {
-                      const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', deepLowercase(putPayload))
+                      // debug: log payload being sent for non-upload (text) mode
+                      const payloadToSend = deepLowercase(putPayload)
+                      console.debug('IVR update payload (text):', payloadToSend)
+                      const res = await apiCall(`/ivr/update/full/${encodeURIComponent((editingNode || '').toString().toLowerCase())}`, 'PUT', payloadToSend)
                       if (res && (res.success || res.updated || res.data)) {
                         setAddOpen(false)
                         setEditingNode(null)
@@ -2010,6 +2019,10 @@ const IVRManagement = () => {
                     }
                     // include optional DID if selected
                     if (selectedDid) savePayload.did = selectedDid
+                    // when mode is text, explicitly include type=text so backend knows
+                    if (voiceMode === 'text') {
+                      savePayload.type = 'text'
+                    }
                     try {
                       // if voiceMode is upload, include file reference or inline base64 as appropriate
                       if (voiceMode === 'upload') {
@@ -2030,6 +2043,8 @@ const IVRManagement = () => {
                         const finalSave = deepLowercase({ ...savePayload })
                         if (savePayload.audioBase64) finalSave.audioBase64 = savePayload.audioBase64
                         if (savePayload.fileName && typeof savePayload.fileName === 'string') finalSave.fileName = savePayload.fileName
+                        // debug: log final payload being sent for upload create
+                        console.debug('IVR create finalSave (upload):', finalSave)
                         const saveRes = await apiCall('/ivr/create', 'POST', finalSave)
                         if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
                           setAddOpen(false)
@@ -2039,7 +2054,10 @@ const IVRManagement = () => {
                           console.error('Failed to create IVR', saveRes)
                         }
                       } else {
-                        const saveRes = await apiCall('/ivr/create', 'POST', deepLowercase(savePayload))
+                        // debug: log payload being sent for non-upload (text) create
+                        const payloadToSend = deepLowercase(savePayload)
+                        console.debug('IVR create payload (text):', payloadToSend)
+                        const saveRes = await apiCall('/ivr/create', 'POST', payloadToSend)
                         if (saveRes && (saveRes.success || saveRes.created || saveRes.data)) {
                           setAddOpen(false)
                           setNewIvr({ node: '', voice: '', language: '', options: [{ key: '1', type: 'node', target: '', agentId: '' }] })

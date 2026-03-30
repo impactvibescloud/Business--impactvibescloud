@@ -1,38 +1,45 @@
 import React, { useState, useEffect } from 'react'
 import {
-  CCard,
-  CCardBody,
-  CCol,
-  CRow,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CButton,
-  CInputGroup,
-  CFormInput,
-  CPagination,
-  CPaginationItem,
-  CCardHeader,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CForm,
-  CFormLabel,
-  CFormSelect,
-  CSpinner,
-  CAlert,
-  CBadge
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch, cilPencil, cilTrash, cilBuilding } from '@coreui/icons'
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  IconButton,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  CircularProgress,
+  Alert,
+  Grid,
+  Collapse,
+  Pagination,
+  InputAdornment
+} from '@mui/material'
+import AddIcon from '@mui/icons-material/Add'
+import SearchIcon from '@mui/icons-material/Search'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import BusinessIcon from '@mui/icons-material/Business'
+import axios from 'axios'
 import { apiCall, ENDPOINTS, API_CONFIG, getBaseURL } from '../../config/api'
 import { errorLog } from '../../utils/logger'
 import './Department.css'
+import '../Leads/CallLogsWebpage.css'
 import { useAuth } from '../../context/authContext'
 
 // Helper function to get API URL
@@ -383,27 +390,23 @@ function Department() {
     }
   }
 
-  // Handle multiple members selection
+  // Handle multiple members selection (MUI Select returns array of selected values)
   const handleMembersChange = (e) => {
-    const options = e.target.options
+    const values = Array.isArray(e.target.value) ? e.target.value : []
     const selectedMembers = []
     const selectedIds = []
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        const branchId = options[i].value
-        selectedIds.push(branchId)
-        // Find the full branch object to get userId, phone, and role
-        const branch = availableBranches.find(b => (b._id === branchId || b.id === branchId))
-        if (branch) {
-          selectedMembers.push({
-            userId: branch.userId || branch._id || branch.id,
-            phone: branch.phone || branch.didNumber || '',
-            didNumber: branch.didNumber || branch.did || '',
-            role: branch.role || 'branch'
-          })
-        }
+    values.forEach(branchId => {
+      selectedIds.push(branchId)
+      const branch = availableBranches.find(b => (b._id === branchId || b.id === branchId))
+      if (branch) {
+        selectedMembers.push({
+          userId: branch.userId || branch._id || branch.id,
+          phone: branch.phone || branch.didNumber || '',
+          didNumber: branch.didNumber || branch.did || '',
+          role: branch.role || 'branch'
+        })
       }
-    }
+    })
     console.log('Selected members:', selectedMembers)
     setSelectedMemberIds(selectedIds)
     setFormData(prev => ({
@@ -702,9 +705,8 @@ function Department() {
 
   const getStatusBadge = (status) => {
     const normalizedStatus = status?.toLowerCase() || 'inactive'
-    const color = normalizedStatus === 'active' ? 'success' : 'secondary'
     const displayStatus = normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1)
-    return <CBadge color={color}>{displayStatus}</CBadge>
+    return <Chip label={displayStatus} color={normalizedStatus === 'active' ? 'success' : 'default'} size="small" />
   }
 
   // Helper function to get department head name from branches
@@ -736,309 +738,154 @@ function Department() {
   }
 
   return (
-    <div className="contact-list-container">
+    <Box className="contact-list-container page-container" sx={{ p: 2 }}>
       {successAlert.show && (
-        <CAlert color="success" dismissible onClose={() => setSuccessAlert({ show: false, message: '' })}>
-          {successAlert.message}
-        </CAlert>
+        <Alert severity="success" onClose={() => setSuccessAlert({ show: false, message: '' })} sx={{ mb: 2 }}>{successAlert.message}</Alert>
       )}
-      
-      <CCard className="mb-4">
-        <style>{`
-          /* Compact table tweaks scoped to this component (match Agents page) */
-          .compact-table th, .compact-table td {
-            padding: 0.25rem 0.4rem !important;
-            vertical-align: middle !important;
-            line-height: 1.15 !important;
-            font-size: 0.8125rem !important;
-          }
-          .compact-table td { overflow: hidden; text-overflow: ellipsis; }
-          .compact-table .note-col { white-space: normal !important; }
-          .compact-table .nowrap { white-space: nowrap !important; }
-        `}</style>
-        <CCardHeader className="d-flex justify-content-between align-items-center" style={{ borderBottom: '0' }}>
-          <div className="me-3" style={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
-            <CInputGroup>
-              <CFormInput
-                className="w-100"
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+              <TextField
                 placeholder="Search departments..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                size="small"
+                fullWidth
+                InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small"/></InputAdornment>) }}
               />
-            </CInputGroup>
-          </div>
-          <div>
-            
-            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</button>
-            <span className="mx-2">Page {currentPage}</span>
-            <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</button>
-            <button className="add-agent-btn-minimal btn-sm" onClick={handleNewDepartment}><CIcon icon={cilPlus} className="me-1" /> New Department</button>
-          </div>
-        </CCardHeader>
-        <CCardBody>
-          {/* Search moved to header */}
+            </Box>
+            <Box>
+              <Button size="small" variant="outlined" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</Button>
+              <Typography component="span" sx={{ mx: 1 }}>Page {currentPage}</Typography>
+              <Button size="small" variant="outlined" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</Button>
+              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleNewDepartment} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>New Department</Button>
+            </Box>
+          </Box>
 
-          <CTable hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>DEPARTMENT NAME</CTableHeaderCell>
-                <CTableHeaderCell>DESCRIPTION</CTableHeaderCell>
-                <CTableHeaderCell>DEPARTMENT HEAD</CTableHeaderCell>
-                <CTableHeaderCell>DID NUMBER</CTableHeaderCell>
-                <CTableHeaderCell>MEMBERS</CTableHeaderCell>
-                <CTableHeaderCell>STATUS</CTableHeaderCell>
-                <CTableHeaderCell>ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {loading ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <CSpinner color="primary" />
-                    <div className="mt-3">Loading departments...</div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : currentDepartments.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilBuilding} size="xl" />
+          <TableContainer component={Paper} className="calllogs-table-container">
+            <Table size="small" className="compact-table" sx={{ minWidth: 700 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>S.NO</TableCell>
+                  <TableCell>DEPARTMENT NAME</TableCell>
+                  <TableCell>DESCRIPTION</TableCell>
+                  <TableCell>DEPARTMENT HEAD</TableCell>
+                  <TableCell>DID NUMBER</TableCell>
+                  <TableCell>MEMBERS</TableCell>
+                  <TableCell>STATUS</TableCell>
+                  <TableCell>ACTIONS</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <CircularProgress />
+                      <div className="mt-3">Loading departments...</div>
+                    </TableCell>
+                  </TableRow>
+                ) : currentDepartments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <div className="empty-state">
+                        <div className="empty-state-icon"><BusinessIcon sx={{ fontSize: 40 }} /></div>
+                        <Typography variant="h6">No departments found</Typography>
+                        <Typography variant="body2">Create your first department to get started.</Typography>
+                        <Button variant="contained" sx={{ mt: 2 }} onClick={handleNewDepartment}>Create Department</Button>
                       </div>
-                      <h4>No departments found</h4>
-                      <p>Create your first department to get started.</p>
-                      <CButton color="primary" className="mt-3" onClick={handleNewDepartment}>
-                        Create Department
-                      </CButton>
-                    </div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                currentDepartments.map((department, index) => (
-                  <CTableRow key={department.id || department._id}>
-                    <CTableDataCell>
-                      <div className="contact-number">{indexOfFirstItem + index + 1}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-name">{department.name}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-phone">{department.description || 'No description'}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-name">
-                        {getDepartmentHeadName(department)}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-phone">
-                        {getDepartmentHeadDidNumber(department)}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge color="info">
-                        {department.members && Array.isArray(department.members) ? department.members.length : 0} Members
-                      </CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell>{getStatusBadge(department.status)}</CTableDataCell>
-                    <CTableDataCell>
-                      <CButton
-                        color="info"
-                        variant="ghost"
-                        size="sm"
-                        className="me-2"
-                        onClick={() => handleEdit(department)}
-                      >
-                        <CIcon icon={cilPencil} />
-                      </CButton>
-                      <CButton
-                        color="danger"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteConfirm(department.id || department._id)}
-                      >
-                        <CIcon icon={cilTrash} />
-                      </CButton>
-                    </CTableDataCell>
-                  </CTableRow>
-                ))
-              )}
-            </CTableBody>
-          </CTable>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentDepartments.map((department, index) => (
+                    <TableRow key={department.id || department._id} hover>
+                      <TableCell>{indexOfFirstItem + index + 1}</TableCell>
+                      <TableCell>{department.name}</TableCell>
+                      <TableCell>{department.description || 'No description'}</TableCell>
+                      <TableCell>{getDepartmentHeadName(department)}</TableCell>
+                      <TableCell>{getDepartmentHeadDidNumber(department)}</TableCell>
+                      <TableCell><Chip label={`${department.members && Array.isArray(department.members) ? department.members.length : 0} Members`} size="small" /></TableCell>
+                      <TableCell>{getStatusBadge(department.status)}</TableCell>
+                      <TableCell>
+                        <IconButton size="small" onClick={() => handleEdit(department)}><EditIcon fontSize="small"/></IconButton>
+                        <IconButton size="small" onClick={() => handleDeleteConfirm(department.id || department._id)}><DeleteIcon fontSize="small"/></IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
           {totalPages > 1 && (
-            <CPagination 
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
-                  onClick={() => handlePageChange(i + 1)}
-                >
-                  {i + 1}
-                </CPaginationItem>
-              ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Pagination count={totalPages} page={currentPage} onChange={(e, page) => handlePageChange(page)} color="primary" />
+            </Box>
           )}
-        </CCardBody>
-      </CCard>
+        </CardContent>
+      </Card>
 
-      {/* Add/Edit Department Modal */}
-      <CModal visible={showDepartmentModal} onClose={handleCloseModal}>
-        <CModalHeader>
-          <CModalTitle>
-            {editingDepartment ? 'Edit Department' : 'Add New Department'}
-          </CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {validationError && (
-            <CAlert color="danger" className="mb-3">
-              {validationError}
-            </CAlert>
-          )}
-          <CForm>
-            <div className="mb-3">
-              <CFormLabel>Department Name</CFormLabel>
-              <CFormInput
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Enter department name"
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Description</CFormLabel>
-              <CFormInput
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Enter department description"
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Business</CFormLabel>
-              <CFormInput
-                value={businessName}
-                placeholder="Business name"
-                disabled
-              />
-              <small className="text-muted">This is automatically set based on your current business</small>
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Department Head</CFormLabel>
-              {availableBranches.length > 0 ? (
-                <CFormSelect
-                  name="departmentHead"
-                  value={selectedDepartmentHeadBranchId}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Select Department Head</option>
-                  {availableBranches.map(branch => (
-                    <option key={branch._id || branch.id} value={branch._id || branch.id}>
-                      {branch.branchName || branch.name}
-                    </option>
-                  ))}
-                </CFormSelect>
-              ) : (
-                <CFormInput value="Loading branches..." disabled />
-              )}
-              <small className="text-muted">Select the branch that will head this department</small>
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Department Members</CFormLabel>
-              {availableBranches.length > 0 ? (
-                <select
-                  multiple
-                  className="form-select"
-                  value={selectedMemberIds}
-                  onChange={handleMembersChange}
-                  style={{ minHeight: '150px' }}
-                >
-                  {availableBranches.map(branch => (
-                    <option key={branch._id || branch.id} value={branch._id || branch.id}>
-                      {branch.branchName || branch.name} {branch.didNumber ? `(${branch.didNumber})` : ''}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <CFormInput value="Loading branches..." disabled />
-              )}
-              <small className="text-muted">Hold Ctrl (Cmd on Mac) to select multiple members</small>
-            </div>
+      {/* Add/Edit Department Dialog */}
+      <Dialog open={showDepartmentModal} onClose={handleCloseModal} maxWidth="md" fullWidth>
+        <DialogTitle>{editingDepartment ? 'Edit Department' : 'Add New Department'}</DialogTitle>
+        <DialogContent dividers>
+          {validationError && <Alert severity="error" sx={{ mb: 2 }}>{validationError}</Alert>}
+          <Box component="form" sx={{ display: 'grid', gap: 2 }}>
+            <TextField name="name" label="Department Name" value={formData.name} onChange={handleInputChange} fullWidth />
+            <TextField name="description" label="Description" value={formData.description} onChange={handleInputChange} fullWidth />
+            <TextField label="Business" value={businessName} disabled fullWidth />
+            <FormControl fullWidth>
+              <InputLabel id="department-head-label">Department Head</InputLabel>
+              <Select labelId="department-head-label" name="departmentHead" value={selectedDepartmentHeadBranchId || ''} label="Department Head" onChange={handleInputChange}>
+                <MenuItem value=""><em>Select Department Head</em></MenuItem>
+                {availableBranches.map(branch => (
+                  <MenuItem key={branch._id || branch.id} value={branch._id || branch.id}>{branch.branchName || branch.name}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant="caption" color="text.secondary">Select the branch that will head this department</Typography>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="members-label">Department Members</InputLabel>
+              <Select labelId="members-label" multiple value={selectedMemberIds} onChange={handleMembersChange} renderValue={(selected) => `${selected.length} selected`}>
+                {availableBranches.map(branch => (
+                  <MenuItem key={branch._id || branch.id} value={branch._id || branch.id}>{branch.branchName || branch.name}{branch.didNumber ? ` (${branch.didNumber})` : ''}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant="caption" color="text.secondary">Hold Ctrl (Cmd on Mac) to select multiple members</Typography>
+            </FormControl>
+
             {editingDepartment && (
-              <div className="mb-3">
-                <CFormLabel>Status</CFormLabel>
-                <CFormSelect
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </CFormSelect>
-              </div>
+              <FormControl fullWidth>
+                <InputLabel id="status-label">Status</InputLabel>
+                <Select labelId="status-label" name="status" value={formData.status} label="Status" onChange={handleInputChange}>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
             )}
-          </CForm>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseModal}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSaveDepartment}>
-            {editingDepartment ? 'Update' : 'Save'} Department
-          </CButton>
-        </CModalFooter>
-      </CModal>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseModal}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveDepartment} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>{editingDepartment ? 'Update' : 'Save'} Department</Button>
+        </DialogActions>
+      </Dialog>
 
-      {/* Delete Confirmation Modal */}
-      <CModal visible={showDeleteModal} onClose={handleDeleteCancel}>
-        <CModalHeader>
-          <CModalTitle>Confirm Delete</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {deleteError && (
-            <CAlert color="danger" className="mb-3">
-              {deleteError}
-            </CAlert>
-          )}
-          {deleteSuccess ? (
-            <CAlert color="success" className="mb-3">
-              Department deleted successfully!
-            </CAlert>
-          ) : (
-            <p>Are you sure you want to delete this department? This action cannot be undone.</p>
-          )}
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleDeleteCancel} disabled={isDeleting}>
-            Cancel
-          </CButton>
-          <CButton 
-            color="danger" 
-            onClick={handleDelete} 
-            disabled={isDeleting || deleteSuccess}
-          >
-            {isDeleting ? <CSpinner size="sm" className="me-2" /> : null}
-            Delete
-          </CButton>
-        </CModalFooter>
-      </CModal>
-    </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteModal} onClose={handleDeleteCancel}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent dividers>
+          {deleteError && <Alert severity="error" sx={{ mb: 2 }}>{deleteError}</Alert>}
+          {deleteSuccess ? <Alert severity="success">Department deleted successfully!</Alert> : <Typography>Are you sure you want to delete this department? This action cannot be undone.</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={isDeleting}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={isDeleting || deleteSuccess}>{isDeleting ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}Delete</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }
 
