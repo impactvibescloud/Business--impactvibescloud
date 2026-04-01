@@ -62,6 +62,8 @@ const CallLogs = () => {
   const [audioFiles, setAudioFiles] = useState([])
   const [audioLoading, setAudioLoading] = useState(false)
   const [audioError, setAudioError] = useState(null)
+  const [agentMap, setAgentMap] = useState({})
+  const [agentByNumberMap, setAgentByNumberMap] = useState({})
   const [activeFilter, setActiveFilter] = useState('All Calls')
   const [businessId, setBusinessId] = useState(null)
   const [dateFrom, setDateFrom] = useState('')
@@ -391,6 +393,119 @@ const CallLogs = () => {
   useEffect(() => {
     fetchAudioFiles()
   }, [businessId])
+
+  const fetchAgents = async () => {
+    if (!businessId) return
+    try {
+      const br = await apiCall(`/branch/${encodeURIComponent(businessId)}/branches`, 'GET')
+      let list = []
+      if (Array.isArray(br)) list = br
+      else if (br?.data && Array.isArray(br.data)) list = br.data
+      else if (Array.isArray(br.branches)) list = br.branches
+      else if (br?.data?.data && Array.isArray(br.data.data)) list = br.data.data
+      else list = []
+
+      const idMap = {}
+      const numMap = {}
+
+      list.forEach((branch) => {
+        const u = branch.user || branch.manager || branch.owner || null
+        if (u) {
+          const id = u._id || u.id || u.email
+          const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email
+          if (id) {
+            const ks = [String(id)]
+            ks.forEach(k => { idMap[k] = name; idMap[String(k).toLowerCase()] = name })
+            const digits = String(id).replace(/[^0-9]/g, '')
+            if (digits) idMap[digits] = name
+          }
+          if (u.extension) {
+            numMap[String(u.extension)] = name
+            numMap[String(u.extension).replace(/[^0-9]/g,'')] = name
+          }
+          if (u.phone) {
+            numMap[String(u.phone)] = name
+            numMap[String(u.phone).replace(/[^0-9]/g,'')] = name
+          }
+        }
+        if (Array.isArray(branch.members)) {
+          branch.members.forEach((m) => {
+            const id = m._id || m.id || m.email
+            const name = m.name || m.fullName || m.email
+            if (id) {
+              const ks = [String(id)]
+              ks.forEach(k => { idMap[k] = name; idMap[String(k).toLowerCase()] = name })
+              const digits = String(id).replace(/[^0-9]/g, '')
+              if (digits) idMap[digits] = name
+            }
+            if (m.extension) {
+              numMap[String(m.extension)] = name
+              numMap[String(m.extension).replace(/[^0-9]/g,'')] = name
+            }
+            if (m.phone) {
+              numMap[String(m.phone)] = name
+              numMap[String(m.phone).replace(/[^0-9]/g,'')] = name
+            }
+          })
+        }
+        if (Array.isArray(branch.didNumbers)) {
+          branch.didNumbers.forEach((dn) => {
+            let num = ''
+            let assignedTo = ''
+            if (typeof dn === 'string') num = dn
+            else if (typeof dn === 'object') {
+              num = dn.number || dn.did || dn.value || ''
+              assignedTo = dn.assignedTo || dn.extensionOwner || ''
+            }
+            if (num) {
+              const n = String(num)
+              numMap[n] = branch.branchName || assignedTo || numMap[n] || n
+              const digits = n.replace(/[^0-9]/g, '')
+              if (digits) numMap[digits] = numMap[digits] || (branch.branchName || assignedTo || n)
+            }
+          })
+        }
+      })
+
+      try {
+        const users = await apiCall(`/users?businessId=${encodeURIComponent(businessId)}`, 'GET')
+        let ulist = []
+        if (Array.isArray(users)) ulist = users
+        else if (users?.data && Array.isArray(users.data)) ulist = users.data
+        else if (users?.data?.data && Array.isArray(users.data.data)) ulist = users.data.data
+        ulist.forEach((u) => {
+          const id = u._id || u.id || u.email
+          const name = u.name || u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email
+          if (id) {
+            const ks = [String(id)]
+            ks.forEach(k => { idMap[k] = name; idMap[String(k).toLowerCase()] = name })
+            const digits = String(id).replace(/[^0-9]/g, '')
+            if (digits) idMap[digits] = name
+          }
+          if (u.extension) {
+            numMap[String(u.extension)] = name
+            numMap[String(u.extension).replace(/[^0-9]/g,'')] = name
+          }
+          if (u.phone) {
+            numMap[String(u.phone)] = name
+            numMap[String(u.phone).replace(/[^0-9]/g,'')] = name
+          }
+          if (u.mobile) {
+            numMap[String(u.mobile)] = name
+            numMap[String(u.mobile).replace(/[^0-9]/g,'')] = name
+          }
+        })
+      } catch (e) {}
+
+      setAgentMap(idMap)
+      setAgentByNumberMap(numMap)
+    } catch (e) {
+      setAgentMap({})
+      setAgentByNumberMap({})
+    }
+  }
+
+  useEffect(() => { fetchAgents() }, [businessId])
 
   // Load saved columns selection from localStorage on mount
   useEffect(() => {
@@ -1142,7 +1257,6 @@ const CallLogs = () => {
               </div>
             </CCol>
             <CCol md={4} className="d-flex justify-content-end align-items-center gap-2">
-              <CButton color="warning" variant="outline" className="cl-oldcdr">OLD CDR</CButton>
               <CButton color="light" className="cl-icon-btn" onClick={exportAllCallLogs} disabled={exporting}>
                 {exporting ? <CSpinner size="sm" /> : <CIcon icon={cilCloudDownload} />}
               </CButton>
@@ -1215,7 +1329,13 @@ const CallLogs = () => {
                   const duration = formatDuration(log.callDuration || log.duration);
                   const callId = log.callId || log.call_id || log._id || '';
                   const solution = log.solution || log.callType || '';
-                  const agents = Array.isArray(log.agents) && log.agents.length ? log.agents : (log.callReceivedBy ? [log.callReceivedBy] : []);
+                  let agents = []
+                  if (Array.isArray(log.agents) && log.agents.length) agents = log.agents
+                  else if (log.agent) agents = [log.agent]
+                  else if (Array.isArray(log.callReceivedBy)) agents = log.callReceivedBy
+                  else if (log.callReceivedBy) agents = [log.callReceivedBy]
+                  else if (log.callReceivedByString) agents = [log.callReceivedByString]
+                  else agents = []
                   const recording = log.callRecording || log.recording || null;
                   // try to find a single best matching audio filename from `audioFiles` when inline recording not present
                   let matchedFiles = []
@@ -1352,10 +1472,34 @@ const CallLogs = () => {
                       <CTableDataCell className="align-middle">{formatCallStatus(log.status)}</CTableDataCell>
 
                       <CTableDataCell className="align-middle">
-                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                          {agents.map((a,ii)=> (
-                            <div key={ii} style={{width:34,height:34,borderRadius:17,background:'#e5e7eb',display:'inline-flex',alignItems:'center',justifyContent:'center',fontWeight:600,color:'#374151'}}>{initials(a)}</div>
-                          ))}
+                        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                          {(() => {
+                            const agentDisplays = (agents || []).map(a => {
+                              if (!a) return ''
+                              if (typeof a === 'object') {
+                                const name = a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                                if (name) return name
+                                if (a.email && agentMap && (agentMap[a.email] || agentMap[a.email.toLowerCase()])) return agentMap[a.email] || agentMap[a.email.toLowerCase()]
+                                if (a._id && agentMap && agentMap[a._id]) return agentMap[a._id]
+                                return a.email || a._id || ''
+                              }
+                              const s = String(a).trim()
+                              // skip external caller numbers
+                              if (s && (s === String(log.contact || '') || s === String(log.callInitiatedBy || ''))) return ''
+                              // try exact or lowercased id/email lookup
+                              if (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) return agentMap[s] || agentMap[s.toLowerCase()]
+                              // numeric lookup (strip non-digits)
+                              const digits = s.replace(/[^0-9]/g, '')
+                              if (digits && agentByNumberMap && (agentByNumberMap[digits] || agentByNumberMap[s])) return agentByNumberMap[digits] || agentByNumberMap[s]
+                              // if it's an email and we couldn't resolve, return mapped name if available, else raw email
+                              if (s.includes('@')) return (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) || s
+                              return s
+                            }).filter(Boolean)
+                            const unique = Array.from(new Set(agentDisplays))
+                            return (
+                              <div style={{fontWeight:600,color:'#374151',fontSize:'0.95rem'}}>{unique.length ? unique.join(', ') : '—'}</div>
+                            )
+                          })()}
                         </div>
                       </CTableDataCell>
 

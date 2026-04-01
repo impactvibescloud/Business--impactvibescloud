@@ -70,6 +70,12 @@ function Settings() {
   const [savingBusiness, setSavingBusiness] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [masterPassword, setMasterPassword] = useState('')
+  const [confirmMasterPassword, setConfirmMasterPassword] = useState('')
+  const [creatingMaster, setCreatingMaster] = useState(false)
+  const [masterMessage, setMasterMessage] = useState(null)
+  const [showMasterPasswordField, setShowMasterPasswordField] = useState(false)
+  const [showConfirmMasterPasswordField, setShowConfirmMasterPasswordField] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -502,6 +508,42 @@ function Settings() {
         });
     }
   }
+
+  // Master password functions
+  const createMasterPassword = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setMasterMessage({ type: 'error', text: 'Missing businessId in localStorage' })
+      return
+    }
+    if (!masterPassword) {
+      setMasterMessage({ type: 'error', text: 'Please enter a master password' })
+      return
+    }
+    if (masterPassword !== confirmMasterPassword) {
+      setMasterMessage({ type: 'error', text: 'Passwords do not match' })
+      return
+    }
+    try {
+      setCreatingMaster(true)
+      setMasterMessage(null)
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      const res = await axios.post(`/api/business/${encodeURIComponent(businessId)}/master-password`, { masterPassword }, {
+        headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+      })
+      if (res && (res.status === 200 || (res.data && res.data.success))) {
+        setMasterMessage({ type: 'success', text: 'Master password created successfully' })
+        setMasterPassword('')
+        setConfirmMasterPassword('')
+      } else {
+        setMasterMessage({ type: 'error', text: (res?.data?.message) || 'Failed to create master password' })
+      }
+    } catch (err) {
+      setMasterMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Request failed' })
+    } finally {
+      setCreatingMaster(false)
+    }
+  }
   
   // Call Attributes functions
   const handleAddCallReason = () => {
@@ -927,201 +969,91 @@ function Settings() {
             
             <CTabPane role="tabpanel" visible={activeKey === 3}>
               <div className="settings-tab-content">
-                {/* Call Attributes Section */}
+                {/* Master Password Section */}
                 <div className="account-card">
                   <div className="account-card-header">
-                    <span className="account-section-icon">📞</span>
-                    <h2 className="account-section-title">Call Attributes</h2>
+                    <span className="account-section-icon">🔐</span>
+                    <h2 className="account-section-title">Master Password</h2>
                   </div>
-                  
+
                   <div className="account-section-content">
-                    <div className="attribute-group">
-                      <label className="attribute-label">Call Reason</label>
-                      <div className="select-with-button">
-                        <CFormSelect className="attribute-select" value={selectedCallReason} onChange={(e) => setSelectedCallReason(e.target.value)}>
-                          {callReasonOptions.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </CFormSelect>
-                        <CButton color="primary" className="add-button" onClick={handleAddCallReason}>Add</CButton>
-                      </div>
-                      
-                      <div className="added-attributes">
-                        {addedCallReasons.map((reason, index) => (
-                          <CBadge 
-                            key={index} 
-                            color="primary" 
-                            className="added-attribute-badge"
-                            onClick={() => handleRemoveCallReason(reason)}
-                          >
-                            {reason} <CIcon icon={cilX} className="remove-icon" />
-                          </CBadge>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="attribute-group">
-                      <label className="attribute-label">Call Outcome</label>
-                      <div className="select-with-button">
-                        <CFormSelect className="attribute-select" value={selectedCallOutcome} onChange={(e) => setSelectedCallOutcome(e.target.value)}>
-                          {callOutcomeOptions.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </CFormSelect>
-                        <CButton color="primary" className="add-button" onClick={handleAddCallOutcome}>Add</CButton>
-                      </div>
-                      
-                      <div className="added-attributes">
-                        {addedCallOutcomes.map((outcome, index) => (
-                          <CBadge 
-                            key={index} 
-                            color="primary" 
-                            className="added-attribute-badge"
-                            onClick={() => handleRemoveCallOutcome(outcome)}
-                          >
-                            {outcome} <CIcon icon={cilX} className="remove-icon" />
-                          </CBadge>
-                        ))}
+                    <div className="form-group">
+                      <label className="form-label">Set Master Password</label>
+                      <div style={{ position: 'relative' }}>
+                        <CFormInput
+                          type={showMasterPasswordField ? 'text' : 'password'}
+                          placeholder="Enter master password"
+                          value={masterPassword}
+                          onChange={(e) => setMasterPassword(e.target.value)}
+                          style={{ paddingRight: 44 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowMasterPasswordField((p) => !p)}
+                          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 14, color: '#2563eb' }}
+                          tabIndex={-1}
+                          aria-label={showMasterPasswordField ? 'Hide password' : 'Show password'}
+                        >
+                          {showMasterPasswordField ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M15 9.5a3 3 0 11-4 4" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <line x1="2" y1="2" x2="22" y2="22" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="1.5"/>
+                            </svg>
+                          )}
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="attribute-group">
-                      <label className="attribute-label">Custom Tags</label>
-                      <CFormInput 
-                        type="text" 
-                        placeholder="Type and press Enter to create..." 
-                        className="tags-input" 
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Notifications Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🔔</span>
-                    <h2 className="account-section-title">Notifications</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="notification-item">
-                      <div className="notification-info">
-                        <h3 className="notification-title">Call Records</h3>
-                        <p className="notification-description">Receive notification when a new call is recorded</p>
-                        <div className="notification-channels">
-                          <span className="channel-label">Email</span>
-                          <span className="channel-separator">•</span>
-                          <span className="channel-label">SMS</span>
-                          <span className="channel-separator">•</span>
-                          <span className="channel-label">Push</span>
-                        </div>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={true} />
-                          <span className="slider round"></span>
-                        </label>
+                    <div className="form-group">
+                      <label className="form-label">Confirm Password</label>
+                      <div style={{ position: 'relative' }}>
+                        <CFormInput
+                          type={showConfirmMasterPasswordField ? 'text' : 'password'}
+                          placeholder="Confirm master password"
+                          value={confirmMasterPassword}
+                          onChange={(e) => setConfirmMasterPassword(e.target.value)}
+                          style={{ paddingRight: 44 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmMasterPasswordField((p) => !p)}
+                          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 14, color: '#2563eb' }}
+                          tabIndex={-1}
+                          aria-label={showConfirmMasterPasswordField ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmMasterPasswordField ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M15 9.5a3 3 0 11-4 4" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <line x1="2" y1="2" x2="22" y2="22" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="1.5"/>
+                            </svg>
+                          )}
+                        </button>
                       </div>
                     </div>
-                    
-                    <div className="notification-item">
-                      <div className="notification-info">
-                        <h3 className="notification-title">Call Recording Database server</h3>
-                        <p className="notification-description">Notify me when recordings that are of being uploaded</p>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={false} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
+                    {masterMessage && (
+                      <div className={`mt-2 ${masterMessage.type === 'success' ? 'text-success' : 'text-danger'}`}>{masterMessage.text}</div>
+                    )}
+                    <div className="save-changes-container mt-3">
+                      <CButton
+                        color="primary"
+                        disabled={creatingMaster}
+                        onClick={createMasterPassword}
+                      >
+                        {creatingMaster ? 'Creating...' : 'Create Master Password'}
+                      </CButton>
                     </div>
-                  </div>
-                </div>
-                
-                {/* Privacy & Security Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🔒</span>
-                    <h2 className="account-section-title">Privacy & Security</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="security-item">
-                      <div className="security-info">
-                        <h3 className="security-title">Require Recording</h3>
-                        <p className="security-description">Mandate recording this week for privacy</p>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={false} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div className="security-item">
-                      <div className="security-info">
-                        <h3 className="security-title">Two Factor Authentication</h3>
-                        <p className="security-description">Use an app or device verification code for all users</p>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={false} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Block List Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🚫</span>
-                    <h2 className="account-section-title">Block List</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="block-list-description">
-                      <p>Block numbers from calling or messaging you</p>
-                    </div>
-                    <div className="block-list-action">
-                      <CButton color="light" className="manage-button">Manage List</CButton>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* API Key Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🔑</span>
-                    <h2 className="account-section-title">API Key</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="api-key-input-container">
-                      <CFormInput 
-                        type="text" 
-                        placeholder="Click the button to create API key..." 
-                        className="api-key-input" 
-                        disabled={!showApiKey}
-                        readOnly={showApiKey}
-                        value={apiKey}
-                      />
-                      {!showApiKey && <CButton color="primary" className="create-key-button" onClick={generateApiKey}>Create</CButton>}
-                    </div>
-                    <div className="api-key-actions">
-                      {showApiKey && 
-                        <CButton color="secondary" className="copy-key-button" onClick={copyApiKey}>
-                          Copy Key
-                        </CButton>
-                      }
-                    </div>
-                    <div className="api-key-description">
-                      <p className="api-key-note">This helps generate authentication codes for your API and applications that help for integration.</p>
-                      <p className="api-key-note">Use <a href="#" className="api-key-link">API Help</a> / <a href="#" className="api-key-link">FAQs</a></p>
-                    </div>
+                    <div className="mt-2 text-muted small">This password allows admin to login as any agent/branch user for this business.</div>
                   </div>
                 </div>
               </div>

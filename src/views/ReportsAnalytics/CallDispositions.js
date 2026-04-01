@@ -324,10 +324,11 @@ const CallLogsLegacy = () => {
           <CTable hover responsive className="table-sm compact-table cdr-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
             <CTableHead>
               <CTableRow>
-                <CTableHeaderCell style={{ width: '50%' }}>TO</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>DATE</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '15%' }}>TIME</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '20%' }}>RESULTS</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '45%' }}>TO</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '12%' }}>DATE</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '12%' }}>TIME</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '12%' }}>TYPE</CTableHeaderCell>
+                <CTableHeaderCell style={{ width: '19%' }}>RESULTS</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -337,6 +338,79 @@ const CallLogsLegacy = () => {
                 const dateOnly = dt ? dt.toLocaleDateString() : '-'
                 const timeOnly = dt ? dt.toLocaleTimeString() : '-'
                 const resultText = d.note || d.callLog?.status || d.status || '—'
+
+                // Determine call direction (inbound = customer -> agent)
+                // Support various CDR shapes: prefer explicit `callType`, then check initiator fields
+                const rawFrom = d.raw?.fromNumber || d.raw?.callInitiatedBy || d.raw?.callerNumber || '';
+                const rawTo = d.raw?.toNumber || d.raw?.callReceivedBy || d.raw?.calleeNumber || '';
+                const contact = d.callLog?.contact || d.contact || d.callInitiatedBy || '';
+                let isInbound = false;
+
+                // 1) explicit callType field
+                if (d.callType && String(d.callType).toLowerCase() === 'inbound') {
+                  isInbound = true
+                } else if (d.raw?.callType && String(d.raw.callType).toLowerCase() === 'inbound') {
+                  isInbound = true
+                // 2) callInitiatedBy equals contact (customer initiated)
+                } else if (d.callInitiatedBy && contact && String(d.callInitiatedBy) === String(contact)) {
+                  isInbound = true
+                // 3) fallback to raw from/to matching contact
+                } else if (rawFrom && contact && String(rawFrom) === String(contact)) {
+                  isInbound = true
+                } else if (rawTo && contact && String(rawTo) === String(contact)) {
+                  isInbound = false
+                // 4) directional flags in raw
+                } else if (d.raw && d.raw.direction) {
+                  const dir = String(d.raw.direction).toLowerCase();
+                  if (dir.includes('in')) isInbound = true;
+                  else if (dir.includes('out')) isInbound = false;
+                // 5) name heuristics
+                } else if (d.agent && d.raw && (d.raw.fromName || d.raw.toName) && d.agent.name) {
+                  const an = String(d.agent.name).toLowerCase();
+                  if (d.raw.fromName && String(d.raw.fromName).toLowerCase().includes(an)) isInbound = false;
+                  else if (d.raw.toName && String(d.raw.toName).toLowerCase().includes(an)) isInbound = true;
+                }
+
+                // Prepare left/right display based on detected direction
+                // inbound: customer(from) -> agent(to)
+                // outbound: agent(from) -> customer(to)
+                const fromTimeDefault = formatDateTimeShort(d.raw?.fromAt || d.callLog?.callDate || d.callDate);
+                const toTimeDefault = formatDateTimeShort(d.raw?.toAt || d.callLog?.callDate || d.callDate);
+
+                let leftTitle, leftSub, leftTime, rightTitle, rightSub, rightTime;
+
+                if (isInbound) {
+                  // customer (from) -> agent (to)
+                  leftTitle = d.raw?.fromName || d.callLog?.contact || 'Caller';
+                  leftSub = d.raw?.fromNumber || d.callLog?.contact || '';
+                  leftTime = fromTimeDefault;
+
+                  rightTitle = d.agent?.name || d.raw?.toName || d.callLog?.virtualNumber || 'Agent';
+                  rightSub = d.raw?.toNumber || d.callLog?.virtualNumber || d.virtualNumber || '';
+                  rightTime = toTimeDefault;
+                } else {
+                  // agent (from) -> customer (to)
+                  leftTitle = d.agent?.name || d.raw?.fromName || d.callLog?.virtualNumber || 'Agent';
+                  leftSub = d.raw?.fromNumber || d.callLog?.virtualNumber || d.callLog?.contact || '';
+                  leftTime = fromTimeDefault;
+
+                  rightTitle = d.raw?.toName || d.callLog?.contact || d.raw?.toNumber || 'Customer';
+                  rightSub = d.raw?.toNumber || d.callLog?.contact || '';
+                  rightTime = toTimeDefault;
+                }
+
+                // Edge case: if both sides resolve to the same agent name (transfer/internal), prefer showing the actual customer where possible
+                if (d.agent && String(leftTitle).toLowerCase() === String(rightTitle).toLowerCase()) {
+                  if (d.callLog?.contact) {
+                    if (!isInbound) {
+                      rightTitle = d.callLog.contact;
+                      rightSub = d.raw?.toNumber || d.callLog.contact || rightSub;
+                    } else {
+                      leftTitle = d.callLog.contact;
+                      leftSub = d.raw?.fromNumber || d.callLog.contact || leftSub;
+                    }
+                  }
+                }
                 return (
                   <React.Fragment key={d._id}>
                     <CTableRow onClick={() => toggleRow(d._id)} style={{ cursor: 'pointer', backgroundColor: expandedRows.has(d._id) ? '#f8f9fa' : 'transparent' }} role="button" tabIndex={0} className="cdr-row">
@@ -351,6 +425,9 @@ const CallLogsLegacy = () => {
                       </CTableDataCell>
                       <CTableDataCell className="align-middle">{dateOnly}</CTableDataCell>
                       <CTableDataCell className="align-middle">{timeOnly}</CTableDataCell>
+                      <CTableDataCell className="align-middle" style={{ width: '12%' }}>
+                        <CBadge color={isInbound ? 'info' : 'warning'}>{isInbound ? 'Inbound' : 'Outbound'}</CBadge>
+                      </CTableDataCell>
                       <CTableDataCell className="align-middle">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div>{resultText}</div>
@@ -385,21 +462,35 @@ const CallLogsLegacy = () => {
                             <div className="cdr-callflow">
                               <div className="flow-step">
                                 <div className="flow-icon caller"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#fff"/></svg></div>
-                                <div className="flow-meta"><div className="flow-title">{d.raw?.fromName || d.agent?.name || 'Caller'}</div><div className="flow-sub">{d.raw?.fromNumber || d.callLog?.contact || ''}</div><div className="flow-time">{formatDateTimeShort(d.raw?.fromAt || d.callLog?.callDate || d.callDate)}</div></div>
+                                <div className="flow-meta"><div className="flow-title">{leftTitle}</div><div className="flow-sub">{leftSub}</div><div className="flow-time">{leftTime}</div></div>
                               </div>
 
-                              <div className="flow-connector"><span className="line"/><span className="arrow"/></div>
-
-                              <div className="flow-step center-step">
-                                <div className="flow-icon mid"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#12323B"/><path d="M8 11h8v2H8z" fill="#fff"/></svg></div>
-                                <div className="flow-meta"><div className="flow-title">Dial-1</div><div className="flow-sub">{d.raw?.dial1Number || d.raw?.via || ''}</div><div className="flow-time">{formatDateTimeShort(d.raw?.dial1At || d.callLog?.callDate || d.callDate)}</div></div>
+                              <div className="flow-connector" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                  <path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
                               </div>
 
-                              <div className="flow-connector"><span className="line"/><span className="arrow"/></div>
+                              <div className="flow-step center-step" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                  <div className="flow-icon mid" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 26, background: '#e9f6f0' }}>
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#13A37F"/><path d="M7.6 5.6c-.4-.4-1.04-.4-1.44 0L4.6 7.16c-.4.4-.4 1.04 0 1.44l1.9 1.9c.4.4 1.04.4 1.44 0l1.06-1.06c.4-.4.4-1.04 0-1.44L7.6 5.6z" fill="#fff"/></svg>
+                                  </div>
+                                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0b5240' }}>-Dailed</div>
+                                </div>
+                              </div>
+
+                              <div className="flow-connector" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                  <path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </div>
 
                               <div className="flow-step">
                                 <div className="flow-icon last"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M16.5 11c-.9 0-1.73.2-2.49.57-.21.11-.34.34-.34.58v3.08c0 .24.13.47.34.58C14.77 16.8 15.6 17 16.5 17c1.38 0 2.5-1.12 2.5-2.5S17.88 11 16.5 11z" fill="#fff"/></svg></div>
-                                <div className="flow-meta"><div className="flow-title">Dial-2</div><div className="flow-sub">{d.callLog?.virtualNumber || d.virtualNumber || ''}</div><div className="flow-time">{formatDateTimeShort(d.raw?.toAt || d.callLog?.callDate || d.callDate)}</div></div>
+                                <div className="flow-meta"><div className="flow-title">{rightTitle}</div><div className="flow-sub">{rightSub}</div><div className="flow-time">{rightTime}</div></div>
                               </div>
 
                             </div>
