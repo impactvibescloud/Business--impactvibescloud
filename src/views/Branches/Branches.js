@@ -37,6 +37,9 @@ import BlockIcon from '@mui/icons-material/Block'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
+import LockIcon from '@mui/icons-material/Lock'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import axios from 'axios'
 import { apiCall, getBaseURL } from '../../config/api'
 import Swal from 'sweetalert2'
@@ -53,6 +56,13 @@ const Branches = () => {
   const [itemsPerPage] = useState(10);
   const [openAddBranch, setOpenAddBranch] = useState(false);
   const [openEditBranch, setOpenEditBranch] = useState(false);
+  const [openChangePassword, setOpenChangePassword] = useState(false);
+  const [selectedAgentForPassword, setSelectedAgentForPassword] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [agentPhone, setAgentPhone] = useState("");
   const [department, setDepartment] = useState("");
@@ -516,6 +526,109 @@ const Branches = () => {
     }
   };
 
+  const handleOpenChangePassword = (agent) => {
+    setSelectedAgentForPassword(agent);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setOpenChangePassword(true);
+  };
+
+  const handleCloseChangePassword = () => {
+    setOpenChangePassword(false);
+    setSelectedAgentForPassword(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleChangePassword = async () => {
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Validation Error',
+        text: 'Please enter both password fields.',
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Mismatch',
+        text: 'Passwords do not match. Please try again.',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Weak Password',
+        text: 'Password must be at least 6 characters long.',
+      });
+      return;
+    }
+
+    if (!selectedAgentForPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Agent not found.',
+      });
+      return;
+    }
+
+    // Get the user ID (branch-related user, not branch ID)
+    const userId = selectedAgentForPassword.user?._id || selectedAgentForPassword.manager?.userId;
+    if (!userId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'User ID not found for this agent.',
+      });
+      return;
+    }
+
+    setPasswordChangeLoading(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.put(
+        `${getBaseURL()}/api/business/agent/change-password`,
+        {
+          agentId: userId,
+          newPassword,
+          confirmPassword,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Password Changed',
+        text: `Password for agent "${selectedAgentForPassword.branchName}" has been changed successfully.`,
+      });
+      handleCloseChangePassword();
+    } catch (error) {
+      console.error('Error changing password:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error?.response?.data?.message || 'Failed to change password. Please try again.',
+      });
+    } finally {
+      setPasswordChangeLoading(false);
+    }
+  };
+
   // Bulk upload handlers
   const handleFileSelect = async (e) => {
     const file = e.target.files && e.target.files[0]
@@ -679,6 +792,7 @@ const Branches = () => {
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   size="small"
                   sx={{ minWidth: 200 }}
+                  autoComplete="off"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -753,6 +867,9 @@ const Branches = () => {
                             </Button>
                             <Button size="small" variant="outlined" color="info" onClick={(e) => { e.stopPropagation(); handleResetPassword(branch.manager?.email); }}>
                               Reset
+                            </Button>
+                            <Button size="small" variant="outlined" startIcon={<LockIcon />} onClick={(e) => { e.stopPropagation(); handleOpenChangePassword(branch); }} sx={{ mx: 1 }}>
+                              Change Password
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -983,6 +1100,92 @@ const Branches = () => {
           <DialogActions>
             <Button onClick={handleCloseEditBranch}>Cancel</Button>
             <Button variant="contained" onClick={handleUpdateBranch} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>Update Agent</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Change Password Dialog */}
+        <Dialog 
+          open={openChangePassword} 
+          onClose={handleCloseChangePassword} 
+          maxWidth="sm" 
+          fullWidth
+          disableEscapeKeyDown={false}
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LockIcon />
+            Change Agent Password
+          </DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gap: 2, pt: 2 }}>
+              {selectedAgentForPassword && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Changing password for: <strong>{selectedAgentForPassword.branchName}</strong> ({selectedAgentForPassword.manager?.email})
+                </Typography>
+              )}
+              <TextField
+                label="New Password"
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                fullWidth
+                placeholder="Enter new password (min 6 characters)"
+                autoFocus
+                autoComplete="new-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        edge="end"
+                        size="small"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                label="Confirm Password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                fullWidth
+                placeholder="Re-enter password to confirm"
+                autoComplete="new-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        edge="end"
+                        size="small"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                • Password must be at least 6 characters long<br />
+                • Use a mix of uppercase, lowercase, numbers, and symbols for security
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseChangePassword} disabled={passwordChangeLoading}>Cancel</Button>
+            <Button 
+              variant="contained" 
+              onClick={handleChangePassword}
+              disabled={passwordChangeLoading}
+              sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}
+            >
+              {passwordChangeLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+              {passwordChangeLoading ? 'Changing...' : 'Change Password'}
+            </Button>
           </DialogActions>
         </Dialog>
       </div>

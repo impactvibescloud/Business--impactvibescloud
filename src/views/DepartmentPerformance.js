@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiCall } from '../config/api';
 import DateRangeModal from '../components/DateRange/DateRangeModal'
 import CIcon from '@coreui/icons-react'
-import { cilCloudDownload, cilReload } from '@coreui/icons'
+import { cilCloudDownload, cilReload, cilExternalLink } from '@coreui/icons'
 import {
   CCard,
   CCardBody,
@@ -18,11 +19,23 @@ import {
 } from '@coreui/react';
 import './Reports/AgentPerformance.css'
 
-const StatTile = ({ title, value, note, icon }) => (
+const StatTile = ({ title, value, note, icon, onNavigate }) => (
   <div className="ap-stat-tile">
     <div className="ap-stat-header">
       <div className="ap-stat-title">{title}</div>
-      <div className="ap-stat-actions">{icon ? <CIcon icon={icon} /> : null}</div>
+      <div className="ap-stat-actions">
+        {onNavigate && (
+          <button 
+            className="ap-nav-btn" 
+            onClick={onNavigate} 
+            title={`View ${title}`}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#0b5a47' }}
+          >
+            <CIcon icon={cilExternalLink} size="lg" />
+          </button>
+        )}
+        {icon ? <CIcon icon={icon} /> : null}
+      </div>
     </div>
     <div className="ap-stat-body">
       <div className="ap-stat-value">{value}</div>
@@ -76,6 +89,7 @@ const CallVolumeChart = ({ data = [] }) => {
 }
 
 const DepartmentPerformance = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [availableDepartments, setAvailableDepartments] = useState([])
@@ -85,7 +99,7 @@ const DepartmentPerformance = () => {
   const [endDate, setEndDate] = useState('')
   const [isDownloading, setIsDownloading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [period, setPeriod] = useState('weekly');
+  const [period, setPeriod] = useState('alltime');
   const [user, setUser] = useState({});
   const token = localStorage.getItem('authToken');
 
@@ -103,28 +117,41 @@ const DepartmentPerformance = () => {
     setLoading(true);
     const fetchData = async () => {
       try {
-        const res = await apiCall(`/performance/departments?businessId=${user.businessId}&period=${period}`, 'GET');
+        // Build query parameters
+        let endpoint = `/performance/departments?businessId=${user.businessId}`;
+        
+        // Add date range if provided
+        if (startDate && endDate) {
+          endpoint += `&from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}`;
+        } else {
+          // Use period if no custom dates
+          endpoint += `&period=${period}`;
+        }
+        
+        console.log('Fetching department performance:', endpoint);
+        const res = await apiCall(endpoint, 'GET');
         const departments = Array.isArray(res) ? res : (res.data || res.departments || []);
         setData(departments);
-        // populate selector
-        const list = (departments || []).map(d => ({ id: d.departmentId || d._id || d.name, name: d.departmentName || d.name || d.departmentId }))
-        setAvailableDepartments(list)
+        
+        // Populate department selector
+        const list = (departments || []).map(d => ({ 
+          id: d.departmentId || d._id || d.name, 
+          name: d.departmentName || d.name || d.departmentId 
+        }));
+        setAvailableDepartments(list);
       } catch (err) {
+        console.error('Error fetching department performance:', err);
         setData([]);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [user?.businessId, period, token]);
+  }, [user?.businessId, period, startDate, endDate, token]);
 
   // charts removed to match AgentPerformance UI (stat tiles + small volume chart)
 
   const filtered = selectedDepartment ? data.filter(d => (d.departmentId || d._id || d.name) === selectedDepartment) : data
-  const totalHandled = filtered.reduce((s, d) => s + (d.handledCalls || 0), 0)
-  const totalLogged = filtered.reduce((s, d) => s + (d.loggedHours || 0), 0)
-  const avgLogged = filtered.length ? (totalLogged / filtered.length).toFixed(2) : 0
-  const presence = filtered.length ? ((filtered.reduce((s,d)=>s+(d.presencePercent||0),0))/filtered.length).toFixed(2) : '-'
 
   const downloadReport = async () => {
     if (isDownloading) return
@@ -133,8 +160,10 @@ const DepartmentPerformance = () => {
       // If no filtered rows are selected, fallback to full data set
       const rowsToExport = (filtered && filtered.length > 0) ? filtered : (data || [])
       console.debug('DepartmentPerformance: downloadReport rows', rowsToExport.length)
-      let csv = 'Department,Members,Handled Calls,Logged Hours,Presence%\n'
-      rowsToExport.forEach(r => { csv += `"${r.departmentName || r.name}","${r.membersCount||''}","${r.handledCalls||0}","${r.loggedHours||0}","${r.presencePercent||''}"\n` })
+      let csv = 'Department,Members,Handled Calls,Answered Calls,Missed Calls,Rejected Calls,Failed Calls,Transferred Calls,Avg AHT (sec),Avg ASA (sec),Total Talk Time (sec),Transfer Rate %,Occupancy %,Logged Hours,Presence %,Online Agents\n'
+      rowsToExport.forEach(r => { 
+        csv += `"${r.departmentName || r.name}","${r.membersCount||''}","${r.handledCalls||0}","${r.answeredCalls||0}","${r.missedCalls||0}","${r.rejectedCalls||0}","${r.failedCalls||0}","${r.transferredCalls||0}","${r.avgAHTSeconds||''}","${r.avgASASeconds||''}","${r.totalTalkSeconds||0}","${r.transferRatePercent||''}","${r.occupancyPercent||''}","${r.loggedHours||0}","${r.presencePercent||''}","${r.onlineAgentsCount||0}"\n` 
+      })
       // prepend BOM so Excel recognizes UTF-8
       const bom = '\uFEFF'
       const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
@@ -162,17 +191,38 @@ const DepartmentPerformance = () => {
   }
 
   const refreshData = async () => {
-    setIsRefreshing(true)
-    try { const res = await apiCall(`/performance/departments?businessId=${user.businessId}&period=${period}`); const departments = Array.isArray(res) ? res : (res.data || res.departments || []); setData(departments); } catch(e){}
-    setIsRefreshing(false)
-  }
+    setIsRefreshing(true);
+    try {
+      let endpoint = `/performance/departments?businessId=${user.businessId}`;
+      if (startDate && endDate) {
+        endpoint += `&from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}`;
+      } else {
+        endpoint += `&period=${period}`;
+      }
+      const res = await apiCall(endpoint, 'GET');
+      const departments = Array.isArray(res) ? res : (res.data || res.departments || []);
+      setData(departments);
+    } catch (e) {
+      console.error('Error refreshing data:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const stats = []
+  // Calculate aggregated metrics from filtered data
+  const totalHandledCalls = filtered.reduce((s, d) => s + (d.handledCalls || 0), 0)
+  const totalAnswered = filtered.reduce((s, d) => s + (d.answeredCalls || 0), 0)
+  const totalMissed = filtered.reduce((s, d) => s + (d.missedCalls || 0), 0)
+  const totalOnlineAgents = filtered.reduce((s, d) => s + (d.onlineAgentsCount || 0), 0)
+  const avgOccupancy = filtered.length ? (filtered.reduce((s, d) => s + (d.occupancyPercent || 0), 0) / filtered.length).toFixed(2) : 0
+  const answerRate = totalHandledCalls > 0 ? ((totalAnswered / totalHandledCalls) * 100).toFixed(2) : 0
+  
   // Compose stats similar to AgentPerformance layout
-  stats.push({ title: 'Total Handled Calls', value: totalHandled, note: 'For sample' })
-  stats.push({ title: 'Average Logged Hours', value: avgLogged, note: 'For sample' })
-  stats.push({ title: 'Presence %', value: presence, note: 'Average presence', isDonut: true, percent: parseFloat(presence) || 0 })
-  // call volume sample
+  stats.push({ title: 'Total Handled Calls', value: totalHandledCalls, note: `${totalAnswered} answered, ${totalMissed} missed`, onNavigate: () => navigate('/callogs') })
+  stats.push({ title: 'Answer Rate', value: `${answerRate}%`, note: 'Answered / Handled' })
+  stats.push({ title: 'Avg Occupancy %', value: avgOccupancy, note: 'Average across departments', isDonut: true, percent: parseFloat(avgOccupancy) || 0 })
+  // Call volume by department
   const sampleVol = (filtered || []).slice(0, 11).map(d => d.handledCalls || 0)
   while (sampleVol.length < 11) sampleVol.push(0)
   stats.push({ title: 'Call Volume', volumeSample: sampleVol, note: '' })
@@ -182,7 +232,24 @@ const DepartmentPerformance = () => {
       <div className="ap-header">
         <h3>Department Performance</h3>
         <div className="ap-header-controls">
-          <button className="ap-date-btn" onClick={() => setShowDateModal(true)}>{startDate && endDate ? `${startDate} - ${endDate}` : 'Select date range'}</button>
+          <CFormSelect 
+            className="ap-agent-select" 
+            value={period} 
+            onChange={(e) => { setPeriod(e.target.value); setStartDate(''); setEndDate(''); }}
+            title="Select time period"
+          >
+            <option value="alltime">All Time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="last1hour">Last 1 Hour</option>
+            <option value="last24hours">Last 24 Hours</option>
+            <option value="last7days">Last 7 Days</option>
+            <option value="last30days">Last 30 Days</option>
+            <option value="thisweek">This Week</option>
+            <option value="thismonth">This Month</option>
+            <option value="lastmonth">Last Month</option>
+          </CFormSelect>
+          <button className="ap-date-btn" onClick={() => setShowDateModal(true)}>{startDate && endDate ? `${startDate} - ${endDate}` : 'Custom Dates'}</button>
           <CFormSelect className="ap-agent-select" value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)}>
             <option value="">All departments</option>
             {availableDepartments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -192,7 +259,12 @@ const DepartmentPerformance = () => {
         </div>
       </div>
 
-      <DateRangeModal visible={showDateModal} onClose={() => setShowDateModal(false)} initialFrom={startDate} initialTo={endDate} onApply={({ from, to }) => { setStartDate(from); setEndDate(to); /* API not supporting custom dates here; could be used in future */ }} />
+      <DateRangeModal visible={showDateModal} onClose={() => setShowDateModal(false)} initialFrom={startDate} initialTo={endDate} onApply={({ from, to }) => { 
+        setStartDate(from); 
+        setEndDate(to);
+        setShowDateModal(false);
+        // Data will refresh automatically due to dependency array
+      }} />
 
       <div className="ap-stats-grid">
         {loading ? (
@@ -219,7 +291,7 @@ const DepartmentPerformance = () => {
                 </div>
               )
             }
-            return <StatTile key={i} title={s.title} value={s.value} note={s.note} />
+            return <StatTile key={i} title={s.title} value={s.value} note={s.note} onNavigate={s.onNavigate} />
           })
         )}
       </div>
@@ -232,18 +304,30 @@ const DepartmentPerformance = () => {
                 <CTableHeaderCell>Department Name</CTableHeaderCell>
                 <CTableHeaderCell>Members</CTableHeaderCell>
                 <CTableHeaderCell>Handled Calls</CTableHeaderCell>
-                <CTableHeaderCell>Logged Hours</CTableHeaderCell>
+                <CTableHeaderCell>Answered</CTableHeaderCell>
+                <CTableHeaderCell>Missed</CTableHeaderCell>
+                <CTableHeaderCell>Avg AHT (sec)</CTableHeaderCell>
+                <CTableHeaderCell>Avg ASA (sec)</CTableHeaderCell>
+                <CTableHeaderCell>Total Talk (sec)</CTableHeaderCell>
+                <CTableHeaderCell>Occupancy %</CTableHeaderCell>
                 <CTableHeaderCell>Presence %</CTableHeaderCell>
+                <CTableHeaderCell>Online</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
             <CTableBody>
               {filtered.map((dept) => (
                 <CTableRow key={dept.departmentId || dept._id || dept.departmentName}>
-                  <CTableDataCell>{dept.departmentName}</CTableDataCell>
+                  <CTableDataCell><strong>{dept.departmentName}</strong></CTableDataCell>
                   <CTableDataCell>{dept.membersCount ?? '-'}</CTableDataCell>
                   <CTableDataCell>{dept.handledCalls ?? 0}</CTableDataCell>
-                  <CTableDataCell>{dept.loggedHours ?? 0}</CTableDataCell>
-                  <CTableDataCell>{dept.presencePercent ?? '-'}</CTableDataCell>
+                  <CTableDataCell>{dept.answeredCalls ?? 0}</CTableDataCell>
+                  <CTableDataCell>{dept.missedCalls ?? 0}</CTableDataCell>
+                  <CTableDataCell>{dept.avgAHTSeconds ? dept.avgAHTSeconds.toFixed(2) : '-'}</CTableDataCell>
+                  <CTableDataCell>{dept.avgASASeconds ? dept.avgASASeconds.toFixed(2) : '-'}</CTableDataCell>
+                  <CTableDataCell>{dept.totalTalkSeconds ?? 0}</CTableDataCell>
+                  <CTableDataCell>{dept.occupancyPercent ? dept.occupancyPercent.toFixed(2) : '-'}%</CTableDataCell>
+                  <CTableDataCell>{dept.presencePercent ? dept.presencePercent.toFixed(2) : '-'}%</CTableDataCell>
+                  <CTableDataCell>{dept.onlineAgentsCount ?? 0}</CTableDataCell>
                 </CTableRow>
               ))}
             </CTableBody>

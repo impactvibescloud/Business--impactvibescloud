@@ -182,7 +182,8 @@ const CallLogs = () => {
 
   // Build endpoint helper with applied filters
   const buildLogsEndpoint = (page = 1, limit = pageSize) => {
-    let endpoint = `/call-logs/business/${businessId}?page=${page}&limit=${limit}`
+    // Use the public call-logs endpoint with businessId as query param (matches backend curl)
+    let endpoint = `/call-logs?businessId=${encodeURIComponent(businessId)}&page=${page}&limit=${limit}`
     if (searchTerm) endpoint += `&search=${encodeURIComponent(searchTerm)}`
     // Send unambiguous ISO timestamps to the backend to avoid UTC/local-date mixups.
     if (dateFrom) {
@@ -340,49 +341,59 @@ const CallLogs = () => {
   }, [autoRefresh])
 
   // Fetch available audio recordings once businessId is known
+  // Helper to construct a recording access/download URL.
+  // Accepts absolute URLs, server paths or plain filenames and returns
+  // a usable URL that points to the unified call-logs download endpoint.
+  const buildRecordingApiUrl = (input) => {
+    if (!input) return null
+    try {
+      const u = new URL(String(input))
+      return u.href
+    } catch (e) {
+      // Not an absolute URL; extract filename if a path was provided
+      let fname = String(input || '')
+      if (fname.includes('/')) fname = fname.split('/').pop()
+      if (!fname) return null
+      // Use the call-logs download route (server should expose this)
+      return `${getBaseURL()}/api/call-logs/download/${encodeURIComponent(fname)}`
+    }
+  }
+
   const fetchAudioFiles = async () => {
-    if (!businessId) return;
+    // Populate available audio filenames by querying call-logs (single API)
     setAudioLoading(true)
     setAudioError(null)
     try {
-      // Try several possible endpoints/response shapes to be tolerant of backend differences
-      const tryEndpoints = [
-        `/v1/audio-recordings`,
-        `/audio-recordings`,
-        `/audio-recordings/business/${businessId}`,
-        `/v1/audio-recordings/business/${businessId}`,
-      ];
-      let files = []
-      for (let ep of tryEndpoints) {
-        try {
-          const r = await apiCall(ep, 'GET')
-          // possible shapes: array of filenames, { files: [...] }, { data: [...] }, { recordings: [...] }
-          if (Array.isArray(r)) {
-            files = r
-          } else if (Array.isArray(r?.files)) {
-            files = r.files
-          } else if (Array.isArray(r?.data)) {
-            files = r.data
-          } else if (Array.isArray(r?.recordings)) {
-            files = r.recordings
-          }
-          if (files && files.length > 0) break
-        } catch (e) {
-          // try next endpoint
-          console.debug('audio recordings endpoint failed', ep, e.message)
-        }
+      if (!businessId) {
+        setAudioFiles([])
+        return
       }
+      const endpoint = `/call-logs?businessId=${encodeURIComponent(businessId)}&page=1&limit=1000`
+      const r = await apiCall(endpoint, 'GET')
+      let logs = []
+      if (Array.isArray(r)) logs = r
+      else if (Array.isArray(r?.data)) logs = r.data
+      else if (Array.isArray(r?.callLogs)) logs = r.callLogs
+      else logs = []
 
-      // Normalize entries to simple filename strings when objects are returned
-      const normalized = (files || []).map(f => {
-        if (!f) return ''
-        if (typeof f === 'string') return f
-        if (typeof f === 'object') return f.filename || f.fileName || f.name || f.key || JSON.stringify(f)
-        return String(f)
+      const files = (logs || []).map(l => {
+        if (!l) return null
+        if (l.recording) return l.recording
+        if (l.callRecording) return l.callRecording
+        if (l.recordingMeta && (l.recordingMeta.filename || l.recordingMeta.fileName)) return l.recordingMeta.filename || l.recordingMeta.fileName
+        if (l.recordingMeta && l.recordingMeta.path) {
+          const p = String(l.recordingMeta.path)
+          if (p.includes('/')) return p.split('/').pop()
+          return p
+        }
+        return null
       }).filter(Boolean)
-      setAudioFiles(normalized)
+
+      // Deduplicate
+      const uniq = Array.from(new Set(files))
+      setAudioFiles(uniq)
     } catch (err) {
-      console.error('Failed to fetch audio recordings', err)
+      console.error('Failed to fetch audio recordings from call-logs', err)
       setAudioError('Failed to load audio recordings')
       setAudioFiles([])
     } finally {
@@ -762,9 +773,8 @@ const CallLogs = () => {
         const u = new URL(recordingUrl)
         fetchUrl = u.href
       } catch (e) {
-        if (!recordingUrl.startsWith('/')) {
-          fetchUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(recordingUrl)}`
-        }
+        // Prefer the unified call-logs download URL for non-absolute inputs
+        fetchUrl = buildRecordingApiUrl(recordingUrl)
       }
 
       // Try direct fetch first; if it fails (CORS/auth), fallback to axios via apiCall
@@ -973,7 +983,7 @@ const CallLogs = () => {
         }
 
         const token = localStorage.getItem('authToken') || ''
-        const downloadUrl = `${getBaseURL()}/api/v1/audio-recordings/download/${encodeURIComponent(filename)}`
+        const downloadUrl = buildRecordingApiUrl(filename)
 
         const resp = await fetch(downloadUrl, {
           method: 'GET',
@@ -1514,7 +1524,7 @@ const CallLogs = () => {
                           <div style={{display:'flex',gap:6}}>
                             {(() => {
                               const rowKey = log._id || callId || index
-                              const rowUrl = recording || (matchedFiles && matchedFiles[0] ? `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(matchedFiles[0])}` : null)
+                              const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
                               const isPlayingRow = playingId === String(rowKey)
                               return (
                                 <button
@@ -1543,7 +1553,7 @@ const CallLogs = () => {
 
                             {(() => {
                               const fname = recording && String(recording).split('/').pop() || (matchedFiles && matchedFiles[0])
-                              const rowUrl = recording || (matchedFiles && matchedFiles[0] ? `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(matchedFiles[0])}` : null)
+                              const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
                               const downloadKey = fname || rowUrl
                               const isDownloading = Boolean(downloadLoadingMap && downloadKey && downloadLoadingMap[String(downloadKey)])
                               return (
@@ -1842,7 +1852,7 @@ const CallLogs = () => {
                           <p className="mb-2">Available recordings:</p>
                           <div className="d-flex flex-column gap-2">
                             {strictMatches.map((fname, i) => {
-                              const fileUrl = `${getBaseURL()}/api/v1/audio-recordings/${encodeURIComponent(fname)}`;
+                              const fileUrl = buildRecordingApiUrl(fname);
                               return (
                                 <div key={i} className="d-flex align-items-center gap-2 p-2 border rounded">
                                   <span className="flex-grow-1 text-truncate" title={fname}>{fname}</span>

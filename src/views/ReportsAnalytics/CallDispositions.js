@@ -21,7 +21,7 @@ import {
   CFormCheck,
   CFormSelect,
 } from '@coreui/react'
-import { apiCall } from '../../config/api'
+import { apiCall, getBaseURL } from '../../config/api'
 import '../Branches/Branches.css'
 import './CallDispositions.css'
 
@@ -41,6 +41,9 @@ const CallLogsLegacy = () => {
   const [selectedItem, setSelectedItem] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [openMoreInfo, setOpenMoreInfo] = useState(new Set())
+
+  // Recording blob URLs cache
+  const recordingBlobCache = React.useRef({})
 
   // Filter inputs (UI only for now)
   const [fromNumber, setFromNumber] = useState('')
@@ -221,6 +224,198 @@ const CallLogsLegacy = () => {
 
   const openDetails = (item) => { setSelectedItem(item); setDetailsOpen(true) }
   const closeDetails = () => { setSelectedItem(null); setDetailsOpen(false) }
+
+  // Handle download recording
+  const handleDownloadRecording = async (record) => {
+    const filename = getRecordingFilename(record)
+    if (!filename) {
+      alert('Recording not available')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('authToken')
+      const apiUrl = `${getBaseURL()}/api/call-logs/download/${filename}`
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
+
+      if (!response.ok) {
+        alert('Failed to download recording')
+        return
+      }
+
+      const blob = await response.blob()
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error downloading recording:', error)
+      alert('Error downloading recording')
+    }
+  }
+
+  // Helper to fetch recording blob with authentication
+  const getRecordingBlobUrl = async (filename) => {
+    if (!filename) {
+      console.warn('No filename provided')
+      return null
+    }
+    
+    // Check cache first
+    if (recordingBlobCache.current[filename]) {
+      console.log('Using cached blob URL for:', filename)
+      return recordingBlobCache.current[filename]
+    }
+
+    try {
+      const token = localStorage.getItem('authToken')
+      const baseUrl = getBaseURL()
+      // Construct the download URL - filename should contain the full filename from API
+      const apiUrl = `${baseUrl}/api/call-logs/download/${encodeURIComponent(filename)}`
+      
+      console.log('Fetching recording:', { filename, apiUrl, token: token ? 'present' : 'missing' })
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
+
+      console.log('Recording fetch response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        console.error(`Failed to fetch recording: ${response.status} ${response.statusText}`)
+        return null
+      }
+
+      const blob = await response.blob()
+      console.log('Recording blob received, size:', blob.size)
+      
+      const blobUrl = URL.createObjectURL(blob)
+      
+      // Cache the blob URL
+      recordingBlobCache.current[filename] = blobUrl
+      
+      return blobUrl
+    } catch (error) {
+      console.error('Error fetching recording blob:', error.message, error)
+      return null
+    }
+  }
+
+  // Recording Player Component
+  const RecordingPlayer = ({ recordingFilename, onDownload }) => {
+    const [blobUrl, setBlobUrl] = React.useState(null)
+    const [playing, setPlaying] = React.useState(false)
+    const audioRef = React.useRef(null)
+
+    React.useEffect(() => {
+      if (!recordingFilename) return
+
+      const loadRecording = async () => {
+        const url = await getRecordingBlobUrl(recordingFilename)
+        setBlobUrl(url)
+      }
+
+      loadRecording()
+    }, [recordingFilename])
+
+    if (!recordingFilename || !blobUrl) {
+      return <span className="text-muted">No recording</span>
+    }
+
+    return (
+      <div className="audio-player d-flex align-items-center gap-2">
+        <audio
+          ref={audioRef}
+          src={blobUrl}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+          onError={(e) => {
+            console.error('Audio playback error:', e)
+            alert('Error playing recording')
+          }}
+          controls
+          style={{ maxWidth: '260px' }}
+        />
+        <button
+          className="btn btn-sm btn-outline-primary"
+          onClick={onDownload}
+          title="Download recording"
+        >
+          ⬇️
+        </button>
+      </div>
+    )
+  }
+
+  // Helper to get the filename from a call record
+  const getRecordingFilename = (record) => {
+    // New structure: recording field or recordingMeta.filename
+    if (record?.recording) return record.recording
+    if (record?.recordingMeta?.filename) return record.recordingMeta.filename
+    // Legacy structure: callRecording field
+    if (record?.callRecording) return record.callRecording
+    return null
+  }
+
+  const exportAllCDR = async () => {
+    if (!records || records.length === 0) {
+      alert('No records to export')
+      return
+    }
+    setExporting(true)
+    try {
+      const csvHeader = 'S.NO,Contact,Virtual Number,Date,Time,Duration,Agent,Status,Notes,Call Type,Recording\n'
+      const csvRows = records.map((record, idx) => {
+        const callDate = record.callLog?.callDate || record.callDate || ''
+        const dt = callDate ? new Date(callDate) : null
+        const dateOnly = dt ? dt.toLocaleDateString() : '-'
+        const timeOnly = dt ? dt.toLocaleTimeString() : '-'
+        const recording = getRecordingFilename(record) || 'N/A'
+        return [
+          idx + 1,
+          record.callLog?.contact || record.contact || '',
+          record.callLog?.virtualNumber || record.virtualNumber || '',
+          dateOnly,
+          timeOnly,
+          record.callLog?.duration || record.duration || '0',
+          record.agent?.name || record.agent?.email || '',
+          record.callLog?.status || record.status || '',
+          record.note || '',
+          record.callType || 'unknown',
+          recording
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+      }).join('\n')
+      const csv = csvHeader + csvRows
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `CDR_Export_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error('Error exporting CDR:', error)
+      alert('Error exporting CDR data')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const resetFilters = () => {
     setFromNumber(''); setToNumber(''); setAgentFilter(''); setStartDateFilter(''); setEndDateFilter(''); fetchRecords(1)
@@ -444,11 +639,7 @@ const CallLogsLegacy = () => {
                               <div className="me-4"><div className="text-muted small">Region</div><div>{d.region || '-'}</div></div>
                               <div className="me-4"><div className="text-muted small">Duration</div><div>{d.callLog?.duration ? `${d.callLog.duration}s` : '—'}</div></div>
                               <div style={{ marginLeft: 'auto' }}>
-                                { (d.callRecording || d.callLog?.recordingUrl) ? (
-                                  <div className="audio-player"><audio controls src={d.callLog?.recordingUrl || d.callRecording || ''} />
-                                  <a className="ms-3" href={d.callLog?.recordingUrl || d.callRecording || '#'} download onClick={(e)=>{if(!(d.callLog?.recordingUrl||d.callRecording))e.preventDefault();}} title="Download recording">⬇️</a>
-                                  </div>
-                                ) : null }
+                                <RecordingPlayer recordingFilename={getRecordingFilename(d)} onDownload={() => handleDownloadRecording(d)} />
                               </div>
                             </div>
 

@@ -111,98 +111,216 @@ const CallMonitor = () => {
   }
 
   const extractExtension = (call) => {
+    if (!call) return null
+
+    // Strategy 1: Try assignedAgent object
     const assigned = call?.assignedAgent || call?.agent
     if (assigned) {
       if (typeof assigned === 'object') {
-        if (assigned.extension) return String(assigned.extension)
-        if (assigned.ext) return String(assigned.ext)
-        if (assigned.sipExtension) return String(assigned.sipExtension)
-      } else if (typeof assigned === 'string' && /^\d+$/.test(assigned)) {
-        return assigned
+        if (assigned.extension) {
+          const ext = String(assigned.extension).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+        if (assigned.ext) {
+          const ext = String(assigned.ext).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+        if (assigned.sipExtension) {
+          const ext = String(assigned.sipExtension).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+        if (assigned.sip) {
+          const ext = String(assigned.sip).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+      } else if (typeof assigned === 'string') {
+        // extract digits if it's a string
+        const digits = assigned.replace(/\D/g, '')
+        if (digits && /^\d{3,}$/.test(digits)) return digits
       }
     }
 
+    // Strategy 2: Parse from channel (SIP channel usually has format like "SIP/1234-xyz")
     const channel = call?.channel || call?.legs?.[0]?.channel
     if (channel && typeof channel === 'string') {
-      const m = channel.match(/\/(\d+)(?:-|$)/)
+      const m = channel.match(/[/:@](\d{3,})(?:[/-]|$)/)
+      if (m && m[1]) {
+        const ext = String(m[1]).trim()
+        if (/^\d{3,}$/.test(ext)) return ext
+      }
+      // Try alternative pattern
+      const m2 = channel.match(/(\d{3,})/)
+      if (m2 && m2[1]) return m2[1]
+    }
+
+    // Strategy 3: Try other agent-related fields
+    if (call?.agentExtension) {
+      const ext = String(call.agentExtension).trim()
+      if (/^\d{3,}$/.test(ext)) return ext
+    }
+    if (call?.agentId && /^\d{3,}$/.test(String(call.agentId).trim())) {
+      return String(call.agentId).trim()
+    }
+
+    // Strategy 4: Extract from raw if available
+    if (call?.raw && typeof call.raw === 'string') {
+      const m = call.raw.match(/(\d{3,})/)
       if (m && m[1]) return m[1]
     }
 
-    if (call?.agent && typeof call.agent === 'string' && /\d+/.test(call.agent)) {
-      const m = call.agent.match(/(\d{3,})/)
-      if (m) return m[1]
-    }
-
+    console.warn('Could not extract extension from call:', call)
     return null
   }
 
-  const handleBargeClick = async (call) => {
+  // Helper to initiate monitor/whisper/barge with proper session listeners
+  const initiateCall = async (callType, call) => {
     const ext = extractExtension(call)
+    
+    console.log(`[${callType}] Attempting call:`, {
+      ext,
+      callData: {
+        assignedAgent: call?.assignedAgent,
+        agent: call?.agent,
+        channel: call?.channel,
+        raw: call?.raw?.slice(0, 100),
+      }
+    })
+
     if (!ext) {
-      alert('Could not determine extension to barge for this call.')
+      alert(`Could not determine extension to ${callType} for this call.\n\nDebug Info:\nAgent: ${call?.assignedAgent?.name || call?.agent || 'unknown'}\nNo valid extension found in call data.`)
       return
     }
+
+    // Validate extension format
+    if (!/^\d{3,}$/.test(ext)) {
+      alert(`Invalid extension format: "${ext}". Extension must be at least 3 digits.`)
+      return
+    }
+
     if (!ua) {
       alert('SIP UA not ready; please wait for registration.')
       return
     }
+
     const domain = (ua.configuration && ua.configuration.uri && ua.configuration.uri.host) || sipCfg.sip_domain || ''
-    const dial = `*92${ext}`
+    
+    // Build dial string based on callType
+    let dial = ''
+    if (callType === 'monitor') dial = `*90${ext}`
+    else if (callType === 'whisper') dial = `*91${ext}`
+    else if (callType === 'barge') dial = `*92${ext}`
+    else return
+
     const target = domain ? `sip:${dial}@${domain}` : `sip:${dial}`
+
     try {
-      const options = { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: sipCfg.iceServers } }
+      // Request microphone access BEFORE initiating call
+      let localStream = null
+      try {
+        console.log(`[${callType}] Requesting microphone access...`)
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false
+        })
+        console.log(`[${callType}] Microphone access granted, local stream:`, localStream)
+      } catch (micErr) {
+        console.warn(`[${callType}] Microphone access failed (this may prevent two-way audio):`, micErr)
+        alert(`Microphone access denied. ${callType} will be audio-out-only.\n\nPlease allow microphone access in browser settings.`)
+        // Continue anyway - at least they can listen
+      }
+
+      const options = {
+        mediaConstraints: { audio: true, video: false },
+        pcConfig: { 
+          iceServers: sipCfg.iceServers,
+          // Ensure ICE consent check is enabled
+          iceTransportPolicy: 'all',
+        },
+        // Pass local stream if available so it gets added to peer connection
+        ...(localStream && { mediaStream: localStream })
+      }
+      
+      console.log(`[${callType}] Initiating SIP call to: ${target}`)
+      
+      // Create session
       const session = ua.call(target, options)
-      setBargeSession(session)
-      setBargeCall(call)
-      session.on && session.on('ended', () => { setBargeSession(null); setBargeCall(null) })
-      session.on && session.on('failed', () => { setBargeSession(null); setBargeCall(null) })
+
+      // Helper to clean up session
+      const cleanup = () => {
+        // Stop local stream tracks
+        if (localStream) {
+          localStream.getTracks().forEach(track => {
+            try { track.stop() } catch (e) {}
+          })
+        }
+
+        if (callType === 'monitor') { setMonitorSession(null); setMonitorCall(null) }
+        else if (callType === 'whisper') { setWhisperSession(null); setWhisperCall(null) }
+        else if (callType === 'barge') { setBargeSession(null); setBargeCall(null) }
+      }
+
+      // Attach event listeners BEFORE storing in state to ensure they fire
+      // This prevents race conditions where the session might end before listeners attach
+      if (session && typeof session.on === 'function') {
+        session.on('progress', () => {
+          console.debug(`[${callType}] Call in progress to ${target}`)
+        })
+        session.on('confirmed', () => {
+          console.debug(`[${callType}] Call confirmed to ${target}`)
+          // Ensure local stream is added to peer connection if not already
+          if (localStream && session.connection) {
+            try {
+              localStream.getTracks().forEach(track => {
+                const senders = session.connection.getSenders ? session.connection.getSenders() : []
+                const hasTrack = senders.some(s => s.track === track)
+                if (!hasTrack) {
+                  console.log(`[${callType}] Adding local ${track.kind} track to peer connection`)
+                  session.connection.addTrack(track, localStream)
+                }
+              })
+            } catch (e) {
+              console.warn(`[${callType}] Error adding local stream to peer connection:`, e)
+            }
+          }
+        })
+        session.on('ended', () => {
+          console.debug(`[${callType}] Call ended`)
+          cleanup()
+        })
+        session.on('failed', (data) => {
+          const errorMsg = data?.cause || (data?.message && data.message.reason) || 'Unknown error'
+          console.error(`[${callType}] Call failed:`, { cause: errorMsg, data, dial, ext, target })
+          alert(`${callType.charAt(0).toUpperCase() + callType.slice(1)} failed (${errorMsg}).\n\nDial: ${dial}\nExt: ${ext}`)
+          cleanup()
+        })
+      }
+
+      // NOW store the session in state - listeners are already attached
+      if (callType === 'monitor') { setMonitorSession(session); setMonitorCall(call) }
+      else if (callType === 'whisper') { setWhisperSession(session); setWhisperCall(call) }
+      else if (callType === 'barge') { setBargeSession(session); setBargeCall(call) }
+
+      console.debug(`[${callType}] Session created`, { session, ext, target, localStream })
     } catch (err) {
-      console.error('Barge failed', err)
-      alert('Barge failed: ' + String(err))
+      console.error(`[${callType}] Failed:`, err)
+      alert(`${callType.charAt(0).toUpperCase() + callType.slice(1)} failed: ${String(err.message || err)}\n\nExt: ${ext}`)
     }
   }
 
-  const handleMonitorClick = async (call) => {
-    const ext = extractExtension(call)
-    if (!ext) {
-      alert('Could not determine extension to monitor for this call.')
-      return
-    }
-    if (!ua) { alert('SIP UA not ready; please wait for registration.'); return }
-    const domain = (ua.configuration && ua.configuration.uri && ua.configuration.uri.host) || sipCfg.sip_domain || ''
-    const dial = `*90${ext}`
-    const target = domain ? `sip:${dial}@${domain}` : `sip:${dial}`
-    try {
-      const options = { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: sipCfg.iceServers } }
-      const session = ua.call(target, options)
-      setMonitorSession(session)
-      setMonitorCall(call)
-      session.on && session.on('ended', () => { setMonitorSession(null); setMonitorCall(null) })
-      session.on && session.on('failed', () => { setMonitorSession(null); setMonitorCall(null) })
-    } catch (err) {
-      console.error('Monitor failed', err)
-      alert('Monitor failed: ' + String(err))
-    }
+  const handleBargeClick = (call) => {
+    initiateCall('barge', call)
   }
 
-  const handleWhisperClick = async (call) => {
-    const ext = extractExtension(call)
-    if (!ext) { alert('Could not determine extension to whisper for this call.'); return }
-    if (!ua) { alert('SIP UA not ready; please wait for registration.'); return }
-    const domain = (ua.configuration && ua.configuration.uri && ua.configuration.uri.host) || sipCfg.sip_domain || ''
-    const dial = `*91${ext}`
-    const target = domain ? `sip:${dial}@${domain}` : `sip:${dial}`
-    try {
-      const options = { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: sipCfg.iceServers } }
-      const session = ua.call(target, options)
-      setWhisperSession(session)
-      setWhisperCall(call)
-      session.on && session.on('ended', () => { setWhisperSession(null); setWhisperCall(null) })
-      session.on && session.on('failed', () => { setWhisperSession(null); setWhisperCall(null) })
-    } catch (err) {
-      console.error('Whisper failed', err)
-      alert('Whisper failed: ' + String(err))
-    }
+  const handleMonitorClick = (call) => {
+    initiateCall('monitor', call)
+  }
+
+  const handleWhisperClick = (call) => {
+    initiateCall('whisper', call)
   }
 
   // Heuristic to determine if a live call is inbound or outbound.
@@ -354,11 +472,19 @@ const CallMonitor = () => {
 
       {/* Monitor session audio playback */}
       {monitorSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)' }}>
+        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1110 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>Monitoring <strong>{monitorCall?.assignedAgent?.name || monitorCall?.assignedAgent?.email || monitorCall?.agent || 'agent'}</strong></div>
             <div>
-              <CButton size="sm" color="danger" onClick={() => { try { monitorSession.terminate(); } catch(e){} setMonitorSession(null); setMonitorCall(null); }}>Hangup</CButton>
+              <CButton size="sm" color="danger" onClick={() => { 
+                try { 
+                  if (monitorSession && typeof monitorSession.terminate === 'function') {
+                    monitorSession.terminate()
+                  }
+                } catch(e){ console.warn('Error terminating monitor session', e) }
+                setMonitorSession(null)
+                setMonitorCall(null)
+              }}>Hangup</CButton>
             </div>
           </div>
           <div style={{ marginTop: 8 }}>
@@ -373,7 +499,15 @@ const CallMonitor = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>Whispering to <strong>{whisperCall?.assignedAgent?.name || whisperCall?.assignedAgent?.email || whisperCall?.agent || 'agent'}</strong></div>
             <div>
-              <CButton size="sm" color="danger" onClick={() => { try { whisperSession.terminate(); } catch(e){} setWhisperSession(null); setWhisperCall(null); }}>Hangup</CButton>
+              <CButton size="sm" color="danger" onClick={() => { 
+                try { 
+                  if (whisperSession && typeof whisperSession.terminate === 'function') {
+                    whisperSession.terminate()
+                  }
+                } catch(e){ console.warn('Error terminating whisper session', e) }
+                setWhisperSession(null)
+                setWhisperCall(null)
+              }}>Hangup</CButton>
             </div>
           </div>
           <div style={{ marginTop: 8 }}>
@@ -388,7 +522,15 @@ const CallMonitor = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>Barging into <strong>{bargeCall?.assignedAgent?.name || bargeCall?.assignedAgent?.email || bargeCall?.agent || 'agent'}</strong></div>
             <div>
-              <CButton size="sm" color="danger" onClick={() => { try { bargeSession.terminate(); } catch(e){} setBargeSession(null); setBargeCall(null); }}>Hangup</CButton>
+              <CButton size="sm" color="danger" onClick={() => { 
+                try { 
+                  if (bargeSession && typeof bargeSession.terminate === 'function') {
+                    bargeSession.terminate()
+                  }
+                } catch(e){ console.warn('Error terminating barge session', e) }
+                setBargeSession(null)
+                setBargeCall(null)
+              }}>Hangup</CButton>
             </div>
           </div>
           <div style={{ marginTop: 8 }}>
