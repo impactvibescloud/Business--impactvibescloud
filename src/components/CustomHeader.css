@@ -24,19 +24,44 @@
 .jc-left { display:flex; align-items:center; gap:12px; height:48px }
 .jc-title { font-size:0.95rem; font-weight:600; color:#0f1724 }
 
-.jc-icon-btn { background:transparent; border:none; padding:6px; cursor:pointer; border-radius:6px; display:inline-flex; align-items:center; justify-content:center }
-.jc-icon-btn:hover { background: rgba(15,23,42,0.04) }
+.jc-icon-btn { 
+  background: #3b82f6; 
+  border: 1px solid rgba(15,23,42,0.1); 
+  padding: 8px; 
+  cursor: pointer; 
+  border-radius: 8px; 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #ffffff;
+}
+.jc-icon-btn:hover { 
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+}
+
+.jc-left .jc-icon-btn {
+  background: #f3f4f6;
+  color: #0f1724;
+  border: 1px solid rgba(15,23,42,0.08);
+}
+.jc-left .jc-icon-btn:hover {
+  background: #e5e7eb;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
 
 .jc-actions { display:flex; align-items:center; gap:10px; height:48px }
+.jc-divider { width:2px; height:24px; background:rgba(15,23,42,0.25) }
 .jc-pill { background:#fff; border:1px solid #e6e6e6; padding:6px 10px; border-radius:18px; font-size:0.9rem; cursor:pointer }
 .jc-pill-icon { display:flex; gap:8px; align-items:center }
-.jc-icon-btn { background:transparent; border:none; padding:6px; cursor:pointer; border-radius:6px }
 .jc-avatar { width:28px; height:28px; border-radius:50%; background:linear-gradient(180deg,#e6eef9,#dfeefc); display:inline-flex; align-items:center; justify-content:center; font-weight:600; border:1px solid rgba(15,23,42,0.06) }
 
 .jc-user-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0;
+  gap: 8px;
   background: transparent;
   border: none;
   padding: 0;
@@ -59,7 +84,10 @@
 }
 
 .jc-user-chip:hover .jc-user-icon,
-.jc-user-chip:focus .jc-user-icon { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,0.08); }
+.jc-user-chip:focus .jc-user-icon { 
+  transform: scale(1.08); 
+  box-shadow: 0 0 0 2px #0f1724, 0 0 12px rgba(15, 23, 42, 0.16);
+}
 
 .jc-user-inner {
   width: 100%;
@@ -72,6 +100,30 @@
   color: #ffffff; /* white initial */
   font-weight: 700;
   font-size: 0.95rem;
+}
+
+.jc-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.jc-user-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f1724;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jc-user-email {
+  font-size: 0.8rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Dropdown menu */

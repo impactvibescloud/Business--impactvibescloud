@@ -1545,7 +1545,7 @@ const IVRManagement = () => {
           </DialogActions>
         </Dialog>
 
-        <Dialog open={detailsOpen} onClose={closeDetails} maxWidth="md" className="ivr-no-focus-modal">
+        <Dialog open={detailsOpen} onClose={closeDetails} maxWidth="md" className="ivr-no-focus-modal" PaperProps={{ sx: { width: '90%', maxWidth: '900px' } }}>
           <DialogTitle>IVR Details</DialogTitle>
           <DialogContent dividers>
             {!selectedItem ? (
@@ -1573,9 +1573,32 @@ const IVRManagement = () => {
                             {opts.map((o) => {
                               const dest = (o.destination || o.destinationType || o.target || '').toString()
                               let kind = 'default'
-                              if (dest.startsWith('dept:')) kind = 'dept'
-                              else if (dest.startsWith('node:')) kind = 'node'
-                              else if (dest.startsWith('agent:')) kind = 'agent'
+                              let displayLabel = ''
+                              if (dest.startsWith('dept:')) {
+                                kind = 'dept'
+                                const parts = dest.split(':')
+                                const deptName = parts[1] || ''
+                                const ext = parts[2] || ''
+                                const dept = departments.find(d => (d.slug && d.slug === deptName) || (d.name && d.name.toLowerCase() === deptName.toLowerCase()))
+                                displayLabel = dept ? (dept.name || dept.departmentName) : deptName
+                                if (ext) displayLabel += ` (${ext})`
+                              } else if (dest.startsWith('node:')) {
+                                kind = 'node'
+                                const parts = dest.split(':')
+                                displayLabel = parts[1] || 'Menu Node'
+                              } else if (dest.startsWith('lang:')) {
+                                kind = 'default'
+                                const parts = dest.split(':')
+                                displayLabel = `Language: ${parts[1] || ''}`
+                              } else if (dest.startsWith('agent:')) {
+                                kind = 'agent'
+                                const parts = dest.split(':')
+                                const agentId = parts[1] || ''
+                                const agent = availableAgents.find(a => a.id === agentId)
+                                displayLabel = agent ? agent.name : agentId
+                              } else {
+                                displayLabel = dest || 'Unknown'
+                              }
                               const colorMap = {
                                 dept: { accent: '#fff7ed', border: '#f6ad55', badgeBg: '#fff2e8', badgeColor: '#7a4100' },
                                 node: { accent: '#eff6ff', border: '#60a5fa', badgeBg: '#eef6ff', badgeColor: '#0b4ea2' },
@@ -1589,7 +1612,7 @@ const IVRManagement = () => {
                                     <Box sx={{ background: styles.badgeBg, color: styles.badgeColor, px: 0.5, py: 0.25, fontSize: '0.85rem', borderRadius: 1, fontWeight: 600 }}>{o.key}</Box>
                                   </Box>
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography sx={{ fontWeight: 600, color: '#102a43' }}>{o.voice || o.text || '—'}</Typography>
+                                    <Typography sx={{ fontWeight: 600, color: '#102a43' }}>{displayLabel || '—'}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: 'break-word' }}>{dest || ''}</Typography>
                                   </Box>
                                 </Box>
@@ -1605,17 +1628,64 @@ const IVRManagement = () => {
                   <Paper variant="outlined" sx={{ p: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">Virtual Number</Typography>
                     <Typography sx={{ fontWeight: 600, mt: 0.5 }}>{selectedItem.did || selectedItem.virtualNumber || selectedItem.number || '-'}</Typography>
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="caption" color="text.secondary">Created By</Typography>
-                      <Typography>{selectedItem.createdBy?.email || selectedItem.createdBy?.name || '-'}</Typography>
-                    </Box>
+                    {(() => {
+                      const createdByValue = 
+                        selectedItem.createdBy?.email || 
+                        selectedItem.createdBy?.name || 
+                        selectedItem.raw?.createdBy?.email ||
+                        selectedItem.raw?.createdBy?.name ||
+                        selectedItem.raw?.createdByEmail ||
+                        selectedItem.raw?.createdByName ||
+                        selectedItem.raw?.createdBy
+                      if (createdByValue) {
+                        return (
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Created By</Typography>
+                            <Typography>{createdByValue}</Typography>
+                          </Box>
+                        )
+                      }
+                      return null
+                    })()}
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="caption" color="text.secondary">Created At</Typography>
                       <Typography>{formatDateTimeShort(selectedItem.createdAt || selectedItem.created)}</Typography>
                     </Box>
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="caption" color="text.secondary">Status</Typography>
-                      <Box sx={{ mt: 0.5 }}><CBadge color={selectedItem.active ? 'success' : 'secondary'}>{selectedItem.active ? 'Active' : 'Inactive'}</CBadge></Box>
+                      <Box sx={{ mt: 0.5 }}>
+                        <CBadge color={
+                          selectedItem.active === true || 
+                          selectedItem.active === 'true' || 
+                          selectedItem.active === 1 ||
+                          selectedItem.raw?.active === true ||
+                          selectedItem.raw?.active === 'true' ||
+                          selectedItem.raw?.active === 1 ||
+                          selectedItem.status === 'active' ||
+                          selectedItem.status === 'on' ||
+                          selectedItem.raw?.status === 'active' ||
+                          selectedItem.raw?.status === 'on' ||
+                          selectedItem.raw?.ivrStatus === 'active' ||
+                          selectedItem.raw?.state === 'active'
+                          ? 'success' : 'secondary'
+                        }>
+                          {
+                            selectedItem.active === true || 
+                            selectedItem.active === 'true' || 
+                            selectedItem.active === 1 ||
+                            selectedItem.raw?.active === true ||
+                            selectedItem.raw?.active === 'true' ||
+                            selectedItem.raw?.active === 1 ||
+                            selectedItem.status === 'active' ||
+                            selectedItem.status === 'on' ||
+                            selectedItem.raw?.status === 'active' ||
+                            selectedItem.raw?.status === 'on' ||
+                            selectedItem.raw?.ivrStatus === 'active' ||
+                            selectedItem.raw?.state === 'active'
+                            ? 'Active' : 'Inactive'
+                          }
+                        </CBadge>
+                      </Box>
                     </Box>
                   </Paper>
                 </Grid>

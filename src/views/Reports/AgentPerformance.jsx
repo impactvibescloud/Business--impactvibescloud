@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import './AgentPerformance.css'
+import './PerformanceDashboard.css'
 import CIcon from '@coreui/icons-react'
-import { cilCalendar, cilFilter, cilCloudDownload, cilReload, cilOptions, cilPhone, cilCheckCircle, cilClock, cilExternalLink } from '@coreui/icons'
+import { cilCloudDownload, cilReload, cilPhone, cilCheckCircle, cilClock, cilExternalLink } from '@coreui/icons'
 import { apiCall } from '../../config/api'
-import DateRangeModal from '../../components/DateRange/DateRangeModal'
-import { CModalHeader, CModalTitle, CModalBody, CModalFooter, CButton, CFormSelect } from '@coreui/react'
+import DateTimeFilterModal from '../../components/DateRange/DateTimeFilterModal'
+import { CFormSelect } from '@coreui/react'
 
 const StatTile = ({ title, value, note, icon, onNavigate }) => (
   <div className="ap-stat-tile">
@@ -39,7 +39,9 @@ const AgentPerformance = () => {
   const [missedPercent, setMissedPercent] = useState(0)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [showDateModal, setShowDateModal] = useState(false)
+  const [startTime, setStartTime] = useState('00:00')
+  const [endTime, setEndTime] = useState('23:59')
+  const [showDateTimeModal, setShowDateTimeModal] = useState(false)
   const [availableAgents, setAvailableAgents] = useState([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [isDownloading, setIsDownloading] = useState(false)
@@ -206,7 +208,9 @@ const AgentPerformance = () => {
     if (h == null || h === '') return '-'
     const n = Number(h)
     if (!Number.isFinite(n)) return '-'
-    return `${n.toFixed(2)} h`
+    const hours = Math.floor(n)
+    const minutes = Math.round((n - hours) * 60)
+    return `${hours}h ${minutes}m`
   }
 
   const formatDate = (iso) => {
@@ -235,7 +239,7 @@ const AgentPerformance = () => {
     return { type: String(val).slice(0, i), id: String(val).slice(i + 1) }
   }
 
-  const fetchAgentPerformance = async (p = period) => {
+  const fetchAgentPerformance = async (p = period, sDate = '', sTime = '', eDate = '', eTime = '') => {
     try {
       setPerfLoading(true)
       setPerfError(null)
@@ -256,8 +260,19 @@ const AgentPerformance = () => {
         return
       }
 
-      const per = normalizePeriod(p)
-      let endpoint = `/performance/agents?businessId=${encodeURIComponent(businessId)}&period=${encodeURIComponent(per)}`
+      let endpoint = `/performance/agents?businessId=${encodeURIComponent(businessId)}`
+      
+      // Use custom dates/times if provided, otherwise use period
+      if (sDate && eDate) {
+        endpoint += `&startDate=${encodeURIComponent(sDate)}`
+        endpoint += `&endDate=${encodeURIComponent(eDate)}`
+        if (sTime) endpoint += `&startTime=${encodeURIComponent(sTime)}`
+        if (eTime) endpoint += `&endTime=${encodeURIComponent(eTime)}`
+      } else {
+        const per = normalizePeriod(p)
+        endpoint += `&period=${encodeURIComponent(per)}`
+      }
+      
       // Use branchId or agent param depending on selected type
       if (selectedAgent) {
         const sel = parseSelected(selectedAgent)
@@ -265,8 +280,7 @@ const AgentPerformance = () => {
           if (sel.type === 'branch') endpoint += `&branchId=${encodeURIComponent(sel.id)}`
           else endpoint += `&agent=${encodeURIComponent(sel.id)}`
         }
-      }
-      const res = await apiCall(endpoint, 'GET')
+      }      const res = await apiCall(endpoint, 'GET')
 
       // Normalize response: support array responses, res.data arrays,
       // or single-object responses (wrap into an array)
@@ -341,7 +355,9 @@ const AgentPerformance = () => {
           if (h == null || h === '') return '-'
           const n = Number(h)
           if (!Number.isFinite(n)) return '-'
-          return `${n.toFixed(2)} h`
+          const hours = Math.floor(n)
+          const minutes = Math.round((n - hours) * 60)
+          return `${hours}h ${minutes}m`
         }
 
         const computed = [
@@ -491,7 +507,24 @@ const AgentPerformance = () => {
     <div className="ap-page">
       <div className="ap-header">
         <div className="ap-header-controls">
-          <button className="ap-date-btn" onClick={() => setShowDateModal(true)}><CIcon icon={cilCalendar} /> {startDate && endDate ? `${startDate} - ${endDate}` : 'Select date range'}</button>
+          <button
+            onClick={() => setShowDateTimeModal(true)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#fff',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#374151',
+              fontWeight: '500',
+              minWidth: '280px',
+              textAlign: 'left'
+            }}
+            title="Select date and time range"
+          >
+            {startDate && endDate ? `${startDate} ${startTime} → ${endDate} ${endTime}` : 'Select Date & Time'}
+          </button>
           <CFormSelect className="ap-period-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
             <option value="Today">Today</option>
             <option value="Weekly">Weekly</option>
@@ -568,7 +601,21 @@ const AgentPerformance = () => {
         </div>
       </div>
 
-      <DateRangeModal visible={showDateModal} onClose={() => setShowDateModal(false)} initialFrom={startDate} initialTo={endDate} onApply={({ from, to }) => { setStartDate(from); setEndDate(to); const sel = parseSelected(selectedAgent); const agentId = sel && sel.type === 'user' ? sel.id : ''; fetchStats(from, to, agentId); }} />
+      <DateTimeFilterModal
+        visible={showDateTimeModal}
+        onClose={() => setShowDateTimeModal(false)}
+        initialStartDate={startDate}
+        initialStartTime={startTime}
+        initialEndDate={endDate}
+        initialEndTime={endTime}
+        onApply={({ startDate: sd, startTime: st, endDate: ed, endTime: et }) => {
+          setStartDate(sd);
+          setStartTime(st);
+          setEndDate(ed);
+          setEndTime(et);
+          fetchAgentPerformance(period, sd, st, ed, et);
+        }}
+      />
 
       {/* Show stat cards and graphs when viewing all agents */}
       {!selectedAgent && perfLoading === false && (

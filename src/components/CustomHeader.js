@@ -5,11 +5,15 @@ import { isAutheticated, signout as doSignout } from 'src/auth'
 import { useNavigate, useLocation } from 'react-router-dom'
 import routes from 'src/routes'
 import { UserActivityStatus } from './index'
+import WebphoneDialerModal from './WebphoneDialerModal'
 import CIcon from '@coreui/icons-react'
-import { cilMenu } from '@coreui/icons'
+import { cilMenu, cilPhone } from '@coreui/icons'
 
 const CustomHeader = () => {
   const [initial, setInitial] = useState('U')
+  const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false)
   const token = isAutheticated()
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
@@ -66,6 +70,8 @@ const CustomHeader = () => {
         const u = res?.data?.user
         const name = u?.name || u?.fullName || u?.firstName || u?.email || ''
         if (name && name.length > 0) setInitial(name.trim().charAt(0).toUpperCase())
+        setUserName(u?.name || u?.fullName || u?.firstName || '')
+        setUserEmail(u?.email || '')
       } catch (err) {
         // ignore errors, keep default initial
       }
@@ -92,8 +98,9 @@ const CustomHeader = () => {
   }
 
   return (
-    <header className="jc-header" role="banner">
-      <div className="jc-header-inner">
+    <>
+      <header className="jc-header" role="banner">
+        <div className="jc-header-inner">
         <div className="jc-left">
           <button
             className="jc-icon-btn"
@@ -110,6 +117,15 @@ const CustomHeader = () => {
           </div>
         </div>
         <div className="jc-actions" style={{ position: 'relative' }}>
+          
+          <button 
+            className="jc-icon-btn" 
+            aria-label="Phone"
+            onClick={() => setPhoneModalVisible(true)}
+          >
+            <CIcon icon={cilPhone} />
+          </button>
+          <div className="jc-divider"></div>
           <div
             className="jc-user-chip"
             aria-haspopup="menu"
@@ -117,6 +133,10 @@ const CustomHeader = () => {
             onClick={() => setOpen((v) => !v)}
           >
             <div className="jc-user-icon"><span className="jc-user-inner">{initial}</span></div>
+            <div className="jc-user-info">
+              {userName && <div className="jc-user-name">{userName}</div>}
+              {userEmail && <div className="jc-user-email">{userEmail}</div>}
+            </div>
           </div>
 
           <div
@@ -131,6 +151,11 @@ const CustomHeader = () => {
         </div>
       </div>
     </header>
+      <WebphoneDialerModal 
+        visible={phoneModalVisible} 
+        onClose={() => setPhoneModalVisible(false)} 
+      />
+    </>
   )
 }
 

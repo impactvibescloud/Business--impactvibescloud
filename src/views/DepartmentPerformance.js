@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiCall } from '../config/api';
-import DateRangeModal from '../components/DateRange/DateRangeModal'
+import DateTimeFilterModal from '../components/DateRange/DateTimeFilterModal';
+
 import CIcon from '@coreui/icons-react'
 import { cilCloudDownload, cilReload, cilExternalLink } from '@coreui/icons'
 import {
@@ -17,7 +18,7 @@ import {
   CFormSelect,
   CButton,
 } from '@coreui/react';
-import './Reports/AgentPerformance.css'
+import './Reports/PerformanceDashboard.css'
 
 const StatTile = ({ title, value, note, icon, onNavigate }) => (
   <div className="ap-stat-tile">
@@ -94,9 +95,12 @@ const DepartmentPerformance = () => {
   const [loading, setLoading] = useState(true);
   const [availableDepartments, setAvailableDepartments] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('')
-  const [showDateModal, setShowDateModal] = useState(false)
+
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [startTime, setStartTime] = useState('00:00')
+  const [endTime, setEndTime] = useState('23:59')
+  const [showDateTimeModal, setShowDateTimeModal] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [period, setPeriod] = useState('alltime');
@@ -122,10 +126,15 @@ const DepartmentPerformance = () => {
         
         // Add date range if provided
         if (startDate && endDate) {
-          endpoint += `&from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}`;
+          // Build ISO timestamps with time components
+          const fromTs = `${startDate}T${startTime}:00`
+          const toTs = `${endDate}T${endTime}:00`
+          endpoint += `&from=${encodeURIComponent(fromTs)}&to=${encodeURIComponent(toTs)}`
+          console.log('Using custom date/time range:', { from: fromTs, to: toTs });
         } else {
           // Use period if no custom dates
           endpoint += `&period=${period}`;
+          console.log('Using period:', period);
         }
         
         console.log('Fetching department performance:', endpoint);
@@ -147,7 +156,7 @@ const DepartmentPerformance = () => {
       }
     };
     fetchData();
-  }, [user?.businessId, period, startDate, endDate, token]);
+  }, [user?.businessId, period, startDate, endDate, startTime, endTime, token]);
 
   // charts removed to match AgentPerformance UI (stat tiles + small volume chart)
 
@@ -195,7 +204,9 @@ const DepartmentPerformance = () => {
     try {
       let endpoint = `/performance/departments?businessId=${user.businessId}`;
       if (startDate && endDate) {
-        endpoint += `&from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}`;
+        const fromTs = `${startDate}T${startTime}:00`
+        const toTs = `${endDate}T${endTime}:00`
+        endpoint += `&from=${encodeURIComponent(fromTs)}&to=${encodeURIComponent(toTs)}`;
       } else {
         endpoint += `&period=${period}`;
       }
@@ -230,7 +241,6 @@ const DepartmentPerformance = () => {
   return (
     <div className="ap-page">
       <div className="ap-header">
-        <h3>Department Performance</h3>
         <div className="ap-header-controls">
           <CFormSelect 
             className="ap-agent-select" 
@@ -249,22 +259,50 @@ const DepartmentPerformance = () => {
             <option value="thismonth">This Month</option>
             <option value="lastmonth">Last Month</option>
           </CFormSelect>
-          <button className="ap-date-btn" onClick={() => setShowDateModal(true)}>{startDate && endDate ? `${startDate} - ${endDate}` : 'Custom Dates'}</button>
+
           <CFormSelect className="ap-agent-select" value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)}>
             <option value="">All departments</option>
             {availableDepartments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </CFormSelect>
+          
+          <button
+            onClick={() => setShowDateTimeModal(true)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#fff',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#374151',
+              fontWeight: '500',
+              minWidth: '280px',
+              textAlign: 'left'
+            }}
+            title="Select date and time range"
+          >
+            {startDate && endDate ? `${startDate} ${startTime} → ${endDate} ${endTime}` : 'Select Date & Time'}
+          </button>
+          
           <button type="button" className="ap-icon-btn" onClick={downloadReport} disabled={isDownloading}>{isDownloading ? 'Downloading...' : <CIcon icon={cilCloudDownload} />}</button>
           <button className={"ap-icon-btn" + (isRefreshing ? ' reload-animate' : '')} onClick={async () => { if (isRefreshing) return; setIsRefreshing(true); await refreshData(); setTimeout(() => setIsRefreshing(false), 600); }}><CIcon icon={cilReload} /></button>
         </div>
       </div>
 
-      <DateRangeModal visible={showDateModal} onClose={() => setShowDateModal(false)} initialFrom={startDate} initialTo={endDate} onApply={({ from, to }) => { 
-        setStartDate(from); 
-        setEndDate(to);
-        setShowDateModal(false);
-        // Data will refresh automatically due to dependency array
-      }} />
+      <DateTimeFilterModal
+        visible={showDateTimeModal}
+        onClose={() => setShowDateTimeModal(false)}
+        initialStartDate={startDate}
+        initialStartTime={startTime}
+        initialEndDate={endDate}
+        initialEndTime={endTime}
+        onApply={({ startDate: sd, startTime: st, endDate: ed, endTime: et }) => {
+          setStartDate(sd);
+          setStartTime(st);
+          setEndDate(ed);
+          setEndTime(et);
+        }}
+      />
 
       <div className="ap-stats-grid">
         {loading ? (

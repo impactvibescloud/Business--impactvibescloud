@@ -669,9 +669,6 @@ const Dashboard = () => {
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box sx={{ width: 44, height: 44, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <CallIcon sx={{ color: '#fff' }} />
-                      </Box>
                       <Box>
                         <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Total Calls</Typography>
                         <Typography variant="h2" sx={{ mt: 1, fontWeight: 900, fontSize: '2.4rem', lineHeight: 1 }}>{callStats?.totalCalls ?? 0}</Typography>

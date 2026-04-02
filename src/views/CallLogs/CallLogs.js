@@ -1041,8 +1041,41 @@ const CallLogs = () => {
       case 'sno': return idx + 1
       case 'type': return log.callType || log.type || ''
       case 'date': return formatDate(log.callDate || log.createdAt)
-      case 'initiated_by': return log.callInitiatedBy || ''
-      case 'received_by': return log.callReceivedBy || ''
+      case 'initiated_by': 
+        // Return phone number (contact) first, fallback to callInitiatedBy
+        return log.contact || log.callInitiatedBy || ''
+      case 'received_by': 
+        // Extract agent names/emails from agents array
+        {
+          let agents = []
+          if (Array.isArray(log.agents) && log.agents.length) agents = log.agents
+          else if (log.agent) agents = [log.agent]
+          else if (Array.isArray(log.callReceivedBy)) agents = log.callReceivedBy
+          else if (log.callReceivedBy && typeof log.callReceivedBy === 'string') agents = [log.callReceivedBy]
+          
+          const agentDisplays = (agents || []).map(a => {
+            if (!a) return ''
+            if (typeof a === 'object') {
+              // Try to get name first
+              const name = a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim()
+              if (name) return name
+              // Fall back to email or ID
+              if (a.email && agentMap && (agentMap[a.email] || agentMap[a.email.toLowerCase()])) return agentMap[a.email] || agentMap[a.email.toLowerCase()]
+              if (a._id && agentMap && agentMap[a._id]) return agentMap[a._id]
+              return a.email || a._id || a.phone || ''
+            }
+            const s = String(a).trim()
+            // Try exact lookup
+            if (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) return agentMap[s] || agentMap[s.toLowerCase()]
+            // Try numeric lookup
+            const digits = s.replace(/[^0-9]/g, '')
+            if (digits && agentByNumberMap && (agentByNumberMap[digits] || agentByNumberMap[s])) return agentByNumberMap[digits] || agentByNumberMap[s]
+            return s
+          }).filter(Boolean)
+          
+          const unique = Array.from(new Set(agentDisplays))
+          return unique.length ? unique.join(', ') : (log.callReceivedBy || '')
+        }
       case 'rejected_by': return log.callRejectedBy || ''
       case 'team': return log.team || ''
       case 'hangup_by': return log.hangUpBy || log.hangupBy || ''
@@ -1071,123 +1104,109 @@ const CallLogs = () => {
     }
     setExporting(true)
     try {
-      // Try to request logs; handle both non-paginated and paginated responses
       const requestingAllFiltered = Boolean(dateFrom || dateTo)
-      const limit = 1000
+      const limit = 100 // Use reasonable page size (API may not support 1000)
       let logs = []
+      let totalFetched = 0
 
-      // Fetch pages sequentially when date filters are active to ensure we
-      // respect the server's filtered responses while avoiding relying on
-      // server-reported totalPages (which may be incorrect).
-      if (requestingAllFiltered) {
-        let page = 1
-        const maxRecordsCap = 5000 // safety cap to avoid huge downloads
-        const maxPages = Math.ceil(maxRecordsCap / limit)
-        const fromTs = dateFrom ? parseLocalDate(dateFrom, false) : null
-        const toTs = dateTo ? parseLocalDate(dateTo, true) : null
-        while (true) {
-          const pageEndpoint = buildLogsEndpoint(page, limit)
-          console.debug(`Export (filtered) fetching page ${page}:`, pageEndpoint)
-          const res = await apiCall(pageEndpoint, 'GET')
-          let pageLogs = []
-          if (Array.isArray(res)) pageLogs = res
-          else if (res && Array.isArray(res.data)) pageLogs = res.data
-          else if (res && Array.isArray(res.callLogs)) pageLogs = res.callLogs
-          else pageLogs = []
+      console.log('=== EXPORT START ===')
+      console.log('Filters:', { activeFilter, dateFrom, dateTo, searchTerm })
+      console.log('Selected Columns:', selectedColumns)
 
-          if (pageLogs.length > 0) {
-            // Filter page logs by selected date range (client-side safeguard)
-            const pageTimestamps = pageLogs.map(l => new Date(l.callDate || l.createdAt).getTime()).filter(Boolean)
-            const maxPageTs = pageTimestamps.length ? Math.max(...pageTimestamps) : null
-            const minPageTs = pageTimestamps.length ? Math.min(...pageTimestamps) : null
+      // Always use sequential fetching for consistency
+      let page = 1
+      const maxRecordsCap = requestingAllFiltered ? 5000 : 10000
+      const maxPages = Math.ceil(maxRecordsCap / limit)
+      const fromTs = dateFrom ? parseLocalDate(dateFrom, false) : null
+      const toTs = dateTo ? parseLocalDate(dateTo, true) : null
 
-            const matched = pageLogs.filter(l => {
-              const t = new Date(l.callDate || l.createdAt).getTime()
-              if (Number.isNaN(t)) return false
-              if (fromTs !== null && t < fromTs) return false
-              if (toTs !== null && t > toTs) return false
-              return true
-            })
-            logs = logs.concat(matched)
+      console.log(`Starting export: filters=${requestingAllFiltered ? 'yes' : 'no'}, maxRecords=${maxRecordsCap}, limit=${limit}`)
 
-            console.debug(`Export (filtered) page ${page} returned ${pageLogs.length} records, matched ${matched.length}`,
-              matched.length ? { firstMatched: matched[0]?.callDate, lastMatched: matched[matched.length - 1]?.callDate } : null,
-              { maxPageTs: maxPageTs ? new Date(maxPageTs).toISOString() : null, minPageTs: minPageTs ? new Date(minPageTs).toISOString() : null })
-
-            // Heuristic early-stop: if server returns pages in descending date order and
-            // the newest timestamp on this page is older than fromTs, further pages
-            // will be older as well — we can stop early.
-            if (fromTs !== null && maxPageTs !== null && maxPageTs < fromTs) {
-              console.debug('Export (filtered) early stop: page max timestamp is older than fromTs')
-              break
-            }
-          }
-
-          // Stop when this page returned fewer than limit records (last page)
-          if (pageLogs.length < limit) break
-          page += 1
-          if (page > maxPages) {
-            console.warn('Reached export max pages cap; stopping further fetches')
-            break
-          }
-        }
-      } else {
-        // No date filters: use existing pagination meta to fetch remaining pages in parallel
-  const firstEndpoint = buildLogsEndpoint(1, limit)
-  console.debug('Export (unfiltered) fetching first page:', firstEndpoint)
-  const first = await apiCall(firstEndpoint, 'GET')
-        let pagination = null
-        if (Array.isArray(first)) {
-          logs = first
-        } else if (first && Array.isArray(first.data)) {
-          logs = first.data
-          pagination = first.pagination || null
-        } else if (first && Array.isArray(first.callLogs)) {
-          logs = first.callLogs
-          pagination = first.pagination || null
+      while (true) {
+        const pageEndpoint = buildLogsEndpoint(page, limit)
+        console.log(`Fetching page ${page}:`, pageEndpoint)
+        
+        const res = await apiCall(pageEndpoint, 'GET')
+        let pageLogs = []
+        
+        // Extract logs from various response formats
+        if (Array.isArray(res)) {
+          pageLogs = res
+        } else if (res && Array.isArray(res.data)) {
+          pageLogs = res.data
+        } else if (res && Array.isArray(res.callLogs)) {
+          pageLogs = res.callLogs
         } else {
-          logs = []
-          pagination = first?.pagination || null
+          pageLogs = []
         }
 
-        if (pagination && pagination.totalPages && pagination.totalPages > 1) {
-          const totalPages = pagination.totalPages
-          const lim = pagination.limit || limit
-          const promises = []
-          for (let p = 2; p <= totalPages; p++) {
-            const e = buildLogsEndpoint(p, lim)
-            console.debug('Export (unfiltered) will fetch page', p, e)
-            promises.push(apiCall(e, 'GET'))
-          }
-          const rest = await Promise.all(promises)
-          rest.forEach(r => {
-            if (Array.isArray(r)) logs = logs.concat(r)
-            else if (r && Array.isArray(r.data)) logs = logs.concat(r.data)
-            else if (r && Array.isArray(r.callLogs)) logs = logs.concat(r.callLogs)
+        console.log(`Page ${page}: received ${pageLogs.length} records`)
+
+        if (pageLogs.length === 0) {
+          console.log(`Page ${page}: empty response, stopping`)
+          break
+        }
+
+        // Apply client-side date filtering if needed
+        if (requestingAllFiltered && (fromTs !== null || toTs !== null)) {
+          const beforeFilter = pageLogs.length
+          pageLogs = pageLogs.filter(l => {
+            const t = new Date(l.callDate || l.createdAt).getTime()
+            if (Number.isNaN(t)) return false
+            if (fromTs !== null && t < fromTs) return false
+            if (toTs !== null && t > toTs) return false
+            return true
           })
+          console.log(`Page ${page}: date filter: ${beforeFilter} → ${pageLogs.length} records`)
+        }
+
+        if (pageLogs.length > 0) {
+          logs = logs.concat(pageLogs)
+          totalFetched += pageLogs.length
+          console.log(`Page ${page}: total collected so far: ${logs.length}`)
+        }
+
+        // Stop if this page had fewer records than limit (last page)
+        if (pageLogs.length < limit) {
+          console.log(`Page ${page}: returned ${pageLogs.length} < ${limit}, this is last page`)
+          break
+        }
+
+        page += 1
+        if (page > maxPages) {
+          console.warn(`Reached max pages cap (${maxPages}), stopping`)
+          break
         }
       }
+
+      console.log(`Export complete: fetched ${totalFetched} raw records, after filtering: ${logs.length}`)
 
       if (!logs || logs.length === 0) {
         alert('No call logs available to export')
+        setExporting(false)
         return
       }
 
-      // Prepare CSV headers and rows using user-selected columns
-      const headers = (selectedColumns && selectedColumns.length)
+      // Prepare CSV headers using selected columns
+      const headers = (selectedColumns && selectedColumns.length > 0)
         ? selectedColumns.map(k => {
-            const m = (Array.isArray(columnsAvailable) ? columnsAvailable.find(c=> (c.key || c) === k) : null)
+            const m = columnsAvailable.find(c => (c.key || c) === k)
             return (m && m.label) ? m.label : (typeof k === 'string' ? k : String(k))
           })
-        : ['S.NO', 'TYPE', 'DATE', 'INITIATED BY', 'RECEIVED BY', 'REJECTED BY', 'TEAM', 'HANG UP BY', 'DURATION', 'COST', 'NOTES', 'STATUS', 'VIRTUAL NUMBER', 'CONTACT']
+        : columnsAvailable.map(c => c.label)
+
+      console.log(`CSV Headers (${headers.length}):`, headers)
 
       const csvRows = []
-      csvRows.push(headers.join(','))
+      csvRows.push(headers.map(h => csvEscape(h)).join(','))
 
       logs.forEach((log, idx) => {
-        const row = (selectedColumns && selectedColumns.length) ?
-          selectedColumns.map(colKey => csvEscape(getColumnValue(colKey, log, idx))) :
-          [
+        let row
+        if (selectedColumns && selectedColumns.length > 0) {
+          row = selectedColumns.map(colKey => csvEscape(getColumnValue(colKey, log, idx)))
+        } else {
+          // Default columns in order
+          row = [
             idx + 1,
             csvEscape(log.callType || ''),
             csvEscape(formatDate(log.callDate || log.createdAt)),
@@ -1203,8 +1222,12 @@ const CallLogs = () => {
             csvEscape(log.virtualNumber || ''),
             csvEscape(log.contact || ''),
           ]
+        }
         csvRows.push(row.join(','))
       })
+
+      console.log(`CSV Rows: ${csvRows.length} total (1 header + ${logs.length} data rows)`)
+      console.log(`First data row sample:`, csvRows[1])
 
       const csvContent = csvRows.join('\n')
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -1218,9 +1241,12 @@ const CallLogs = () => {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
+
+      console.log(`Export successful: ${fname} (${(blob.size / 1024).toFixed(2)} KB)`)
+      alert(`Export successful! ${logs.length} records exported.`)
     } catch (err) {
-      console.error('Export failed', err)
-      alert('Export failed. Check console for details.')
+      console.error('Export failed:', err)
+      alert(`Export failed: ${err.message}`)
     } finally {
       setExporting(false)
     }
