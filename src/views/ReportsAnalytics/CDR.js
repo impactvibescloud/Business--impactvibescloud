@@ -23,7 +23,7 @@ import {
 } from '@coreui/react'
 import { apiCall, getBaseURL } from '../../config/api'
 import '../Branches/Branches.css'
-import './CallDispositions.css'
+import './CDR.css'
 
 const CallLogsLegacy = () => {
   const [records, setRecords] = useState([])
@@ -317,6 +317,7 @@ const CallLogsLegacy = () => {
   // Recording Player Component
   const RecordingPlayer = ({ recordingFilename, onDownload }) => {
     const [blobUrl, setBlobUrl] = React.useState(null)
+    const [loading, setLoading] = React.useState(false)
     const [playing, setPlaying] = React.useState(false)
     const audioRef = React.useRef(null)
 
@@ -324,15 +325,31 @@ const CallLogsLegacy = () => {
       if (!recordingFilename) return
 
       const loadRecording = async () => {
+        setLoading(true)
         const url = await getRecordingBlobUrl(recordingFilename)
         setBlobUrl(url)
+        setLoading(false)
       }
 
       loadRecording()
     }, [recordingFilename])
 
-    if (!recordingFilename || !blobUrl) {
+    if (!recordingFilename) {
       return <span className="text-muted">No recording</span>
+    }
+
+    if (loading) {
+      return (
+        <div className="audio-player d-flex align-items-center gap-2">
+          <span className="text-muted">
+            <CSpinner size="sm" className="me-2" /> Loading recording...
+          </span>
+        </div>
+      )
+    }
+
+    if (!blobUrl) {
+      return <span className="text-danger">Failed to load recording</span>
     }
 
     return (
@@ -351,11 +368,16 @@ const CallLogsLegacy = () => {
           style={{ maxWidth: '260px' }}
         />
         <button
-          className="btn btn-sm btn-outline-primary"
+          className="recording-download-btn"
           onClick={onDownload}
           title="Download recording"
         >
-          ⬇️
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download</span>
         </button>
       </div>
     )

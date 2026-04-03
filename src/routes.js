@@ -22,7 +22,7 @@ const UsersTeams = React.lazy(() => import("./views/UsersTeams/UsersTeams"));
 const VirtualNumbers = React.lazy(() => import("./views/VirtualNumbers/VirtualNumbers"));
 const Billing = React.lazy(() => import("./views/Billing/Billing"));
 const ReportsAnalytics = React.lazy(() => import("./views/ReportsAnalytics/ReportsAnalytics"));
-const CallLogsLegacy = React.lazy(() => import("./views/ReportsAnalytics/CallDispositions"));
+const CallLogsLegacy = React.lazy(() => import("./views/ReportsAnalytics/CDR"));
 const Payments = React.lazy(() => import("./views/Payments/Payments"));
 const Settings = React.lazy(() => import("./views/Settings/Settings"));
 const Department = React.lazy(() => import("./views/Department/Department"));

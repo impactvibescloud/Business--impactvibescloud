@@ -7,19 +7,29 @@ const SipRegistration = ({ sipConfig = {}, enableDebug = false, onRegistrationSt
 
   useEffect(() => {
     if (!sipConfig || !sipConfig.extension || !sipConfig.sip_password || !sipConfig.sip_domain) {
+      console.error('[SipRegistration] Missing required config:', { sipConfig })
       onRegistrationStatus && onRegistrationStatus('missing-config')
       return
     }
 
+    console.log('[SipRegistration] Starting registration with config:', {
+      extension: sipConfig.extension,
+      domain: sipConfig.sip_domain,
+      ws_port: sipConfig.ws_port,
+      ws_path: sipConfig.ws_path,
+      wss: sipConfig.wss,
+    })
+
     // If a global sipUA exists and is registered, reuse it instead of reinitializing
     try {
       if (window.sipUA && typeof window.sipUA === 'object' && window.sipUA.isRegistered && window.sipUA.isRegistered()) {
+        console.log('[SipRegistration] Reusing existing registered UA')
         onRegistrationStatus && onRegistrationStatus('registered')
         try { onUaReady && onUaReady(window.sipUA) } catch (e) { console.warn('onUaReady failed', e) }
         return
       }
     } catch (e) {
-      // ignore and continue
+      console.warn('[SipRegistration] Error checking existing UA:', e)
     }
 
     const wsPath = sipConfig.ws_path || '/ws'
@@ -52,15 +62,18 @@ const SipRegistration = ({ sipConfig = {}, enableDebug = false, onRegistrationSt
     const attemptFallback = () => {
       if (triedFallback) return
       triedFallback = true
-      console.warn('SipRegistration: attempting fallback to same-origin websocket')
+      console.warn('[SipRegistration] Attempting fallback to same-origin websocket')
       // choose protocol based on page protocol to satisfy CSP 'self'
       const pageProto = window.location.protocol === 'https:' ? 'wss' : 'ws'
       const fallbackUri = `${pageProto}://${window.location.host}${wsPath}`
+      console.log(`[SipRegistration] Fallback URI: ${fallbackUri}`)
       initUaWithSocket(fallbackUri, false)
     }
 
     const initUaWithSocket = (wsUri, allowFallback = true) => {
       try {
+        console.log(`[SipRegistration] Attempting connection to: ${wsUri}`)
+        
         // stop previous UA if exists
         if (uaRef.current) {
           try { uaRef.current.stop() } catch (e) {}
@@ -78,16 +91,28 @@ const SipRegistration = ({ sipConfig = {}, enableDebug = false, onRegistrationSt
         uaRef.current = ua
         window.sipUA = ua
 
-        ua.on('connecting', () => onRegistrationStatus && onRegistrationStatus('connecting'))
-        ua.on('connected', () => onRegistrationStatus && onRegistrationStatus('connected'))
+        console.log('[SipRegistration] UA created, registering...')
+
+        ua.on('connecting', () => {
+          console.log('[SipRegistration] Event: connecting')
+          onRegistrationStatus && onRegistrationStatus('connecting')
+        })
+        ua.on('connected', () => {
+          console.log('[SipRegistration] Event: connected')
+          onRegistrationStatus && onRegistrationStatus('connected')
+        })
         ua.on('registered', () => {
+          console.log('[SipRegistration] Event: registered ✓')
           clearConnectionTimeout()
           onRegistrationStatus && onRegistrationStatus('registered')
           try { onUaReady && onUaReady(ua) } catch (e) { console.warn('onUaReady failed', e) }
         })
-        ua.on('unregistered', () => onRegistrationStatus && onRegistrationStatus('unregistered'))
+        ua.on('unregistered', () => {
+          console.log('[SipRegistration] Event: unregistered')
+          onRegistrationStatus && onRegistrationStatus('unregistered')
+        })
         ua.on('registrationFailed', (e) => {
-          console.warn('JsSIP registration failed', e)
+          console.error('[SipRegistration] Event: registrationFailed', e)
           onRegistrationStatus && onRegistrationStatus('failed')
         })
 
@@ -99,15 +124,16 @@ const SipRegistration = ({ sipConfig = {}, enableDebug = false, onRegistrationSt
 
         // start UA and set a timeout to try fallback if nothing happens
         ua.start()
+        console.log('[SipRegistration] UA started')
         onRegistrationStatus && onRegistrationStatus('connecting')
 
         clearConnectionTimeout()
         connectionTimeout = setTimeout(() => {
-          console.warn('SipRegistration: connection timeout; no registration yet')
+          console.warn(`[SipRegistration] Connection timeout after ${sipConfig.connection_timeout_ms || 5000}ms; no registration yet`)
           if (allowFallback) attemptFallback()
         }, sipConfig.connection_timeout_ms || 5000)
       } catch (err) {
-        console.error('Failed to initialize JsSIP UA with', wsUri, err)
+        console.error('[SipRegistration] Failed to initialize JsSIP UA with', wsUri, err)
         onRegistrationStatus && onRegistrationStatus('failed')
         if (!triedFallback && wsUri !== socketUrlPrimary) {
           // if primary failed, try fallback
@@ -117,6 +143,7 @@ const SipRegistration = ({ sipConfig = {}, enableDebug = false, onRegistrationSt
     }
 
     // kick off primary attempt
+    console.log(`[SipRegistration] Primary socket URI: ${socketUrlPrimary}`)
     initUaWithSocket(socketUrlPrimary, true)
 
     return () => {

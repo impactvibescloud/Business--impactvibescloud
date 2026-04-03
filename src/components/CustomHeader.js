@@ -5,7 +5,6 @@ import { isAutheticated, signout as doSignout } from 'src/auth'
 import { useNavigate, useLocation } from 'react-router-dom'
 import routes from 'src/routes'
 import { UserActivityStatus } from './index'
-import WebphoneDialerModal from './WebphoneDialerModal'
 import CIcon from '@coreui/icons-react'
 import { cilMenu, cilPhone } from '@coreui/icons'
 
@@ -13,7 +12,6 @@ const CustomHeader = () => {
   const [initial, setInitial] = useState('U')
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
-  const [phoneModalVisible, setPhoneModalVisible] = useState(false)
   const token = isAutheticated()
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
@@ -98,9 +96,8 @@ const CustomHeader = () => {
   }
 
   return (
-    <>
-      <header className="jc-header" role="banner">
-        <div className="jc-header-inner">
+    <header className="jc-header" role="banner">
+      <div className="jc-header-inner">
         <div className="jc-left">
           <button
             className="jc-icon-btn"
@@ -118,11 +115,7 @@ const CustomHeader = () => {
         </div>
         <div className="jc-actions" style={{ position: 'relative' }}>
           
-          <button 
-            className="jc-icon-btn" 
-            aria-label="Phone"
-            onClick={() => setPhoneModalVisible(true)}
-          >
+          <button className="jc-icon-btn" aria-label="Phone">
             <CIcon icon={cilPhone} />
           </button>
           <div className="jc-divider"></div>
@@ -151,11 +144,6 @@ const CustomHeader = () => {
         </div>
       </div>
     </header>
-      <WebphoneDialerModal 
-        visible={phoneModalVisible} 
-        onClose={() => setPhoneModalVisible(false)} 
-      />
-    </>
   )
 }
 

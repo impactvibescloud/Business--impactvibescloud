@@ -49,7 +49,11 @@ const DateTimeFilterModal = ({ visible, onClose, onApply, initialStartDate, init
   };
 
   return (
-    <CModal visible={visible} onClose={onClose} backdrop="static">
+    <CModal 
+      visible={visible} 
+      onClose={onClose} 
+      backdrop="static"
+    >
       <CModalHeader closeButton>
         <span>Date & Time Filter</span>
       </CModalHeader>
