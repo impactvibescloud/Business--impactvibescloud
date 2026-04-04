@@ -47,6 +47,8 @@ import TextField from '@mui/material/TextField'
 import Stack from '@mui/material/Stack'
 import Collapse from '@mui/material/Collapse'
 import Alert from '@mui/material/Alert'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
 
 const IVRManagement = () => {
   const [ivrs, setIvrs] = useState([])
@@ -1335,29 +1337,29 @@ const IVRManagement = () => {
   }
 
   return (
-    <CCard className="mb-4 ivr-no-focus">
-    
-      <div className="p-2 border-bottom ivr-tabs-wrap">
-        <ul className="nav nav-tabs card-header-tabs mb-0">
-          <li className="nav-item">
-            <button type="button" className={`nav-link btn btn-link ${activeTab === 'ivr' ? 'active' : ''}`} onClick={() => setActiveTab('ivr')}>Menu</button>
-          </li>
-          <li className="nav-item">
-            <button type="button" className={`nav-link btn btn-link ${activeTab === 'after' ? 'active' : ''}`} onClick={() => setActiveTab('after')}>After Hours</button>
-          </li>
-          <li className="nav-item">
-            <button type="button" className={`nav-link btn btn-link ${activeTab === 'language' ? 'active' : ''}`} onClick={() => setActiveTab('language')}>Language</button>
-          </li>
-          <li className="nav-item">
-            <button type="button" className={`nav-link btn btn-link ${activeTab === 'audio' ? 'active' : ''}`} onClick={() => setActiveTab('audio')}>Audio</button>
-          </li>
-          <li className="nav-item">
-            <button type="button" className={`nav-link btn btn-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>Settings</button>
-          </li>
-        </ul>
-      </div>
-      <CCardBody>
-        <div style={{ display: activeTab === 'ivr' ? 'block' : 'none' }}>
+    <Box className="page-container" sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+        <Box>
+          <h3 style={{ margin: 0, marginBottom: '0.5rem', color: '#111827', fontWeight: 700 }}>IVR Management</h3>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>Create and manage interactive voice response (IVR) systems with menus, after-hours messages, and audio configurations</Typography>
+        </Box>
+      </Box>
+
+      <Paper variant="outlined" sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={(e, newValue) => setActiveTab(newValue)}
+          sx={{ borderBottom: 1, borderColor: '#d1d5db' }}
+        >
+          <Tab label="Menu" value="ivr" />
+          <Tab label="After Hours" value="after" />
+          <Tab label="Language" value="language" />
+          <Tab label="Audio" value="audio" />
+          <Tab label="Settings" value="settings" />
+        </Tabs>
+
+        <Box sx={{ p: 2 }}>
+          <div style={{ display: activeTab === 'ivr' ? 'block' : 'none' }}>
             <div className="ivr-header mb-3">
             
           <div className="ivr-actions">
@@ -2725,8 +2727,9 @@ const IVRManagement = () => {
             )}
           </Box>
         )}
-      </CCardBody>
-    </CCard>
+        </Box>
+      </Paper>
+    </Box>
   )
 }
 

@@ -1,36 +1,66 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import './PerformanceDashboard.css'
-import CIcon from '@coreui/icons-react'
-import { cilCloudDownload, cilReload, cilPhone, cilCheckCircle, cilClock, cilExternalLink } from '@coreui/icons'
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  CircularProgress,
+  Grid,
+  MenuItem,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from '@mui/material'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import GetAppIcon from '@mui/icons-material/GetApp'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import { apiCall } from '../../config/api'
 import DateTimeFilterModal from '../../components/DateRange/DateTimeFilterModal'
-import { CFormSelect } from '@coreui/react'
 
-const StatTile = ({ title, value, note, icon, onNavigate }) => (
-  <div className="ap-stat-tile">
-    <div className="ap-stat-header">
-      <div className="ap-stat-title">{title}</div>
-      <div className="ap-stat-actions">
+const StatTile = ({ title, value, note, onNavigate }) => (
+  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+    <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', pb: 1.5, pt: 2 }}>
+      {/* Header with Title and Icon Button */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700, fontSize: '1rem' }}>
+          {title}
+        </Typography>
         {onNavigate && (
-          <button 
-            className="ap-nav-btn" 
-            onClick={onNavigate} 
-            title={`View ${title}`}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#0b5a47' }}
+          <Button
+            size="small"
+            onClick={onNavigate}
+            sx={{ minWidth: 'auto', p: 0.5, color: '#0b5a47' }}
           >
-            <CIcon icon={cilExternalLink} size="lg" />
-          </button>
+            <OpenInNewIcon sx={{ fontSize: '1.2rem' }} />
+          </Button>
         )}
-        {icon ? <CIcon icon={icon} /> : null}
-      </div>
-    </div>
-    <div className="ap-stat-body">
-      <div className="ap-stat-value">{value}</div>
-      <div className="ap-stat-note">{note}</div>
-    </div>
-    <div className="ap-stat-footer">vs 0 prev, 1 day</div>
-  </div>
+      </Box>
+
+      {/* Middle Section - Value and Note */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5, fontSize: '2.5rem', lineHeight: 1, color: '#111827' }}>
+          {value}
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.95rem', fontWeight: 500 }}>
+          {note}
+        </Typography>
+      </Box>
+
+      {/* Footer */}
+      <Typography variant="caption" sx={{ color: '#9ca3af', mt: 2, fontSize: '0.75rem' }}>
+        vs 0 prev, 1 day
+      </Typography>
+    </CardContent>
+  </Card>
 )
 
 const AgentPerformance = () => {
@@ -84,18 +114,18 @@ const AgentPerformance = () => {
       for (let i = 0; i < Math.min(11, data.length); i++) sample[i] = 1
 
       const computed = [
-        { title: 'Total Calls', value: total, note: 'For sample', icon: cilPhone },
-        { title: 'Missed Calls', value: missed, note: 'For sample', icon: cilPhone },
-        { title: 'Answered Calls', value: answered, note: 'For sample', icon: cilCheckCircle },
-        { title: 'Missed Call Percentage', value: `${missedP.toFixed(2)}%`, note: 'Missed Call Percentage', icon: cilPhone },
+        { title: 'Total Calls', value: total, note: 'For sample' },
+        { title: 'Missed Calls', value: missed, note: 'For sample' },
+        { title: 'Answered Calls', value: answered, note: 'For sample' },
+        { title: 'Missed Call Percentage', value: `${missedP.toFixed(2)}%`, note: 'Missed Call Percentage' },
 
-        { title: 'Average Speed Of Answer', value: '00:00:00', note: 'For sample', icon: cilClock },
-        { title: 'Transferred Calls', value: 0, note: 'For sample', icon: cilPhone },
-        { title: 'Call Volume', value: '', note: '', icon: cilPhone, volumeSample: sample },
+        { title: 'Average Speed Of Answer', value: '00:00:00', note: 'For sample' },
+        { title: 'Transferred Calls', value: 0, note: 'For sample' },
+        { title: 'Call Volume', value: '', note: '', volumeSample: sample },
 
-        { title: 'Hold Calls', value: 0, note: 'For sample', icon: cilClock },
-        { title: 'Average Hold Duration', value: '00:00:00', note: 'For sample', icon: cilClock },
-        { title: 'Average WrapUp Duration', value: '00:00:00', note: 'For sample', icon: cilClock }
+        { title: 'Hold Calls', value: 0, note: 'For sample' },
+        { title: 'Average Hold Duration', value: '00:00:00', note: 'For sample' },
+        { title: 'Average WrapUp Duration', value: '00:00:00', note: 'For sample' }
       ]
       setStats(computed)
       setMissedPercent(missedP)
@@ -361,16 +391,16 @@ const AgentPerformance = () => {
         }
 
         const computed = [
-          { title: 'Total Calls', value: totalHandled, note: 'Combined across agents', icon: cilPhone },
-          { title: 'Missed Calls', value: totalMissed, note: 'Combined across agents', icon: cilPhone },
-          { title: 'Answered Calls', value: totalAnswered, note: 'Combined across agents', icon: cilCheckCircle },
-          { title: 'Missed Call Percentage', value: `${missedPct.toFixed(2)}%`, note: 'Missed Call Percentage', icon: cilPhone },
+          { title: 'Total Calls', value: totalHandled, note: 'Combined across agents' },
+          { title: 'Missed Calls', value: totalMissed, note: 'Combined across agents' },
+          { title: 'Answered Calls', value: totalAnswered, note: 'Combined across agents' },
+          { title: 'Missed Call Percentage', value: `${missedPct.toFixed(2)}%`, note: 'Missed Call Percentage' },
 
-          { title: 'Average Speed Of Answer', value: avgASA ? formatSeconds(avgASA) : '-', note: 'Average across agents', icon: cilClock },
-          { title: 'Average Handle Time', value: avgAHT ? formatSeconds(avgAHT) : '-', note: 'Average across agents', icon: cilClock },
-          { title: 'Transferred Calls', value: totalTransferred, note: 'Combined across agents', icon: cilPhone },
-          { title: 'Total Talk Time', value: formatSeconds(totalTalkSeconds), note: 'Sum of talk seconds', icon: cilClock },
-          { title: 'Logged Hours', value: formatHours(loggedHoursTotal), note: 'Sum of logged hours', icon: cilClock }
+          { title: 'Average Speed Of Answer', value: avgASA ? formatSeconds(avgASA) : '-', note: 'Average across agents' },
+          { title: 'Average Handle Time', value: avgAHT ? formatSeconds(avgAHT) : '-', note: 'Average across agents' },
+          { title: 'Transferred Calls', value: totalTransferred, note: 'Combined across agents' },
+          { title: 'Total Talk Time', value: formatSeconds(totalTalkSeconds), note: 'Sum of talk seconds' },
+          { title: 'Logged Hours', value: formatHours(loggedHoursTotal), note: 'Sum of logged hours' }
         ]
 
         setStats(computed)
@@ -434,10 +464,10 @@ const AgentPerformance = () => {
   }
 
   const CallVolumeChart = ({ data = [] }) => {
-    const w = 360
-    const h = 140
-    const padX = 36
-    const padY = 20
+    const w = 450
+    const h = 260
+    const padX = 40
+    const padY = 30
     const innerW = w - padX * 2
     const innerH = h - padY * 2
     const max = Math.max(...(data.length ? data : [0]), 1)
@@ -504,103 +534,170 @@ const AgentPerformance = () => {
     const answeredCallsStat = stats.find(s => s.title === 'Answered Calls') || {}
 
   return (
-    <div className="ap-page">
-      <div className="ap-header">
-        <div className="ap-header-controls">
-          <button
+    <Box sx={{ p: 3 }}>
+      {/* Header Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+            Agent Performance
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>
+            Track and analyze agent-level call metrics and performance activity
+          </Typography>
+        </Box>
+
+        {/* Filter Controls */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Date & Time Button */}
+          <Button
+            variant="outlined"
+            size="small"
             onClick={() => setShowDateTimeModal(true)}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#fff',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
+            sx={{
+              textTransform: 'none',
+              minWidth: 280,
+              height: 40,
+              borderRadius: '4px',
+              justifyContent: 'flex-start',
               color: '#374151',
-              fontWeight: '500',
-              minWidth: '280px',
-              textAlign: 'left'
+              borderColor: '#d1d5db'
             }}
-            title="Select date and time range"
           >
             {startDate && endDate ? `${startDate} ${startTime} → ${endDate} ${endTime}` : 'Select Date & Time'}
-          </button>
-          <CFormSelect className="ap-period-select" value={period} onChange={(e) => setPeriod(e.target.value)}>
-            <option value="Today">Today</option>
-            <option value="Weekly">Weekly</option>
-            <option value="Monthly">Monthly</option>
-            <option value="Yearly">Yearly</option>
-            <option value="All-time">All-time</option>
-          </CFormSelect>
-          <CFormSelect className="ap-agent-select" value={selectedAgent} onChange={(e) => {
-            const val = e.target.value
-            setSelectedAgent(val)
-            const parsed = parseSelected(val)
-            const agentId = parsed && parsed.type === 'user' ? parsed.id : ''
-            fetchStats(startDate, endDate, agentId)
-          }}>
-            <option value="">All agents</option>
-            {availableAgents.map((a) => <option key={`${a.type || 'user'}:${a.id}`} value={`${a.type || 'user'}:${a.id}`}>{a.name}</option>)}
-          </CFormSelect>
-          <button className="ap-icon-btn" onClick={async () => {
-            if (isDownloading) return
-            setIsDownloading(true)
-            try {
-              // fetch call logs for current filters (large limit)
-              let businessId = localStorage.getItem('businessId') || ''
-              if (!businessId) {
-                try { const ud = await apiCall('/v1/user/details', 'GET'); const u = ud?.user || ud?.data || ud; businessId = u?.businessId || u?.businessid || '' } catch (e) {}
-              }
-              if (!businessId) return
-              const qp = [`businessId=${encodeURIComponent(businessId)}`, `limit=10000`, `page=1`]
-              if (startDate) qp.push(`startDate=${encodeURIComponent(startDate)}`)
-              if (endDate) qp.push(`endDate=${encodeURIComponent(endDate)}`)
-              if (selectedAgent) {
-                const sel = parseSelected(selectedAgent)
-                if (sel) {
-                  if (sel.type === 'branch') qp.push(`branchId=${encodeURIComponent(sel.id)}`)
-                  else qp.push(`agent=${encodeURIComponent(sel.id)}`)
-                }
-              }
-              const res = await apiCall(`/call-logs?${qp.join('&')}`)
-              const rows = (res && res.data) || []
-              // Build CSV
-              const headers = ['ID','Agent','Caller','Receiver','Duration','Timestamp','Status']
-              let csv = headers.join(',') + '\n'
-              rows.forEach(r => {
-                const id = r._id || r.id || ''
-                const agentName = (r.agent && (r.agent.name || r.agent.fullName)) || r.agent || ''
-                const caller = r.from || r.caller || r.callLog?.contact || ''
-                const receiver = r.to || r.receiver || r.virtualNumber || ''
-                const duration = r.callDuration || r.duration || ''
-                const ts = r.callDate || r.createdAt || r.timestamp || ''
-                const status = r.status || r.callLog?.status || ''
-                csv += `"${id}","${agentName}","${caller}","${receiver}","${duration}","${ts}","${status}"\n`
-              })
-              const blob = new Blob([csv], { type: 'text/csv' })
-              const url = window.URL.createObjectURL(blob)
-              const link = document.createElement('a')
-              link.href = url
-              link.download = `agent-performance-${new Date().toISOString().split('T')[0]}.csv`
-              document.body.appendChild(link)
-              link.click()
-              document.body.removeChild(link)
-              window.URL.revokeObjectURL(url)
-            } catch (e) {
-              console.error('Download failed', e)
-            } finally { setIsDownloading(false) }
-          }}>
-            {isDownloading ? 'Downloading...' : <CIcon icon={cilCloudDownload} />}
-          </button>
-          <button className={"ap-icon-btn" + (isRefreshing ? ' reload-animate' : '')} onClick={async () => {
-            if (isRefreshing) return
-            setIsRefreshing(true)
-            try { const sel = parseSelected(selectedAgent); const agentId = sel && sel.type === 'user' ? sel.id : ''; await fetchStats(startDate, endDate, agentId) } catch (e) {}
-            setTimeout(() => setIsRefreshing(false), 800)
-          }}><CIcon icon={cilReload} /></button>
-        </div>
-      </div>
+          </Button>
 
+          {/* Period Filter */}
+          <TextField
+            select
+            label="Period"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            size="small"
+            variant="outlined"
+            sx={{ minWidth: 180, width: 160 }}
+            InputLabelProps={{ shrink: true }}
+          >
+            <MenuItem value="Today">Today</MenuItem>
+            <MenuItem value="Weekly">Weekly</MenuItem>
+            <MenuItem value="Monthly">Monthly</MenuItem>
+            <MenuItem value="Yearly">Yearly</MenuItem>
+            <MenuItem value="All-time">All-time</MenuItem>
+          </TextField>
+
+          {/* Agent Filter */}
+          <TextField
+            select
+            label="Agent"
+            size="small"
+            variant="outlined"
+            value={selectedAgent}
+            onChange={(e) => {
+              const val = e.target.value
+              setSelectedAgent(val)
+              const parsed = parseSelected(val)
+              const agentId = parsed && parsed.type === 'user' ? parsed.id : ''
+              fetchStats(startDate, endDate, agentId)
+            }}
+            InputLabelProps={{ shrink: true }}
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: (value) => {
+                if (value === '' || !value) {
+                  return 'All agents'
+                }
+                const agent = availableAgents.find(a => `${a.type || 'user'}:${a.id}` === value)
+                return agent?.name || 'All agents'
+              }
+            }}
+            sx={{ minWidth: 180, width: 160 }}
+          >
+            <MenuItem value="">All agents</MenuItem>
+            {availableAgents.map((a) => (
+              <MenuItem key={`${a.type || 'user'}:${a.id}`} value={`${a.type || 'user'}:${a.id}`}>
+                {a.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {/* Download Button */}
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={async () => {
+              if (isDownloading) return
+              setIsDownloading(true)
+              try {
+                // fetch call logs for current filters (large limit)
+                let businessId = localStorage.getItem('businessId') || ''
+                if (!businessId) {
+                  try { const ud = await apiCall('/v1/user/details', 'GET'); const u = ud?.user || ud?.data || ud; businessId = u?.businessId || u?.businessid || '' } catch (e) {}
+                }
+                if (!businessId) return
+                const qp = [`businessId=${encodeURIComponent(businessId)}`, `limit=10000`, `page=1`]
+                if (startDate) qp.push(`startDate=${encodeURIComponent(startDate)}`)
+                if (endDate) qp.push(`endDate=${encodeURIComponent(endDate)}`)
+                if (selectedAgent) {
+                  const sel = parseSelected(selectedAgent)
+                  if (sel) {
+                    if (sel.type === 'branch') qp.push(`branchId=${encodeURIComponent(sel.id)}`)
+                    else qp.push(`agent=${encodeURIComponent(sel.id)}`)
+                  }
+                }
+                const res = await apiCall(`/call-logs?${qp.join('&')}`)
+                const rows = (res && res.data) || []
+                // Build CSV
+                const headers = ['ID','Agent','Caller','Receiver','Duration','Timestamp','Status']
+                let csv = headers.join(',') + '\n'
+                rows.forEach(r => {
+                  const id = r._id || r.id || ''
+                  const agentName = (r.agent && (r.agent.name || r.agent.fullName)) || r.agent || ''
+                  const caller = r.from || r.caller || r.callLog?.contact || ''
+                  const receiver = r.to || r.receiver || r.virtualNumber || ''
+                  const duration = r.callDuration || r.duration || ''
+                  const ts = r.callDate || r.createdAt || r.timestamp || ''
+                  const status = r.status || r.callLog?.status || ''
+                  csv += `"${id}","${agentName}","${caller}","${receiver}","${duration}","${ts}","${status}"\n`
+                })
+                const blob = new Blob([csv], { type: 'text/csv' })
+                const url = window.URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `agent-performance-${new Date().toISOString().split('T')[0]}.csv`
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                window.URL.revokeObjectURL(url)
+              } catch (e) {
+                console.error('Download failed', e)
+              } finally { setIsDownloading(false) }
+            }}
+            startIcon={isDownloading ? <CircularProgress size={16} /> : <GetAppIcon />}
+            disabled={isDownloading}
+            sx={{ color: '#374151', textTransform: 'none', height: 40, borderRadius: '4px', borderColor: '#d1d5db' }}
+          >
+            {isDownloading ? 'Downloading...' : 'Download'}
+          </Button>
+
+          {/* Refresh Button */}
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={async () => {
+              if (isRefreshing) return
+              setIsRefreshing(true)
+              try { const sel = parseSelected(selectedAgent); const agentId = sel && sel.type === 'user' ? sel.id : ''; await fetchStats(startDate, endDate, agentId) } catch (e) {}
+              setTimeout(() => setIsRefreshing(false), 800)
+            }}
+            startIcon={<RefreshIcon sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />}
+            disabled={isRefreshing}
+            sx={{ color: '#374151', textTransform: 'none', height: 40, borderRadius: '4px', borderColor: '#d1d5db' }}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Date/Time Filter Modal */}
       <DateTimeFilterModal
         visible={showDateTimeModal}
         onClose={() => setShowDateTimeModal(false)}
@@ -617,9 +714,9 @@ const AgentPerformance = () => {
         }}
       />
 
-      {/* Show stat cards and graphs when viewing all agents */}
+      {/* Stats Grid - Show when viewing all agents */}
       {!selectedAgent && perfLoading === false && (
-        <div className="ap-stats-grid">
+        <Grid container spacing={3} sx={{ mb: 4 }}>
           {agentPerf && agentPerf.length > 0 && (() => {
             const toNumber = (v) => {
               const n = Number(v)
@@ -638,8 +735,8 @@ const AgentPerformance = () => {
             while (sampleVol.length < 11) sampleVol.push(0)
             
             const aggStats = [
-              { title: 'Total Calls', value: totalHandled, note: `${totalAnswered} answered, ${totalMissed} missed`, icon: cilPhone, onNavigate: () => navigate('/callogs') },
-              { title: 'Answer Rate', value: `${answerRate}%`, note: 'Answered / Handled', icon: cilCheckCircle },
+              { title: 'Total Calls', value: totalHandled, note: `${totalAnswered} answered, ${totalMissed} missed`, onNavigate: () => navigate('/callogs') },
+              { title: 'Answer Rate', value: `${answerRate}%`, note: 'Answered / Handled' },
               { title: 'Avg Occupancy %', value: avgOccupancy, note: 'Average across agents', isDonut: true, percent: parseFloat(avgOccupancy) || 0 },
               { title: 'Call Volume', volumeSample: sampleVol, note: '', isVolume: true }
             ]
@@ -647,31 +744,51 @@ const AgentPerformance = () => {
             return aggStats.map((s, i) => {
               if (s.isDonut) {
                 return (
-                  <div className="ap-stat-tile donut-tile" key={i}>
-                    <div className="ap-stat-header"><div className="ap-stat-title">{s.title}</div></div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-                      <Donut percent={s.percent || 0} />
-                    </div>
-                    <div className="ap-stat-footer">{s.note}</div>
-                  </div>
+                  <Grid item xs={12} sm={6} md={3} key={i}>
+                    <Card sx={{ height: '100%', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                      <CardContent>
+                        <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700, fontSize: '1rem', mb: 2 }}>
+                          {s.title}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+                          <Donut percent={s.percent || 0} />
+                        </Box>
+                        <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.75rem', display: 'block', textAlign: 'center' }}>
+                          {s.note}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 )
               }
               if (s.isVolume) {
                 return (
-                  <div className="ap-stat-tile chart-tile" key={i}>
-                    <div className="ap-stat-header"><div className="ap-stat-title">{s.title}</div></div>
-                    <div style={{ paddingTop: 8 }}><CallVolumeChart data={s.volumeSample || []} /></div>
-                    <div className="ap-stat-footer">{s.note}</div>
-                  </div>
+                  <Grid item xs={12} sm={6} md={3} key={i}>
+                    <Card sx={{ height: '100%', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                      <CardContent>
+                        <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700, fontSize: '1rem', mb: 1 }}>
+                          {s.title}
+                        </Typography>
+                        <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}><CallVolumeChart data={s.volumeSample || []} /></Box>
+                        <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.75rem', display: 'block' }}>
+                          {s.note}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 )
               }
-              return <StatTile key={i} title={s.title} value={s.value} note={s.note} icon={s.icon} onNavigate={s.onNavigate} />
+              return (
+                <Grid item xs={12} sm={6} md={3} key={i}>
+                  <StatTile title={s.title} value={s.value} note={s.note} onNavigate={s.onNavigate} />
+                </Grid>
+              )
             })
           })()}
-        </div>
+        </Grid>
       )}
 
-      {/* Show detailed charts/cards when a specific agent is selected */}
+      {/* Agent Detail View - Show when a specific agent is selected */}
       {selectedAgent && agentPerf && agentPerf.length > 0 && (() => {
         const a = agentPerf[0]
         const handled = pick(a, ['handledCalls','handled','totalCalls','total','calls']) || 0
@@ -690,120 +807,257 @@ const AgentPerformance = () => {
         const missedPct = handled > 0 ? (Number(missed) / Number(handled)) * 100 : 0
 
         return (
-          <div className="ap-agent-detail">
-            <div className="ap-agent-detail-cards">
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{handled}</div>
-                <div className="ap-agent-stat-title">Handled</div>
-              </div>
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{answered}</div>
-                <div className="ap-agent-stat-title">Answered</div>
-              </div>
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{missed}</div>
-                <div className="ap-agent-stat-title">Missed</div>
-              </div>
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{handled > 0 ? `${missedPct.toFixed(1)}%` : '-'}</div>
-                <div className="ap-agent-stat-title">Missed %</div>
-              </div>
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{avgASA != null ? formatSeconds(avgASA) : '-'}</div>
-                <div className="ap-agent-stat-title">Average Speed of Answer (ASA)</div>
-              </div>
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{avgAHT != null ? formatSeconds(avgAHT) : '-'}</div>
-                <div className="ap-agent-stat-title">Average Handle Time (AHT)</div>
-              </div>
-              <div className="ap-agent-stat-card">
-                <div className="ap-agent-stat-value">{loggedHours != null ? formatHours(loggedHours) : '-'}</div>
-                <div className="ap-agent-stat-title">Logged</div>
-              </div>
-            </div>
-            <div className="ap-agent-charts">
-              <div className="ap-donut-wrapper">
-                <Donut percent={occupancyPct != null ? occupancyPct : 0} />
-                <div style={{ textAlign: 'center', marginTop: 6 }}>{occupancyPct != null ? `Occupancy ${occupancyPct.toFixed(1)}%` : 'Occupancy: N/A'}</div>
-              </div>
-              <div className="ap-volume-chart-wrapper">
-                <CallVolumeChart data={volumeData} />
-              </div>
-            </div>
-          </div>
+          <Box>
+            {/* Agent Detail Stat Cards - Quick Stats in One Row */}
+            <Box sx={{ display: 'flex', gap: 0, mb: 3, justifyContent: 'space-between' }}>
+              <Box sx={{ textAlign: 'center', flex: 1, py: 1, px: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Handled
+                </Typography>
+                <Typography sx={{ fontWeight: 800, color: '#111827', fontSize: '1.5rem', lineHeight: 1.2 }}>
+                  {handled}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center', flex: 1, py: 1, px: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Answered
+                </Typography>
+                <Typography sx={{ fontWeight: 800, color: '#111827', fontSize: '1.5rem', lineHeight: 1.2 }}>
+                  {answered}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center', flex: 1, py: 1, px: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                  Missed
+                </Typography>
+                <Typography sx={{ fontWeight: 800, color: '#111827', fontSize: '1.5rem', lineHeight: 1.2 }}>
+                  {missed}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Remaining Stat Cards Grid */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                  <CardContent sx={{ textAlign: 'center', pb: 2 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827', mb: 1 }}>
+                      {handled > 0 ? `${missedPct.toFixed(1)}%` : '-'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                      Missed %
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                  <CardContent sx={{ textAlign: 'center', pb: 2 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827', mb: 1 }}>
+                      {avgASA != null ? formatSeconds(avgASA) : '-'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                      ASA
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                  <CardContent sx={{ textAlign: 'center', pb: 2 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827', mb: 1 }}>
+                      {avgAHT != null ? formatSeconds(avgAHT) : '-'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                      AHT
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                  <CardContent sx={{ textAlign: 'center', pb: 2 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827', mb: 1 }}>
+                      {loggedHours != null ? formatHours(loggedHours) : '-'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.9rem' }}>
+                      Logged
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Charts Section */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              {/* Occupancy Donut Chart */}
+              <Grid item xs={12} md={6}>
+                <Card sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                  <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    <Donut percent={occupancyPct != null ? occupancyPct : 0} />
+                    <Typography variant="body2" sx={{ mt: 2, color: '#374151', fontWeight: 500 }}>
+                      {occupancyPct != null ? `Occupancy ${occupancyPct.toFixed(1)}%` : 'Occupancy: N/A'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Volume Chart */}
+              <Grid item xs={12} md={6}>
+                <Card sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                  <CardContent>
+                    <CallVolumeChart data={volumeData} />
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
         )
       })()}
 
-        <div className="ap-perf-section">
-          <h4 style={{ marginTop: 18, marginBottom: 12 }}>Agent Performance Details — {period}</h4>
-          {perfLoading ? (
-            <div>Loading agent performance...</div>
-          ) : perfError ? (
-            <div style={{ color: 'var(--danger, #d9534f)' }}>{perfError}</div>
-          ) : (
-            <div>
-              {(!agentPerf || agentPerf.length === 0) ? (
-                <div>No performance data available for the selected period.</div>
-              ) : (
-                <div className="ap-agent-grid">
-                  {agentPerf.map((a, idx) => {
-                    const agentName = a.agentName || a.agent || a.name || a.name || a._id || a.id || `Agent ${idx+1}`
-                    const branchName = a.branchName || a.branch || a.branch_name || '-'
-                    const handled = pick(a, ['handledCalls','handled','totalCalls','total','calls']) || 0
-                    const answered = pick(a, ['answeredCalls','answered','successful']) || 0
-                    const missed = pick(a, ['missedCalls','missed']) || 0
-                    const avgAHT = pick(a, ['avgAHTSeconds','avgAHT','averageHandleSeconds','avgHandle'])
-                    const avgASA = pick(a, ['avgASASeconds','avgASA','averageSpeedSeconds','avgAnswer'])
-                    const totalTalk = pick(a, ['totalTalkSeconds','totalTalk','talkSeconds','talk'])
-                    const transferred = pick(a, ['transferredCalls','transferred']) || 0
-                    const loggedHours = pick(a, ['loggedHours','logged_hours'])
-                    const liveStatus = a.liveStatus || a.status || '-'
-                    const lastSeen = a.lastSeen || a.last_seen || a.updatedAt || a.lastActive
+      {/* Agent Performance Details Section */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#111827' }}>
+          Agent Performance Details — {period}
+        </Typography>
 
-                    return (
-                      <div className="ap-agent-card" key={idx}>
-                        <div className="ap-agent-card-header">
-                          <div>
-                            <div className="ap-agent-name">{agentName}</div>
-                            <div className="ap-agent-branch">{branchName}</div>
-                          </div>
-                          <div className={`ap-agent-badge ${String(liveStatus).toLowerCase()}`}>
-                            {String(liveStatus || '-').toUpperCase()}
-                          </div>
-                        </div>
+        {perfLoading ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+            <Typography sx={{ ml: 2 }}>Loading agent performance...</Typography>
+          </Box>
+        ) : perfError ? (
+          <Typography sx={{ color: '#dc2626', py: 2 }}>{perfError}</Typography>
+        ) : !agentPerf || agentPerf.length === 0 ? (
+          <Typography sx={{ color: '#6b7280', py: 2 }}>No performance data available for the selected period.</Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {agentPerf.map((a, idx) => {
+              const agentName = a.agentName || a.agent || a.name || a.name || a._id || a.id || `Agent ${idx+1}`
+              const branchName = a.branchName || a.branch || a.branch_name || '-'
+              const handled = pick(a, ['handledCalls','handled','totalCalls','total','calls']) || 0
+              const answered = pick(a, ['answeredCalls','answered','successful']) || 0
+              const missed = pick(a, ['missedCalls','missed']) || 0
+              const avgAHT = pick(a, ['avgAHTSeconds','avgAHT','averageHandleSeconds','avgHandle'])
+              const avgASA = pick(a, ['avgASASeconds','avgASA','averageSpeedSeconds','avgAnswer'])
+              const totalTalk = pick(a, ['totalTalkSeconds','totalTalk','talkSeconds','talk'])
+              const transferred = pick(a, ['transferredCalls','transferred']) || 0
+              const loggedHours = pick(a, ['loggedHours','logged_hours'])
+              const liveStatus = a.liveStatus || a.status || '-'
+              const lastSeen = a.lastSeen || a.last_seen || a.updatedAt || a.lastActive
 
-                        <div className="ap-agent-metrics">
-                          <div className="ap-agent-metric">
-                            <div className="ap-agent-metric-title">Handled</div>
-                            <div className="ap-agent-metric-value">{handled}</div>
-                          </div>
-                          <div className="ap-agent-metric">
-                            <div className="ap-agent-metric-title">Answered</div>
-                            <div className="ap-agent-metric-value">{answered}</div>
-                          </div>
-                          <div className="ap-agent-metric">
-                            <div className="ap-agent-metric-title">Missed</div>
-                            <div className="ap-agent-metric-value">{missed}</div>
-                          </div>
-                        </div>
+              return (
+                <Grid item xs={12} md={6} lg={4} key={idx}>
+                  <Card sx={{ height: '100%', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #000' }}>
+                    <CardHeader
+                      title={
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827' }}>
+                            {agentName}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                            {branchName}
+                          </Typography>
+                        </Box>
+                      }
+                      action={
+                        <Chip
+                          label={String(liveStatus || '-').toUpperCase()}
+                          size="small"
+                          variant="filled"
+                          sx={{
+                            bgcolor: liveStatus && String(liveStatus).toLowerCase() === 'online' ? '#dcfce7' : '#fee2e2',
+                            color: liveStatus && String(liveStatus).toLowerCase() === 'online' ? '#166534' : '#991b1b',
+                            borderRadius: '2px',
+                            fontWeight: 600,
+                            fontSize: '0.7rem'
+                          }}
+                        />
+                      }
+                      sx={{ pb: 1 }}
+                    />
+                    <CardContent sx={{ pt: 0 }}>
+                      {/* Quick Stats Row */}
+                      <Grid container spacing={1} sx={{ mb: 2 }}>
+                        <Grid item xs={4}>
+                          <Box sx={{ textAlign: 'center', p: 0.75, bgcolor: '#f9fafb', borderRadius: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
+                              {handled}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                              Handled
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Box sx={{ textAlign: 'center', p: 0.75, bgcolor: '#f9fafb', borderRadius: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
+                              {answered}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                              Answered
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Box sx={{ textAlign: 'center', p: 0.75, bgcolor: '#f9fafb', borderRadius: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
+                              {missed}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                              Missed
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
 
-                        <div className="ap-agent-extra">
-                          <div><strong>Average Speed of Answer (ASA):</strong> {avgASA != null ? formatSeconds(avgASA) : '-'}</div>
-                          <div><strong>Average Handle Time (AHT):</strong> {avgAHT != null ? formatSeconds(avgAHT) : '-'}</div>
-                          <div><strong>Talk Time:</strong> {totalTalk != null ? formatSeconds(totalTalk) : '-'}</div>
-                          <div><strong>Transferred:</strong> {transferred}</div>
-                          <div><strong>Logged:</strong> {loggedHours != null ? formatHours(loggedHours) : '-'}</div>
-                          <div className="ap-agent-lastseen">Last seen: {formatDate(lastSeen)}</div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-    </div>
+                      {/* Detailed Metrics */}
+                      <Box sx={{ space: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>ASA:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {avgASA != null ? formatSeconds(avgASA) : '-'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>AHT:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {avgAHT != null ? formatSeconds(avgAHT) : '-'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Talk Time:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {totalTalk != null ? formatSeconds(totalTalk) : '-'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Transferred:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {transferred}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Logged:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {loggedHours != null ? formatHours(loggedHours) : '-'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 1, borderTop: '1px solid #e5e7eb' }}>
+                          <Typography variant="caption" sx={{ color: '#9ca3af' }}>
+                            Last seen: {formatDate(lastSeen)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )
+            })}
+          </Grid>
+        )}
+      </Box>
+    </Box>
   )
 }
 

@@ -23,6 +23,8 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
+  FormControlLabel,
+  Checkbox,
   CircularProgress,
   Alert,
   Grid,
@@ -77,7 +79,8 @@ function Department() {
     status: 'active', // Changed from 'Active' to 'active' to match API
     departmentHead: '', // User ID of department head
     didNumber: '', // didNumber of department head
-    members: [] // Array of member objects {userId, phone, role}
+    members: [], // Array of member objects {userId, phone, role}
+    default: false // Boolean flag for default department
   })
 
   // Get current businessId from Auth context or localStorage and initialize
@@ -344,7 +347,8 @@ function Department() {
       status: 'active', // Default to active for new departments
       departmentHead: '',
       didNumber: '',
-      members: []
+      members: [],
+      default: false
     })
     setShowDepartmentModal(true)
   }
@@ -474,7 +478,8 @@ function Department() {
       // Keep the userId in formData for API
       departmentHead: departmentHeadUserId || '',
       didNumber: department.didNumber || '',
-      members: normalizedMembers
+      members: normalizedMembers,
+      default: department.default || false
     })
     setShowDepartmentModal(true)
   }
@@ -583,7 +588,8 @@ function Department() {
         status: formData.status,
         departmentHead: formData.departmentHead,
         didNumber: formData.didNumber,
-        members: normalizedMembers // Array of {userId, phone, didNumber, role}
+        members: normalizedMembers, // Array of {userId, phone, didNumber, role}
+        default: formData.default // Boolean flag for default department
       };
       
       console.log('Department data being sent:', JSON.stringify(departmentData, null, 2));
@@ -607,7 +613,8 @@ function Department() {
             status: formData.status,
             departmentHead: formData.departmentHead,
             didNumber: formData.didNumber,
-            members: departmentData.members
+            members: departmentData.members,
+            default: formData.default
           },
           { headers }
         );
@@ -775,20 +782,21 @@ function Department() {
                   <TableCell>DID NUMBER</TableCell>
                   <TableCell>MEMBERS</TableCell>
                   <TableCell>STATUS</TableCell>
+                  <TableCell>DEFAULT</TableCell>
                   <TableCell>ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                       <CircularProgress />
                       <div className="mt-3">Loading departments...</div>
                     </TableCell>
                   </TableRow>
                 ) : currentDepartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                       <div className="empty-state">
                         <div className="empty-state-icon"><BusinessIcon sx={{ fontSize: 40 }} /></div>
                         <Typography variant="h6">No departments found</Typography>
@@ -807,6 +815,7 @@ function Department() {
                       <TableCell>{getDepartmentHeadDidNumber(department)}</TableCell>
                       <TableCell><Chip label={`${department.members && Array.isArray(department.members) ? department.members.length : 0} Members`} size="small" /></TableCell>
                       <TableCell>{getStatusBadge(department.status)}</TableCell>
+                      <TableCell>{department.default ? <Chip label="Default" size="small" color="primary" variant="filled" /> : '-'}</TableCell>
                       <TableCell>
                         <IconButton size="small" onClick={() => handleEdit(department)}><EditIcon fontSize="small"/></IconButton>
                         <IconButton size="small" onClick={() => handleDeleteConfirm(department.id || department._id)}><DeleteIcon fontSize="small"/></IconButton>
@@ -855,6 +864,11 @@ function Department() {
               </Select>
               <Typography variant="caption" color="text.secondary">Hold Ctrl (Cmd on Mac) to select multiple members</Typography>
             </FormControl>
+
+            <FormControlLabel
+              control={<Checkbox name="default" checked={formData.default} onChange={(e) => setFormData({ ...formData, default: e.target.checked })} />}
+              label="Set as Default Department"
+            />
 
             {editingDepartment && (
               <FormControl fullWidth>

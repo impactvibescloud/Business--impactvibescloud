@@ -1,22 +1,28 @@
 import React, { useEffect, useState } from 'react'
 import {
-  CRow,
-  CCol,
-  CCard,
-  CCardBody,
-  CFormInput,
-  CFormSelect,
-  CButton,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CSpinner,
-  CBadge,
-} from '@coreui/react'
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Button,
+  TextField,
+  MenuItem,
+  Chip,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Paper,
+  CircularProgress,
+  Alert,
+  Typography,
+} from '@mui/material'
+import GetAppIcon from '@mui/icons-material/GetApp'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import ClearIcon from '@mui/icons-material/Clear'
 import { apiCall } from '../../config/api'
+import '../Leads/CallLogsWebpage.css'
 
 const CallUses = () => {
   const [userId, setUserId] = useState('')
@@ -426,183 +432,246 @@ const CallUses = () => {
   }
 
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="h3">Call Uses</h1>
-      </div>
+    <Box className="page-container" sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 600, mb: 0.5 }}>Call Uses</Typography>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>Track call usage by agent with detailed logs</Typography>
+        </Box>
+      </Box>
 
-      <CCard className="mb-4">
-        <CCardBody>
-          <CRow className="mb-3">
-            <CCol md={6} className="mb-2">
-              <label className="form-label">Agent</label>
-              <CFormSelect
-                value={userId}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setUserId(val)
-                  // Clear previously loaded data so old data doesn't conflict with the newly selected agent
-                  clearLoadedData()
-                  setLogsPage(1)
-                }}
-              >
-                <option value="">-- Select agent --</option>
-                {agentsLoading ? (
-                  <option value="">Loading agents...</option>
-                ) : (
-                  availableAgents.map((ag) => (
-                    <option key={ag._id} value={ag._id}>{ag.name || ag.email || ag._id}</option>
-                  ))
-                )}
-              </CFormSelect>
-            </CCol>
-            <CCol md={6} className="d-flex align-items-end gap-2 justify-content-end">
-              <CButton color="primary" onClick={handleApplyFilters} disabled={loading || !userId}>
-                {loading ? <><CSpinner size="sm" />&nbsp;Loading</> : 'Load Data'}
-              </CButton>
-            </CCol>
-          </CRow>
+      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-          {error && <div className="text-danger mb-3">{error}</div>}
-
-          {/* Summary */}
-          <CRow className="mb-3">
-            <CCol>
-              <h5>Summary</h5>
-              {loading ? (
-                <CSpinner />
-              ) : callUses.length === 0 ? (
-                <div className="text-muted">No call uses found for the selected agent.</div>
+      <Grid container spacing={3}>
+        {/* Left: Filters Form */}
+        <Grid item xs={12} md={4}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Agent"
+              select
+              fullWidth
+              size="small"
+              value={userId}
+              onChange={(e) => {
+                const val = e.target.value
+                setUserId(val)
+                clearLoadedData()
+                setLogsPage(1)
+              }}
+            >
+              <MenuItem value="">-- Select agent --</MenuItem>
+              {agentsLoading ? (
+                <MenuItem disabled>Loading agents...</MenuItem>
               ) : (
-                callUses.map((cu) => (
-                  <CCard className="mb-2" key={cu._id}>
-                    <CCardBody>
-                      <div className="d-flex justify-content-between">
-                        <div>
-                          <strong>Number:</strong> {cu.numberId?.number || '—'}<br />
-                          <strong>Outbound:</strong> {cu.outboundCalls} &nbsp; <strong>Inbound:</strong> {cu.inboundCalls}
-                        </div>
-                        <div className="text-end text-muted">
-                          <div>Created: {new Date(cu.createdAt).toLocaleString()}</div>
-                          <div>Updated: {new Date(cu.updatedAt).toLocaleString()}</div>
-                        </div>
-                      </div>
-                    </CCardBody>
-                  </CCard>
+                availableAgents.map((ag) => (
+                  <MenuItem key={ag._id} value={ag._id}>{ag.name || ag.email || ag._id}</MenuItem>
                 ))
               )}
-            </CCol>
-          </CRow>
+            </TextField>
 
-          {/* Logs controls */}
-          <CRow className="align-items-center mb-2">
-            <CCol md={2} className="mb-2">
-              <label className="form-label">Logs page</label>
-              <CFormSelect value={logsPage} onChange={(e) => setLogsPage(Number(e.target.value))}>
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <option key={i} value={i + 1}>{i + 1}</option>
-                ))}
-              </CFormSelect>
-            </CCol>
-            <CCol md={2} className="mb-2">
-              <label className="form-label">Logs limit</label>
-              <CFormSelect value={logsLimit} onChange={(e) => setLogsLimit(Number(e.target.value))}>
-                {[10, 20, 50, 100].map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </CFormSelect>
-            </CCol>
-            <CCol md={2} className="mb-2">
-              <label className="form-label">From</label>
-              <CFormInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </CCol>
-            <CCol md={2} className="mb-2">
-              <label className="form-label">To</label>
-              <CFormInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </CCol>
-            <CCol md={2} className="mb-2">
-              <label className="form-label">Call Type</label>
-              <CFormSelect value={callType} onChange={(e) => setCallType(e.target.value)}>
-                {['All', 'Incoming', 'Outgoing'].map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </CFormSelect>
-            </CCol>
-            <CCol md={2} className="mb-2">
-              <label className="form-label">Status</label>
-              <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-                {['All', 'Completed', 'Failed'].map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </CFormSelect>
-            </CCol>
-          </CRow>
+            <TextField
+              label="From"
+              type="date"
+              size="small"
+              fullWidth
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
 
-          <CRow className="align-items-center mb-2">
-            <CCol md={6} className="mb-2 d-flex gap-2">
-              <CButton color="primary" onClick={handleApplyFilters} disabled={loading || !userId}>
-                {loading ? (<><CSpinner size="sm" />&nbsp;Loading</>) : 'Load Data'}
-              </CButton>
-              <CButton color="secondary" onClick={handleClearFilters} disabled={loading}>
-                Clear Filters
-              </CButton>
-              <CButton color="success" onClick={handleExport} disabled={exporting || !userId}>
-                {exporting ? (<><CSpinner size="sm" />&nbsp;Exporting</>) : 'Export Excel'}
-              </CButton>
-            </CCol>
-            <CCol md={6} className="mb-2">
-              <div className="text-end text-muted">Total logs: <strong>{callLogsCount}</strong></div>
-            </CCol>
-          </CRow>
+            <TextField
+              label="To"
+              type="date"
+              size="small"
+              fullWidth
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
 
-          {/* Logs table */}
-          <CRow>
-            <CCol>
-              <CTable hover responsive>
-                <CTableHead>
-                  <CTableRow>
-                    <CTableHeaderCell>Date</CTableHeaderCell>
-                    <CTableHeaderCell>Contact</CTableHeaderCell>
-                    <CTableHeaderCell>Virtual Number</CTableHeaderCell>
-                    <CTableHeaderCell>Duration (s)</CTableHeaderCell>
-                    <CTableHeaderCell>Type</CTableHeaderCell>
-                    <CTableHeaderCell>Status</CTableHeaderCell>
-                    <CTableHeaderCell>Notes</CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
-                <CTableBody>
-                  {loading ? (
-                    <CTableRow>
-                      <CTableDataCell colSpan={7} className="text-center">
-                        <CSpinner />
-                      </CTableDataCell>
-                    </CTableRow>
-                  ) : callLogs.length === 0 ? (
-                    <CTableRow>
-                      <CTableDataCell colSpan={7} className="text-center text-muted">No call logs</CTableDataCell>
-                    </CTableRow>
-                  ) : (
-                    callLogs.map((log) => (
-                      <CTableRow key={log._id}>
-                        <CTableDataCell>{new Date(log.callDate || log.createdAt).toLocaleString()}</CTableDataCell>
-                        <CTableDataCell>{log.contact || log.callReceivedBy || '—'}</CTableDataCell>
-                        <CTableDataCell>{log.virtualNumber || log.number || (log.numberId && log.numberId.number) || '—'}</CTableDataCell>
-                        <CTableDataCell>{log.callDuration ?? log.duration ?? '—'}</CTableDataCell>
-                        <CTableDataCell>
-                          <CBadge color={log.callType === 'outbound' ? 'primary' : 'success'}>{log.callType}</CBadge>
-                        </CTableDataCell>
-                        <CTableDataCell>{log.status}</CTableDataCell>
-                        <CTableDataCell>{log.notes || '—'}</CTableDataCell>
-                      </CTableRow>
-                    ))
-                  )}
-                </CTableBody>
-              </CTable>
-            </CCol>
-          </CRow>
-        </CCardBody>
-      </CCard>
-    </div>
+            <TextField
+              label="Call Type"
+              select
+              size="small"
+              fullWidth
+              value={callType}
+              onChange={(e) => setCallType(e.target.value)}
+            >
+              {['All', 'Incoming', 'Outgoing'].map((v) => (
+                <MenuItem key={v} value={v}>{v}</MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Status"
+              select
+              size="small"
+              fullWidth
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              {['All', 'Completed', 'Failed'].map((v) => (
+                <MenuItem key={v} value={v}>{v}</MenuItem>
+              ))}
+            </TextField>
+
+            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+                onClick={handleApplyFilters}
+                disabled={loading || !userId}
+                sx={{ backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#5a46eb' }, flex: 1 }}
+              >
+                {loading ? 'Loading' : 'Load Data'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<ClearIcon />}
+                onClick={handleClearFilters}
+                disabled={loading}
+              >
+                Clear
+              </Button>
+            </Box>
+
+            <Button
+              variant="contained"
+              startIcon={exporting ? <CircularProgress size={18} /> : <GetAppIcon />}
+              onClick={handleExport}
+              disabled={exporting || !userId}
+              sx={{ backgroundColor: '#00b894', '&:hover': { backgroundColor: '#00a383' } }}
+            >
+              {exporting ? 'Exporting...' : 'Export Excel'}
+            </Button>
+
+            <TextField
+              label="Logs Per Page"
+              select
+              size="small"
+              fullWidth
+              value={logsLimit}
+              onChange={(e) => setLogsLimit(Number(e.target.value))}
+            >
+              {[10, 20, 50, 100].map((v) => (
+                <MenuItem key={v} value={v}>{v}</MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Page"
+              type="number"
+              size="small"
+              fullWidth
+              value={logsPage}
+              onChange={(e) => setLogsPage(Math.max(1, Number(e.target.value)))}
+              InputProps={{ inputProps: { min: 1 } }}
+            />
+          </Box>
+        </Grid>
+
+        {/* Right: Summary and Logs */}
+        <Grid item xs={12} md={8}>
+          {/* Summary Section */}
+          {!loading && callUses.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Summary</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {callUses.map((cu) => (
+                  <Card key={cu._id} variant="outlined">
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            Number: {cu.numberId?.number || '—'}
+                          </Typography>
+                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            <Chip
+                              label={`Outbound: ${cu.outboundCalls}`}
+                              size="small"
+                              className="custom-chip"
+                              sx={{ mr: 1 }}
+                            />
+                            <Chip
+                              label={`Inbound: ${cu.inboundCalls}`}
+                              size="small"
+                              className="custom-chip"
+                            />
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right', fontSize: '0.85rem', color: '#6c757d' }}>
+                          <div>Created: {new Date(cu.createdAt).toLocaleString()}</div>
+                          <div>Updated: {new Date(cu.updatedAt).toLocaleString()}</div>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Logs Section */}
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Call Logs</Typography>
+              <Typography variant="body2" sx={{ color: '#6c757d' }}>
+                Total: <strong>{callLogsCount}</strong>
+              </Typography>
+            </Box>
+
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : callLogs.length === 0 ? (
+              <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', color: '#6c757d' }}>
+                No call logs found
+              </Paper>
+            ) : (
+              <Paper variant="outlined" className="calllogs-table-container">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#f3f4f6' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Contact</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Virtual Number</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Duration (s)</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Notes</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {callLogs.map((log) => (
+                      <TableRow key={log._id} hover>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>{new Date(log.callDate || log.createdAt).toLocaleString()}</TableCell>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>{log.contact || log.callReceivedBy || '—'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>{log.virtualNumber || log.number || (log.numberId && log.numberId.number) || '—'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>{log.callDuration ?? log.duration ?? '—'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>
+                          <Chip
+                            label={log.callType === 'outbound' ? 'Outgoing' : 'Incoming'}
+                            size="small"
+                            sx={{
+                              backgroundColor: log.callType === 'outbound' ? '#fce4ec' : '#e3f2fd',
+                              color: log.callType === 'outbound' ? '#c2185b' : '#1565c0',
+                              fontWeight: 500,
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>{log.status}</TableCell>
+                        <TableCell sx={{ fontSize: '0.9rem' }}>{log.notes || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Paper>
+            )}
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
   )
 }
 

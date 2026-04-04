@@ -1,42 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import {
-  CCard,
-  CCardBody,
-  CCardHeader,
-  CRow,
-  CCol,
-  CForm,
-  CFormInput,
-  CFormSelect,
-  CFormTextarea,
-  CButton,
-  CTable,
-  CTableHead,
-  CTableBody,
-  CTableRow,
-  CTableHeaderCell,
-  CTableDataCell,
-  CBadge,
-  CSpinner,
-  CAlert,
-  CModal,
-  CModalHeader,
-  CModalBody,
-  CModalFooter,
-  CModalTitle,
-  CNav,
-  CNavItem,
-  CNavLink,
-  CTabContent,
-  CTabPane,
-  CInputGroup,
-  CInputGroupText,
-} from '@coreui/react';
+  Box,
+  Card,
+  CardContent,
+  Button,
+  TextField,
+  Select,
+  MenuItem,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+  CircularProgress,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  InputAdornment,
+  Typography,
+  Paper
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import SendIcon from '@mui/icons-material/Send';
 import { apiCall, ENDPOINTS, getBaseURL, getHeaders } from '../../config/api';
 import { useAuth } from '../../context/authContext';
 import { statusMap, reverseStatusMap, PAGE_SIZE } from './types';
-// Scrollbar and other styles
-import './scrollbar.css';
 // Import the modern chat CSS
 import './modern-chat.css';
 
@@ -390,12 +381,23 @@ const NewTicketComponent = () => {
     const colors = {
       low: 'info',
       medium: 'warning',
-      high: 'danger'
+      high: 'error'
+    };
+    const colorMap = {
+      low: '#2196F3',
+      medium: '#FF9800',
+      high: '#F44336'
     };
     return (
-      <CBadge color={colors[priority?.toLowerCase()] || 'secondary'}>
-        {priority?.toUpperCase() || 'N/A'}
-      </CBadge>
+      <Chip
+        label={priority?.toUpperCase() || 'N/A'}
+        size="small"
+        sx={{
+          backgroundColor: colorMap[priority?.toLowerCase()] || '#9C27B0',
+          color: 'white',
+          fontWeight: 600
+        }}
+      />
     );
   };
 
@@ -403,326 +405,487 @@ const NewTicketComponent = () => {
   const paginatedTickets = tickets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
-    <>
-      <div className="max-w-full overflow-x-auto p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-            Ticketing System
-          </h2>
-          <CButton color="primary" onClick={() => setShowForm(true)}>Create Ticket</CButton>
-        </div>
+    <Box sx={{ p: 1.5, maxWidth: '100%', overflow: 'auto' }}>
+      {/* Header Section */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+          Ticketing System
+        </Typography>
+      </Box>
 
-        {error && <CAlert color="danger" dismissible>{error}</CAlert>}
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 1.5 }}>
+          {error}
+        </Alert>
+      )}
 
-        {/* Create Ticket Modal */}
-        <CModal visible={showForm} onClose={() => setShowForm(false)}>
-          <CModalHeader closeButton>
-            <CModalTitle>Create New Ticket</CModalTitle>
-          </CModalHeader>
-          <CForm onSubmit={createTicket}>
-            <CModalBody>
-              {formError && <CAlert color="danger">{formError}</CAlert>}
-
-              <div className="mb-3">
-                <CFormInput
-                  type="text"
-                  id="subject"
-                  label="Subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="mb-3">
-                <CFormTextarea
-                  id="description"
-                  label="Description"
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="mb-3">
-                <CFormSelect
-                  id="priority"
-                  label="Priority"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  options={[
-                    { label: 'High', value: 'High' },
-                    { label: 'Medium', value: 'Medium' },
-                    { label: 'Low', value: 'Low' },
-                  ]}
-                />
-              </div>
-
-              <div className="mb-3">
-                <CFormSelect
-                  id="category"
-                  label="Category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  options={[
-                    { label: 'Technical', value: 'Technical' },
-                    { label: 'Billing', value: 'Billing' },
-                    { label: 'Feature Request', value: 'Feature Request' },
-                    { label: 'Other', value: 'Other' },
-                  ]}
-                />
-              </div>
-            </CModalBody>
-            <CModalFooter>
-              <CButton color="secondary" onClick={() => setShowForm(false)}>
-                Cancel
-              </CButton>
-              <CButton color="primary" type="submit" disabled={submitting}>
-                {submitting ? <CSpinner size="sm" /> : 'Create Ticket'}
-              </CButton>
-            </CModalFooter>
-          </CForm>
-        </CModal>
-
-        {/* Search and Filter Section */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <CInputGroup>
-                <CInputGroupText>
-                  <i className="fas fa-search text-gray-400"></i>
-                </CInputGroupText>
-                <CFormInput
-                  type="text"
-                  id="searchQuery"
-                  placeholder="Search tickets..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </CInputGroup>
-            </div>
-            <div style={{ width: '180px' }}>
-              <CFormSelect
-                id="filterStatus"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                options={[
-                  { label: 'All Tickets', value: 'all' },
-                  { label: 'Open', value: 'Open' },
-                  { label: 'In Progress', value: 'In Progress' },
-                  { label: 'Resolved', value: 'Resolved' },
-                  { label: 'Closed', value: 'Closed' },
-                ]}
-              />
-            </div>
-            {(searchQuery || filterStatus !== 'all') && (
-              <CButton 
-                color="secondary" 
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery('');
-                  setFilterStatus('all');
-                }}
-              >
-                Clear
-              </CButton>
+      {/* Create Ticket Dialog */}
+      <Dialog open={showForm} onClose={() => setShowForm(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#6366f1', color: 'white', fontSize: '1rem' }}>
+          Create New Ticket
+        </DialogTitle>
+        <Box component="form" onSubmit={createTicket}>
+          <DialogContent sx={{ pt: 2, pb: 1.5 }}>
+            {formError && (
+              <Alert severity="error" sx={{ mb: 1.5 }}>
+                {formError}
+              </Alert>
             )}
-          </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <CTable hover responsive striped>
-            <CTableHead>
-              <CTableRow className="bg-light">
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">#</CTableHeaderCell>
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">Subject</CTableHeaderCell>
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">Priority</CTableHeaderCell>
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">Category</CTableHeaderCell>
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">Created</CTableHeaderCell>
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">Resolved</CTableHeaderCell>
-                <CTableHeaderCell className="px-4 py-3 text-xs font-semibold text-gray-600">Messages</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
+            <TextField
+              fullWidth
+              label="Subject"
+              id="subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              size="small"
+              margin="dense"
+              sx={{ mb: 1 }}
+              variant="outlined"
+            />
+
+            <TextField
+              fullWidth
+              label="Description"
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+              margin="dense"
+              multiline
+              rows={2}
+              variant="outlined"
+              sx={{ mb: 1 }}
+            />
+
+            <TextField
+              fullWidth
+              select
+              label="Priority"
+              id="priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              margin="dense"
+              size="small"
+              variant="outlined"
+              sx={{ mb: 1 }}
+            >
+              <MenuItem value="High">High</MenuItem>
+              <MenuItem value="Medium">Medium</MenuItem>
+              <MenuItem value="Low">Low</MenuItem>
+            </TextField>
+
+            <TextField
+              fullWidth
+              select
+              label="Category"
+              id="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              margin="dense"
+              size="small"
+              variant="outlined"
+            >
+              <MenuItem value="Technical">Technical</MenuItem>
+              <MenuItem value="Billing">Billing</MenuItem>
+              <MenuItem value="Feature Request">Feature Request</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
+            </TextField>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setShowForm(false)} variant="outlined">
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={submitting}
+              sx={{
+                backgroundColor: '#6366f1',
+                '&:hover': { backgroundColor: '#4f46e5' }
+              }}
+            >
+              {submitting ? (
+                <CircularProgress size={20} sx={{ color: 'white', mr: 1 }} />
+              ) : (
+                'Create Ticket'
+              )}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* Search and Filter Section */}
+      <Paper sx={{ p: 1.5, mb: 1.5, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Box sx={{ flex: 1, minWidth: '200px' }}>
+            <TextField
+              fullWidth
+              placeholder="Search tickets..."
+              id="searchQuery"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              variant="outlined"
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#9CA3AF' }} />
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Box>
+          <Box sx={{ minWidth: '140px' }}>
+            <TextField
+              fullWidth
+              select
+              id="filterStatus"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              variant="outlined"
+              size="small"
+            >
+              <MenuItem value="all">All Tickets</MenuItem>
+              <MenuItem value="Open">Open</MenuItem>
+              <MenuItem value="In Progress">In Progress</MenuItem>
+              <MenuItem value="Resolved">Resolved</MenuItem>
+              <MenuItem value="Closed">Closed</MenuItem>
+            </TextField>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => setShowForm(true)}
+            sx={{
+              backgroundColor: '#6366f1',
+              color: 'white',
+              textTransform: 'none',
+              '&:hover': { backgroundColor: '#4f46e5' },
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Create Ticket
+          </Button>
+          {(searchQuery || filterStatus !== 'all') && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                setSearchQuery('');
+                setFilterStatus('all');
+              }}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              Clear
+            </Button>
+          )}
+        </Box>
+      </Paper>
+
+      {/* Tickets Table */}
+      <Paper sx={{ width: '100%', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table size="small">
+            <TableHead sx={{ backgroundColor: '#F3F4F6' }}>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  #
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  Subject
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  Priority
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  Category
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  Created
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  Resolved
+                </TableCell>
+                <TableCell align="center" sx={{ fontWeight: 600, color: '#4B5563', fontSize: '0.875rem', py: 1 }}>
+                  Messages
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {loading ? (
-                <CTableRow>
-                  <td colSpan={7} className="text-center py-8">
-                    <CSpinner className="mx-auto" />
-                  </td>
-                </CTableRow>
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 2 }}>
+                    <CircularProgress size={30} />
+                  </TableCell>
+                </TableRow>
               ) : getFilteredTickets().length === 0 ? (
-                <CTableRow>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 2, color: '#9CA3AF', fontSize: '0.875rem' }}>
                     No tickets logged.
-                  </td>
-                </CTableRow>
+                  </TableCell>
+                </TableRow>
               ) : (
                 paginatedTickets.map((ticket, idx) => (
-                  <CTableRow key={ticket.id} className="hover:bg-gray-50">
-                    <CTableDataCell className="px-4 py-3">{(currentPage - 1) * PAGE_SIZE + idx + 1}</CTableDataCell>
-                    <CTableDataCell className="px-4 py-3 font-medium">{ticket.subject}</CTableDataCell>
-                    <CTableDataCell className="px-4 py-3">{getPriorityBadge(ticket.priority)}</CTableDataCell>
-                    <CTableDataCell className="px-4 py-3">{ticket.category || 'N/A'}</CTableDataCell>
-                    <CTableDataCell className="px-4 py-3 text-xs text-gray-500">
+                  <TableRow
+                    key={ticket.id}
+                    hover
+                    sx={{
+                      '&:hover': {
+                        backgroundColor: '#F9FAFB'
+                      }
+                    }}
+                  >
+                    <TableCell sx={{ py: 0.75, fontSize: '0.875rem' }}>
+                      {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                    </TableCell>
+                    <TableCell sx={{ py: 0.75, fontWeight: 500, fontSize: '0.875rem' }}>
+                      {ticket.subject}
+                    </TableCell>
+                    <TableCell sx={{ py: 0.75 }}>
+                      {getPriorityBadge(ticket.priority)}
+                    </TableCell>
+                    <TableCell sx={{ py: 0.75, fontSize: '0.875rem' }}>
+                      {ticket.category || 'N/A'}
+                    </TableCell>
+                    <TableCell sx={{ py: 0.75, fontSize: '0.75rem', color: '#6B7280' }}>
                       {new Date(ticket.createdAt).toLocaleString()}
-                    </CTableDataCell>
-                    <CTableDataCell className="px-4 py-3 text-xs text-gray-500">
-                      {ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString() : "-"}
-                    </CTableDataCell>
-                    <CTableDataCell className="px-4 py-3 text-center">
-                      <CButton
-                        color="info"
-                        variant="ghost"
-                        size="sm"
-                        className="min-w-[100px]"
+                    </TableCell>
+                    <TableCell sx={{ py: 0.75, fontSize: '0.75rem', color: '#6B7280' }}>
+                      {ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleString() : '-'}
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 0.75 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
                         onClick={() => {
                           setSelectedTicket(ticket);
                           fetchTicketMessages(ticket.id);
                         }}
+                        sx={{
+                          textTransform: 'none',
+                          minWidth: '100px',
+                          borderColor: '#6366f1',
+                          color: '#6366f1',
+                          '&:hover': {
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(99, 102, 241, 0.04)'
+                          }
+                        }}
                       >
-                        View Messages
-                      </CButton>
-                    </CTableDataCell>
-                  </CTableRow>
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </CTableBody>
-          </CTable>
-        </div>
+            </TableBody>
+          </Table>
+        </Box>
+      </Paper>
 
-        {/* Pagination */}
-        <div className="flex justify-end mt-4 gap-2">
-          <CButton
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-            disabled={currentPage === 1}
-            variant="outline"
-          >
-            Prev
-          </CButton>
-          <span className="py-2 px-3">{`Page ${currentPage} of ${totalPages}`}</span>
-          <CButton
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            variant="outline"
-          >
-            Next
-          </CButton>
-        </div>
+      {/* Pagination */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, mt: 1.5 }}>
+        <Button
+          onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+          disabled={currentPage === 1}
+          variant="outlined"
+          size="small"
+        >
+          Previous
+        </Button>
+        <Typography variant="caption" sx={{ px: 1.5, fontWeight: 500, fontSize: '0.8rem' }}>
+          Page {currentPage} of {totalPages}
+        </Typography>
+        <Button
+          onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          variant="outlined"
+          size="small"
+        >
+          Next
+        </Button>
+      </Box>
 
-        {/* Messages Modal */}
-        {selectedTicket && (
-          <CModal
-            visible={true}
-            onClose={() => {
-              setSelectedTicket(null);
-              setTicketMessages([]);
+      {/* Messages Dialog */}
+      <Dialog
+        open={Boolean(selectedTicket)}
+        onClose={() => {
+          setSelectedTicket(null);
+          setTicketMessages([]);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundImage: 'none'
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, backgroundColor: '#6366f1', color: 'white', pb: 0.75 }}>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              {selectedTicket?.subject}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem' }}>
+              Ticket #{selectedTicket?.ticketNo || selectedTicket?.id?.slice(-6)}
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 0, height: 300, display: 'flex', flexDirection: 'column', backgroundColor: '#FAFAFA' }}>
+          {ticketMessages.length === 0 ? (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                textAlign: 'center'
+              }}
+            >
+              <Box>
+                <Typography variant="h5" sx={{ mb: 0.5 }}>
+                  💬
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#9CA3AF', fontSize: '0.8rem' }}>
+                  No messages yet. Start the conversation!
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                flex: 1,
+                overflowY: 'auto',
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5
+              }}
+            >
+              {ticketMessages.map((msg) => {
+                const currentBusinessId = businessId || userDetails?.businessId || userDetails?.business?._id;
+                const currentUserId = userId || userDetails?._id;
+                const senderBusinessId = msg.sender?.businessId || msg.sender?.business?._id || null;
+
+                const userEmail = userDetails?.email || '';
+                const userDomain = userEmail.includes('@') ? userEmail.split('@')[1] : '';
+                const senderEmail = msg.sender?.email || '';
+                const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : '';
+
+                const isFromBusiness =
+                  (senderBusinessId && currentBusinessId && String(senderBusinessId) === String(currentBusinessId)) ||
+                  (msg.sender && currentUserId && String(msg.sender._id) === String(currentUserId)) ||
+                  (userDomain && senderDomain && userDomain === senderDomain);
+
+                return (
+                  <Box
+                    key={msg._id}
+                    sx={{
+                      display: 'flex',
+                      flexDirection: isFromBusiness ? 'row-reverse' : 'row',
+                      alignItems: 'flex-start',
+                      gap: 1
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isFromBusiness ? '#6366f1' : '#E5E7EB',
+                        color: isFromBusiness ? 'white' : '#4B5563',
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        flexShrink: 0
+                      }}
+                    >
+                      {msg.sender.name ? msg.sender.name.charAt(0).toUpperCase() : '?'}
+                    </Box>
+                    <Box sx={{ flex: 1, maxWidth: '70%' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: '#4B5563' }}>
+                        {msg.sender.name}
+                      </Typography>
+                      <Box
+                        sx={{
+                          backgroundColor: isFromBusiness ? '#6366f1' : '#FFFFFF',
+                          color: isFromBusiness ? 'white' : '#1F2937',
+                          borderRadius: isFromBusiness ? '8px 8px 0px 8px' : '8px 8px 8px 0px',
+                          p: 1,
+                          mt: 0.25,
+                          wordWrap: 'break-word',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          border: isFromBusiness ? 'none' : '1px solid #E5E7EB'
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ mb: msg.statusUpdate ? 0.5 : 0 }}>
+                          {msg.message}
+                        </Typography>
+                        {msg.statusUpdate && (
+                          <Box
+                            sx={{
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              opacity: 0.8,
+                              pt: 0.5,
+                              borderTop: isFromBusiness ? '1px solid rgba(255,255,255,0.3)' : '1px solid #E5E7EB'
+                            }}
+                          >
+                            {msg.statusUpdate === 'resolved' ? '✓ Resolved' : '↻ In Progress'}
+                          </Box>
+                        )}
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        sx={{ display: 'block', mt: 0.5, color: '#9CA3AF', fontSize: '0.75rem' }}
+                      >
+                        {new Date(msg.createdAt).toLocaleString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 1.5, backgroundColor: 'white', gap: 0.5 }}>
+          <TextField
+            fullWidth
+            multiline
+            rows={1}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type a message..."
+            variant="outlined"
+            size="small"
+            sx={{ mr: 0.5 }}
+          />
+          <Button
+            variant="contained"
+            endIcon={sendingMessage ? <CircularProgress size={16} /> : <SendIcon />}
+            onClick={() => selectedTicket && sendMessage(selectedTicket.id || selectedTicket._id, newMessage)}
+            disabled={!newMessage.trim() || sendingMessage}
+            sx={{
+              backgroundColor: '#6366f1',
+              '&:hover': { backgroundColor: '#4f46e5' }
             }}
-            size="md" // Changed from 'lg' to 'md'
-            className="modern-chat-modal"
           >
-            <CModalHeader className="chat-header">
-              <CModalTitle className="chat-modal-title">
-                <div className="ticket-subject">{selectedTicket?.subject}</div>
-                <div className="ticket-id">Ticket #{selectedTicket?.ticketNo || selectedTicket?.id?.slice(-6)}</div>
-              </CModalTitle>
-            </CModalHeader>
-            <CModalBody className="p-0">
-              <div className="chat-body">
-                {ticketMessages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-center">
-                    <div>
-                      <div className="text-4xl text-gray-300 mb-3">💬</div>
-                      <p className="text-gray-500 text-sm">No messages yet. Start the conversation!</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="messages-container">
-                    {ticketMessages.map((msg) => {
-                      // Determine whether the message is from the current business
-                      const currentBusinessId = businessId || userDetails?.businessId || userDetails?.business?._id;
-                      const currentUserId = userId || userDetails?._id;
-                      const senderBusinessId = msg.sender?.businessId || msg.sender?.business?._id || null;
-
-                      // Fallback: consider same business if sender email domain matches current user's email domain
-                      const userEmail = userDetails?.email || '';
-                      const userDomain = userEmail.includes('@') ? userEmail.split('@')[1] : '';
-                      const senderEmail = msg.sender?.email || '';
-                      const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : '';
-
-                      const isFromBusiness = (
-                        // direct id matches
-                        (senderBusinessId && currentBusinessId && String(senderBusinessId) === String(currentBusinessId)) ||
-                        // sender is the current logged-in user
-                        (msg.sender && currentUserId && String(msg.sender._id) === String(currentUserId)) ||
-                        // domain fallback
-                        (userDomain && senderDomain && userDomain === senderDomain)
-                      );
-
-                      return (
-                        <div key={msg._id} className={`chat-message ${isFromBusiness ? 'sent' : 'received'}`}>
-                          <div className={`flex items-start ${isFromBusiness ? 'flex-row-reverse' : 'flex-row'}`}>
-                            <div className={`chat-avatar ${isFromBusiness ? 'sent' : 'received'}`}>
-                              {msg.sender.name ? msg.sender.name.charAt(0).toUpperCase() : '?'}
-                            </div>
-                            <div className="chat-message-content">
-                              <span className="chat-sender-name">{msg.sender.name}</span>
-                              <div className={`chat-message-bubble ${isFromBusiness ? 'sent' : 'received'}`}>
-                                <p>{msg.message}</p>
-                                {msg.statusUpdate && (
-                                  <div className="status-update">
-                                    {msg.statusUpdate === 'resolved' ? (
-                                      <span>✓ Resolved</span>
-                                    ) : (
-                                      <span>↻ In Progress</span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="chat-time">
-                                {new Date(msg.createdAt).toLocaleString('en-US', {
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                  hour12: true
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </CModalBody>
-            <CModalFooter className="chat-footer p-2">
-              <CInputGroup>
-                <CFormTextarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  rows={1}
-                  className="chat-input"
-                />
-                <CButton
-                  color="primary"
-                  className="chat-send-button"
-                  onClick={() => selectedTicket && sendMessage(selectedTicket.id || selectedTicket._id, newMessage)}
-                  disabled={!newMessage.trim() || sendingMessage}
-                >
-                  {sendingMessage ? (
-                    <CSpinner size="sm" component="span" aria-hidden="true" className="text-white" />
-                  ) : (
-                    'Send'
-                  )}
-                </CButton>
-              </CInputGroup>
-            </CModalFooter>
-          </CModal>
-        )}
-      </div>
-    </>
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }
 

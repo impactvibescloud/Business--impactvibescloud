@@ -1,51 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
-  CRow,
-  CCol,
-  CCard,
-  CCardBody,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CSpinner,
-  CInputGroup,
-  CFormInput,
-  CFormSelect,
-  CButton,
-  CDropdown,
-  CDropdownToggle,
-  CDropdownMenu,
-  CDropdownItem,
-  CPagination,
-  CPaginationItem,
-  CAlert,
-  CBadge,
-  CModal,
-  CModalHeader,
-  CModalBody,
-  CModalFooter
-  ,CFormCheck
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { 
-  cilSearch, 
-  cilFilter, 
-  cilMediaPlay,
-  cilMediaStop,
-  cilCloudDownload,
-  cilDescription,
-  cilCalendar,
-  cilReload,
-  cilOptions,
-  cilCheckCircle,
-  cilPhone,
-  cilXCircle
-} from '@coreui/icons'
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControlLabel,
+  Checkbox,
+  Grid,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  MenuItem,
+  Alert,
+  Typography,
+  InputAdornment,
+  Pagination,
+} from '@mui/material'
+import GetAppIcon from '@mui/icons-material/GetApp'
+import SearchIcon from '@mui/icons-material/Search'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import StopIcon from '@mui/icons-material/Stop'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
+import CallMakeIcon from '@mui/icons-material/CallMade'
+import CallMissedIcon from '@mui/icons-material/CallMissed'
 import './CallLogs.css'
 import '../Branches/Branches.css'
+import '../Leads/CallLogsWebpage.css'
 import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
 
 const CallLogs = () => {
@@ -222,9 +219,10 @@ const CallLogs = () => {
     }
 
     // Normalize active filter to backend parameters (status / callType)
-    if (activeFilter && activeFilter !== 'All Calls') {
-      if (activeFilter === 'Completed') endpoint += `&status=completed`
-      else if (activeFilter === 'Failed') endpoint += `&status=failed`
+    // Note: Don't send status=missed to backend as it may not be recognized
+    // Instead rely on client-side filtering for missed calls
+    if (activeFilter && activeFilter !== 'All Calls' && activeFilter !== 'Missed') {
+      if (activeFilter === 'Answered') endpoint += `&status=answered`
       else if (activeFilter === 'Outgoing') endpoint += `&callType=outbound`
       else if (activeFilter === 'Incoming') endpoint += `&callType=inbound`
     }
@@ -688,19 +686,25 @@ const CallLogs = () => {
     )
   }
 
-  // When server provides paginated results, the server is expected to apply filters.
-  // Only apply client-side filtering when server did NOT paginate (we have the full list).
-  const clientFilteredCallLogs = serverPaginated ? callLogs : callLogs.filter(log => {
-    const callType = String(log.callType || '').toLowerCase();
+  // Apply both server-side and client-side filtering for comprehensive filtering support
+  // Client-side filtering is always applied to handle all filter types reliably
+  const clientFilteredCallLogs = callLogs.filter(log => {
+    const callType = String(log.callType || log.type || '').toLowerCase();
     const status = String(log.status || '').toLowerCase();
     let matches = true;
 
-    // activeFilter can be: All Calls, Completed, Failed, Outgoing, Incoming
+    // activeFilter can be: All Calls, Answered, Missed, Outgoing, Incoming
     if (activeFilter && activeFilter !== 'All Calls') {
-      if (activeFilter === 'Completed') {
-        matches = status === 'completed' || status === 'success'
-      } else if (activeFilter === 'Failed') {
-        matches = status.includes('fail') || status.includes('error')
+      if (activeFilter === 'Answered') {
+        matches = status === 'answered' || status === 'success'
+      } else if (activeFilter === 'Missed') {
+        // Check for multiple variations of missed call status
+        const isMissedCall = status.includes('miss') || 
+                            status.includes('unanswer') || 
+                            status.includes('no_answer') ||
+                            String(log.hangupby || '').toLowerCase() === 'caller' ||
+                            String(log.hangUpBy || '').toLowerCase() === 'caller'
+        matches = isMissedCall
       } else if (activeFilter === 'Outgoing') {
         matches = callType === 'outbound' || callType === 'outgoing'
       } else if (activeFilter === 'Incoming') {
@@ -710,7 +714,7 @@ const CallLogs = () => {
 
     // callTypeFilter removed: rely on `activeFilter` for call type/status filtering
 
-    // dateFrom / dateTo client-side filtering when server didn't paginate
+    // dateFrom / dateTo client-side filtering
     if (matches && (dateFrom || dateTo)) {
       const t = log.callDate || log.createdAt
       if (t) {
@@ -1263,119 +1267,140 @@ const CallLogs = () => {
   }
 
   return (
-    <div className="call-logs-container">
-      <CCard className="mb-4">
-        <CCardBody>
-          <CRow className="mb-3 align-items-center call-logs-header">
-            <CCol md={8}>
-              <div className="calllogs-controls d-flex align-items-center gap-2">
-                <button className="cl-date-range btn btn-light" onClick={openDateModal}>
-                  <CIcon icon={cilCalendar} className="me-2" />
-                  {dateFrom && dateTo ? `${dateFrom} ${selectedFromTime} - ${dateTo} ${selectedToTime}` : 'Select date range'}
-                </button>
+    <Box className="page-container" sx={{ p: 2 }}>
+      <Card>
+        <CardHeader
+          title={
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Call Logs</Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280' }}>View and manage detailed call records</Typography>
+            </Box>
+          }
+        />
+        <CardContent>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', mb: 3 }}>
+            <Button
+              variant="outlined"
+              startIcon={<CalendarTodayIcon />}
+              onClick={openDateModal}
+              sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+            >
+              {dateFrom && dateTo ? `${dateFrom} - ${dateTo}` : 'Date range'}
+            </Button>
 
-                <div className="cl-callid-search input-group">
-                  <CFormInput placeholder="Search (Customer No. / Caller)" value={searchTerm} onChange={handleSearch} />
-                  <CButton type="button" color="primary" variant="outline"><CIcon icon={cilSearch} /></CButton>
-                </div>
-                
+            <TextField
+              placeholder="Search"
+              size="small"
+              value={searchTerm}
+              onChange={handleSearch}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <SearchIcon sx={{ cursor: 'pointer', color: '#6c5ce7' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: 200 }}
+            />
 
-                <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <CFormSelect value={activeFilter} onChange={e=>{setActiveFilter(e.target.value); setCurrentPage(1)}} style={{width:170}} aria-label="Status filter">
-                    <option>All Calls</option>
-                    <option>Completed</option>
-                    <option>Failed</option>
-                    <option>Outgoing</option>
-                    <option>Incoming</option>
-                  </CFormSelect>
-                  
-                </div>
-              </div>
-            </CCol>
-            <CCol md={4} className="d-flex justify-content-end align-items-center gap-2">
-              <CButton color="light" className="cl-icon-btn" onClick={exportAllCallLogs} disabled={exporting}>
-                {exporting ? <CSpinner size="sm" /> : <CIcon icon={cilCloudDownload} />}
-              </CButton>
-              <CButton
-                color={autoRefresh ? 'primary' : 'light'}
-                className="cl-icon-btn"
+            <TextField
+              select
+              size="small"
+              value={activeFilter}
+              onChange={e => { setActiveFilter(e.target.value); setCurrentPage(1) }}
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value="All Calls">All Calls</MenuItem>
+              <MenuItem value="Answered">Answered</MenuItem>
+              <MenuItem value="Missed">Missed</MenuItem>
+              <MenuItem value="Outgoing">Outgoing</MenuItem>
+              <MenuItem value="Incoming">Incoming</MenuItem>
+            </TextField>
+
+            <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={exportAllCallLogs}
+                disabled={exporting}
+                startIcon={exporting ? <CircularProgress size={18} /> : <GetAppIcon />}
+              >
+                {exporting ? 'Exporting' : 'Export'}
+              </Button>
+              <Button
+                variant={autoRefresh ? 'contained' : 'outlined'}
+                size="small"
                 onClick={() => {
                   setAutoRefresh(prev => {
                     const next = !prev
-                    if (next) setRefreshTrigger(t => t + 1) // immediate refresh when enabling
+                    if (next) setRefreshTrigger(t => t + 1)
                     return next
                   })
                 }}
-                title={autoRefresh ? 'Auto-refresh ON (click to stop)' : 'Start auto-refresh (5s)'}
+                startIcon={<RefreshIcon sx={{ animation: autoRefresh ? 'spin 1s linear infinite' : 'none' }} />}
+                title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
               >
-                <CIcon icon={cilReload} className={autoRefresh ? 'reload-animate' : ''} />
-              </CButton>
-              <CButton color="light" className="cl-icon-btn" onClick={() => setShowColumnsModal(true)} title="Customize columns"><CIcon icon={cilOptions} /></CButton>
-            </CCol>
-          </CRow>
-          {/* New filters UI (top controls) are used. Old inline filter row removed. */}
-          <CTable hover responsive className="table-sm compact-table branches-table" style={{ tableLayout: 'auto' }}>
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell style={{width: '48px'}}></CTableHeaderCell>
-                <CTableHeaderCell>Customer No.</CTableHeaderCell>
-                <CTableHeaderCell>DID No.</CTableHeaderCell>
-                <CTableHeaderCell>Duration</CTableHeaderCell>
-                <CTableHeaderCell>Call ID</CTableHeaderCell>
-                <CTableHeaderCell>Solution</CTableHeaderCell>
-                <CTableHeaderCell>Status</CTableHeaderCell>
-                <CTableHeaderCell>Agents Involved</CTableHeaderCell>
-                <CTableHeaderCell>Recording</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {loading ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="12" className="text-center py-5">
-                    <CSpinner color="primary" />
-                    <div className="mt-3">Loading call logs...</div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : error ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="12" className="text-center py-5">
-                    <CAlert color="danger" className="mb-0">
-                      {error}
-                    </CAlert>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : clientFilteredCallLogs.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="12" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilSearch} size="xl" />
-                      </div>
-                      <h4>No call logs found</h4>
-                      <p>There are no call logs available matching your search criteria.</p>
-                    </div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                paginatedCallLogs.map((log, index) => {
-                  const callDate = formatDate(log.callDate || log.createdAt);
-                  const callType = String((log.callType || log.type || '').toLowerCase())
-                  const isIncoming = callType === 'inbound' || callType === 'incoming'
-                  const isMissed = (log.status || '').toLowerCase().includes('miss') || (log.hangupby || '').toLowerCase() === 'caller'
-                  const duration = formatDuration(log.callDuration || log.duration);
-                  const callId = log.callId || log.call_id || log._id || '';
-                  const solution = log.solution || log.callType || '';
-                  let agents = []
-                  if (Array.isArray(log.agents) && log.agents.length) agents = log.agents
-                  else if (log.agent) agents = [log.agent]
-                  else if (Array.isArray(log.callReceivedBy)) agents = log.callReceivedBy
-                  else if (log.callReceivedBy) agents = [log.callReceivedBy]
-                  else if (log.callReceivedByString) agents = [log.callReceivedByString]
-                  else agents = []
-                  const recording = log.callRecording || log.recording || null;
-                  // try to find a single best matching audio filename from `audioFiles` when inline recording not present
-                  let matchedFiles = []
-                  try {
+                Auto
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setShowColumnsModal(true)}
+                startIcon={<MoreVertIcon />}
+              >
+                Columns
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Table Section */}
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          ) : clientFilteredCallLogs.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4, color: '#6c757d' }}>
+              <Typography>No call logs found</Typography>
+              <Typography variant="body2">There are no call logs matching your search criteria.</Typography>
+            </Box>
+          ) : (
+            <Paper variant="outlined" className="calllogs-table-container">
+              <Table size="small" sx={{ '& th, & td': { py: 1, px: 1.5 } }}>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#f3f4f6' }}>
+                    <TableCell sx={{ fontWeight: 600 }}>Customer No.</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>DID No.</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Solution</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Agents</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Recording</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedCallLogs.map((log, index) => {
+                    const callDate = formatDate(log.callDate || log.createdAt);
+                    const callType = String((log.callType || log.type || '').toLowerCase())
+                    const isIncoming = callType === 'inbound' || callType === 'incoming'
+                    const isMissed = (log.status || '').toLowerCase().includes('miss') || (log.hangupby || '').toLowerCase() === 'caller'
+                    const duration = formatDuration(log.callDuration || log.duration);
+                    const callId = log.callId || log.call_id || log._id || '';
+                    const solution = log.solution || log.callType || '';
+                    let agents = []
+                    if (Array.isArray(log.agents) && log.agents.length) agents = log.agents
+                    else if (log.agent) agents = [log.agent]
+                    else if (Array.isArray(log.callReceivedBy)) agents = log.callReceivedBy
+                    else if (log.callReceivedBy) agents = [log.callReceivedBy]
+                    else if (log.callReceivedByString) agents = [log.callReceivedByString]
+                    else agents = []
+                    const recording = log.callRecording || log.recording || null;
+                    // try to find a single best matching audio filename from `audioFiles` when inline recording not present
+                    let matchedFiles = []
+                    try {
                     if (!recording && audioFiles && audioFiles.length > 0) {
                       const vn = String(log.virtualNumber || '').replace(/[^0-9]/g, '')
                       const contactNum = String(log.contact || log.callInitiatedBy || '').replace(/[^0-9]/g, '')
@@ -1475,217 +1500,166 @@ const CallLogs = () => {
                   }
 
                   return (
-                    <CTableRow key={log._id || index}>
-                      <CTableDataCell className="align-middle">
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <input type="checkbox" onClick={(e)=>e.stopPropagation()} />
-                        </div>
-                      </CTableDataCell>
+                    <TableRow key={log._id || index} hover>
+                      <TableCell sx={{ py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              backgroundColor: isIncoming ? '#e3f2fd' : isMissed ? '#ffebee' : '#f5f5f5',
+                              color: isIncoming ? '#1565c0' : isMissed ? '#c62828' : '#388e3c',
+                            }}
+                          >
+                            {isMissed ? (
+                              <CallMissedIcon fontSize="small" />
+                            ) : isIncoming ? (
+                              <CallReceivedIcon fontSize="small" />
+                            ) : (
+                              <CallMakeIcon fontSize="small" />
+                            )}
+                          </Box>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{log.contact || log.callInitiatedBy || '—'}</Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{callDate}</Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
 
-                      <CTableDataCell className="align-middle">
-                        <div style={{display:'flex',alignItems:'center',gap:12}}>
-                          <div className={isIncoming ? 'call-type-icon incoming' : (isMissed ? 'call-type-icon missed' : 'call-type-icon') }>
-                            <CIcon icon={isIncoming ? cilPhone : (isMissed ? cilXCircle : cilPhone)} />
-                          </div>
-                          <div style={{display:'flex',flexDirection:'column'}}>
-                            <div style={{fontWeight:600}}>{log.contact || log.callInitiatedBy || '—'}</div>
-                            <div style={{fontSize:'12px',color:'#6b7280'}}>{callDate}</div>
-                          </div>
-                        </div>
-                      </CTableDataCell>
+                      <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>{log.virtualNumber || '—'}</TableCell>
 
-                      <CTableDataCell className="align-middle">{log.virtualNumber || '—'}</CTableDataCell>
+                      <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>{duration}</TableCell>
 
-                      <CTableDataCell className="align-middle">{duration}</CTableDataCell>
-
-                      <CTableDataCell className="align-middle">
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <div style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:220}}>{callId}</div>
-                        </div>
-                      </CTableDataCell>
-
-                      <CTableDataCell className="align-middle">{solution}</CTableDataCell>
-                      <CTableDataCell className="align-middle">{formatCallStatus(log.status)}</CTableDataCell>
-
-                      <CTableDataCell className="align-middle">
-                        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                      <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>{solution}</TableCell>
+                      <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {(() => {
-                            const agentDisplays = (agents || []).map(a => {
-                              if (!a) return ''
-                              if (typeof a === 'object') {
-                                const name = a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim()
-                                if (name) return name
-                                if (a.email && agentMap && (agentMap[a.email] || agentMap[a.email.toLowerCase()])) return agentMap[a.email] || agentMap[a.email.toLowerCase()]
-                                if (a._id && agentMap && agentMap[a._id]) return agentMap[a._id]
-                                return a.email || a._id || ''
-                              }
-                              const s = String(a).trim()
-                              // skip external caller numbers
-                              if (s && (s === String(log.contact || '') || s === String(log.callInitiatedBy || ''))) return ''
-                              // try exact or lowercased id/email lookup
-                              if (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) return agentMap[s] || agentMap[s.toLowerCase()]
-                              // numeric lookup (strip non-digits)
-                              const digits = s.replace(/[^0-9]/g, '')
-                              if (digits && agentByNumberMap && (agentByNumberMap[digits] || agentByNumberMap[s])) return agentByNumberMap[digits] || agentByNumberMap[s]
-                              // if it's an email and we couldn't resolve, return mapped name if available, else raw email
-                              if (s.includes('@')) return (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) || s
-                              return s
-                            }).filter(Boolean)
-                            const unique = Array.from(new Set(agentDisplays))
+                            const isMissed = log.status === 'missed'
+                            const isAnswered = log.status === 'answered'
+                            const isIncoming = log.callType === 'inbound' || log.callType === 'Inbound'
+                            const isOutgoing = log.callType === 'outbound' || log.callType === 'Outbound'
+                            
+                            if (isMissed && isIncoming) {
+                              return <ArrowDownwardIcon sx={{ color: '#d32f2f', fontSize: 20 }} />
+                            } else if (isMissed && isOutgoing) {
+                              return <ArrowUpwardIcon sx={{ color: '#d32f2f', fontSize: 20 }} />
+                            } else if (isAnswered) {
+                              return <CallReceivedIcon sx={{ color: '#388e3c', fontSize: 20, transform: 'rotate(90deg)' }} />
+                            }
+                            return null
+                          })()}
+                          <Chip 
+                            label={formatCallStatus(log.status)} 
+                            size="small"
+                            color={log.status === 'missed' ? 'error' : log.status === 'answered' ? 'success' : 'default'}
+                            variant={log.status === 'missed' || log.status === 'answered' ? 'filled' : 'outlined'}
+                          />
+                        </Box>
+                      </TableCell>
+
+                      <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
+                        {(() => {
+                          const agentDisplays = (agents || []).map(a => {
+                            if (!a) return ''
+                            if (typeof a === 'object') {
+                              const name = a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim()
+                              if (name) return name
+                              if (a.email && agentMap && (agentMap[a.email] || agentMap[a.email.toLowerCase()])) return agentMap[a.email] || agentMap[a.email.toLowerCase()]
+                              if (a._id && agentMap && agentMap[a._id]) return agentMap[a._id]
+                              return a.email || a._id || ''
+                            }
+                            const s = String(a).trim()
+                            if (s && (s === String(log.contact || '') || s === String(log.callInitiatedBy || ''))) return ''
+                            if (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) return agentMap[s] || agentMap[s.toLowerCase()]
+                            const digits = s.replace(/[^0-9]/g, '')
+                            if (digits && agentByNumberMap && (agentByNumberMap[digits] || agentByNumberMap[s])) return agentByNumberMap[digits] || agentByNumberMap[s]
+                            if (s.includes('@')) return (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) || s
+                            return s
+                          }).filter(Boolean)
+                          const unique = Array.from(new Set(agentDisplays))
+                          return <Typography variant="body2">{unique.length ? unique.join(', ') : '—'}</Typography>
+                        })()}
+                      </TableCell>
+
+                      <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                          {(() => {
+                            const rowKey = log._id || callId || index
+                            const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
+                            const isPlayingRow = playingId === String(rowKey)
                             return (
-                              <div style={{fontWeight:600,color:'#374151',fontSize:'0.95rem'}}>{unique.length ? unique.join(', ') : '—'}</div>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!rowUrl) return
+                                  if (isPlayingRow) handleStopPlayback()
+                                  else handlePlayRecording(rowUrl, rowKey)
+                                }}
+                                disabled={!rowUrl}
+                                startIcon={recordingLoading && isPlayingRow ? <CircularProgress size={16} /> : (isPlayingRow ? <StopIcon /> : <PlayArrowIcon />)}
+                                sx={{ minWidth: 'auto', textTransform: 'none', fontSize: '0.8rem' }}
+                              >
+                                {recordingLoading && isPlayingRow ? 'Loading' : (isPlayingRow ? 'Stop' : 'Play')}
+                              </Button>
                             )
                           })()}
-                        </div>
-                      </CTableDataCell>
 
-                      <CTableDataCell className="align-middle">
-                        {/** Unified recording control: show voice-loader + play/download buttons. Disabled when no recording. **/}
-                        <div className="recording-control">
-                          <div className={`voice-loader ${(!recording && (!matchedFiles || matchedFiles.length === 0)) ? 'disabled' : ''}`} aria-hidden>
-                            {(barHeights || [12,12,12,12,12]).map((h, idx) => (
-                              <div key={idx} className="voice-bar" style={{ height: `${h}px` }} />
-                            ))}
-                          </div>
-                          <div style={{display:'flex',gap:6}}>
-                            {(() => {
-                              const rowKey = log._id || callId || index
-                              const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
-                              const isPlayingRow = playingId === String(rowKey)
-                              return (
-                                <button
-                                  type="button"
-                                  className={`rec-btn play ${isPlayingRow ? 'playing' : ''}`}
-                                  onClick={(e) => { e.stopPropagation();
-                                    const url = rowUrl
-                                    if (!url) return
-                                    if (isPlayingRow) {
-                                      handleStopPlayback()
-                                    } else {
-                                      handlePlayRecording(url, rowKey)
-                                    }
-                                  }}
-                                  disabled={!rowUrl}
-                                  title={isPlayingRow ? 'Stop playback' : 'Play recording'}
-                                >
-                                  {recordingLoading && isPlayingRow ? (
-                                    <CSpinner size="sm" />
-                                  ) : (
-                                    <CIcon icon={isPlayingRow ? cilMediaStop : cilMediaPlay} />
-                                  )}
-                                </button>
-                              )
-                            })()}
-
-                            {(() => {
-                              const fname = recording && String(recording).split('/').pop() || (matchedFiles && matchedFiles[0])
-                              const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
-                              const downloadKey = fname || rowUrl
-                              const isDownloading = Boolean(downloadLoadingMap && downloadKey && downloadLoadingMap[String(downloadKey)])
-                              return (
-                                <button
-                                  type="button"
-                                  className="rec-btn"
-                                  onClick={(e) => { e.stopPropagation();
-                                    if (!rowUrl) return
-                                    handleDownloadRecording(rowUrl, fname)
-                                  }}
-                                  disabled={!rowUrl || isDownloading}
-                                  title={isDownloading ? 'Downloading...' : 'Download recording'}
-                                >
-                                  {isDownloading ? <CSpinner size="sm" /> : <CIcon icon={cilCloudDownload} />}
-                                </button>
-                              )
-                            })()}
-                          </div>
-                        </div>
-                      </CTableDataCell>
-                    </CTableRow>
+                          {(() => {
+                            const fname = recording && String(recording).split('/').pop() || (matchedFiles && matchedFiles[0])
+                            const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
+                            const downloadKey = fname || rowUrl
+                            const isDownloading = Boolean(downloadLoadingMap && downloadKey && downloadLoadingMap[String(downloadKey)])
+                            return (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!rowUrl) return
+                                  handleDownloadRecording(rowUrl, fname)
+                                }}
+                                disabled={!rowUrl || isDownloading}
+                                startIcon={isDownloading ? <CircularProgress size={16} /> : <FileDownloadIcon />}
+                                sx={{ minWidth: 'auto', textTransform: 'none', fontSize: '0.8rem' }}
+                              >
+                                {isDownloading ? 'Saving' : 'Download'}
+                              </Button>
+                            )
+                          })()}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
                   )
-                })
-              )}
-            </CTableBody>
-          </CTable>
-          {effectiveTotalPages > 1 && (
-            <div style={{ overflowX: 'auto', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-              <CPagination aria-label="Page navigation" className="justify-content-center mt-4" style={{ display: 'inline-flex', flexWrap: 'nowrap' }}>
-                <CPaginationItem
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Previous
-                </CPaginationItem>
-                {/* Compact pagination: max 5 page buttons */}
-                {(() => {
-                  const pages = [];
-                  const showFirst = 1;
-                  const showLast = effectiveTotalPages;
-                  // Always show first page
-                  pages.push(
-                    <CPaginationItem key={showFirst} active={currentPage === showFirst} onClick={() => setCurrentPage(showFirst)}>
-                      {showFirst}
-                    </CPaginationItem>
-                  );
-                  // Show ellipsis if needed
-                  if (currentPage > 3) {
-                    pages.push(<CPaginationItem key="start-ellipsis" disabled>...</CPaginationItem>);
-                  }
-                  // Show previous page if not near start
-                  if (currentPage > 2 && currentPage !== showLast) {
-                    pages.push(
-                      <CPaginationItem key={currentPage - 1} onClick={() => setCurrentPage(currentPage - 1)}>
-                        {currentPage - 1}
-                      </CPaginationItem>
-                    );
-                  }
-                  // Show current page (if not first/last)
-                  if (currentPage !== showFirst && currentPage !== showLast) {
-                    pages.push(
-                      <CPaginationItem key={currentPage} active onClick={() => setCurrentPage(currentPage)}>
-                        {currentPage}
-                      </CPaginationItem>
-                    );
-                  }
-                  // Show next page if not near end
-                  if (currentPage < showLast - 1 && currentPage !== showFirst) {
-                    pages.push(
-                      <CPaginationItem key={currentPage + 1} onClick={() => setCurrentPage(currentPage + 1)}>
-                        {currentPage + 1}
-                      </CPaginationItem>
-                    );
-                  }
-                  // Show ellipsis if needed
-                  if (currentPage < showLast - 2) {
-                    pages.push(<CPaginationItem key="end-ellipsis" disabled>...</CPaginationItem>);
-                  }
-                  // Always show last page (if not already shown)
-                  if (showLast !== showFirst) {
-                    pages.push(
-                      <CPaginationItem key={showLast} active={currentPage === showLast} onClick={() => setCurrentPage(showLast)}>
-                        {showLast}
-                      </CPaginationItem>
-                    );
-                  }
-                  return pages;
-                })()}
-                <CPaginationItem
-                  disabled={currentPage === effectiveTotalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </CPaginationItem>
-              </CPagination>
-            </div>
+                })}
+                </TableBody>
+              </Table>
+            </Paper>
           )}
-        </CCardBody>
-      </CCard>
+
+          {/* Pagination */}
+          {effectiveTotalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Pagination
+                count={effectiveTotalPages}
+                page={currentPage}
+                onChange={(e, value) => setCurrentPage(value)}
+                color="primary"
+              />
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
         {/* Customize Columns Modal */}
-        <CModal visible={showColumnsModal} onClose={() => setShowColumnsModal(false)} size="xl">
-          <CModalHeader>
-            <h5>Customize Columns</h5>
-          </CModalHeader>
-          <CModalBody>
+        <Dialog open={showColumnsModal} onClose={() => setShowColumnsModal(false)} maxWidth="lg" fullWidth>
+          <DialogTitle>Customize Columns</DialogTitle>
+          <DialogContent>
             <div className="d-flex flex-column" style={{gap:8}}>
               <div>
                 <strong>Preview (first 3 rows):</strong>
@@ -1717,110 +1691,108 @@ const CallLogs = () => {
                 const label = (typeof c === 'string') ? c : c.label || c.key
                 const checked = selectedColumns && selectedColumns.indexOf(key) !== -1
                 return (
-                  <CFormCheck
+                  <FormControlLabel
                     key={key}
                     label={label}
-                    checked={checked}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedColumns(s => Array.from(new Set([...(s||[]), key])))
-                      else setSelectedColumns(s => (s||[]).filter(x=>x!==key))
-                    }}
+                    control={
+                      <Checkbox
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedColumns(s => Array.from(new Set([...(s||[]), key])))
+                          else setSelectedColumns(s => (s||[]).filter(x=>x!==key))
+                        }}
+                      />
+                    }
                   />
                 )
               })}
             </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="light" onClick={() => { setSelectedColumns((columnsAvailable||[]).map(c => (c.key || c))); }}>Select All</CButton>
-            <CButton color="light" onClick={() => { setSelectedColumns([]); }}>Clear All</CButton>
-            <CButton color="primary" onClick={() => applyColumns()}>Apply</CButton>
-            <CButton color="secondary" onClick={() => setShowColumnsModal(false)}>Close</CButton>
-          </CModalFooter>
-        </CModal>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { setSelectedColumns((columnsAvailable||[]).map(c => (c.key || c))); }}>Select All</Button>
+            <Button onClick={() => { setSelectedColumns([]); }}>Clear All</Button>
+            <Button onClick={() => applyColumns()} variant="contained">Apply</Button>
+            <Button onClick={() => setShowColumnsModal(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
 
       {/* Recording Modal */}
-      <CModal visible={showModal} scrollable onClose={() => {
-        setShowModal(false);
-        if (audioBlobUrl) { try { URL.revokeObjectURL(audioBlobUrl); } catch(e){}; setAudioBlobUrl(null); }
-        setRecordingMimeType(null);
-        setRecordingError(null);
-        setRecordingLoading(false);
-        setRecordingInfo(null);
-        try { stopWebAudio() } catch(e){}
-        try { if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null } } catch(e){}
-      }} size="lg">
-        <CModalHeader>
-          <h5>Call Recording - {selectedLog ? formatDate(selectedLog.callDate || selectedLog.createdAt) : ''}</h5>
-        </CModalHeader>
-          <CModalBody style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+      <Dialog 
+        open={showModal} 
+        onClose={() => {
+          setShowModal(false);
+          if (audioBlobUrl) { try { URL.revokeObjectURL(audioBlobUrl); } catch(e){}; setAudioBlobUrl(null); }
+          setRecordingMimeType(null);
+          setRecordingError(null);
+          setRecordingLoading(false);
+          setRecordingInfo(null);
+          try { stopWebAudio() } catch(e){}
+          try { if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null } } catch(e){}
+        }} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          Call Recording - {selectedLog ? formatDate(selectedLog.callDate || selectedLog.createdAt) : ''}
+        </DialogTitle>
+        <DialogContent sx={{ maxHeight: '65vh', overflowY: 'auto' }}>
           {selectedLog && (
-            <div>
-              <div className="mb-3">
-                <strong>Call Details:</strong>
-                <p>Type: {selectedLog.callType || 'Unknown'}</p>
-                <p>Initiated By: {selectedLog.callInitiatedBy || 'Unknown'}</p>
-                <p>Received By: {selectedLog.callReceivedBy || 'N/A'}</p>
-                <p>Rejected By: {selectedLog.callRejectedBy || 'N/A'}</p>
-                <p>Team: {selectedLog.team || 'N/A'}</p>
-                <p>Hang Up By: {selectedLog.hangUpBy || 'Unknown'}</p>
-                <p>Duration: {formatDuration(selectedLog.callDuration || selectedLog.duration)}</p>
-                <p>Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</p>
-                <p>Status: {formatCallStatus(selectedLog.status)}</p>
-                <p>Notes: {selectedLog.notes || selectedLog.notebyagent || 'N/A'}</p>
-              </div>
+            <Box>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Call Details:</Typography>
+                <Typography variant="body2">Type: {selectedLog.callType || 'Unknown'}</Typography>
+                <Typography variant="body2">Initiated By: {selectedLog.callInitiatedBy || 'Unknown'}</Typography>
+                <Typography variant="body2">Received By: {selectedLog.callReceivedBy || 'N/A'}</Typography>
+                <Typography variant="body2">Rejected By: {selectedLog.callRejectedBy || 'N/A'}</Typography>
+                <Typography variant="body2">Team: {selectedLog.team || 'N/A'}</Typography>
+                <Typography variant="body2">Hang Up By: {selectedLog.hangUpBy || 'Unknown'}</Typography>
+                <Typography variant="body2">Duration: {formatDuration(selectedLog.callDuration || selectedLog.duration)}</Typography>
+                <Typography variant="body2">Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</Typography>
+                <Typography variant="body2">Status: {formatCallStatus(selectedLog.status)}</Typography>
+                <Typography variant="body2">Notes: {selectedLog.notes || selectedLog.notebyagent || 'N/A'}</Typography>
+              </Box>
               
-              <div className="mb-3">
-                <strong>Recording Options:</strong>
-                <div className="d-flex gap-2 flex-wrap mt-2">
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Recording Options:</Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
                   {selectedLog.callRecording ? (
                     <>
                       {(() => {
                         const modalPlayKey = selectedLog._id ? String(selectedLog._id) : `modal-${selectedLog.callId || 'sel'}`
                         const isPlayingModal = playingId === String(modalPlayKey)
                         return (
-                          <CButton
+                          <Button
+                            variant="contained"
                             color="primary"
+                            startIcon={recordingLoading && isPlayingModal ? <CircularProgress size={20} sx={{ mr: 1 }} /> : (isPlayingModal ? <StopIcon /> : <PlayArrowIcon />)}
                             onClick={() => {
                               if (isPlayingModal) handleStopPlayback()
                               else handlePlayRecording(selectedLog.callRecording, modalPlayKey)
                             }}
                           >
-                            {recordingLoading && isPlayingModal ? (
-                              <CSpinner size="sm" className="me-2" />
-                            ) : (
-                              <CIcon icon={isPlayingModal ? cilMediaStop : cilMediaPlay} className="me-2" />
-                            )}
-                            {isPlayingModal ? 'Stop' : 'Play Recording'}
-                          </CButton>
+                            {recordingLoading && isPlayingModal ? 'Loading...' : (isPlayingModal ? 'Stop' : 'Play Recording')}
+                          </Button>
                         )
                       })()}
-                      <CButton
+                      <Button
+                        variant="contained"
                         color="success"
+                        startIcon={downloadLoadingMap && downloadLoadingMap[`call-recording-${selectedLog._id}.mp3`] ? <CircularProgress size={20} /> : <FileDownloadIcon />}
                         onClick={() => handleDownloadRecording(
                           selectedLog.callRecording,
                           `call-recording-${selectedLog._id}.mp3`
                         )}
                         disabled={Boolean(downloadLoadingMap && downloadLoadingMap[`call-recording-${selectedLog._id}.mp3`])}
                       >
-                        {downloadLoadingMap && downloadLoadingMap[`call-recording-${selectedLog._id}.mp3`] ? (
-                          <>
-                            <CSpinner size="sm" className="me-2" />
-                            Downloading...
-                          </>
-                        ) : (
-                          <>
-                            <CIcon icon={cilCloudDownload} className="me-2" />
-                            Download Recording
-                          </>
-                        )}
-                      </CButton>
+                        {downloadLoadingMap && downloadLoadingMap[`call-recording-${selectedLog._id}.mp3`] ? 'Downloading...' : 'Download Recording'}
+                      </Button>
                     </>
                   ) : (
                     // ...existing code for alternate recordings...
                     (() => {
                       const vn = String(selectedLog.virtualNumber || '').replace(/[^0-9]/g, '')
                       const contactNum = String(selectedLog.contact || '').replace(/[^0-9]/g, '')
-                      if ((!vn || !contactNum) || audioFiles.length === 0) return <p className="text-muted">No recording available for this call.</p>
+                      if ((!vn || !contactNum) || audioFiles.length === 0) return <Typography color="textSecondary">No recording available for this call.</Typography>
 
                       const makeVariants = (s) => {
                         const v = []
@@ -1845,14 +1817,14 @@ const CallLogs = () => {
                           return vnVariants.some(v => v && f.includes(v)) || contactVariants.some(c => c && f.includes(c))
                         })
                         if (loose.length === 0) return (
-                          <div>
-                            <p className="text-muted">No recording available for this call.</p>
-                            <div className="mt-2">
-                              <CButton size="sm" color="secondary" onClick={() => fetchAudioFiles()}>
+                          <Box>
+                            <Typography color="textSecondary">No recording available for this call.</Typography>
+                            <Box sx={{ mt: 2 }}>
+                              <Button size="small" color="inherit" onClick={() => fetchAudioFiles()}>
                                 Refresh recordings ({audioLoading ? '...' : (audioFiles.length)})
-                              </CButton>
-                            </div>
-                          </div>
+                              </Button>
+                            </Box>
+                          </Box>
                         )
                         // prefer looser unique list
                         const seenLoose = new Set()
@@ -1874,95 +1846,88 @@ const CallLogs = () => {
                       }
 
                       return (
-                        <div>
-                          <p className="mb-2">Available recordings:</p>
-                          <div className="d-flex flex-column gap-2">
+                        <Box>
+                          <Typography variant="body2" sx={{ mb: 2 }}>Available recordings:</Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             {strictMatches.map((fname, i) => {
                               const fileUrl = buildRecordingApiUrl(fname);
                               return (
-                                <div key={i} className="d-flex align-items-center gap-2 p-2 border rounded">
-                                  <span className="flex-grow-1 text-truncate" title={fname}>{fname}</span>
+                                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
+                                  <Typography sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={fname}>{fname}</Typography>
                                         {(() => {
                                           const modalKey = `modal-${fname}`
                                           const isPlaying = playingId === String(modalKey)
                                           return (
-                                            <CButton
-                                              size="sm"
+                                            <Button
+                                              size="small"
+                                              variant="outlined"
                                               color="primary"
-                                              variant="outline"
+                                              startIcon={recordingLoading && isPlaying ? <CircularProgress size={16} /> : (isPlaying ? <StopIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />)}
                                               onClick={() => {
                                                 if (isPlaying) handleStopPlayback()
                                                 else handlePlayRecording(fileUrl, modalKey)
                                               }}
-                                            >
-                                              {recordingLoading && isPlaying ? <CSpinner size="sm" /> : <CIcon icon={isPlaying ? cilMediaStop : cilMediaPlay} size="sm" />}
-                                            </CButton>
+                                            />
                                           )
                                         })()}
-                                  <CButton
-                                    size="sm"
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
                                     color="success"
-                                    variant="outline"
+                                    startIcon={downloadLoadingMap && downloadLoadingMap[fname] ? <CircularProgress size={16} /> : <FileDownloadIcon fontSize="small" />}
                                     onClick={() => handleDownloadRecording(fileUrl, fname)}
                                     disabled={Boolean(downloadLoadingMap && downloadLoadingMap[fname])}
                                   >
-                                    {downloadLoadingMap && downloadLoadingMap[fname] ? (
-                                      <>
-                                        <CSpinner size="sm" className="me-1" />
-                                        DL
-                                      </>
-                                    ) : (
-                                      <CIcon icon={cilCloudDownload} size="sm" />
-                                    )}
-                                  </CButton>
-                                </div>
+                                    {downloadLoadingMap && downloadLoadingMap[fname] ? 'DL' : 'DL'}
+                                  </Button>
+                                </Box>
                               )
                             })}
-                          </div>
-                        </div>
+                          </Box>
+                        </Box>
                       )
                     })()
                   )}
-                </div>
+                </Box>
                 {recordingLoading && (
-                  <div className="mt-3">Loading recording...</div>
+                  <Box sx={{ mt: 3 }}>Loading recording...</Box>
                 )}
                 {recordingError && (
-                  <div className="mt-3 text-danger">{recordingError}</div>
+                  <Box sx={{ mt: 3, color: 'error.main' }}>{recordingError}</Box>
                 )}
                   {recordingInfo && (
-                    <div className="mt-2 small text-muted">
+                    <Typography variant="caption" color="textSecondary" sx={{ mt: 2, display: 'block' }}>
                       Response: {recordingInfo.status} • Type: {recordingInfo.contentType} • Size: {Math.round((recordingInfo.size||0)/1024)} KB
-                    </div>
+                    </Typography>
                   )}
                 {audioBlobUrl && (
-                  <div className="mt-3">
-                    <div className="d-flex gap-2 mb-2">
-                      <CButton size="sm" color="info" variant="outline" onClick={() => window.open(audioBlobUrl, '_blank')}>Open in new tab</CButton>
-                      <CButton size="sm" color="secondary" variant="outline" onClick={() => {
+                  <Box sx={{ mt: 3 }}>
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                      <Button size="small" variant="outlined" color="info" onClick={() => window.open(audioBlobUrl, '_blank')}>Open in new tab</Button>
+                      <Button size="small" variant="outlined" onClick={() => {
                         const a = document.createElement('a')
                         a.href = audioBlobUrl
                         a.download = `recording.${(recordingMimeType && recordingMimeType.includes('wav')) ? 'wav' : 'mp3'}`
                         document.body.appendChild(a)
                         a.click()
                         a.remove()
-                      }}>Download (debug)</CButton>
+                      }}>Download (debug)</Button>
                       {audioCtxPlaying ? (
-                        <CButton size="sm" color="danger" variant="outline" onClick={() => stopWebAudio()}>Stop WebAudio</CButton>
+                        <Button size="small" variant="outlined" color="error" onClick={() => stopWebAudio()}>Stop WebAudio</Button>
                       ) : null}
-                    </div>
-                    <audio controls ref={audioRef} autoPlay style={{ width: '100%' }}>
+                    </Box>
+                    <Box component="audio" controls ref={audioRef} autoPlay={true} sx={{ width: '100%' }}>
                       <source src={audioBlobUrl} type={recordingMimeType || 'audio/mpeg'} />
                       Your browser does not support the audio element.
-                    </audio>
-                  </div>
+                    </Box>
+                  </Box>
                 )}
-              </div>
-            </div>
+              </Box>
+            </Box>
           )}
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={() => {
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
             setShowModal(false);
             if (audioBlobUrl) { try { URL.revokeObjectURL(audioBlobUrl); } catch(e){}; setAudioBlobUrl(null); }
             setRecordingMimeType(null);
@@ -1973,61 +1938,89 @@ const CallLogs = () => {
             try { if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null } } catch(e){}
           }}>
             Close
-          </CButton>
-        </CModalFooter>
-      </CModal>
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Date Range Modal (Quick Actions + Dual Calendar) */}
-      <CModal visible={showDateModal} onClose={() => setShowDateModal(false)} size="lg">
-        <div className="date-filter-modal date-filter-modal-rich">
-          <div className="date-filter-left">
-            <h5>Quick Actions</h5>
-            <ul>
-              {['Last 1 hour','Today','Last 24 hour','Yesterday','This Week','Last 7 days','Last 30 days','Last Month','This Month'].map((q) => (
-                <li key={q}><button type="button" className="quick-action" onClick={() => applyQuickRange(q)}>{q}</button></li>
-              ))}
-            </ul>
-          </div>
-          <div className="date-filter-right">
-            <div className="date-filter-top">
-              <div className="date-display">
-                <div className="date-block">
-                  <div className="date-title">From</div>
-                  <div className="date-large">{selectedFromDate ? selectedFromDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</div>
-                  <div className="time-large">{selectedFromTime}</div>
-                </div>
-                <div className="date-block">
-                  <div className="date-title">To</div>
-                  <div className="date-large">{selectedToDate ? selectedToDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</div>
-                  <div className="time-large">{selectedToTime}</div>
-                </div>
-              </div>
-            </div>
+      <Dialog open={showDateModal} onClose={() => setShowDateModal(false)} maxWidth="lg" fullWidth>
+        <Card sx={{ m: 2 }}>
+          <CardHeader
+            title="Select Date Range"
+            subheader="Choose dates and times for filtering call logs"
+          />
+          <CardContent sx={{ display: 'flex', gap: 3 }}>
+            <Box sx={{ flex: 1, minWidth: 180 }}>
+              <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>Quick Actions</Typography>
+              <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+                {['Last 1 hour','Today','Last 24 hour','Yesterday','This Week','Last 7 days','Last 30 days','Last Month','This Month'].map((q) => (
+                  <Box component="li" key={q} sx={{ mb: 0.5 }}>
+                    <Button
+                      type="button"
+                      size="small"
+                      fullWidth
+                      variant="text"
+                      onClick={() => applyQuickRange(q)}
+                      sx={{ justifyContent: 'flex-start', textTransform: 'none', color: '#1565c0' }}
+                    >
+                      {q}
+                    </Button>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+            <Box sx={{ flex: 2 }}>
+              <Box sx={{ mb: 3 }}>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>From</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {selectedFromDate ? selectedFromDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>{selectedFromTime}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>To</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {selectedToDate ? selectedToDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>{selectedToTime}</Typography>
+                  </Grid>
+                </Grid>
+              </Box>
 
-            <div className="date-filter-panels-rich">
-              <div className="date-panel-rich">
-                <div className="calendar-wrapper">
-                  <CalendarPanel
-                    valueDate={selectedFromDate}
-                    onSelect={d=>setSelectedFromDate(d)}
-                    baseDate={baseLeftDate || selectedFromDate || new Date()}
-                    onPrev={() => setBaseLeftDate(prev => {
-                      const src = prev || (selectedFromDate || new Date())
-                      return new Date(src.getFullYear(), src.getMonth() - 1, 1)
-                    })}
-                    onNext={() => setBaseLeftDate(prev => {
-                      const src = prev || (selectedFromDate || new Date())
-                      return new Date(src.getFullYear(), src.getMonth() + 1, 1)
-                    })}
-                  />
-                </div>
-                <div className="time-row">
-                  <input type="time" value={selectedFromTime} onChange={e=>setSelectedFromTime(e.target.value)} />
-                </div>
-              </div>
-              <div className="date-panel-rich">
-                <div className="calendar-wrapper">
-                  <CalendarPanel
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} sm={6}>
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>Start Date & Time</Typography>
+                    <CalendarPanel
+                      valueDate={selectedFromDate}
+                      onSelect={d=>setSelectedFromDate(d)}
+                      baseDate={baseLeftDate || selectedFromDate || new Date()}
+                      onPrev={() => setBaseLeftDate(prev => {
+                        const src = prev || (selectedFromDate || new Date())
+                        return new Date(src.getFullYear(), src.getMonth() - 1, 1)
+                      })}
+                      onNext={() => setBaseLeftDate(prev => {
+                        const src = prev || (selectedFromDate || new Date())
+                        return new Date(src.getFullYear(), src.getMonth() + 1, 1)
+                      })}
+                    />
+                    <TextField
+                      type="time"
+                      value={selectedFromTime}
+                      onChange={e=>setSelectedFromTime(e.target.value)}
+                      size="small"
+                      fullWidth
+                      sx={{ mt: 1 }}
+                      inputProps={{ style: { cursor: 'pointer' } }}
+                    />
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>End Date & Time</Typography>
+                    <CalendarPanel
                     valueDate={selectedToDate}
                     onSelect={d=>setSelectedToDate(d)}
                     baseDate={baseRightDate || selectedToDate || new Date()}
@@ -2040,33 +2033,48 @@ const CallLogs = () => {
                       return new Date(src.getFullYear(), src.getMonth() + 1, 1)
                     })}
                   />
-                </div>
-                <div className="time-row">
-                  <input type="time" value={selectedToTime} onChange={e=>setSelectedToTime(e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            <div className="date-filter-actions-rich">
-              <CButton color="warning" onClick={() => {
-                // apply selected values to dateFrom/dateTo (date-only fields expected by backend)
+                  <TextField
+                    type="time"
+                    value={selectedToTime}
+                    onChange={e=>setSelectedToTime(e.target.value)}
+                    size="small"
+                    fullWidth
+                    sx={{ mt: 1 }}
+                    inputProps={{ style: { cursor: 'pointer' } }}
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
+          </CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, p: 2, borderTop: '1px solid #e5e7eb' }}>
+            <Button
+              variant="outlined"
+              onClick={() => setShowDateModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
                 setDateFrom(selectedFromDate ? formatDateInput(selectedFromDate) : '')
                 setDateTo(selectedToDate ? formatDateInput(selectedToDate) : '')
                 setShowDateModal(false)
                 setCurrentPage(1)
-              }}>APPLY</CButton>
-            </div>
-          </div>
-        </div>
-      </CModal>
+              }}
+            >
+              Apply Filter
+            </Button>
+          </Box>
+        </Card>
+      </Dialog>
       {/* Filters moved inline; modal removed */}
       {/* Notes Modal (notepad) */}
-      <CModal visible={showNotesModal} scrollable onClose={() => setShowNotesModal(false)} size="md">
-        <CModalHeader>
-          <h5>Notes</h5>
-        </CModalHeader>
-        <CModalBody style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-          <div>
+      <Dialog open={showNotesModal} onClose={() => setShowNotesModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Notes</DialogTitle>
+        <DialogContent sx={{ maxHeight: '50vh', overflowY: 'auto', py: 2 }}>
+          <Box>
             <textarea
               readOnly
               value={notesContent}
@@ -2074,15 +2082,15 @@ const CallLogs = () => {
               style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', padding: '10px', borderRadius: 4, border: '1px solid #ddd', background: '#fffef6' }}
             />
             {(!notesContent || String(notesContent).trim() === '') && (
-              <div className="text-muted mt-2">No notes available for this call.</div>
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>No notes available for this call.</Typography>
             )}
-          </div>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={() => setShowNotesModal(false)}>Close</CButton>
-        </CModalFooter>
-      </CModal>
-    </div>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button color="inherit" onClick={() => setShowNotesModal(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }
 

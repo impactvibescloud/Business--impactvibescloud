@@ -1,160 +1,275 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import PropTypes from "prop-types";
 
-import { CBadge } from "@coreui/react";
+import {
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Collapse,
+  ListItemButton,
+  Chip,
+  Box,
+  Typography,
+} from '@mui/material';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-export const AppSidebarNav = ({ items }) => {
+export const AppSidebarNav = ({ items, collapsed }) => {
   const location = useLocation();
-  // We'll inject section headers above certain items (Data & Analytics, Agents)
+  const [expandedGroups, setExpandedGroups] = useState({});
+
   let headerInjectedDataAnalytics = false;
   let headerInjectedAgents = false;
   let headerInjectedCallSettings = false;
   let headerInjectedContacts = false;
   let headerInjectedMoreSettings = false;
   let headerInjectedCampaigns = false;
-  const navLink = (name, icon, badge) => {
+
+  const toggleGroup = (groupName) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  const SectionHeader = ({ label }) => (
+    <Box sx={{ px: collapsed ? 1 : 2, py: 0.75, mt: 0.5 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          fontWeight: 700,
+          color: '#9ca3af',
+          fontSize: collapsed ? '0.65rem' : '0.75rem',
+          letterSpacing: '0.5px',
+          textTransform: 'uppercase',
+          display: collapsed ? 'none' : 'block',
+        }}
+      >
+        {label}
+      </Typography>
+    </Box>
+  );
+
+  const NavItemComponent = ({ item, index }) => {
+    const { name, icon, badge, to } = item;
+    const isActive = location.pathname === to || location.pathname.startsWith(`${to}/`);
+
     return (
-      <>
-        {icon && (
-          <span className="nav-icon-wrapper" aria-hidden>
-            {React.isValidElement(icon) ? icon : icon}
-          </span>
-        )}
-        {name && (
-          <span style={{ color: '#1f2937', display: 'inline-block' }}>
-            {name}
-          </span>
-        )}
-        {badge && (
-          <CBadge color={badge.color} className="ms-auto" style={{ color: '#1f2937' }}>
-            {badge.text}
-          </CBadge>
-        )}
-      </>
+      <ListItem
+        disablePadding
+        key={`navitem-${index}`}
+        sx={{
+          display: 'block',
+          px: collapsed ? 0.5 : 1,
+          mb: 0.25,
+        }}
+      >
+        <NavLink
+          to={to}
+          style={{ textDecoration: 'none' }}
+          className={isActive ? 'active' : ''}
+        >
+          <ListItemButton
+            sx={{
+              minHeight: collapsed ? 32 : 36,
+              borderRadius: collapsed ? '4px' : '6px',
+              backgroundColor: isActive ? '#f3f4f6' : 'transparent',
+              '&:hover': {
+                backgroundColor: '#f9fafb',
+              },
+              px: collapsed ? 0.5 : 1,
+              py: collapsed ? 0.25 : 0.5,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
+          >
+            {icon && (
+              <ListItemIcon
+                sx={{
+                  minWidth: collapsed ? 'auto' : 40,
+                  color: isActive ? '#6366f1' : '#6b7280',
+                  fontSize: '1.3rem',
+                }}
+              >
+                {icon}
+              </ListItemIcon>
+            )}
+            {!collapsed && (
+              <ListItemText
+                primary={name}
+                primaryTypographyProps={{
+                  sx: {
+                    color: isActive ? '#111827' : '#6b7280',
+                    fontWeight: isActive ? 600 : 500,
+                    fontSize: '0.85rem',
+                  },
+                }}
+              />
+            )}
+            {!collapsed && badge && (
+              <Chip
+                label={badge.text}
+                size="small"
+                sx={{
+                  ml: 'auto',
+                  backgroundColor: badge.color || '#e5e7eb',
+                  color: '#fff',
+                  height: 20,
+                  fontSize: '0.7rem',
+                }}
+              />
+            )}
+          </ListItemButton>
+        </NavLink>
+      </ListItem>
     );
   };
 
-  const navItem = (item, index) => {
-    const { component, name, badge, icon, ...rest } = item;
-    const Component = component;
-    // Force a visible link color (inline style has highest priority)
-    const forcedStyle = Object.assign({}, rest.style || {}, { color: '#1f2937' });
-    const forcedClass = ['app-sidebar-link', rest.className].filter(Boolean).join(' ');
+  const NavGroupComponent = ({ item, index }) => {
+    const { name, icon, to, items: subItems } = item;
+    const isExpanded = expandedGroups[to] !== false; // Default expanded
+    const isActive = location.pathname.startsWith(to);
+
     return (
-      <Component
-        {...(rest.to &&
-          !rest.items && {
-            component: NavLink,
-            activeclassname: "active",
-          })}
-        key={`navitem-${index}`}
-        {...rest}
-        style={forcedStyle}
-        className={forcedClass}
-      >
-        {navLink(name, icon, badge)}
-      </Component>
-    );
-  };
-  const navGroup = (item, index) => {
-    const { component, name, icon, to, ...rest } = item;
-    const Component = component;
-    const groupStyle = Object.assign({}, rest.style || {}, { color: '#1f2937' });
-    const groupClass = ['app-sidebar-group', rest.className].filter(Boolean).join(' ');
-    return (
-      <Component
-        idx={String(index)}
-        key={`navgroup-${index}-${name}`}
-        toggler={navLink(name, icon)}
-        visible={location.pathname.startsWith(to)}
-        {...rest}
-        style={groupStyle}
-        className={groupClass}
-      >
-        {item.items?.map((item, index) =>
-          item.items ? navGroup(item, `${index}-${item.name}`) : navItem(item, `${index}-${item.name}`)
+      <Box key={`navgroup-${index}-${name}`}>
+        <ListItem
+          disablePadding
+          sx={{
+            display: 'block',
+            px: collapsed ? 0.5 : 1,
+            mb: 0.25,
+          }}
+        >
+          <ListItemButton
+            onClick={() => toggleGroup(to)}
+            sx={{
+              minHeight: collapsed ? 32 : 36,
+              borderRadius: collapsed ? '4px' : '6px',
+              backgroundColor: isActive ? '#f3f4f6' : 'transparent',
+              '&:hover': {
+                backgroundColor: '#f9fafb',
+              },
+              px: collapsed ? 0.5 : 1,
+              py: collapsed ? 0.25 : 0.5,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
+          >
+            {icon && (
+              <ListItemIcon
+                sx={{
+                  minWidth: collapsed ? 'auto' : 40,
+                  color: isActive ? '#6366f1' : '#6b7280',
+                  fontSize: '1.3rem',
+                }}
+              >
+                {icon}
+              </ListItemIcon>
+            )}
+            {!collapsed && (
+              <>
+                <ListItemText
+                  primary={name}
+                  primaryTypographyProps={{
+                    sx: {
+                      color: isActive ? '#111827' : '#6b7280',
+                      fontWeight: isActive ? 600 : 500,
+                      fontSize: '0.85rem',
+                    },
+                  }}
+                />
+                {isExpanded ? (
+                  <ExpandLessIcon sx={{ fontSize: '1.2rem', color: '#9ca3af' }} />
+                ) : (
+                  <ExpandMoreIcon sx={{ fontSize: '1.2rem', color: '#9ca3af' }} />
+                )}
+              </>
+            )}
+          </ListItemButton>
+        </ListItem>
+
+        {!collapsed && (
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <List
+              component="div"
+              disablePadding
+              sx={{
+                pl: 2,
+                pr: 1,
+                mb: 0.25,
+              }}
+            >
+              {subItems?.map((subItem, subIndex) =>
+                subItem.items ? (
+                  <NavGroupComponent item={subItem} index={`${index}-${subIndex}`} key={`${index}-${subIndex}`} />
+                ) : (
+                  <NavItemComponent item={subItem} index={`${index}-${subIndex}`} key={`${index}-${subIndex}`} />
+                )
+              )}
+            </List>
+          </Collapse>
         )}
-      </Component>
+      </Box>
     );
   };
 
   const rendered = [];
   if (items && items.length) {
     items.forEach((item, index) => {
-      // Insert the DATA & ANALYTICS header before the first analytics-related item
       if (
         !headerInjectedDataAnalytics &&
         (item.name === 'Agent Performance' || item.name === 'Department Performance')
       ) {
         headerInjectedDataAnalytics = true;
-        rendered.push(
-          <div key={`section-data-analytics`} className="sidebar-section">
-            <span className="sidebar-section-label">DATA &amp; ANALYTICS</span>
-          </div>
-        );
+        rendered.push(<SectionHeader key="section-data-analytics" label="Data & Analytics" />);
       }
 
-      // Insert the AGENT & DEPARTMENT header before the Agents item
       if (!headerInjectedAgents && item.name === 'Agents') {
         headerInjectedAgents = true;
-        rendered.push(
-          <div key={`section-agent-dept`} className="sidebar-section">
-            <span className="sidebar-section-label">AGENT &amp; DEPARTMENT</span>
-          </div>
-        );
+        rendered.push(<SectionHeader key="section-agent-dept" label="Agent & Department" />);
       }
 
-      // Insert the CALL SETTINGS header before the Call Settings item
       if (!headerInjectedCallSettings && item.name === 'Call Settings') {
         headerInjectedCallSettings = true;
-        rendered.push(
-          <div key={`section-call-settings`} className="sidebar-section">
-            <span className="sidebar-section-label">CALL SETTINGS</span>
-          </div>
-        );
+        rendered.push(<SectionHeader key="section-call-settings" label="Call Settings" />);
       }
 
-      // Insert the CONTACT & VIRTUAL NUMBERS header before the first contact-related item
       if (
         !headerInjectedContacts &&
         (item.name === 'Virtual Numbers' || item.name === 'Contacts')
       ) {
         headerInjectedContacts = true;
-        rendered.push(
-          <div key={`section-contact`} className="sidebar-section">
-            <span className="sidebar-section-label">CONTACT &amp; VIRTUAL NUMBERS</span>
-          </div>
-        );
+        rendered.push(<SectionHeader key="section-contact" label="Contact & Virtual Numbers" />);
       }
 
-      // Insert CAMPAIGNS header before the first campaigns-related item (Audio Cmpaign)
       if (!headerInjectedCampaigns && item.name === 'Audio Cmpaign') {
         headerInjectedCampaigns = true;
-        rendered.push(
-          <div key={`section-campaigns`} className="sidebar-section">
-            <span className="sidebar-section-label">CAMPAIGNS</span>
-          </div>
-        );
+        rendered.push(<SectionHeader key="section-campaigns" label="Campaigns" />);
       }
 
-      // Insert MORE SETTINGS header before the Billing item
       if (!headerInjectedMoreSettings && item.name === 'Billing') {
         headerInjectedMoreSettings = true;
-        rendered.push(
-          <div key={`section-more-settings`} className="sidebar-section">
-            <span className="sidebar-section-label">MORE SETTINGS</span>
-          </div>
-        );
+        rendered.push(<SectionHeader key="section-more-settings" label="More Settings" />);
       }
 
-      rendered.push(item.items ? navGroup(item, `main-${index}-${item.name}`) : navItem(item, `main-${index}-${item.name}`));
+      rendered.push(
+        item.items ? (
+          <NavGroupComponent item={item} index={`main-${index}-${item.name}`} key={`main-${index}-${item.name}`} />
+        ) : (
+          <NavItemComponent item={item} index={`main-${index}-${item.name}`} key={`main-${index}-${item.name}`} />
+        )
+      );
     });
   }
 
-  return <>{rendered}</>;
+  return (
+    <List sx={{ py: 0 }}>
+      {rendered}
+    </List>
+  );
 };
 
 AppSidebarNav.propTypes = {
   items: PropTypes.arrayOf(PropTypes.any).isRequired,
+  collapsed: PropTypes.bool,
 };

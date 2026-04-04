@@ -1,22 +1,33 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import {
-  CButton,
-  CCard,
-  CCardBody,
-  CRow,
-  CCol,
-  CBadge,
-  CModal,
-  CModalHeader,
-  CModalBody,
-  CModalFooter,
-  CModalTitle,
-  CFormCheck,
-  CFormTextarea,
-  CFormInput,
-  CSpinner
-} from '@coreui/react'
+  Box,
+  Card,
+  CardContent,
+  Grid,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+  Radio,
+  CircularProgress,
+  Typography,
+  Alert,
+  Select,
+  MenuItem,
+  Checkbox
+} from '@mui/material'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import NotificationsIcon from '@mui/icons-material/Notifications'
+import InboxIcon from '@mui/icons-material/Inbox'
+import DownloadIcon from '@mui/icons-material/Download'
 import jsPDF from 'jspdf'
 import { apiCall, ENDPOINTS } from '../../config/api'
 import './payment-requests.css'
@@ -617,19 +628,6 @@ function PaymentRequests() {
     setShowNewRequestModal(false)
   }
 
-  const getStatusBadge = (status) => {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return <CBadge color="success">Approved</CBadge>
-      case 'rejected':
-        return <CBadge color="danger">Rejected</CBadge>
-      case 'pending':
-        return <CBadge color="warning">Pending</CBadge>
-      default:
-        return <CBadge color="info">{status}</CBadge>
-    }
-  }
-
   const handlePaymentMethodChange = (method) => {
     setPaymentMethod(method)
   }
@@ -638,78 +636,91 @@ function PaymentRequests() {
     setUpiId(e.target.value)
   }
 
+  const getStatusBadge = (status) => {
+    const statusMap = {
+      'approved': { color: 'success', label: 'Approved' },
+      'rejected': { color: 'error', label: 'Rejected' },
+      'pending': { color: 'warning', label: 'Pending' }
+    }
+    const config = statusMap[status?.toLowerCase()] || { color: 'default', label: status }
+    return <Chip label={config.label} color={config.color} variant="outlined" size="small" />
+  }
+
   return (
-    <div className="payment-requests-container">
-      <div className="payment-requests-header d-flex justify-content-between align-items-center mb-4">
-        <h2>Payment Requests</h2>
-      </div>
+    <Box sx={{ p: 2 }}>
+      {/* Header */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>Payment Requests</Typography>
+        <Typography variant="body2" sx={{ color: '#6b7280' }}>Manage and process payment requests</Typography>
+      </Box>
 
       {/* Pending Payment Requests Section */}
-      <div className="pending-requests-section mb-4">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h3 className="section-title mb-0">Pending Payment Requests</h3>
-          <CButton 
-            color="primary" 
-            size="sm"
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Pending Payment Requests</Typography>
+          <Button 
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
             onClick={() => {
               setError(null)
               fetchPaymentRequests()
             }}
           >
-            <i className="bi bi-arrow-clockwise me-2"></i>
             Refresh
-          </CButton>
-        </div>
-        
+          </Button>
+        </Box>
+
         {loading ? (
-          <div className="loading-spinner d-flex align-items-center justify-content-center py-5">
-            <div className="text-center">
-              <div className="spinner-border text-primary mb-2" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <p className="mb-0">Loading payment requests...</p>
-            </div>
-          </div>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 5 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <CircularProgress sx={{ mb: 2 }} />
+              <Typography>Loading payment requests...</Typography>
+            </Box>
+          </Box>
         ) : error ? (
-          <CCard className="mb-4 border-danger">
-            <CCardBody>
-              <div className="error-message">
-                <h5 className="text-danger">Error Loading Payment Requests</h5>
-                <p>{error}</p>
-                <CButton 
-                  color="primary" 
-                  size="sm" 
-                  onClick={() => {
-                    setError(null)
-                    fetchPaymentRequests()
-                  }}
-                >
-                  Try Again
-                </CButton>
-              </div>
-            </CCardBody>
-          </CCard>
+          <Card sx={{ mb: 2, border: '1px solid #fee2e2', bgcolor: '#fef2f2' }}>
+            <CardContent>
+              <Typography sx={{ color: '#991b1b', fontWeight: 'bold', mb: 1 }}>Error Loading Payment Requests</Typography>
+              <Typography sx={{ color: '#7c2d12', mb: 2 }}>{error}</Typography>
+              <Button 
+                variant="contained"
+                size="small"
+                onClick={() => {
+                  setError(null)
+                  fetchPaymentRequests()
+                }}
+              >
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="payment-notifications">
+          <Box>
             {paymentRequests.length > 0 ? (
               paymentRequests.map((request) => (
-                <CCard 
-                  key={request.id || request._id} 
-                  className="notification-card mb-3 border-start border-4 border-primary shadow-sm"
-                  style={{ cursor: 'pointer' }}
+                <Card 
+                  key={request.id || request._id}
+                  sx={{ 
+                    mb: 2, 
+                    cursor: 'pointer',
+                    border: '1px solid #e5e7eb',
+                    borderLeft: '4px solid #6366f1',
+                    '&:hover': { boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }
+                  }}
                   onClick={() => handleCardClick(request)}
                 >
-                  <CCardBody>
-                    <div className="row align-items-center">
-                      <div className="col">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <div className="d-flex align-items-center">
-                            <div className="notification-icon me-3">
-                              <i className="bi bi-bell-fill text-primary" style={{ fontSize: '24px' }}></i>
-                            </div>
-                            <div>
-                              <h5 className="mb-0">{request.planName || 'New Payment Request'}</h5>
-                              <small className="text-muted">
+                  <CardContent>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 2, flex: 1 }}>
+                            <NotificationsIcon sx={{ fontSize: '24px', color: '#6366f1' }} />
+                            <Box>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                {request.planName || 'New Payment Request'}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>
                                 {request.requestedAt ? new Date(request.requestedAt).toLocaleString('en-US', {
                                   month: 'short',
                                   day: 'numeric',
@@ -718,867 +729,374 @@ function PaymentRequests() {
                                   minute: 'numeric',
                                   hour12: true
                                 }) : currentDate}
-                              </small>
-                            </div>
-                          </div>
-                          <div className="d-flex align-items-center">
-                            {getStatusBadge(request.status)}
-                          </div>
-                        </div>
-                        <p className="mb-3">{request.template || request.details || request.description}</p>
-                        <div className="d-flex justify-content-between align-items-center">
-                          <div>
-                            <span className="text-muted me-3">Payment Status:</span>
-                            <span className={`badge bg-${(request.paymentStatus === 'paid' ? 'success' : 'warning')}-subtle text-${request.paymentStatus === 'paid' ? 'success' : 'warning'}`}>
-                              {request.paymentStatus || 'Pending'}
-                            </span>
-                          </div>
+                              </Typography>
+                            </Box>
+                          </Box>
+                          {getStatusBadge(request.status)}
+                        </Box>
+                        <Typography variant="body2" sx={{ my: 1.5, color: '#374151' }}>
+                          {request.template || request.details || request.description}
+                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280' }}>Payment Status:</Typography>
+                            <Chip 
+                              label={request.paymentStatus || 'Pending'} 
+                              size="small"
+                              color={request.paymentStatus === 'paid' ? 'success' : 'warning'}
+                              variant="outlined"
+                            />
+                          </Box>
                           {(request.status === 'Pending' || request.status === 'pending') && (
-                            <div className="action-buttons">
-                              <CButton 
-                                color="success" 
-                                size="sm" 
-                                variant="outline"
-                                className="me-2"
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button 
+                                variant="outlined"
+                                color="success"
+                                size="small"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleAccept(request)
                                 }}
                               >
-                                <i className="bi bi-check-lg me-1"></i>
                                 Accept
-                              </CButton>
-                              <CButton 
-                                color="danger" 
-                                size="sm"
-                                variant="outline"
+                              </Button>
+                              <Button 
+                                variant="outlined"
+                                color="error"
+                                size="small"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   openRejectModal(request)
                                 }}
                               >
-                                <i className="bi bi-x-lg me-1"></i>
                                 Reject
-                              </CButton>
-                            </div>
+                              </Button>
+                            </Box>
                           )}
-                          {/* Dispute button - always visible */}
                           {request.status !== 'disputed' && (
-                            <CButton 
-                              color="warning" 
-                              size="sm"
-                              variant="outline"
-                              className="ms-2"
+                            <Button 
+                              variant="outlined"
+                              color="warning"
+                              size="small"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleOpenDisputeModal(request)
                               }}
                             >
-                              <i className="bi bi-exclamation-triangle me-1"></i>
                               Dispute
-                            </CButton>
+                            </Button>
                           )}
-                        </div>
-                      </div>
-                    </div>
-                  </CCardBody>
-                </CCard>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
               ))
             ) : (
-              <CCard className="text-center py-5">
-                <CCardBody>
-                  <div className="empty-state">
-                    <div className="empty-icon mb-3">
-                      <i className="bi bi-inbox text-muted" style={{ fontSize: '48px' }}></i>
-                    </div>
-                    <h4>No Payment Requests</h4>
-                    <p className="text-muted">Your payment requests inbox is empty.</p>
-                  </div>
-                </CCardBody>
-              </CCard>
+              <Card sx={{ textAlign: 'center', py: 5, border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <InboxIcon sx={{ fontSize: '48px', color: '#9ca3af', mb: 2 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>No Payment Requests</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>Your payment requests inbox is empty.</Typography>
+                </CardContent>
+              </Card>
             )}
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
       {/* New Payment Request Modal */}
-      <CModal 
-        visible={showNewRequestModal} 
+      <Dialog 
+        open={showNewRequestModal}
         onClose={() => setShowNewRequestModal(false)}
-        className="payment-request-modal"
       >
-        <CModalHeader closeButton>
-          <CModalTitle>Create New Payment Request</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {/* Form fields would go here */}
-          <p>Payment request creation form will be implemented here.</p>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={() => setShowNewRequestModal(false)}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSubmitRequest}>
-            Create Request
-          </CButton>
-        </CModalFooter>
-      </CModal>
+        <DialogTitle>Create New Payment Request</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mt: 1 }}>Payment request creation form will be implemented here.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNewRequestModal(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSubmitRequest}>Create Request</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Reject Payment Modal */}
-      <CModal
-        visible={showRejectModal}
+      <Dialog
+        open={showRejectModal}
         onClose={() => !rejecting && setShowRejectModal(false)}
-        backdrop="static"
-        size="lg"
+        maxWidth="sm"
+        fullWidth
       >
-        <CModalHeader closeButton>
-          <CModalTitle>Reject Payment Request</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <p>
+        <DialogTitle>Reject Payment Request</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2, mt: 1 }}>
             You are rejecting payment request <strong>{selectedRequest?._id || selectedRequest?.id}</strong>
             {selectedRequest?.planName ? ` for ${selectedRequest.planName}` : ''}.
-          </p>
-          <div className="mb-3">
-            <label htmlFor="rejectionReason" className="form-label">Rejection Reason</label>
-            <CFormTextarea
-              id="rejectionReason"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              rows="4"
-              placeholder="Enter reason for rejection (required)"
-              disabled={rejecting}
-            />
-          </div>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={() => setShowRejectModal(false)} disabled={rejecting}>
-            Cancel
-          </CButton>
-          <CButton color="danger" onClick={submitReject} disabled={rejecting || !rejectionReason.trim()}>
-            {rejecting ? (
-              <>
-                <CSpinner size="sm" className="me-2" />
-                Rejecting...
-              </>
-            ) : (
-              'Reject Payment'
-            )}
-          </CButton>
-        </CModalFooter>
-      </CModal>
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Rejection Reason"
+            placeholder="Enter reason for rejection (required)"
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            disabled={rejecting}
+            variant="outlined"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowRejectModal(false)} disabled={rejecting}>Cancel</Button>
+          <Button 
+            variant="contained"
+            color="error"
+            onClick={submitReject}
+            disabled={rejecting || !rejectionReason.trim()}
+          >
+            {rejecting ? 'Rejecting...' : 'Reject Payment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Payment Modal */}
-      <CModal 
-        visible={showPaymentModal} 
+      <Dialog 
+        open={showPaymentModal}
         onClose={() => !processingPayment && !paymentSuccess && setShowPaymentModal(false)}
-        className="payment-modal"
-        backdrop="static"
-        size="lg"
+        maxWidth="md"
+        fullWidth
       >
-        <CModalHeader closeButton={!processingPayment && !paymentSuccess}>
-          <CModalTitle>Complete Payment</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
+        <DialogTitle>Complete Payment</DialogTitle>
+        <DialogContent sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
           {paymentSuccess ? (
-            <div className="text-center py-3">
-              <div className="payment-success-icon mb-3">
-                <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '48px' }}></i>
-              </div>
-              <h5 className="mb-3">Payment Successful!</h5>
-              <p className="mb-0">Your payment has been processed successfully.</p>
-            </div>
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <CheckCircleIcon sx={{ fontSize: '48px', color: '#10b981', mb: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Payment Successful!</Typography>
+              <Typography>Your payment has been processed successfully.</Typography>
+            </Box>
           ) : loadingInvoiceData ? (
-            <div className="text-center py-3">
-              <CSpinner color="primary" />
-              <p className="mt-3 mb-0">Loading invoice details...</p>
-            </div>
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <CircularProgress sx={{ mb: 2 }} />
+              <Typography>Loading invoice details...</Typography>
+            </Box>
           ) : (
-            <>
-              <div className="invoice-content mb-4">
-                {/* Invoice Header */}
-                <div className="invoice-header mb-4">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <h5 className="mb-1">Invoice #{invoiceData?.invoiceNumber}</h5>
-                      <p className="text-muted mb-0">
-                        Generated on: {new Date(invoiceData?.invoiceDate).toLocaleDateString()}
-                      </p>
-                      {invoiceData?.dueDate && (
-                        <p className="text-danger mb-0">
-                          Due by: {new Date(invoiceData.dueDate).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-end">
-                      <span className={`badge bg-${invoiceData?.status === 'paid' ? 'success' : 'warning'}`}>
-                        {invoiceData?.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+            <Box sx={{ mt: 2 }}>
+              {/* Invoice Header */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: '#f3f4f6', borderRadius: '4px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Invoice #{invoiceData?.invoiceNumber}</Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Generated on: {new Date(invoiceData?.invoiceDate).toLocaleDateString()}</Typography>
+                  </Box>
+                  <Chip label={invoiceData?.status} color={invoiceData?.status === 'paid' ? 'success' : 'warning'} />
+                </Box>
+              </Box>
 
-                {/* Customer Information */}
-                <div className="customer-info mb-4">
-                  <h6 className="text-primary mb-3">Customer Details</h6>
-                  <div className="card bg-light">
-                    <div className="card-body">
-                      <h6 className="mb-2">{invoiceData?.customer?.name}</h6>
-                      <p className="mb-1">{invoiceData?.customer?.email}</p>
-                      <p className="mb-1">{invoiceData?.customer?.phone}</p>
-                      <p className="mb-0">{invoiceData?.customer?.address}</p>
-                    </div>
-                  </div>
-                </div>
+              {/* Summary Cards */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography color="textSecondary" variant="caption">Total Amount</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', mt: 1 }}>₹{invoiceData?.pricing?.finalTotalAmount.toLocaleString('en-IN')}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography color="textSecondary" variant="caption">Outstanding Balance</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#dc2626', mt: 1 }}>₹{invoiceData?.pricing?.outstandingBalance.toLocaleString('en-IN')}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
 
-                {/* Billing Details */}
-                <div className="billing-details mb-4">
-                  <h6 className="text-primary mb-3">Billing Period & Usage</h6>
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="row g-3">
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Start Date:</span>
-                            <span>{new Date(invoiceData?.startDate).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">End Date:</span>
-                            <span>{new Date(invoiceData?.endDate).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Billing Days:</span>
-                            <span>{invoiceData?.billingDetails?.billingDaysCount} / {invoiceData?.billingDetails?.totalDaysInMonth} days</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Daily Rate:</span>
-                            <span>₹{invoiceData?.billingDetails?.dailyRate.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Channels Added:</span>
-                            <span>{invoiceData?.billingDetails?.channelsAdded}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Total Users/Channels:</span>
-                            <span>{invoiceData?.billingDetails?.usersOrChannelsCount}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* Payment Method Selection */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>Select Payment Method</Typography>
+                <FormControl fullWidth>
+                  <RadioGroup value={paymentMethod} onChange={(e) => handlePaymentMethodChange(e.target.value)}>
+                    <FormControlLabel value="UPI" control={<Radio />} label="UPI" />
+                    <FormControlLabel value="Credit/Debit Card" control={<Radio />} label="Credit/Debit Card" />
+                    <FormControlLabel value="Net Banking" control={<Radio />} label="Net Banking" />
+                  </RadioGroup>
+                </FormControl>
+              </Box>
 
-                {/* Plan Details */}
-                <div className="plan-details mb-4">
-                  <h6 className="text-primary mb-3">Plan Information</h6>
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="row g-3">
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Plan Name:</span>
-                            <span className="fw-bold">{invoiceData?.plan?.planName}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Plan ID:</span>
-                            <span>{invoiceData?.plan?.planId}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Base Price:</span>
-                            <span>₹{invoiceData?.pricing?.planBasePrice.toLocaleString('en-IN')}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Discount:</span>
-                            <span className="text-success">{invoiceData?.pricing?.discountPercentage}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cost Breakdown */}
-                <div className="cost-breakdown mb-4">
-                  <h6 className="text-primary mb-3">Cost Breakdown</h6>
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="mb-3">
-                        <div className="d-flex justify-content-between mb-2">
-                          <span className="text-muted">Base Price:</span>
-                          <span>₹{invoiceData?.pricing?.planBasePrice.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2">
-                          <span className="text-muted">Price After Discount:</span>
-                          <span>₹{invoiceData?.pricing?.priceAfterDiscount.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2">
-                          <span className="text-muted">Subtotal Before Tax:</span>
-                          <span>₹{invoiceData?.pricing?.subtotalBeforeTax.toLocaleString('en-IN')}</span>
-                        </div>
-                        <div className="d-flex justify-content-between mb-2">
-                          <span className="text-muted">Tax Amount:</span>
-                          <span>₹{invoiceData?.pricing?.taxAmount.toLocaleString('en-IN')}</span>
-                        </div>
-                      </div>
-                      <hr />
-                      <div className="d-flex justify-content-between fw-bold">
-                        <span>Final Total Amount:</span>
-                        <span>₹{invoiceData?.pricing?.finalTotalAmount.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mt-2">
-                        <span className="text-muted">Amount Paid:</span>
-                        <span className="text-success">₹{invoiceData?.pricing?.amountPaid.toLocaleString('en-IN')}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mt-2">
-                        <span className="text-muted">Outstanding Balance:</span>
-                        <span className="text-danger">₹{invoiceData?.pricing?.outstandingBalance.toLocaleString('en-IN')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Information */}
-                <div className="payment-info mb-4">
-                  <h6 className="text-primary mb-3">Payment Information</h6>
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="row g-3">
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Payment Mode:</span>
-                            <span>{invoiceData?.paymentMode}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Payment Type:</span>
-                            <span>{invoiceData?.paymentType}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Upgrade Type:</span>
-                            <span>{invoiceData?.upgradeType}</span>
-                          </div>
-                        </div>
-                        <div className="col-md-6">
-                          <div className="d-flex justify-content-between">
-                            <span className="text-muted">Order ID:</span>
-                            <span>{invoiceData?.orderId}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="payment-method-section">
-                <h6 className="mb-3">Select Payment Method</h6>
-                
-                <div className="payment-method-options">
-                  <div className="payment-method-option mb-2">
-                    <CFormCheck 
-                      type="radio"
-                      name="paymentMethod"
-                      id="upi"
-                      value="UPI"
-                      checked={paymentMethod === 'UPI'}
-                      onChange={() => handlePaymentMethodChange('UPI')}
-                      label="UPI"
-                    />
-                  </div>
-                  
-                  <div className="payment-method-option mb-2">
-                    <CFormCheck 
-                      type="radio"
-                      name="paymentMethod"
-                      id="card"
-                      value="Credit/Debit Card"
-                      checked={paymentMethod === 'Credit/Debit Card'}
-                      onChange={() => handlePaymentMethodChange('Credit/Debit Card')}
-                      label="Credit/Debit Card"
-                    />
-                  </div>
-                  
-                  <div className="payment-method-option mb-3">
-                    <CFormCheck 
-                      type="radio"
-                      name="paymentMethod"
-                      id="netbanking"
-                      value="Net Banking"
-                      checked={paymentMethod === 'Net Banking'}
-                      onChange={() => handlePaymentMethodChange('Net Banking')}
-                      label="Net Banking"
-                    />
-                  </div>
-                </div>
-                
-                {paymentMethod === 'UPI' && (
-                  <div className="upi-section mt-3">
-                    <label htmlFor="upiId" className="form-label mb-2">UPI ID</label>
-                    <CFormInput
-                      type="text"
-                      id="upiId"
-                      placeholder="Enter UPI ID (e.g., username@upi)"
-                      value={upiId}
-                      onChange={handleUpiIdChange}
-                      disabled={processingPayment}
-                    />
-                  </div>
-                )}
-                
-                {paymentMethod === 'Credit/Debit Card' && (
-                  <div className="card-section mt-3">
-                    <div className="mb-3">
-                      <label htmlFor="cardNumber" className="form-label mb-2">Card Number</label>
-                      <CFormInput
-                        type="text"
-                        id="cardNumber"
-                        placeholder="Enter card number"
-                        disabled={processingPayment}
-                      />
-                    </div>
-                    <div className="row mb-3">
-                      <div className="col-6">
-                        <label htmlFor="expiryDate" className="form-label mb-2">Expiry Date</label>
-                        <CFormInput
-                          type="text"
-                          id="expiryDate"
-                          placeholder="MM/YY"
-                          disabled={processingPayment}
-                        />
-                      </div>
-                      <div className="col-6">
-                        <label htmlFor="cvv" className="form-label mb-2">CVV</label>
-                        <CFormInput
-                          type="text"
-                          id="cvv"
-                          placeholder="CVV"
-                          disabled={processingPayment}
-                        />
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <label htmlFor="nameOnCard" className="form-label mb-2">Name on Card</label>
-                      <CFormInput
-                        type="text"
-                        id="nameOnCard"
-                        placeholder="Enter name on card"
-                        disabled={processingPayment}
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                {paymentMethod === 'Net Banking' && (
-                  <div className="netbanking-section mt-3">
-                    <label htmlFor="bankSelection" className="form-label mb-2">Select Bank</label>
-                    <select className="form-select" id="bankSelection" disabled={processingPayment}>
-                      <option value="">Select your bank</option>
-                      <option value="sbi">State Bank of India</option>
-                      <option value="hdfc">HDFC Bank</option>
-                      <option value="icici">ICICI Bank</option>
-                      <option value="axis">Axis Bank</option>
-                      <option value="kotak">Kotak Mahindra Bank</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </CModalBody>
-        {!paymentSuccess && (
-          <CModalFooter>
-            <CButton 
-              color="secondary" 
-              onClick={() => setShowPaymentModal(false)}
-              disabled={processingPayment}
-            >
-              Cancel
-            </CButton>
-            <CButton 
-              color="primary" 
-              onClick={processPayment}
-              disabled={processingPayment || loadingInvoiceData}
-            >
-              {processingPayment ? (
-                <>
-                  <CSpinner size="sm" className="me-2" />
-                  Processing...
-                </>
-              ) : (
-                'Pay'
+              {/* Payment Method Specific Fields */}
+              {paymentMethod === 'UPI' && (
+                <TextField fullWidth label="UPI ID" placeholder="Enter UPI ID (e.g., username@upi)" value={upiId} onChange={handleUpiIdChange} disabled={processingPayment} variant="outlined" sx={{ mb: 2 }} />
               )}
-            </CButton>
-          </CModalFooter>
-        )}
-      </CModal>
+
+              {paymentMethod === 'Credit/Debit Card' && (
+                <Box sx={{ mb: 2 }}>
+                  <TextField fullWidth label="Card Number" placeholder="Enter card number" disabled={processingPayment} variant="outlined" sx={{ mb: 2 }} />
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <TextField fullWidth label="Expiry Date" placeholder="MM/YY" disabled={processingPayment} variant="outlined" />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField fullWidth label="CVV" placeholder="CVV" disabled={processingPayment} variant="outlined" type="password" />
+                    </Grid>
+                  </Grid>
+                  <TextField fullWidth label="Name on Card" placeholder="Enter name on card" disabled={processingPayment} variant="outlined" sx={{ mt: 2 }} />
+                </Box>
+              )}
+
+              {paymentMethod === 'Net Banking' && (
+                <Select fullWidth disabled={processingPayment} variant="outlined" sx={{ mb: 2 }}>
+                  <MenuItem value="">Select your bank</MenuItem>
+                  <MenuItem value="sbi">State Bank of India</MenuItem>
+                  <MenuItem value="hdfc">HDFC Bank</MenuItem>
+                  <MenuItem value="icici">ICICI Bank</MenuItem>
+                  <MenuItem value="axis">Axis Bank</MenuItem>
+                  <MenuItem value="kotak">Kotak Mahindra Bank</MenuItem>
+                </Select>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ pt: 2 }}>
+          <Button onClick={() => setShowPaymentModal(false)} disabled={processingPayment || paymentSuccess}>Cancel</Button>
+          <Button 
+            variant="contained"
+            onClick={processPayment}
+            disabled={processingPayment}
+          >
+            {processingPayment ? 'Processing...' : 'Pay Now'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Invoice Details Modal */}
-      <CModal 
-        visible={showInvoiceModal} 
+      <Dialog
+        open={showInvoiceModal}
         onClose={() => setShowInvoiceModal(false)}
-        size="lg"
+        maxWidth="md"
+        fullWidth
       >
-        <CModalHeader closeButton>
-          <CModalTitle>Invoice Details</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
+        <DialogTitle>Invoice Details</DialogTitle>
+        <DialogContent>
           {loadingInvoiceDetails ? (
-            <div className="text-center py-4">
-              <CSpinner color="primary" />
-              <p className="mt-2">Loading invoice details...</p>
-            </div>
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <CircularProgress sx={{ mb: 2 }} />
+              <Typography>Loading invoice details...</Typography>
+            </Box>
           ) : invoiceDetails ? (
-            <div className="invoice-details">
-              {/* Invoice Header */}
-              <div className="invoice-header mb-4">
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <h5 className="mb-1">Invoice #{invoiceDetails.invoiceNumber || invoiceDetails.id || selectedInvoice?._id}</h5>
-                    <p className="text-muted mb-0">
-                      Generated: {new Date(invoiceDetails.invoiceDate || invoiceDetails.date || selectedInvoice?.requestedAt).toLocaleDateString()}
-                    </p>
-                    {invoiceDetails.endDate && (
-                      <p className="text-muted mb-0">
-                        Valid Until: {new Date(invoiceDetails.endDate).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-end">
-                    {getStatusBadge(invoiceDetails.status || selectedInvoice?.status)}
-                    <div className="mt-2">
-                      <span className={`badge bg-${invoiceDetails.paymentStatus === 'paid' ? 'success' : 'warning'}-subtle text-${invoiceDetails.paymentStatus === 'paid' ? 'success' : 'warning'} ms-2`}>
-                        {invoiceDetails.paymentStatus}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Plan Details Section */}
-              <div className="plan-details-section mb-4">
-                <h6 className="text-primary mb-3">Plan Details</h6>
-                <div className="card">
-                  <div className="card-body">
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Plan Name:</span>
-                          <span className="fw-semibold">{invoiceDetails.planDetails?.planName || invoiceDetails.planName}</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Plan ID:</span>
-                          <span>{invoiceDetails.planDetails?.planId || 'N/A'}</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Duration:</span>
-                          <span>{invoiceDetails.planDetails?.duration || 30} days</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Grace Period:</span>
-                          <span>{invoiceDetails.planDetails?.gracePeriod || 0} days</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Plan Type:</span>
-                          <span>{invoiceDetails.planDetails?.type || 'Standard'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ mb: 3, p: 2, bgcolor: '#f3f4f6', borderRadius: '4px' }}>
+                <Typography variant="subtitle2">Invoice Number: <strong>{invoiceDetails.invoiceNumber}</strong></Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>Date: {new Date(invoiceDetails.invoiceDate).toLocaleDateString()}</Typography>
+              </Box>
 
-            
-              {/* Financial Details Section */}
-              <div className="financial-details-section mb-4">
-                <h6 className="text-primary mb-3">Financial Details</h6>
-                <div className="card">
-                  <div className="card-body">
-                    <div className="table-responsive">
-                      <table className="table table-borderless mb-0">
-                        <tbody>
-                          <tr>
-                            <td className="text-muted">Base Price:</td>
-                            <td className="text-end">₹{invoiceDetails.financialDetails?.basePrice.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                          <tr>
-                            <td className="text-muted">Discount ({invoiceDetails.financialDetails?.discountPercentage || 0}%):</td>
-                            <td className="text-end text-success">-₹{invoiceDetails.financialDetails?.discountAmount.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                          <tr>
-                            <td className="text-muted">Price After Discount:</td>
-                            <td className="text-end">₹{invoiceDetails.financialDetails?.priceAfterDiscount.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                          <tr>
-                            <td className="text-muted">GST ({invoiceDetails.financialDetails?.taxPercentage || 18}%):</td>
-                            <td className="text-end">₹{invoiceDetails.financialDetails?.taxAmount.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                          <tr className="border-top">
-                            <td className="fw-bold">Final Total Amount:</td>
-                            <td className="text-end fw-bold">₹{invoiceDetails.financialDetails?.finalTotalAmount.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                          <tr>
-                            <td className="text-muted">Amount Paid:</td>
-                            <td className="text-end text-success">₹{invoiceDetails.financialDetails?.amountPaid.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                          <tr>
-                            <td className="text-muted">Outstanding Balance:</td>
-                            <td className="text-end text-danger">₹{invoiceDetails.financialDetails?.outstandingBalance.toLocaleString('en-IN') || '0'}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Plan Name</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mt:  0.5 }}>{invoiceDetails.planName}</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Total Amount</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>₹{invoiceDetails.amount}</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Tax/GST</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>₹{invoiceDetails.gst}</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ p: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Outstanding Balance</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#dc2626', mt: 0.5 }}>₹{invoiceDetails.balance}</Typography>
+                  </Card>
+                </Grid>
+              </Grid>
 
-              {/* Payment Information */}
-              <div className="payment-info-section mb-4">
-                <h6 className="text-primary mb-3">Payment Information</h6>
-                <div className="card">
-                  <div className="card-body">
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Payment Mode:</span>
-                          <span>{invoiceDetails.paymentMode || 'N/A'}</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Payment Type:</span>
-                          <span>{invoiceDetails.paymentType || 'N/A'}</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Order ID:</span>
-                          <span>{invoiceDetails.orderId || 'N/A'}</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Business ID:</span>
-                          <span>{invoiceDetails.businessId || 'N/A'}</span>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Upgrade Type:</span>
-                          <span>{invoiceDetails.upgradeType || 'N/A'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Invoice Items */}
-              <div className="invoice-items mb-4">
-                <h6 className="text-primary mb-3">Invoice Items</h6>
-                <div className="table-responsive">
-                  <table className="table table-bordered">
-                    <thead className="bg-light">
-                      <tr>
-                        <th>Item</th>
-                        <th className="text-end">Quantity</th>
-                        <th className="text-end">Price</th>
-                        <th className="text-end">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(invoiceDetails.items || [{
-                        name: invoiceDetails.planName || requestPlanNames[selectedInvoice?._id] || 'Subscription Plan',
-                        quantity: 1,
-                        price: invoiceDetails.amount || 0,
-                        total: invoiceDetails.totalAmount || invoiceDetails.amount || 0
-                      }]).map((item, index) => (
-                        <tr key={index}>
-                          <td>{item.name}</td>
-                          <td className="text-end">{item.quantity}</td>
-                          <td className="text-end">₹{item.price.toLocaleString('en-IN')}</td>
-                          <td className="text-end">₹{item.total.toLocaleString('en-IN')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Invoice Summary */}
-              <div className="invoice-summary">
-                <h6 className="text-primary mb-3">Invoice Summary</h6>
-                <div className="card">
-                  <div className="card-body">
-                    <div className="d-flex justify-content-between mb-2">
-                      <span>Subtotal:</span>
-                      <span>₹{(invoiceDetails.subTotal || invoiceDetails.amount || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <span>Tax:</span>
-                      <span>₹{(invoiceDetails.tax || invoiceDetails.gst || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    <hr />
-                    <div className="d-flex justify-content-between fw-bold">
-                      <span>Total Amount:</span>
-                      <span>₹{(invoiceDetails.total || invoiceDetails.totalAmount || 0).toLocaleString('en-IN')}</span>
-                    </div>
-                    {(invoiceDetails.balance || invoiceDetails.remainingAmount) > 0 && (
-                      <div className="d-flex justify-content-between text-danger mt-2">
-                        <span>Balance Due:</span>
-                        <span>₹{(invoiceDetails.balance || invoiceDetails.remainingAmount || 0).toLocaleString('en-IN')}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional Information */}
-              {(invoiceDetails.description || invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details) && (
-                <div className="additional-info mt-4">
-                  <h6 className="text-primary mb-3">Additional Information</h6>
-                  <div className="card">
-                    <div className="card-body">
-                      <p className="mb-0">
-                        {invoiceDetails.description || invoiceDetails.details || selectedInvoice?.template || selectedInvoice?.details}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {invoiceDetails.description && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>Description</Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>{invoiceDetails.description}</Typography>
+                </Box>
               )}
-            </div>
+            </Box>
           ) : (
-            <div className="text-center py-4">
-              <p>No invoice details available</p>
-            </div>
+            <Alert severity="info">No invoice details available</Alert>
           )}
-        </CModalBody>
-        <CModalFooter>
-          <CButton 
-            color="primary" 
-            variant="outline"
-            onClick={handleDownloadInvoice}
-            className="me-2"
-          >
-            Download PDF
-          </CButton>
-          <CButton color="secondary" onClick={() => setShowInvoiceModal(false)}>
-            Close
-          </CButton>
-          {selectedInvoice && (selectedInvoice.status === 'Pending' || selectedInvoice.status === 'pending') && (
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowInvoiceModal(false)}>Close</Button>
+          {invoiceDetails && (
             <>
-              <CButton 
-                color="success" 
+              <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadInvoice}>Download</Button>
+              <Button 
+                variant="contained"
                 onClick={() => {
-                  setShowInvoiceModal(false)
                   handleAccept(selectedInvoice)
                 }}
-                className="me-2"
               >
                 Accept & Pay
-              </CButton>
-              <CButton 
-                color="danger" 
-                variant="outline"
+              </Button>
+              <Button 
+                color="error"
+                variant="outlined"
                 onClick={() => {
                   setShowInvoiceModal(false)
                   handleOpenDisputeModal(selectedInvoice)
                 }}
               >
                 Dispute Invoice
-              </CButton>
+              </Button>
             </>
           )}
-        </CModalFooter>
-      </CModal>
+        </DialogActions>
+      </Dialog>
 
       {/* Dispute Modal */}
-      <CModal
-        visible={showDisputeModal}
+      <Dialog
+        open={showDisputeModal}
         onClose={() => setShowDisputeModal(false)}
-        backdrop="static"
+        maxWidth="sm"
+        fullWidth
       >
-        <CModalHeader closeButton>
-          <CModalTitle>Dispute Invoice</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
+        <DialogTitle>Dispute Invoice</DialogTitle>
+        <DialogContent>
           {selectedInvoice && (
-            <div>
-              <div className="mb-3">
-                <h6>Invoice Number: {selectedInvoice._id}</h6>
-                <p className="text-muted">
-                  Amount: {selectedInvoice.amount || selectedInvoice.totalAmount}
-                </p>
-              </div>
-              <div className="mb-3">
-                <label htmlFor="disputeReason" className="form-label">Reason for Dispute</label>
-                <textarea
-                  id="disputeReason"
-                  className="form-control"
-                  value={disputeReason}
-                  onChange={(e) => setDisputeReason(e.target.value)}
-                  rows="4"
-                  placeholder="Please provide detailed reason for the dispute..."
-                />
-              </div>
-              {disputeError && (
-                <div className="alert alert-danger" role="alert">
-                  {disputeError}
-                </div>
-              )}
-            </div>
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ p: 2, bgcolor: '#f3f4f6', borderRadius: '4px', mb: 2 }}>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>Invoice Number</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>{selectedInvoice._id}</Typography>
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Reason for Dispute"
+                placeholder="Please provide detailed reason for the dispute..."
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                disabled={creatingDispute}
+                variant="outlined"
+              />
+              {disputeError && <Alert severity="error" sx={{ mt: 2 }}>{disputeError}</Alert>}
+            </Box>
           )}
-        </CModalBody>
-        <CModalFooter>
-          <CButton 
-            color="secondary" 
-            onClick={() => setShowDisputeModal(false)}
-          >
-            Cancel
-          </CButton>
-          <CButton
-            color="primary"
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDisputeModal(false)} disabled={creatingDispute}>Cancel</Button>
+          <Button
+            variant="contained"
             onClick={handleCreateDispute}
             disabled={creatingDispute || !disputeReason.trim()}
           >
-            {creatingDispute ? (
-              <>
-                <CSpinner size="sm" className="me-2" />
-                Creating Dispute...
-              </>
-            ) : (
-              'Submit Dispute'
-            )}
-          </CButton>
-        </CModalFooter>
-      </CModal>
-    </div>
+            {creatingDispute ? 'Creating Dispute...' : 'Submit Dispute'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }
 

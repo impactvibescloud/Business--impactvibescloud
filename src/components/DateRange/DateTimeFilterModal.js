@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { CModal, CModalHeader, CModalBody, CModalFooter, CButton } from '@coreui/react';
-import CIcon from '@coreui/icons-react';
-import { cilX } from '@coreui/icons';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Box,
+  Typography,
+  Alert,
+} from '@mui/material';
 
 const DateTimeFilterModal = ({ visible, onClose, onApply, initialStartDate, initialStartTime, initialEndDate, initialEndTime }) => {
   const [startDate, setStartDate] = useState(initialStartDate || '');
@@ -49,124 +57,92 @@ const DateTimeFilterModal = ({ visible, onClose, onApply, initialStartDate, init
   };
 
   return (
-    <CModal 
-      visible={visible} 
-      onClose={onClose} 
-      backdrop="static"
+    <Dialog 
+      open={visible} 
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
     >
-      <CModalHeader closeButton>
-        <span>Date & Time Filter</span>
-      </CModalHeader>
-      <CModalBody>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <DialogTitle sx={{ pb: 1 }}>Date & Time Filter</DialogTitle>
+      <DialogContent sx={{ pt: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {/* From Date & Time */}
-          <div>
-            <h6 style={{ marginBottom: '12px', color: '#374151', fontWeight: '600' }}>From</h6>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '6px' }}>Date</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '6px' }}>Time</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#374151' }}>
+              From
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <TextField
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                label="Date"
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+              <TextField
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                label="Time"
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+            </Box>
+          </Box>
 
           {/* To Date & Time */}
-          <div>
-            <h6 style={{ marginBottom: '12px', color: '#374151', fontWeight: '600' }}>To</h6>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '6px' }}>Date</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '6px' }}>Time</label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#374151' }}>
+              To
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <TextField
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                label="Date"
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+              <TextField
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                label="Time"
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+            </Box>
+          </Box>
 
           {/* Selected Range Display */}
           {startDate && endDate && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '6px',
-              borderLeft: '4px solid #0b5a47'
-            }}>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                <strong>Selected Range:</strong>
-              </div>
-              <div style={{ fontSize: '13px', color: '#111827', marginTop: '4px' }}>
+            <Alert severity="info" sx={{ borderLeft: '4px solid #0b5a47' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>Selected Range:</Typography>
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
                 {startDate} {startTime} → {endDate} {endTime}
-              </div>
-            </div>
+              </Typography>
+            </Alert>
           )}
-        </div>
-      </CModalBody>
-      <CModalFooter>
-        <CButton color="secondary" onClick={handleClear}>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button variant="outlined" onClick={handleClear} sx={{ textTransform: 'none' }}>
           Clear
-        </CButton>
-        <CButton color="secondary" onClick={onClose}>
+        </Button>
+        <Button variant="outlined" onClick={onClose} sx={{ textTransform: 'none' }}>
           Cancel
-        </CButton>
-        <CButton color="primary" onClick={handleApply}>
+        </Button>
+        <Button variant="contained" onClick={handleApply} sx={{ textTransform: 'none', backgroundColor: '#0b5a47' }}>
           Apply
-        </CButton>
-      </CModalFooter>
-    </CModal>
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

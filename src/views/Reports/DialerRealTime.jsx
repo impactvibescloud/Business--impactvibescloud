@@ -1,9 +1,26 @@
 import React, { useEffect, useState } from 'react'
-import './DialerRealTime.css'
-import CIcon from '@coreui/icons-react'
-import { cilPhone, cilCalendar, cilCheckCircle, cilXCircle, cilArrowRight } from '@coreui/icons'
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Grid,
+  Paper,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Typography,
+  Chip,
+} from '@mui/material'
+import PhoneIcon from '@mui/icons-material/Phone'
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import CancelIcon from '@mui/icons-material/Cancel'
 import { apiCall } from '../../config/api'
-// Simple direction detector reused from CallMonitor patterns
+
+// Direction detector (kept for potential future use)
 const detectDirection = (call) => {
   try {
     const leg = (call.legs && call.legs[0]) || call
@@ -18,48 +35,55 @@ const detectDirection = (call) => {
   return 'Inbound'
 }
 
-const StatCard = ({ value, label, icon }) => {
+const StatCard = ({ value, label, icon: Icon }) => {
   const displayValue = value === '-' || value === null || value === undefined ? 0 : value
   return (
-    <div className="drt-stat-card">
-      <div className="drt-stat-topline" />
-      <div className="drt-stat-topicon"><CIcon icon={icon} size="lg" /></div>
-      <div className="drt-stat-body">
-        <div className="drt-stat-value">{displayValue}</div>
-        <div className="drt-stat-label">{label}</div>
-      </div>
-    </div>
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', border: '1px solid #d1d5db' }}>
+      <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', pb: 1.5, pt: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, backgroundColor: '#eef2f6', borderRadius: '50%' }}>
+            <Icon sx={{ fontSize: '1.5rem', color: '#6366f1' }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#111827', fontSize: '1.75rem', lineHeight: 1 }}>
+              {displayValue}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.85rem', fontWeight: 500 }}>
+              {label}
+            </Typography>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
   )
 }
 
 const DialerRealTime = () => {
   const [stats, setStats] = useState([
-    { value: 0, label: 'Active Calls', icon: cilPhone },
-    { value: 0, label: 'Calls Today', icon: cilCalendar },
-    { value: 0, label: 'Outgoing Answered', icon: cilCheckCircle },
-    { value: 0, label: 'Outgoing Missed', icon: cilXCircle },
-    { value: 0, label: 'Incoming Answered', icon: cilCheckCircle },
-    { value: 0, label: 'Incoming Missed', icon: cilXCircle }
+    { value: 0, label: 'Active Calls' },
+    { value: 0, label: 'Calls Today' },
+    { value: 0, label: 'Outgoing Answered' },
+    { value: 0, label: 'Outgoing Missed' },
+    { value: 0, label: 'Incoming Answered' },
+    { value: 0, label: 'Incoming Missed' }
   ])
   const [liveCalls, setLiveCalls] = useState([])
+  const [actualLiveCalls, setActualLiveCalls] = useState([])
   const livePollingRef = React.useRef(null)
-  const [liveError, setLiveError] = useState(null)
 
   const fetchLiveCalls = async () => {
-    setLiveError(null)
     try {
       const bId = await fetchBusinessIdIfNeeded()
       if (!bId) {
-        setLiveCalls([])
+        setActualLiveCalls([])
         return
       }
       const res = await apiCall(`/asterisk/livecalls/${encodeURIComponent(bId)}`, 'GET')
       // Normalize response shapes (same approach as CallMonitor)
       const lCalls = Array.isArray(res.liveCalls) ? res.liveCalls : Array.isArray(res) ? res : (Array.isArray(res.data) ? res.data : [])
-      setLiveCalls(lCalls)
+      setActualLiveCalls(lCalls)
     } catch (err) {
       console.error('DialerRealTime fetchLiveCalls failed', err)
-      setLiveError(err?.response?.data?.message || err.message || 'Failed to fetch live calls')
       // don't clear existing liveCalls on transient errors; keep current data until a successful empty response arrives
     }
   }
@@ -87,82 +111,41 @@ const DialerRealTime = () => {
         setIsRefreshing(true)
         const businessId = await fetchBusinessIdIfNeeded()
         if (!businessId) {
-          // ensure liveCalls cleared if no businessId
           setLiveCalls([])
           return
         }
-        const res = await apiCall(`/call-logs?businessId=${encodeURIComponent(businessId)}&page=1&limit=200`)
-        if (process.env.NODE_ENV === 'development') console.debug('DialerRealTime: call-logs response', res)
+        const res = await apiCall(`/performance/agents?businessId=${encodeURIComponent(businessId)}&period=today`)
+        if (process.env.NODE_ENV === 'development') console.debug('DialerRealTime: performance/agents response', res)
 
-        // Normalize response shapes (similar to CallLogs component)
-        const raw = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.callLogs) ? res.callLogs : []))
+        // Normalize response shapes
+        const agentData = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (Array.isArray(res?.agents) ? res.agents : []))
+        
+        // Set live calls to agent data for display
+        setLiveCalls(agentData)
 
-        // Helpers to interpret call records robustly across backends
-        const getCallTs = (c) => {
-          const t = c.callDate || c.createdAt || c.call_date || c.timestamp
-          if (!t) return null
-          const ms = Number(t) || new Date(t).getTime()
-          return Number.isFinite(ms) ? ms : null
-        }
-        const normalizeStatus = (s) => String(s || '').toLowerCase()
-        const isAnsweredStatus = (s) => {
-          const st = normalizeStatus(s)
-          return st === 'answered' || st === 'success' || st === 'completed' || st === 'connected'
-        }
-        const isMissedRecord = (r) => {
-          const st = normalizeStatus(r.status)
-          if (st.includes('miss')) return true
-          const hb = String(r.hangupBy || r.hangupby || r.hangup_by || '').toLowerCase()
-          if (hb === 'caller') return true
-          return false
-        }
-        const isOutbound = (r) => {
-          const ct = String((r.callType || r.type || '').toLowerCase())
-          return ct === 'outbound' || ct === 'outgoing'
-        }
-        const isInbound = (r) => {
-          const ct = String((r.callType || r.type || '').toLowerCase())
-          return ct === 'inbound' || ct === 'incoming'
-        }
+        // Calculate aggregate stats from agent data
+        const totalHandledCalls = agentData.reduce((sum, a) => sum + (a.handledCalls || 0), 0)
+        const totalAnsweredCalls = agentData.reduce((sum, a) => sum + (a.answeredCalls || 0), 0)
+        const totalMissedCalls = agentData.reduce((sum, a) => sum + (a.missedCalls || 0), 0)
+        const totalRejectedCalls = agentData.reduce((sum, a) => sum + (a.rejectedCalls || 0), 0)
+        const totalFailedCalls = agentData.reduce((sum, a) => sum + (a.failedCalls || 0), 0)
+        const onlineAgents = agentData.filter(a => a.liveStatus === 'online').length
 
-        // Compute today's local range and filter by call timestamp when available
-        const now = new Date()
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime()
-
-        const callsTodayList = raw.filter((d) => {
-          const ts = getCallTs(d)
-          if (ts === null) return false
-          return ts >= startOfToday && ts <= endOfToday
-        })
-
-        const callsToday = callsTodayList.length
-
-        // Count answered/missed for today's calls (robust to status values)
-        const outgoingAnswered = raw.filter(d => isOutbound(d) && isAnsweredStatus(d.status) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
-        const outgoingMissed = raw.filter(d => isOutbound(d) && isMissedRecord(d) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
-        const incomingAnswered = raw.filter(d => isInbound(d) && isAnsweredStatus(d.status) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
-        const incomingMissed = raw.filter(d => isInbound(d) && isMissedRecord(d) && (() => { const t = getCallTs(d); return t !== null && t >= startOfToday && t <= endOfToday })()).length
-
-        // Active calls heuristic: keep to duration > 0 as a fallback; UI prefers liveCalls.length
-        const active = raw.filter(d => (d.callDuration || d.duration || 0) > 0).length
         if (!mounted) return
         setStats([
-          { value: active, label: 'Active Calls', icon: cilPhone },
-          { value: callsToday, label: 'Calls Today', icon: cilCalendar },
-          { value: outgoingAnswered, label: 'Outgoing Answered', icon: cilCheckCircle },
-          { value: outgoingMissed, label: 'Outgoing Missed', icon: cilXCircle },
-          { value: incomingAnswered, label: 'Incoming Answered', icon: cilCheckCircle },
-          { value: incomingMissed, label: 'Incoming Missed', icon: cilXCircle }
+          { value: 0, label: 'Active Calls' }, // Will be set from actualLiveCalls
+          { value: totalHandledCalls, label: 'Calls Today' },
+          { value: totalAnsweredCalls, label: 'Outgoing Answered' },
+          { value: totalMissedCalls, label: 'Outgoing Missed' },
+          { value: totalRejectedCalls, label: 'Incoming Answered' },
+          { value: totalFailedCalls, label: 'Incoming Missed' }
         ])
         setLastUpdated(new Date())
       } catch (e) {
-        // ignore
+        console.error('DialerRealTime fetchDialer failed', e)
       } finally {
         if (mounted) setIsRefreshing(false)
       }
-        // live calls are fetched independently by fetchLiveCalls to avoid
-        // overlapping requests that cause transient clears/flicker.
     }
 
     // Initial fetch for stats
@@ -176,76 +159,101 @@ const DialerRealTime = () => {
   }, [])
 
   return (
-    <div className="drt-page">
-      <div className="drt-header drt-header-bar">
-        <div className="drt-header-left">
-          <h3>Dialer Real Time Report</h3>
-        </div>
-        <div className="drt-header-right">
-          <div className="drt-controls">
-            <div className="drt-refresh">{isRefreshing ? 'Refreshing...' : (lastUpdated ? `Last updated: ${new Date(lastUpdated).toLocaleTimeString()}` : 'Not updated yet')}</div>
-            
-            
-          </div>
-        </div>
-      </div>
+    <Box className="page-container" sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box>
+          <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Dialer Real Time Report</h3>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>
+            {isRefreshing ? 'Refreshing...' : (lastUpdated ? `Last updated: ${new Date(lastUpdated).toLocaleTimeString()}` : 'Not updated yet')}
+          </Typography>
+        </Box>
+      </Box>
 
-      <div className="drt-stats-grid">
-        {stats.map((s, i) => {
-          const value = (s.label === 'Active Calls') ? liveCalls.length : s.value
-          return <StatCard key={i} value={value} label={s.label} icon={s.icon} />
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        {[0, 1, 2, 3, 4, 5].map((i) => {
+          const s = stats[i]
+          const value = (s.label === 'Active Calls') ? actualLiveCalls.length : s.value
+          const iconMap = {
+            'Active Calls': PhoneIcon,
+            'Calls Today': CalendarTodayIcon,
+            'Outgoing Answered': CheckCircleIcon,
+            'Outgoing Missed': CancelIcon,
+            'Incoming Answered': CheckCircleIcon,
+            'Incoming Missed': CancelIcon,
+          }
+          return (
+            <Grid item xs={12} sm={6} md={4} key={i}>
+              <StatCard value={value} label={s.label} icon={iconMap[s.label] || PhoneIcon} />
+            </Grid>
+          )
         })}
-      </div>
+      </Grid>
 
-      
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <h5 style={{ margin: 0, color: '#111827', fontWeight: 600 }}>Active Calls / Live Calls</h5>
+      </Box>
 
-      <div className="drt-table-wrap">
-        <div className="drt-table-header">
-          <button className="drt-filter-btn">Filter</button>
-          <div className="drt-table-title">Agents / Agent Groups</div>
-        </div>
-          <div className="drt-table-placeholder">
-          <table className="drt-table">
-            <thead>
-              <tr>
-                <th>Direction</th>
-                <th>Channel</th>
-                <th>Status</th>
-                <th>Duration</th>
-                <th>DID</th>
-                <th>Agent</th>
-                <th>Branch</th>
-                <th>Raw</th>
-              </tr>
-            </thead>
-            <tbody>
-              {liveCalls.length === 0 ? (
-                <tr>
-                  <td className="drt-empty" colSpan="8">No active calls</td>
-                </tr>
-              ) : (
-                liveCalls.map((c, idx) => (
-                  <tr key={`${c.channel || c.groupId || idx}-${idx}`}>
-                    <td>{detectDirection(c)}</td>
-                    <td>{c.channel || '-'}</td>
-                    <td>{c.status || '-'}</td>
-                    <td>{c.duration || '-'}</td>
-                    <td>{(c.did && c.did.number) || (c.tokens && c.tokens[3]) || '-'}</td>
-                    <td>{(c.assignedAgent && (c.assignedAgent.name || c.assignedAgent.email)) || c.assignedAgent || '-'}</td>
-                    <td>{(c.branch && (c.branch.branchName || c.branch.name)) || '-'}</td>
-                    <td style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.raw || '-'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="drt-legend-placeholder">
-        <div className="drt-legend-header">Color Significance <span className="drt-toggle">+</span></div>
-      </div>
-    </div>
+      <Paper variant="outlined" sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
+        <Table size="small" sx={{ '& th, & td': { py: 1, px: 1.5, lineHeight: 1.15 }, '& td': { overflow: 'hidden', textOverflow: 'ellipsis' } }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f3f4f6' }}>
+              <TableCell sx={{ fontWeight: 600 }}>Direction</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Channel</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>DID</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {actualLiveCalls.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#6b7280' }}>
+                  No active calls
+                </TableCell>
+              </TableRow>
+            ) : (
+              actualLiveCalls.map((c, idx) => (
+                <TableRow key={`${c.channel || c.groupId || idx}-${idx}`} hover>
+                  <TableCell sx={{ fontSize: '0.9rem' }}>
+                    {(() => {
+                      const dir = detectDirection(c)
+                      return (
+                        <Chip
+                          icon={dir === 'Outgoing' ? <CancelIcon /> : <CheckCircleIcon />}
+                          label={dir}
+                          size="small"
+                          sx={{
+                            backgroundColor: dir === 'Outgoing' ? '#e3f2fd' : dir === 'Inbound' ? '#f3e5f5' : '#f5f5f5',
+                            color: dir === 'Outgoing' ? '#1565c0' : dir === 'Inbound' ? '#6a1b9a' : '#616161',
+                            fontWeight: 500,
+                          }}
+                        />
+                      )
+                    })()}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: '0.9rem' }}>{c.channel || '-'}</TableCell>
+                  <TableCell sx={{ fontSize: '0.9rem' }}>
+                    <Chip
+                      label={c.status || '-'}
+                      size="small"
+                      sx={{
+                        backgroundColor: String(c.status || '').toLowerCase() === 'up' ? '#c8e6c9' : String(c.status || '').toLowerCase() === 'ring' ? '#ffe0b2' : '#e0e0e0',
+                        color: String(c.status || '').toLowerCase() === 'up' ? '#2e7d32' : String(c.status || '').toLowerCase() === 'ring' ? '#f57c00' : '#424242',
+                        fontWeight: 500,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontSize: '0.9rem' }}>{c.duration || '-'}</TableCell>
+                  <TableCell sx={{ fontSize: '0.9rem' }}>{c.did?.number || c.tokens?.[3] || '-'}</TableCell>
+                  <TableCell sx={{ fontSize: '0.9rem' }}>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Paper>
+    </Box>
   )
 }
 

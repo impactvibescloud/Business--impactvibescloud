@@ -1,40 +1,57 @@
 import React, { useEffect, useState } from 'react'
 import {
-  CCard,
-  CCardBody,
-  CCardHeader,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CBadge,
-  CSpinner,
-  CAlert,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CButton,
-  CFormCheck,
-  CFormSelect,
-} from '@coreui/react'
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControlLabel,
+  Checkbox,
+  TextField,
+  MenuItem,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Paper,
+  Typography,
+  Alert,
+  Grid,
+} from '@mui/material'
+import GetAppIcon from '@mui/icons-material/GetApp'
+import SearchIcon from '@mui/icons-material/Search'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import { apiCall, getBaseURL } from '../../config/api'
 import '../Branches/Branches.css'
 import './CDR.css'
+import '../Leads/CallLogsWebpage.css'
 
-const CallLogsLegacy = () => {
+const CDR = () => {
   const [records, setRecords] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [limit] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
 
   const [businessId, setBusinessId] = useState(localStorage.getItem('businessId') || '')
-  const [startDateFilter, setStartDateFilter] = useState('')
-  const [endDateFilter, setEndDateFilter] = useState('')
+  
+  // Initialize with today's date
+  const getTodayDate = () => {
+    const today = new Date()
+    return today.toISOString().split('T')[0]
+  }
+  
+  const [startDateFilter, setStartDateFilter] = useState(getTodayDate())
+  const [endDateFilter, setEndDateFilter] = useState(getTodayDate())
 
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [openCallFlows, setOpenCallFlows] = useState(new Set())
@@ -49,6 +66,7 @@ const CallLogsLegacy = () => {
   const [fromNumber, setFromNumber] = useState('')
   const [toNumber, setToNumber] = useState('')
   const [agentFilter, setAgentFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [availableAgents, setAvailableAgents] = useState([])
   // Columns customization state
   const columnsList = [
@@ -110,6 +128,7 @@ const CallLogsLegacy = () => {
       if (fromNumber) qp.push(`from=${encodeURIComponent(fromNumber)}`)
       if (toNumber) qp.push(`to=${encodeURIComponent(toNumber)}`)
       if (agentFilter) qp.push(`agent=${encodeURIComponent(agentFilter)}`)
+      if (typeFilter) qp.push(`type=${encodeURIComponent(typeFilter)}`)
       const endpoint = `/call-logs?${qp.join('&')}`
       const res = await apiCall(endpoint, 'GET')
       if (res && res.success) {
@@ -128,7 +147,13 @@ const CallLogsLegacy = () => {
           raw: cl,
         }))
         setRecords(normalized)
-        if (res.pagination && res.pagination.page) try { setPage(res.pagination.page) } catch (e) {}
+        if (res.pagination) {
+          try { 
+            setPage(res.pagination.page || 1)
+            setTotalPages(res.pagination.totalPages || 1)
+            setTotalRecords(res.pagination.totalRecords || 0)
+          } catch (e) {}
+        }
       } else {
         setRecords([])
       }
@@ -340,11 +365,11 @@ const CallLogsLegacy = () => {
 
     if (loading) {
       return (
-        <div className="audio-player d-flex align-items-center gap-2">
-          <span className="text-muted">
-            <CSpinner size="sm" className="me-2" /> Loading recording...
-          </span>
-        </div>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" sx={{ color: '#6c757d', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={20} /> Loading recording...
+          </Typography>
+        </Box>
       )
     }
 
@@ -440,7 +465,7 @@ const CallLogsLegacy = () => {
   }
 
   const resetFilters = () => {
-    setFromNumber(''); setToNumber(''); setAgentFilter(''); setStartDateFilter(''); setEndDateFilter(''); fetchRecords(1)
+    setFromNumber(''); setToNumber(''); setAgentFilter(''); setTypeFilter(''); setStartDateFilter(getTodayDate()); setEndDateFilter(getTodayDate()); fetchRecords(1)
   }
   const applyFilters = () => { fetchRecords(1) }
 
@@ -466,326 +491,432 @@ const CallLogsLegacy = () => {
   })
 
   return (
-    <CCard className="mb-4">
-      <CCardHeader style={{ borderBottom: '0' }}>
-        <div className="filter-tiles">
-          <div className="filter-tile">
-            <label className="form-label">From</label>
-            <input className="form-control form-control-sm" placeholder="From number" value={fromNumber} onChange={(e) => setFromNumber(e.target.value)} />
-          </div>
-          <div className="filter-tile">
-            <label className="form-label">To</label>
-            <input className="form-control form-control-sm" placeholder="To number" value={toNumber} onChange={(e) => setToNumber(e.target.value)} />
-          </div>
-          <div className="filter-tile">
-            <label className="form-label">Agent / Branch</label>
-            <CFormSelect className="form-control form-control-sm" value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
-              <option value="">All agents</option>
-              {availableAgents.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </CFormSelect>
-          </div>
-          <div className="filter-tile">
-            <label className="form-label">From Date</label>
-            <input type="date" className="form-control form-control-sm" value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} />
-          </div>
-          <div className="filter-tile">
-            <label className="form-label">To Date</label>
-            <input type="date" className="form-control form-control-sm" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
-          </div>
-        </div>
-        <div className="filter-actions">
-          <button className="btn btn-sm btn-outline-secondary me-3" onClick={resetFilters} disabled={loading}>Reset</button>
-          <button className="btn btn-sm btn-outline-primary me-2" onClick={applyFilters} disabled={loading}>Search</button>
-          <button className="btn btn-sm btn-outline-success me-2" onClick={() => exportAllCDR()} disabled={loading || exporting}>{exporting ? 'Exporting...' : 'Export'}</button>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => setShowColumnsModal(true)}>Columns</button>
-        </div>
-      </CCardHeader>
+    <Box className="page-container" sx={{ p: 2 }}>
+      <Card>
+        <CardHeader
+          title={
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>Call Detail Records</Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280' }}>View and analyze call history with detailed information</Typography>
+            </Box>
+          }
+        />
+        <CardContent>
+          {!businessId && (
+            <Alert severity="warning" sx={{ mb: 3 }}>Missing <code>businessId</code> in localStorage. Set it to view CDRs.</Alert>
+          )}
 
-      <CCardBody>
-        {!businessId && (
-          <div className="mb-3">
-            <CAlert color="warning">Missing <code>businessId</code> in localStorage. Set it to view CDRs.</CAlert>
-          </div>
-        )}
-
-        <CModal visible={detailsOpen} onClose={closeDetails} alignment="center">
-          <CModalHeader>
-            <CModalTitle>CDR Details</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            {!selectedItem ? (<div>No item selected</div>) : (
-              <div>
-                <div className="mb-3"><strong>Agent:</strong> {selectedItem.agent?.email || selectedItem.agent?.name || '-'}</div>
-                <div className="mb-2"><strong>Contact:</strong> {selectedItem.callLog?.contact || '-'}</div>
-                <div className="mb-2"><strong>Virtual Number:</strong> {selectedItem.callLog?.virtualNumber || '-'}</div>
-                <div className="mb-2"><strong>Call Date:</strong> {formatDateTime(selectedItem.callLog?.callDate)}</div>
-                <div className="mb-2"><strong>Duration:</strong> {selectedItem.callLog?.duration ? `${selectedItem.callLog.duration}s` : '-'}</div>
-                <hr />
-                <div className="mb-2"><strong>Note:</strong> {selectedItem.note || '-'}</div>
-                <div className="mb-2"><strong>Call Status:</strong> <CBadge color={selectedItem.callLog?.status === 'answered' ? 'success' : selectedItem.callLog?.status === 'missed' ? 'danger' : 'secondary'}>{selectedItem.callLog?.status || '-'}</CBadge></div>
-              </div>
-            )}
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={closeDetails}>Close</CButton>
-          </CModalFooter>
-        </CModal>
-
-        {loading ? (
-          <div className="text-center py-4"><CSpinner /></div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-3">No call logs found</div>
-        ) : (
-          <CTable hover responsive className="table-sm compact-table cdr-table" style={{ tableLayout: 'auto', borderTop: '0' }}>
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell style={{ width: '45%' }}>TO</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>DATE</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>TIME</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '12%' }}>TYPE</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '19%' }}>RESULTS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {filtered.map((d) => {
-                const callDate = d.callLog?.callDate || d.callDate
-                const dt = callDate ? new Date(callDate) : null
-                const dateOnly = dt ? dt.toLocaleDateString() : '-'
-                const timeOnly = dt ? dt.toLocaleTimeString() : '-'
-                const resultText = d.note || d.callLog?.status || d.status || '—'
-
-                // Determine call direction (inbound = customer -> agent)
-                // Support various CDR shapes: prefer explicit `callType`, then check initiator fields
-                const rawFrom = d.raw?.fromNumber || d.raw?.callInitiatedBy || d.raw?.callerNumber || '';
-                const rawTo = d.raw?.toNumber || d.raw?.callReceivedBy || d.raw?.calleeNumber || '';
-                const contact = d.callLog?.contact || d.contact || d.callInitiatedBy || '';
-                let isInbound = false;
-
-                // 1) explicit callType field
-                if (d.callType && String(d.callType).toLowerCase() === 'inbound') {
-                  isInbound = true
-                } else if (d.raw?.callType && String(d.raw.callType).toLowerCase() === 'inbound') {
-                  isInbound = true
-                // 2) callInitiatedBy equals contact (customer initiated)
-                } else if (d.callInitiatedBy && contact && String(d.callInitiatedBy) === String(contact)) {
-                  isInbound = true
-                // 3) fallback to raw from/to matching contact
-                } else if (rawFrom && contact && String(rawFrom) === String(contact)) {
-                  isInbound = true
-                } else if (rawTo && contact && String(rawTo) === String(contact)) {
-                  isInbound = false
-                // 4) directional flags in raw
-                } else if (d.raw && d.raw.direction) {
-                  const dir = String(d.raw.direction).toLowerCase();
-                  if (dir.includes('in')) isInbound = true;
-                  else if (dir.includes('out')) isInbound = false;
-                // 5) name heuristics
-                } else if (d.agent && d.raw && (d.raw.fromName || d.raw.toName) && d.agent.name) {
-                  const an = String(d.agent.name).toLowerCase();
-                  if (d.raw.fromName && String(d.raw.fromName).toLowerCase().includes(an)) isInbound = false;
-                  else if (d.raw.toName && String(d.raw.toName).toLowerCase().includes(an)) isInbound = true;
-                }
-
-                // Prepare left/right display based on detected direction
-                // inbound: customer(from) -> agent(to)
-                // outbound: agent(from) -> customer(to)
-                const fromTimeDefault = formatDateTimeShort(d.raw?.fromAt || d.callLog?.callDate || d.callDate);
-                const toTimeDefault = formatDateTimeShort(d.raw?.toAt || d.callLog?.callDate || d.callDate);
-
-                let leftTitle, leftSub, leftTime, rightTitle, rightSub, rightTime;
-
-                if (isInbound) {
-                  // customer (from) -> agent (to)
-                  leftTitle = d.raw?.fromName || d.callLog?.contact || 'Caller';
-                  leftSub = d.raw?.fromNumber || d.callLog?.contact || '';
-                  leftTime = fromTimeDefault;
-
-                  rightTitle = d.agent?.name || d.raw?.toName || d.callLog?.virtualNumber || 'Agent';
-                  rightSub = d.raw?.toNumber || d.callLog?.virtualNumber || d.virtualNumber || '';
-                  rightTime = toTimeDefault;
-                } else {
-                  // agent (from) -> customer (to)
-                  leftTitle = d.agent?.name || d.raw?.fromName || d.callLog?.virtualNumber || 'Agent';
-                  leftSub = d.raw?.fromNumber || d.callLog?.virtualNumber || d.callLog?.contact || '';
-                  leftTime = fromTimeDefault;
-
-                  rightTitle = d.raw?.toName || d.callLog?.contact || d.raw?.toNumber || 'Customer';
-                  rightSub = d.raw?.toNumber || d.callLog?.contact || '';
-                  rightTime = toTimeDefault;
-                }
-
-                // Edge case: if both sides resolve to the same agent name (transfer/internal), prefer showing the actual customer where possible
-                if (d.agent && String(leftTitle).toLowerCase() === String(rightTitle).toLowerCase()) {
-                  if (d.callLog?.contact) {
-                    if (!isInbound) {
-                      rightTitle = d.callLog.contact;
-                      rightSub = d.raw?.toNumber || d.callLog.contact || rightSub;
-                    } else {
-                      leftTitle = d.callLog.contact;
-                      leftSub = d.raw?.fromNumber || d.callLog.contact || leftSub;
-                    }
-                  }
-                }
-                return (
-                  <React.Fragment key={d._id}>
-                    <CTableRow onClick={() => toggleRow(d._id)} style={{ cursor: 'pointer', backgroundColor: expandedRows.has(d._id) ? '#f8f9fa' : 'transparent' }} role="button" tabIndex={0} className="cdr-row">
-                      <CTableDataCell className="align-middle">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <input type="checkbox" onClick={(e) => e.stopPropagation()} />
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ fontWeight: 600 }}>{d.callLog?.contact || d.contact || 'Unknown'}</div>
-                            <div className="text-muted small"><span className="me-2">{d.callLog?.virtualNumber || d.virtualNumber || ''}</span></div>
-                          </div>
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell className="align-middle">{dateOnly}</CTableDataCell>
-                      <CTableDataCell className="align-middle">{timeOnly}</CTableDataCell>
-                      <CTableDataCell className="align-middle" style={{ width: '12%' }}>
-                        <CBadge color={isInbound ? 'info' : 'warning'}>{isInbound ? 'Inbound' : 'Outbound'}</CBadge>
-                      </CTableDataCell>
-                      <CTableDataCell className="align-middle">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div>{resultText}</div>
-                          <div><CBadge color={d.callLog?.status === 'answered' ? 'success' : d.callLog?.status === 'missed' ? 'danger' : 'secondary'}>{d.callLog?.status || ''}</CBadge></div>
-                        </div>
-                      </CTableDataCell>
-                    </CTableRow>
-                    {expandedRows.has(d._id) && (
-                      <CTableRow>
-                        <CTableDataCell colSpan={4} style={{ padding: '1rem', backgroundColor: '#fff' }}>
-                          <div className="cdr-expanded">
-                            <div className="cdr-meta d-flex align-items-center mb-3">
-                              <div className="me-4"><div className="text-muted small">Call ID</div><div className="fw-bold">{d._id}</div></div>
-                              <div className="me-4"><div className="text-muted small">Region</div><div>{d.region || '-'}</div></div>
-                              <div className="me-4"><div className="text-muted small">Duration</div><div>{d.callLog?.duration ? `${d.callLog.duration}s` : '—'}</div></div>
-                              <div style={{ marginLeft: 'auto' }}>
-                                <RecordingPlayer recordingFilename={getRecordingFilename(d)} onDownload={() => handleDownloadRecording(d)} />
-                              </div>
-                            </div>
-
-                            <div className="cdr-actions mb-3">
-                              <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); toggleCallFlow(d._id)}} aria-pressed={openCallFlows.has(d._id)}>Call Flow</button>
-                              <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); openDetails(d)}}>View Note</button>
-                              <button className="btn btn-sm btn-light me-2" onClick={(e)=>{e.stopPropagation(); toggleMoreInfo(d._id)}} aria-pressed={openMoreInfo.has(d._id)}>More Information</button>
-                            </div>
-
-                            {openCallFlows.has(d._id) && (
-                            <div className="cdr-callflow">
-                              <div className="flow-step">
-                                <div className="flow-icon caller"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#fff"/></svg></div>
-                                <div className="flow-meta"><div className="flow-title">{leftTitle}</div><div className="flow-sub">{leftSub}</div><div className="flow-time">{leftTime}</div></div>
-                              </div>
-
-                              <div className="flow-connector" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                  <path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </div>
-
-                              <div className="flow-step center-step" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                                  <div className="flow-icon mid" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 26, background: '#e9f6f0' }}>
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#13A37F"/><path d="M7.6 5.6c-.4-.4-1.04-.4-1.44 0L4.6 7.16c-.4.4-.4 1.04 0 1.44l1.9 1.9c.4.4 1.04.4 1.44 0l1.06-1.06c.4-.4.4-1.04 0-1.44L7.6 5.6z" fill="#fff"/></svg>
-                                  </div>
-                                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0b5240' }}>-Dailed</div>
-                                </div>
-                              </div>
-
-                              <div className="flow-connector" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                  <path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </div>
-
-                              <div className="flow-step">
-                                <div className="flow-icon last"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M16.5 11c-.9 0-1.73.2-2.49.57-.21.11-.34.34-.34.58v3.08c0 .24.13.47.34.58C14.77 16.8 15.6 17 16.5 17c1.38 0 2.5-1.12 2.5-2.5S17.88 11 16.5 11z" fill="#fff"/></svg></div>
-                                <div className="flow-meta"><div className="flow-title">{rightTitle}</div><div className="flow-sub">{rightSub}</div><div className="flow-time">{rightTime}</div></div>
-                              </div>
-
-                            </div>
-                            )}
-
-                            {openMoreInfo.has(d._id) && (
-                              <div className="cdr-moreinfo mt-3">
-                                <div className="row">
-                                  <div className="col-md-4"><strong>Agent</strong><div>{d.agent?.email || d.agent?.name || '-'}</div></div>
-                                  <div className="col-md-4"><strong>Initiated By</strong><div>{d.raw?.callInitiatedBy || d.callLog?.initiatedBy || '-'}</div></div>
-                                  <div className="col-md-4"><strong>Received By</strong><div>{d.raw?.callReceivedBy || d.callLog?.receivedBy || '-'}</div></div>
-                                </div>
-                                <div className="row mt-2">
-                                  <div className="col-md-4"><strong>Rejected By</strong><div>{d.raw?.callRejectedBy || d.callLog?.rejectedBy || '-'}</div></div>
-                                  <div className="col-md-4"><strong>Hang Up By</strong><div>{d.raw?.hangUpBy || d.callLog?.hangUpBy || '-'}</div></div>
-                                  <div className="col-md-4"><strong>Team</strong><div>{d.team || '-'}</div></div>
-                                </div>
-                                <div className="row mt-2">
-                                  <div className="col-md-4"><strong>Cost</strong><div>{d.cost != null ? `$${Number(d.cost).toFixed(2)}` : '-'}</div></div>
-                                  <div className="col-md-8"><strong>Notes</strong><div>{d.note || d.callLog?.note || '-'}</div></div>
-                                </div>
-                              </div>
-                            )}
-
-                          </div>
-                        </CTableDataCell>
-                      </CTableRow>
-                    )}
-                  </React.Fragment>
-                )
-              })}
-            </CTableBody>
-          </CTable>
-        )}
-        {/* Columns Modal */}
-        <CModal visible={showColumnsModal} onClose={() => setShowColumnsModal(false)} size="xl">
-          <CModalHeader>
-            <CModalTitle>Customize Columns</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <div><strong>Preview (first 3 rows):</strong></div>
-            <div style={{overflowX:'auto', marginTop:8}}>
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    {(selectedColumns && selectedColumns.length ? selectedColumns : columnsList.map(c=>c.key)).map(k => {
-                      const m = columnsList.find(c=>c.key===k)
-                      return <th key={k}>{(m && m.label) ? m.label : k}</th>
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(filtered||[]).slice(0,3).map((r,ri)=> (
-                    <tr key={ri}>
-                      {(selectedColumns && selectedColumns.length ? selectedColumns : columnsList.map(c=>c.key)).map(k=> (
-                        <td key={k} style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:200}}>{String(getColumnValue(k,r,ri) || '')}</td>
+          {/* Columns Customization Dialog */}
+          <Dialog open={showColumnsModal} onClose={() => setShowColumnsModal(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>Customize Columns</DialogTitle>
+            <DialogContent>
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>Preview (first 3 rows):</Typography>
+                <Box sx={{ overflowX: 'auto', mb: 3 }}>
+                  <table className="table table-sm" style={{ minWidth: 500 }}>
+                    <thead>
+                      <tr>
+                        {(selectedColumns && selectedColumns.length ? selectedColumns : columnsList.map(c=>c.key)).map(k => {
+                          const m = columnsList.find(c=>c.key===k)
+                          return <th key={k}>{(m && m.label) ? m.label : k}</th>
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(filtered||[]).slice(0,3).map((r,ri)=> (
+                        <tr key={ri}>
+                          {(selectedColumns && selectedColumns.length ? selectedColumns : columnsList.map(c=>c.key)).map(k=> (
+                            <td key={k} style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:200}}>{String(getColumnValue(k,r,ri) || '')}</td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </tbody>
+                  </table>
+                </Box>
 
-            <div className="mt-3 d-flex flex-column" style={{gap:8}}>
-              {columnsList.map(c => (
-                <CFormCheck key={c.key} label={c.label} checked={selectedColumns.indexOf(c.key) !== -1} onChange={(e)=>{
-                  if (e.target.checked) setSelectedColumns(s => Array.from(new Set([...(s||[]), c.key])))
-                  else setSelectedColumns(s => (s||[]).filter(x=>x!==c.key))
-                }} />
-              ))}
-            </div>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="light" onClick={() => setSelectedColumns(columnsList.map(c=>c.key))}>Select All</CButton>
-            <CButton color="light" onClick={() => setSelectedColumns([])}>Clear All</CButton>
-            <CButton color="primary" onClick={() => { try { localStorage.setItem('cdrSelectedColumns', JSON.stringify(selectedColumns||[])) } catch(e){}; setShowColumnsModal(false) }}>Apply</CButton>
-            <CButton color="secondary" onClick={() => setShowColumnsModal(false)}>Close</CButton>
-          </CModalFooter>
-        </CModal>
-      </CCardBody>
-    </CCard>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {columnsList.map(c => (
+                    <FormControlLabel
+                      key={c.key}
+                      label={c.label}
+                      control={
+                        <Checkbox
+                          checked={selectedColumns.indexOf(c.key) !== -1}
+                          onChange={(e)=>{
+                            if (e.target.checked) setSelectedColumns(s => Array.from(new Set([...(s||[]), c.key])))
+                            else setSelectedColumns(s => (s||[]).filter(x=>x!==c.key))
+                          }}
+                        />
+                      }
+                    />
+                  ))}
+                </Box>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSelectedColumns(columnsList.map(c=>c.key))} variant="text">Select All</Button>
+              <Button onClick={() => setSelectedColumns([])} variant="text">Clear All</Button>
+              <Button
+                onClick={() => {
+                  try { localStorage.setItem('cdrSelectedColumns', JSON.stringify(selectedColumns||[])) } catch(e){}
+                  setShowColumnsModal(false)
+                }}
+                variant="contained"
+                sx={{ backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#5a46eb' } }}
+              >
+                Apply
+              </Button>
+              <Button onClick={() => setShowColumnsModal(false)} variant="outlined">Close</Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Details Modal */}
+          <Dialog open={detailsOpen} onClose={closeDetails} maxWidth="sm" fullWidth>
+            <DialogTitle>CDR Details</DialogTitle>
+            <DialogContent>
+              {!selectedItem ? (
+                <Typography>No item selected</Typography>
+              ) : (
+                <Box sx={{ mt: 2 }}>
+                  <Box sx={{ mb: 2 }}><Typography variant="subtitle2"><strong>Agent:</strong> {selectedItem.agent?.email || selectedItem.agent?.name || '-'}</Typography></Box>
+                  <Box sx={{ mb: 1 }}><Typography variant="body2"><strong>Contact:</strong> {selectedItem.callLog?.contact || '-'}</Typography></Box>
+                  <Box sx={{ mb: 1 }}><Typography variant="body2"><strong>Virtual Number:</strong> {selectedItem.callLog?.virtualNumber || '-'}</Typography></Box>
+                  <Box sx={{ mb: 1 }}><Typography variant="body2"><strong>Call Date:</strong> {formatDateTime(selectedItem.callLog?.callDate)}</Typography></Box>
+                  <Box sx={{ mb: 2 }}><Typography variant="body2"><strong>Duration:</strong> {selectedItem.callLog?.duration ? `${selectedItem.callLog.duration}s` : '-'}</Typography></Box>
+                  <Box sx={{ borderTop: '1px solid #e5e7eb', pt: 2, mb: 2 }}></Box>
+                  <Box sx={{ mb: 1 }}><Typography variant="body2"><strong>Note:</strong> {selectedItem.note || '-'}</Typography></Box>
+                  <Box><Typography variant="body2"><strong>Call Status:</strong> <Chip label={selectedItem.callLog?.status || '-'} size="small" sx={{ backgroundColor: selectedItem.callLog?.status === 'answered' ? '#c8e6c9' : selectedItem.callLog?.status === 'missed' ? '#ffcdd2' : '#e0e0e0', color: selectedItem.callLog?.status === 'answered' ? '#2e7d32' : selectedItem.callLog?.status === 'missed' ? '#c62828' : '#424242', fontWeight: 500 }} /></Typography></Box>
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeDetails} variant="outlined">Close</Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Filter Section */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField label="From" size="small" fullWidth placeholder="From number" value={fromNumber} onChange={(e) => setFromNumber(e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField label="To" size="small" fullWidth placeholder="To number" value={toNumber} onChange={(e) => setToNumber(e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField label="Agent / Branch" select size="small" fullWidth value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
+                <MenuItem value="">All agents</MenuItem>
+                {availableAgents.map((a) => (
+                  <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField label="Type" select size="small" fullWidth value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <MenuItem value="">All types</MenuItem>
+                <MenuItem value="inbound">Inbound</MenuItem>
+                <MenuItem value="outbound">Outbound</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField label="From Date" type="date" size="small" fullWidth value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} InputLabelProps={{ shrink: true }} />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField label="To Date" type="date" size="small" fullWidth value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} InputLabelProps={{ shrink: true }} />
+            </Grid>
+            <Grid item xs={12} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={resetFilters}
+                disabled={loading}
+              >
+                Reset
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<SearchIcon />}
+                onClick={applyFilters}
+                disabled={loading}
+                sx={{ backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#5a46eb' } }}
+              >
+                Search
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={exporting ? <CircularProgress size={18} /> : <GetAppIcon />}
+                onClick={() => exportAllCDR()}
+                disabled={loading || exporting}
+                sx={{ backgroundColor: '#00b894', '&:hover': { backgroundColor: '#00a383' } }}
+              >
+                {exporting ? 'Exporting...' : 'Export'}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setShowColumnsModal(true)}
+              >
+                Columns
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Table Section */}
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : filtered.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4, color: '#6c757d' }}>
+              <Typography>No call logs found</Typography>
+            </Box>
+          ) : (
+            <>
+              <Paper variant="outlined" className="calllogs-table-container">
+                <Table size="small" sx={{ '& th, & td': { py: 1, px: 1.5 } }}>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#f3f4f6' }}>
+                    <TableCell sx={{ fontWeight: 600, width: '45%' }}>TO</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: '12%' }}>DATE</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: '12%' }}>TIME</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: '12%' }}>TYPE</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: '19%' }}>RESULTS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered.map((d) => {
+                    const callDate = d.callLog?.callDate || d.callDate
+                    const dt = callDate ? new Date(callDate) : null
+                    const dateOnly = dt ? dt.toLocaleDateString() : '-'
+                    const timeOnly = dt ? dt.toLocaleTimeString() : '-'
+                    const resultText = d.note || d.callLog?.status || d.status || '—'
+
+                    const rawFrom = d.raw?.fromNumber || d.raw?.callInitiatedBy || d.raw?.callerNumber || ''
+                    const rawTo = d.raw?.toNumber || d.raw?.callReceivedBy || d.raw?.calleeNumber || ''
+                    const contact = d.callLog?.contact || d.contact || d.callInitiatedBy || ''
+                    let isInbound = false
+
+                    if (d.callType && String(d.callType).toLowerCase() === 'inbound') {
+                      isInbound = true
+                    } else if (d.raw?.callType && String(d.raw.callType).toLowerCase() === 'inbound') {
+                      isInbound = true
+                    } else if (d.callInitiatedBy && contact && String(d.callInitiatedBy) === String(contact)) {
+                      isInbound = true
+                    } else if (rawFrom && contact && String(rawFrom) === String(contact)) {
+                      isInbound = true
+                    } else if (rawTo && contact && String(rawTo) === String(contact)) {
+                      isInbound = false
+                    } else if (d.raw && d.raw.direction) {
+                      const dir = String(d.raw.direction).toLowerCase()
+                      if (dir.includes('in')) isInbound = true
+                      else if (dir.includes('out')) isInbound = false
+                    } else if (d.agent && d.raw && (d.raw.fromName || d.raw.toName) && d.agent.name) {
+                      const an = String(d.agent.name).toLowerCase()
+                      if (d.raw.fromName && String(d.raw.fromName).toLowerCase().includes(an)) isInbound = false
+                      else if (d.raw.toName && String(d.raw.toName).toLowerCase().includes(an)) isInbound = true
+                    }
+
+                    const fromTimeDefault = formatDateTimeShort(d.raw?.fromAt || d.callLog?.callDate || d.callDate)
+                    const toTimeDefault = formatDateTimeShort(d.raw?.toAt || d.callLog?.callDate || d.callDate)
+
+                    let leftTitle, leftSub, leftTime, rightTitle, rightSub, rightTime
+
+                    if (isInbound) {
+                      leftTitle = contact
+                      leftSub = d.raw?.fromName || 'Incoming'
+                      leftTime = fromTimeDefault
+                      rightTitle = d.agent?.name || d.agent?.email || 'Agent'
+                      rightSub = d.raw?.toName || 'Answered'
+                      rightTime = toTimeDefault
+                    } else {
+                      leftTitle = d.agent?.name || d.agent?.email || 'Agent'
+                      leftSub = d.raw?.fromName || 'Outgoing'
+                      leftTime = fromTimeDefault
+                      rightTitle = contact
+                      rightSub = d.raw?.toName || 'Recipient'
+                      rightTime = toTimeDefault
+                    }
+
+                    return (
+                      <React.Fragment key={d._id}>
+                        <TableRow hover onClick={() => toggleRow(d._id)} sx={{ cursor: 'pointer' }}>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{leftTitle}</Typography>
+                              <Typography variant="caption" sx={{ color: '#6c757d' }}>{rightTitle}</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{dateOnly}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{timeOnly}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Chip
+                              label={isInbound ? 'Inbound' : 'Outbound'}
+                              size="small"
+                              sx={{
+                                backgroundColor: isInbound ? '#e3f2fd' : '#fce4ec',
+                                color: isInbound ? '#1565c0' : '#c2185b',
+                                fontWeight: 500,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Box>
+                              <Typography variant="body2">{resultText}</Typography>
+                              <Chip
+                                label={d.callLog?.status || ''}
+                                size="small"
+                                sx={{
+                                  backgroundColor: d.callLog?.status === 'answered' ? '#c8e6c9' : d.callLog?.status === 'missed' ? '#ffcdd2' : '#e0e0e0',
+                                  color: d.callLog?.status === 'answered' ? '#2e7d32' : d.callLog?.status === 'missed' ? '#c62828' : '#424242',
+                                  fontWeight: 500,
+                                  mt: 0.5,
+                                }}
+                              />
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                        {expandedRows.has(d._id) && (
+                          <TableRow>
+                            <TableCell colSpan={5} sx={{ py: 2, backgroundColor: '#fff' }}>
+                              <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 3 }}>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#6c757d' }}>Call ID</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{d._id}</Typography>
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#6c757d' }}>Region</Typography>
+                                    <Typography variant="body2">{d.region || '-'}</Typography>
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#6c757d' }}>Duration</Typography>
+                                    <Typography variant="body2">{d.callLog?.duration ? `${d.callLog.duration}s` : '—'}</Typography>
+                                  </Box>
+                                  <Box sx={{ ml: 'auto' }}>
+                                    <RecordingPlayer recordingFilename={getRecordingFilename(d)} onDownload={() => handleDownloadRecording(d)} />
+                                  </Box>
+                                </Box>
+
+                                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                                  <Button size="small" variant="outlined" onClick={(e)=>{e.stopPropagation(); toggleCallFlow(d._id)}} sx={{ textTransform: 'none' }}>Call Flow</Button>
+                                  <Button size="small" variant="outlined" onClick={(e)=>{e.stopPropagation(); openDetails(d)}} sx={{ textTransform: 'none' }}>View Note</Button>
+                                  <Button size="small" variant="outlined" onClick={(e)=>{e.stopPropagation(); toggleMoreInfo(d._id)}} sx={{ textTransform: 'none' }}>More Information</Button>
+                                </Box>
+
+                                {openCallFlows.has(d._id) && (
+                                  <Box className="cdr-callflow" sx={{ mt: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                        <Box sx={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#e9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#fff"/></svg>
+                                        </Box>
+                                        <Typography variant="caption">{leftTitle}</Typography>
+                                      </Box>
+
+                                      <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                        <Box sx={{ width: 52, height: 52, borderRadius: '50%', backgroundColor: '#e9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#13A37F"/><path d="M7.6 5.6c-.4-.4-1.04-.4-1.44 0L4.6 7.16c-.4.4-.4 1.04 0 1.44l1.9 1.9c.4.4 1.04.4 1.44 0l1.06-1.06c.4-.4.4-1.04 0-1.44L7.6 5.6z" fill="#fff"/></svg>
+                                        </Box>
+                                        <Typography variant="caption">Dialed</Typography>
+                                      </Box>
+
+                                      <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                        <Box sx={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#e9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M16.5 11c-.9 0-1.73.2-2.49.57-.21.11-.34.34-.34.58v3.08c0 .24.13.47.34.58C14.77 16.8 15.6 17 16.5 17c1.38 0 2.5-1.12 2.5-2.5S17.88 11 16.5 11z" fill="#fff"/></svg>
+                                        </Box>
+                                        <Typography variant="caption">{rightTitle}</Typography>
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                )}
+
+                                {openMoreInfo.has(d._id) && (
+                                  <Grid container spacing={2} sx={{ mt: 2 }}>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Agent</Typography>
+                                      <Typography variant="body2">{d.agent?.email || d.agent?.name || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Initiated By</Typography>
+                                      <Typography variant="body2">{d.raw?.callInitiatedBy || d.callLog?.initiatedBy || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Received By</Typography>
+                                      <Typography variant="body2">{d.raw?.callReceivedBy || d.callLog?.receivedBy || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Rejected By</Typography>
+                                      <Typography variant="body2">{d.raw?.callRejectedBy || d.callLog?.rejectedBy || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Hang Up By</Typography>
+                                      <Typography variant="body2">{d.raw?.hangUpBy || d.callLog?.hangUpBy || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Team</Typography>
+                                      <Typography variant="body2">{d.team || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Cost</Typography>
+                                      <Typography variant="body2">{d.cost != null ? `$${Number(d.cost).toFixed(2)}` : '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={8}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Notes</Typography>
+                                      <Typography variant="body2">{d.note || d.callLog?.note || '-'}</Typography>
+                                    </Grid>
+                                  </Grid>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+
+              {/* Pagination Controls */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderTop: '1px solid #e5e7eb' }}>
+                <Typography variant="body2" sx={{ color: '#6c757d' }}>
+                  Page {page} of {totalPages} | Total Records: {totalRecords}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={page <= 1 || loading}
+                    onClick={() => {
+                      const newPage = page - 1
+                      setPage(newPage)
+                      fetchRecords(newPage)
+                    }}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={page >= totalPages || loading}
+                    onClick={() => {
+                      const newPage = page + 1
+                      setPage(newPage)
+                      fetchRecords(newPage)
+                    }}
+                  >
+                    Next
+                  </Button>
+                </Box>
+              </Box>
+            </Paper>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </Box>
   )
 }
 
-export default CallLogsLegacy
+export default CDR

@@ -3,11 +3,19 @@ import './AppSidebar.css';
 import { useSelector, useDispatch } from "react-redux";
 
 import {
-  CSidebar,
-  CSidebarBrand,
-  CSidebarNav,
-} from "@coreui/react";
-import CIcon from "@coreui/icons-react";
+  Drawer,
+  Box,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  IconButton,
+  Collapse,
+  Typography,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 
 import { AppSidebarNav } from "./AppSidebarNav";
 
@@ -229,73 +237,77 @@ const AppSidebar = () => {
   }, []);
 
   //---------------------------//
+  const DRAWER_WIDTH = collapsed ? 80 : 250;
+
   return (
-    <CSidebar
-      position="fixed"
-      unfoldable={unfoldableFlag}
-      visible={visibleFlag}
-      className={collapsed ? 'c-sidebar c-sidebar-minimized' : 'c-sidebar'}
-      style={{ background: '#FFFFFF', backgroundImage: 'none' }}
-      onVisibleChange={(visible) => {
-        // Prevent redundant dispatches/loops: only update store when value actually changed.
-        const newVisible = Boolean(visible)
-        if (newVisible === visibleFlag) return
-        try {
-          dispatch({ type: "set", payload: { sidebarShow: newVisible } });
-        } catch (e) {
-          console.warn('Failed to dispatch sidebar visibility change', e)
-        }
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: DRAWER_WIDTH,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: DRAWER_WIDTH,
+          boxSizing: 'border-box',
+          backgroundColor: '#ffffff',
+          borderRight: '1px solid #e5e7eb',
+          transition: 'width 0.3s ease',
+          overflowX: 'hidden',
+        },
       }}
     >
-      <CSidebarBrand className="d-none d-md-flex sidebar-brand" style={{ padding: 0, height: 56 }}>
-        <div className="sidebar-brand-inner" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link
-              to="/dashboard"
-              className="sidebar-logo"
-              aria-label="Go to dashboard"
-              onClick={(e) => handleLogoClick(e)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
-            >
-              <img src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'} alt="Just Connect" style={{ width: 44, height: 44, objectFit: 'contain' }} />
-            </Link>
-            <button
-              className="sidebar-title"
-              onClick={(e) => { e.preventDefault(); handleToggle(); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
-              aria-pressed={collapsed}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              <div className="sidebar-title-main"><span style={{ color: '#0760c7ff' }}>just</span><span style={{ marginLeft: 6, color: '#f97316' }}>Connect</span></div>
-              <div className="sidebar-title-sub">Enterprise Conversations Simplified</div>
-            </button>
-          </div>
+      {/* Sidebar Header / Brand */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px',
+          borderBottom: '1px solid #e5e7eb',
+          minHeight: '70px',
+        }}
+      >
+        <Link
+          to="/dashboard"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            textDecoration: 'none',
+            flex: 1,
+            cursor: 'pointer',
+          }}
+          onClick={(e) => handleLogoClick(e)}
+        >
+          <img 
+            src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'} 
+            alt="Just Connect" 
+            style={{ width: 40, height: 40, objectFit: 'contain' }}
+          />
+          {!collapsed && (
+            <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <Box sx={{ display: 'flex', gap: '0', alignItems: 'baseline' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0760c7', fontSize: '0.9rem', margin: 0 }}>just</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f97316', fontSize: '0.9rem', margin: 0 }}>Connect</Typography>
+              </Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#6b7280', fontSize: '0.6rem', lineHeight: 1.2 }}>Enterprise Conversations Simplified</Typography>
+            </Box>
+          )}
+        </Link>
+      </Box>
 
-          <button
-            className="sidebar-toggle-btn"
-            onClick={() => { const next = !collapsed; setCollapsed(next); try { localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false'); } catch (e) {} }}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <span className="sidebar-toggle-icon" aria-hidden>{'›'}</span>
-          </button>
-        </div>
-      </CSidebarBrand>
-      <CSidebarNav>
-        <SimpleBar>
-          <AppSidebarNav items={navigationItem} />
-        </SimpleBar>
-      </CSidebarNav>
-      {/* Sidebar footer: user/profile + status (fixed at bottom) */}
-      {/* Divider to separate main nav from bottom menu */}
-      <div className="sidebar-divider" aria-hidden />
+      {/* Sidebar Navigation */}
+      <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
+        <AppSidebarNav items={navigationItem} collapsed={collapsed} />
+      </Box>
 
-      <div className="sidebar-footer p-2">
-        <div className="sidebar-footer-inner" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Footer intentionally empty - user/profile actions moved to header dropdown */}
-        </div>
-      </div>
-    </CSidebar>
+      {/* Divider */}
+      <Divider sx={{ marginY: 1 }} />
+
+      {/* Sidebar Footer */}
+      <Box sx={{ padding: '8px', minHeight: '50px' }}>
+        {/* Footer content can be added here */}
+      </Box>
+    </Drawer>
   );
 };
 

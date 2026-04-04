@@ -784,7 +784,7 @@ const Dashboard = () => {
                 </Box>
               </CardContent>
 
-              <IconButton aria-label="redirect" onClick={() => navigate('/billing')} sx={{ position: 'absolute', right: 12, top: 12, zIndex: 3, pointerEvents: 'auto', bgcolor: 'rgba(255,255,255,0.12)', color: '#fff', width: 40, height: 40, '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
+              <IconButton aria-label="redirect" onClick={() => navigate('/callmonitor')} sx={{ position: 'absolute', right: 12, top: 12, zIndex: 3, pointerEvents: 'auto', bgcolor: 'rgba(255,255,255,0.12)', color: '#fff', width: 40, height: 40, '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
                 <OpenInNewIcon fontSize="small" />
               </IconButton>
             </Card>
@@ -813,8 +813,8 @@ const Dashboard = () => {
               <CardContent sx={{ p: 0 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="h6">Most Handled Calls</Typography>
-                  <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                    <MoreVertIcon />
+                  <IconButton size="small" aria-label="redirect" onClick={() => navigate('/agent-performance')} sx={{ color: 'text.secondary' }}>
+                    <OpenInNewIcon fontSize="small" />
                   </IconButton>
                 </Box>
 

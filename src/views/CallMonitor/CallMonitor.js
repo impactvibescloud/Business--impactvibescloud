@@ -1,24 +1,29 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
-  CRow,
-  CCol,
-  CCard,
-  CCardHeader,
-  CCardBody,
-  CButton,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CSpinner,
-  CBadge,
-  
-} from '@coreui/react'
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  CircularProgress,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Paper,
+  Typography,
+  Alert,
+} from '@mui/material'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import CallMissedIcon from '@mui/icons-material/CallMissed'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
 import { apiCall } from '../../config/api'
 import SipRegistration from '../../components/sip/SipRegistration'
 import WebphoneAudio from '../../components/sip/WebphoneAudio'
+import WebPhoneDialer from '../../components/sip/WebPhoneDialer'
+import '../Leads/CallLogsWebpage.css'
 
 const CallMonitor = () => {
   const [businessId, setBusinessId] = useState('')
@@ -37,6 +42,11 @@ const CallMonitor = () => {
   const [bargeSession, setBargeSession] = useState(null)
   const [bargeCall, setBargeCall] = useState(null)
 
+  // SIP configuration state
+  const [sipConfig, setSipConfig] = useState(null)
+  const [loadingSipConfig, setLoadingSipConfig] = useState(false)
+  const [supervisorNumber, setSupervisorNumber] = useState(null)
+
   const fetchBusinessIdIfNeeded = async () => {
     if (businessId) return businessId
     try {
@@ -50,6 +60,79 @@ const CallMonitor = () => {
       // ignore; will show error on fetch
     }
     return null
+  }
+
+  const isIpAddress = (domain) => {
+    // Check if domain is an IP address (IPv4 or IPv6)
+    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/
+    const ipv6Pattern = /^(\[?([a-f0-9:]+)\]?)$/
+    return ipv4Pattern.test(domain) || ipv6Pattern.test(domain)
+  }
+
+  const fetchSipConfiguration = async () => {
+    const bId = await fetchBusinessIdIfNeeded()
+    if (!bId) {
+      console.warn('Business ID not available for SIP config fetch')
+      return
+    }
+
+    setLoadingSipConfig(true)
+    try {
+      // Fetch supervisor-number endpoint which now returns password
+      const supervisorRes = await apiCall(`/businesses/${encodeURIComponent(bId)}/supervisor-number`, 'GET')
+      
+      console.log('[CallMonitor] Supervisor-Number Response:', supervisorRes)
+      
+      if (supervisorRes?.success && supervisorRes?.numberDetails) {
+        const details = supervisorRes.numberDetails
+        let domain = details.sip_domain || 'pbx.justconnect.biz'
+        
+        // Store supervisor number
+        const supervisorNum = supervisorRes.supervisorNumber || supervisorRes.numberDetails?.number
+        setSupervisorNumber(supervisorNum)
+        
+        // If domain is an IP address, use WS (non-secure) instead of WSS
+        // because SSL certificates don't support IP addresses
+        const isIP = isIpAddress(domain)
+        const shouldUseWSS = !isIP && (details.sip_transport === 'wss' || details.sip_transport === 'WSS')
+        
+        const config = {
+          sip_domain: domain,
+          extension: details.sip_endpoint || details.extension || '1010',
+          sip_password: details.sip_password || '',
+          ws_port: details.sip_port || 8089,
+          ws_path: '/ws',
+          wss: shouldUseWSS,
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        }
+        setSipConfig(config)
+        console.log('[CallMonitor] SIP configuration ready with credentials:', {
+          domain: config.sip_domain,
+          isIP: isIP,
+          extension: config.extension,
+          hasPassword: !!config.sip_password,
+          port: config.ws_port,
+          transport: config.wss ? 'WSS' : 'WS',
+          note: isIP ? 'Using WS instead of WSS because domain is IP address' : ''
+        })
+      } else {
+        console.warn('[CallMonitor] Invalid SIP configuration response:', supervisorRes)
+      }
+    } catch (err) {
+      console.error('[CallMonitor] Failed to fetch SIP configuration:', err)
+      // Use fallback config
+      setSipConfig({
+        sip_domain: 'pbx.justconnect.biz',
+        extension: '1010',
+        sip_password: '',
+        ws_port: 8089,
+        ws_path: '/ws',
+        wss: true,
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      })
+    } finally {
+      setLoadingSipConfig(false)
+    }
   }
 
   const fetchLiveCalls = async () => {
@@ -85,6 +168,7 @@ const CallMonitor = () => {
   useEffect(() => {
     // initial fetch
     fetchLiveCalls()
+    fetchSipConfiguration()
 
     // poll every 5 seconds
     pollingRef.current = setInterval(() => {
@@ -99,11 +183,11 @@ const CallMonitor = () => {
 
   
 
-  // SIP config (using credentials provided)
-  const sipCfg = {
+  // Use fetched SIP config if available, fallback to default
+  const sipCfg = sipConfig || {
     sip_domain: 'pbx.justconnect.biz',
-    extension: '1036',
-    sip_password: 'secure_password_1036',
+    extension: '1010',
+    sip_password: '',
     ws_port: 8089,
     ws_path: '/ws',
     wss: true,
@@ -359,184 +443,249 @@ const CallMonitor = () => {
 
   return (
     <>
-    <CRow>
-      <CCol>
-        <CCard>
-          <div>
-              <style>{`
-                .compact-table th, .compact-table td { padding: 0.25rem 0.4rem !important; vertical-align: middle !important; line-height: 1.15 !important; }
-                .compact-table td { overflow: hidden; text-overflow: ellipsis; }
-              `}</style>
-              <CCardHeader className="d-flex justify-content-between align-items-center">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <h3 style={{ margin: 0 }}>Call Monitor</h3>
-                  <CBadge color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'secondary'}>{regStatus}</CBadge>
-                </div>
-                <div>
-                  <button className="btn btn-sm btn-outline-primary me-2" onClick={fetchLiveCalls} disabled={loading}>{loading ? 'Refreshing' : 'Refresh'}</button>
-                </div>
-              </CCardHeader>
+    <Box className="page-container" sx={{ p: 2 }}>
+      {/* Two-column layout: Webphone on left, Call Monitor on right */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '320px 1fr' }, gap: 2, minHeight: 'calc(100vh - 100px)' }}>
+        {/* LEFT SIDEBAR: Webphone Dialer */}
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column' }}>
+          <WebPhoneDialer ua={ua} regStatus={regStatus} sipDomain={sipCfg.sip_domain} businessId={businessId} supervisorNumber={supervisorNumber} />
+        </Box>
 
-              <CCardBody>
-                <SipRegistration sipConfig={sipCfg} enableDebug={false} onRegistrationStatus={setRegStatus} onUaReady={(u) => setUa(u)} />
+        {/* RIGHT MAIN: Call Monitor Table and SIP Registration */}
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Card>
+            <CardHeader
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600, m: 0 }}>Call Monitor</Typography>
+                  <Chip
+                    label={regStatus}
+                    size="small"
+                    color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'default'}
+                    variant="outlined"
+                  />
+                </Box>
+              }
+              action={
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+                  onClick={fetchLiveCalls}
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing' : 'Refresh'}
+                </Button>
+              }
+              sx={{ pb: 2 }}
+            />
+            <CardContent>
+              <Box sx={{ mb: 3 }}>
+                {loadingSipConfig ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+                    <CircularProgress size={24} sx={{ mr: 2 }} />
+                    <Typography variant="body2">Loading SIP configuration...</Typography>
+                  </Box>
+                ) : !sipConfig?.sip_password ? (
+                  <Alert severity="warning">
+                    SIP password not configured. Please configure it in Settings &gt; Call Settings.
+                  </Alert>
+                ) : (
+                  <SipRegistration sipConfig={sipCfg} enableDebug={false} onRegistrationStatus={setRegStatus} onUaReady={(u) => setUa(u)} />
+                )}
+              </Box>
 
-                {error && <div style={{ color: 'var(--cui-danger)' }}>{error}</div>}
+              {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
-                <div style={{ marginTop: 12 }}>
-                  {loading && !liveCalls.length ? (
-                    <div style={{ padding: 20 }}><CSpinner />&nbsp;Loading live calls...</div>
-                  ) : (
-                    <>
-                      {liveCalls.length === 0 ? (
-                        <div style={{ padding: 20 }}><CBadge color="secondary">No active calls</CBadge></div>
-                      ) : (
-                        <CTable striped hover responsive className="table-sm compact-table" style={{ tableLayout: 'auto' }}>
-                          <CTableHead>
-                            <CTableRow>
-                              <CTableHeaderCell>Direction</CTableHeaderCell>
-                              <CTableHeaderCell>Channel</CTableHeaderCell>
-                              <CTableHeaderCell>Status</CTableHeaderCell>
-                              <CTableHeaderCell>Duration</CTableHeaderCell>
-                              <CTableHeaderCell>DID</CTableHeaderCell>
-                              <CTableHeaderCell>Agent</CTableHeaderCell>
-                              <CTableHeaderCell>Branch</CTableHeaderCell>
-                              <CTableHeaderCell>Raw</CTableHeaderCell>
-                              <CTableHeaderCell>Actions</CTableHeaderCell>
-                            </CTableRow>
-                          </CTableHead>
-                          <CTableBody>
-                            {liveCalls.map((c, idx) => (
-                              <CTableRow key={`${c.channel || c.groupId || idx}-${idx}`}>
-                                <CTableDataCell>
-                                  {(() => {
-                                    const dir = detectDirection(c)
-                                    return (
-                                      <CBadge color={dir === 'Outgoing' ? 'primary' : dir === 'Inbound' ? 'info' : 'secondary'}>
-                                        {dir}
-                                      </CBadge>
-                                    )
-                                  })()}
-                                </CTableDataCell>
-                                <CTableDataCell>{c.channel || '-'}</CTableDataCell>
-                                <CTableDataCell>
-                                  <CBadge color={String(c.status || '').toLowerCase() === 'up' ? 'success' : String(c.status || '').toLowerCase() === 'ring' ? 'warning' : 'secondary'}>
-                                    {c.status || '-'}
-                                  </CBadge>
-                                </CTableDataCell>
-                                <CTableDataCell>{c.duration || '-'}</CTableDataCell>
-                                <CTableDataCell>{c.did?.number || c.tokens?.[3] || '-'}</CTableDataCell>
-                                <CTableDataCell>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</CTableDataCell>
-                                <CTableDataCell>{c.branch?.branchName || '-'}</CTableDataCell>
-                                <CTableDataCell style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.raw || '-'}</CTableDataCell>
-                                <CTableDataCell>
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    <CButton
-                                      size="sm"
-                                      color="info"
-                                      onClick={() => handleMonitorClick(c)}
-                                      disabled={regStatus !== 'registered' || !ua}
-                                    >
-                                      Monitor
-                                    </CButton>
-                                    <CButton
-                                      size="sm"
-                                      color="warning"
-                                      onClick={() => handleWhisperClick(c)}
-                                      disabled={regStatus !== 'registered' || !ua}
-                                    >
-                                      Whisper
-                                    </CButton>
-                                    <CButton
-                                      size="sm"
-                                      color="success"
-                                      onClick={() => handleBargeClick(c)}
-                                      disabled={regStatus !== 'registered' || !ua}
-                                    >
-                                      Barge
-                                    </CButton>
-                                  </div>
-                                </CTableDataCell>
-                              </CTableRow>
-                            ))}
-                          </CTableBody>
-                        </CTable>
-                      )}
-                    </>
-                  )}
-                </div>
-          </CCardBody>
-              </div>
-        </CCard>
-      </CCol>
-      </CRow>
+              {loading && !liveCalls.length ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress sx={{ mr: 2 }} />
+                  <Typography>Loading live calls...</Typography>
+                </Box>
+              ) : liveCalls.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Chip label="No active calls" color="default" />
+                </Box>
+              ) : (
+                <Paper variant="outlined" className="calllogs-table-container">
+                  <Table size="small" sx={{ '& th, & td': { py: 1, px: 1.5, lineHeight: 1.15 }, '& td': { overflow: 'hidden', textOverflow: 'ellipsis' } }}>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: '#f3f4f6' }}>
+                        <TableCell sx={{ fontWeight: 600 }}>Direction</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Channel</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>DID</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {liveCalls.map((c, idx) => (
+                        <TableRow key={`${c.channel || c.groupId || idx}-${idx}`} hover>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            {(() => {
+                              const dir = detectDirection(c)
+                              return (
+                                <Chip
+                                  icon={dir === 'Outgoing' ? <CallMissedIcon /> : <CallReceivedIcon />}
+                                  label={dir}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: dir === 'Outgoing' ? '#e3f2fd' : dir === 'Inbound' ? '#f3e5f5' : '#f5f5f5',
+                                    color: dir === 'Outgoing' ? '#1565c0' : dir === 'Inbound' ? '#6a1b9a' : '#616161',
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              )
+                            })()}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.channel || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Chip
+                              label={c.status || '-'}
+                              size="small"
+                              sx={{
+                                backgroundColor: String(c.status || '').toLowerCase() === 'up' ? '#c8e6c9' : String(c.status || '').toLowerCase() === 'ring' ? '#ffe0b2' : '#e0e0e0',
+                                color: String(c.status || '').toLowerCase() === 'up' ? '#2e7d32' : String(c.status || '').toLowerCase() === 'ring' ? '#f57c00' : '#424242',
+                                fontWeight: 500,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.duration || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.did?.number || c.tokens?.[3] || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' }, fontSize: '0.75rem', py: 0.5, px: 1 }}
+                                onClick={() => handleMonitorClick(c)}
+                                disabled={regStatus !== 'registered' || !ua}
+                              >
+                                Monitor
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ backgroundColor: '#f59e0b', '&:hover': { backgroundColor: '#d97706' }, fontSize: '0.75rem', py: 0.5, px: 1 }}
+                                onClick={() => handleWhisperClick(c)}
+                                disabled={regStatus !== 'registered' || !ua}
+                              >
+                                Whisper
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ backgroundColor: '#10b981', '&:hover': { backgroundColor: '#059669' }, fontSize: '0.75rem', py: 0.5, px: 1 }}
+                                onClick={() => handleBargeClick(c)}
+                                disabled={regStatus !== 'registered' || !ua}
+                              >
+                                Barge
+                              </Button>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
+    </Box>
 
       {/* Monitor session audio playback */}
       {monitorSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1110 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>Monitoring <strong>{monitorCall?.assignedAgent?.name || monitorCall?.assignedAgent?.email || monitorCall?.agent || 'agent'}</strong></div>
-            <div>
-              <CButton size="sm" color="danger" onClick={() => { 
-                try { 
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 2, borderRadius: 1, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1110 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2">
+              Monitoring <strong>{monitorCall?.assignedAgent?.name || monitorCall?.assignedAgent?.email || monitorCall?.agent || 'agent'}</strong>
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                try {
                   if (monitorSession && typeof monitorSession.terminate === 'function') {
                     monitorSession.terminate()
                   }
                 } catch(e){ console.warn('Error terminating monitor session', e) }
                 setMonitorSession(null)
                 setMonitorCall(null)
-              }}>Hangup</CButton>
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
+              }}
+            >
+              Hangup
+            </Button>
+          </Box>
+          <Box>
             <WebphoneAudio session={monitorSession} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       {/* Whisper session audio playback */}
       {whisperSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1100 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>Whispering to <strong>{whisperCall?.assignedAgent?.name || whisperCall?.assignedAgent?.email || whisperCall?.agent || 'agent'}</strong></div>
-            <div>
-              <CButton size="sm" color="danger" onClick={() => { 
-                try { 
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 2, borderRadius: 1, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1100 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2">
+              Whispering to <strong>{whisperCall?.assignedAgent?.name || whisperCall?.assignedAgent?.email || whisperCall?.agent || 'agent'}</strong>
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                try {
                   if (whisperSession && typeof whisperSession.terminate === 'function') {
                     whisperSession.terminate()
                   }
                 } catch(e){ console.warn('Error terminating whisper session', e) }
                 setWhisperSession(null)
                 setWhisperCall(null)
-              }}>Hangup</CButton>
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
+              }}
+            >
+              Hangup
+            </Button>
+          </Box>
+          <Box>
             <WebphoneAudio session={whisperSession} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       {/* Barge session audio playback */}
       {bargeSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1090 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>Barging into <strong>{bargeCall?.assignedAgent?.name || bargeCall?.assignedAgent?.email || bargeCall?.agent || 'agent'}</strong></div>
-            <div>
-              <CButton size="sm" color="danger" onClick={() => { 
-                try { 
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 2, borderRadius: 1, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1090 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2">
+              Barging into <strong>{bargeCall?.assignedAgent?.name || bargeCall?.assignedAgent?.email || bargeCall?.agent || 'agent'}</strong>
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                try {
                   if (bargeSession && typeof bargeSession.terminate === 'function') {
                     bargeSession.terminate()
                   }
                 } catch(e){ console.warn('Error terminating barge session', e) }
                 setBargeSession(null)
                 setBargeCall(null)
-              }}>Hangup</CButton>
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
+              }}
+            >
+              Hangup
+            </Button>
+          </Box>
+          <Box>
             <WebphoneAudio session={bargeSession} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
     </>
   )
