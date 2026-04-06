@@ -1032,8 +1032,12 @@ const CDR = () => {
                                       <Typography variant="body2">{d.raw?.hangUpBy || d.callLog?.hangUpBy || '-'}</Typography>
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
-                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Team</Typography>
-                                      <Typography variant="body2">{d.team || '-'}</Typography>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Department</Typography>
+                                      <Typography variant="body2">{d.agent?.department?.departmentName || '-'}</Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" sx={{ fontWeight: 600 }}>Call Outcome</Typography>
+                                      <Typography variant="body2">{d.callOutcomeReason || '-'}</Typography>
                                     </Grid>
                                     <Grid item xs={12} sm={4}>
                                       <Typography variant="caption" sx={{ fontWeight: 600 }}>Cost</Typography>
