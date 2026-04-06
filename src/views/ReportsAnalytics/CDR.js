@@ -791,7 +791,11 @@ const CDR = () => {
                                     <Typography variant="body2">{d.callLog?.duration ? `${d.callLog.duration}s` : '—'}</Typography>
                                   </Box>
                                   <Box sx={{ ml: 'auto' }}>
-                                    <RecordingPlayer recordingFilename={getRecordingFilename(d)} onDownload={() => handleDownloadRecording(d)} />
+                                    {d.callLog?.status === 'missed' ? (
+                                      <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>No recording available</Typography>
+                                    ) : (
+                                      <RecordingPlayer recordingFilename={getRecordingFilename(d)} onDownload={() => handleDownloadRecording(d)} />
+                                    )}
                                   </Box>
                                 </Box>
 
@@ -802,33 +806,206 @@ const CDR = () => {
                                 </Box>
 
                                 {openCallFlows.has(d._id) && (
-                                  <Box className="cdr-callflow" sx={{ mt: 2 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                        <Box sx={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#e9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#fff"/></svg>
+                                  <Box sx={{ 
+                                    mt: 3, 
+                                    p: 3, 
+                                    backgroundColor: '#f9fafb',
+                                    borderRadius: 2,
+                                    border: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center'
+                                  }}>
+                                    {d.callType?.toLowerCase() === 'inbound' ? (
+                                      // INBOUND FLOW: Caller -> Virtual Number -> Agent
+                                      <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: { xs: 1.5, sm: 2, md: 3 },
+                                        justifyContent: 'center',
+                                        flexWrap: 'wrap',
+                                        maxWidth: '100%'
+                                      }}>
+                                        {/* Caller */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+                                          <Box sx={{ 
+                                            width: 64, 
+                                            height: 64, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#e0f2f1',
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            boxShadow: '0 4px 12px rgba(19, 163, 127, 0.15)',
+                                            border: '2px solid #13A37F'
+                                          }}>
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="#13A37F"/><path d="M 12 14 C 8 14 5 16.239 5 19 C 5 20.657 6.343 22 8 22 L 16 22 C 17.657 22 19 20.657 19 19 C 19 16.239 16 14 12 14 Z" fill="#13A37F"/></svg>
+                                          </Box>
+                                          <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#1f2937', display: 'block' }}>{d.contact}</Typography>
+                                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', display: 'block' }}>Incoming Call</Typography>
+                                          </Box>
                                         </Box>
-                                        <Typography variant="caption">{leftTitle}</Typography>
-                                      </Box>
 
-                                      <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-
-                                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                        <Box sx={{ width: 52, height: 52, borderRadius: '50%', backgroundColor: '#e9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 8c1.66 0 3 1.34 3 3 0 .35-.07.68-.18.98L12.9 13c1.17.7 2.2 1.73 2.9 2.9l1.02-.72c.3-.11.63-.18.98-.18 1.66 0 3 1.34 3 3V19c0-.55-.45-1-1-1h-1c-4.97 0-9-4.03-9-9V8z" fill="#13A37F"/><path d="M7.6 5.6c-.4-.4-1.04-.4-1.44 0L4.6 7.16c-.4.4-.4 1.04 0 1.44l1.9 1.9c.4.4 1.04.4 1.44 0l1.06-1.06c.4-.4.4-1.04 0-1.44L7.6 5.6z" fill="#fff"/></svg>
+                                        {/* Arrow 1 */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', color: '#13A37F' }}>
+                                          <svg width="100" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h14" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M17 9l3 3-3 3" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                         </Box>
-                                        <Typography variant="caption">Dialed</Typography>
-                                      </Box>
 
-                                      <svg width="36" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h12" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><path d="M15 6l6 6-6 6" stroke="#0b7a5f" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-
-                                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                        <Box sx={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#e9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#13A37F"/><path d="M16.5 11c-.9 0-1.73.2-2.49.57-.21.11-.34.34-.34.58v3.08c0 .24.13.47.34.58C14.77 16.8 15.6 17 16.5 17c1.38 0 2.5-1.12 2.5-2.5S17.88 11 16.5 11z" fill="#fff"/></svg>
+                                        {/* Telephone Icon 1 */}
+                                        <Box sx={{ 
+                                          width: 48, 
+                                          height: 48, 
+                                          borderRadius: '50%', 
+                                          backgroundColor: '#e0f2f1',
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center',
+                                          border: '2px solid #13A37F'
+                                        }}>
+                                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#13A37F"/></svg>
                                         </Box>
-                                        <Typography variant="caption">{rightTitle}</Typography>
+
+                                        {/* Arrow 2 */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', color: '#13A37F' }}>
+                                          <svg width="100" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h14" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M17 9l3 3-3 3" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        </Box>
+
+                                        {/* Telephone Icon 2 */}
+                                        <Box sx={{ 
+                                          width: 48, 
+                                          height: 48, 
+                                          borderRadius: '50%', 
+                                          backgroundColor: '#e0f2f1',
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center',
+                                          border: '2px solid #13A37F'
+                                        }}>
+                                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#13A37F"/></svg>
+                                        </Box>
+
+                                        {/* Arrow 3 */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', color: '#13A37F' }}>
+                                          <svg width="100" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h14" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M17 9l3 3-3 3" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        </Box>
+
+                                        {/* Agent or Status */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+                                          <Box sx={{ 
+                                            width: 64, 
+                                            height: 64, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: d.callLog?.status === 'answered' ? '#dbeafe' : '#fee2e2',
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            boxShadow: d.callLog?.status === 'answered' ? '0 4px 12px rgba(59, 130, 246, 0.15)' : '0 4px 12px rgba(239, 68, 68, 0.15)',
+                                            border: d.callLog?.status === 'answered' ? '2px solid #3b82f6' : '2px solid #ef4444'
+                                          }}>
+                                            {d.callLog?.status === 'answered' ? (
+                                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#3b82f6"/></svg>
+                                            ) : (
+                                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#ef4444" opacity="0.3"/><line x1="1" y1="1" x2="23" y2="23" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"/></svg>
+                                            )}
+                                          </Box>
+                                          <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#1f2937', display: 'block' }}>
+                                              {d.callLog?.status === 'answered' ? d.agent?.name || 'Agent' : 'Missed'}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', display: 'block' }}>
+                                              {d.callLog?.duration ? `${d.callLog?.duration}s` : d.callLog?.status || 'unknown'}
+                                            </Typography>
+                                          </Box>
+                                        </Box>
                                       </Box>
-                                    </Box>
+                                    ) : (
+                                      // OUTBOUND FLOW: Agent -> Customer
+                                      <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: { xs: 1.5, sm: 2, md: 3 },
+                                        justifyContent: 'center',
+                                        flexWrap: 'wrap',
+                                        maxWidth: '100%'
+                                      }}>
+                                        {/* Agent */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+                                          <Box sx={{ 
+                                            width: 64, 
+                                            height: 64, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#dbeafe',
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)',
+                                            border: '2px solid #3b82f6'
+                                          }}>
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="#3b82f6"/><path d="M 12 14 C 8 14 5 16.239 5 19 C 5 20.657 6.343 22 8 22 L 16 22 C 17.657 22 19 20.657 19 19 C 19 16.239 16 14 12 14 Z" fill="#3b82f6"/><path d="M18 11c-.5 0-.9.2-1.2.5" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                                          </Box>
+                                          <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#1f2937', display: 'block' }}>{d.agent?.name || 'Agent'}</Typography>
+                                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', display: 'block' }}>Agent Dialer</Typography>
+                                          </Box>
+                                        </Box>
+
+                                        {/* Arrow */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', color: '#13A37F' }}>
+                                          <svg width="100" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h14" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M17 9l3 3-3 3" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        </Box>
+
+                                        {/* Telephone Icon */}
+                                        <Box sx={{ 
+                                          width: 48, 
+                                          height: 48, 
+                                          borderRadius: '50%', 
+                                          backgroundColor: d.callLog?.status === 'answered' ? '#e0f2f1' : '#fee2e2',
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center',
+                                          border: d.callLog?.status === 'answered' ? '2px solid #13A37F' : '2px solid #ef4444'
+                                        }}>
+                                          {d.callLog?.status === 'answered' ? (
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#13A37F"/></svg>
+                                          ) : (
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#ef4444" opacity="0.3"/><line x1="1" y1="1" x2="23" y2="23" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"/></svg>
+                                          )}
+                                        </Box>
+
+                                        {/* Arrow */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', color: '#13A37F' }}>
+                                          <svg width="100" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 12h14" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M17 9l3 3-3 3" stroke="#13A37F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                        </Box>
+
+                                        {/* Customer/Contact */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+                                          <Box sx={{ 
+                                            width: 64, 
+                                            height: 64, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: d.callLog?.status === 'answered' ? '#e0f2f1' : '#fee2e2',
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center',
+                                            boxShadow: d.callLog?.status === 'answered' ? '0 4px 12px rgba(19, 163, 127, 0.15)' : '0 4px 12px rgba(239, 68, 68, 0.15)',
+                                            border: d.callLog?.status === 'answered' ? '2px solid #13A37F' : '2px solid #ef4444'
+                                          }}>
+                                            {d.callLog?.status === 'answered' ? (
+                                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#13A37F"/></svg>
+                                            ) : (
+                                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#ef4444" opacity="0.3"/><line x1="1" y1="1" x2="23" y2="23" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"/></svg>
+                                            )}
+                                          </Box>
+                                          <Box sx={{ textAlign: 'center' }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#1f2937', display: 'block' }}>{d.contact}</Typography>
+                                            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', display: 'block' }}>
+                                              {d.callLog?.duration ? `${d.callLog?.duration}s` : d.callLog?.status === 'answered' ? 'Answered' : d.callLog?.status || 'Ringing'}
+                                            </Typography>
+                                          </Box>
+                                        </Box>
+                                      </Box>
+                                    )}
                                   </Box>
                                 )}
 

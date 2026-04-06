@@ -299,14 +299,6 @@ const AppSidebar = () => {
       <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
         <AppSidebarNav items={navigationItem} collapsed={collapsed} />
       </Box>
-
-      {/* Divider */}
-      <Divider sx={{ marginY: 1 }} />
-
-      {/* Sidebar Footer */}
-      <Box sx={{ padding: '8px', minHeight: '50px' }}>
-        {/* Footer content can be added here */}
-      </Box>
     </Drawer>
   );
 };

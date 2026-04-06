@@ -762,6 +762,49 @@ function Settings() {
     }
   }
 
+  const releaseSupervisorNumber = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setCallSettingsMessage({ type: 'error', text: 'Business ID not found' })
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to release this supervisor number? It will revert to a normal number.')) {
+      return
+    }
+
+    setSavingCallSettings(true)
+    setCallSettingsMessage(null)
+    try {
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      
+      // Delete supervisor number via the dedicated endpoint
+      const res = await axios.delete(
+        `/api/businesses/${encodeURIComponent(businessId)}/supervisor-number`,
+        {
+          headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+        }
+      )
+      
+      if (!res || !(res.status === 200 || (res.data && res.data.success))) {
+        setCallSettingsMessage({ type: 'error', text: 'Failed to release supervisor number' })
+        return
+      }
+      
+      // Reset the supervisor number state
+      setSupervisorNumber('')
+      setSelectedSupervisorNumber('')
+      setSipPassword('')
+      setSupervisorNumberDetails(null)
+      setCallSettingsMessage({ type: 'success', text: 'Supervisor number released successfully' })
+    } catch (err) {
+      console.error('Failed to release supervisor number:', err)
+      setCallSettingsMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to release supervisor number' })
+    } finally {
+      setSavingCallSettings(false)
+    }
+  }
+
   // Load call settings when component mounts
   useEffect(() => {
     fetchCallSettings()
@@ -1463,22 +1506,42 @@ function Settings() {
                       )}
 
                       <Grid item xs={12}>
-                        <Button
-                          variant="contained"
-                          onClick={saveSupervisorNumber}
-                          disabled={savingCallSettings || !selectedSupervisorNumber.trim()}
-                          sx={{
-                            bgcolor: '#6366f1',
-                            color: '#fff',
-                            fontWeight: '600',
-                            textTransform: 'none',
-                            fontSize: '14px',
-                            '&:hover': { bgcolor: '#4f46e5' },
-                            '&:disabled': { bgcolor: '#d1d5db' }
-                          }}
-                        >
-                          {savingCallSettings ? 'Saving...' : 'Save Supervisor Number'}
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            variant="contained"
+                            onClick={saveSupervisorNumber}
+                            disabled={savingCallSettings || !selectedSupervisorNumber.trim()}
+                            sx={{
+                              bgcolor: '#6366f1',
+                              color: '#fff',
+                              fontWeight: '600',
+                              textTransform: 'none',
+                              fontSize: '14px',
+                              '&:hover': { bgcolor: '#4f46e5' },
+                              '&:disabled': { bgcolor: '#d1d5db' }
+                            }}
+                          >
+                            {savingCallSettings ? 'Saving...' : 'Save Supervisor Number'}
+                          </Button>
+                          {supervisorNumber && (
+                            <Button
+                              variant="outlined"
+                              onClick={releaseSupervisorNumber}
+                              disabled={savingCallSettings}
+                              sx={{
+                                color: '#dc2626',
+                                borderColor: '#dc2626',
+                                fontWeight: '600',
+                                textTransform: 'none',
+                                fontSize: '14px',
+                                '&:hover': { bgcolor: '#fef2f2', borderColor: '#991b1b' },
+                                '&:disabled': { bgcolor: '#f3f4f6', color: '#d1d5db' }
+                              }}
+                            >
+                              Release Number
+                            </Button>
+                          )}
+                        </Box>
                       </Grid>
                     </Grid>
                   )}

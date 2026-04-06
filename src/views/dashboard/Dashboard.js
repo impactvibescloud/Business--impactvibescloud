@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { isAutheticated } from "../../auth.js";
 // WidgetsDropdown no longer used in this layout
 import { API_CONFIG, getBaseURL } from "../../config/api";
-import { Box, Grid, Card, CardContent, Typography, Button, Paper, Chip, List, ListItem, ListItemText, IconButton } from '@mui/material'
+import { Box, Grid, Card, CardContent, CardHeader, Typography, Button, Paper, Chip, List, ListItem, ListItemText, IconButton, Modal, Backdrop } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
@@ -12,8 +12,15 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
 import StorefrontIcon from '@mui/icons-material/Storefront'
 import GroupIcon from '@mui/icons-material/Group'
 import CallIcon from '@mui/icons-material/Call'
+import PhoneIcon from '@mui/icons-material/Phone'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
+import CallMadeIcon from '@mui/icons-material/CallMade'
+import CallMissedIcon from '@mui/icons-material/CallMissed'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+import '../Leads/CallLogsWebpage.css'
+import './dashboard.css'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -24,14 +31,31 @@ const getApiUrl = (path) => {
   return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
 };
 
+// Helper function to get today's date in YYYY-MM-DD format
+const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const token = isAutheticated();
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const onlineStatusRef = React.useRef(null);
+  const offlineStatusRef = React.useRef(null);
+  const closeTimeoutRef = React.useRef(null);
   const [user, setUser] = useState({});
   const [agents, setAgents] = useState(0);
   const [branches, setBranches] = useState([]);
   const [agentStatuses, setAgentStatuses] = useState({ active: 0, deactive: 0, break: 0, lunch: 0, offline: 0, online: 0 });
+  const [agentSummary, setAgentSummary] = useState({ total: 0, online: 0, offline: 0, lunch: 0, break: 0 });
+  const [agentsList, setAgentsList] = useState([]);
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [selectedAgentStatus, setSelectedAgentStatus] = useState('online');
+  const [agentPopperAnchor, setAgentPopperAnchor] = useState(null);
   // Fetch agent/branch list and update agent stats
   useEffect(() => {
     if (!token || !user?.businessId) return;
@@ -310,6 +334,37 @@ const Dashboard = () => {
     }
   };
 
+  const refreshAgentStatus = async () => {
+    if (!token || !user?.businessId) return;
+    try {
+      const response = await axios.get(getApiUrl('/api/business/agents/status'), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.data && response.data.success && response.data.data && response.data.data.summary) {
+        const summary = response.data.data.summary;
+        const agents = response.data.data.agents || [];
+        
+        setAgentSummary({
+          total: summary.total || 0,
+          online: summary.online || 0,
+          offline: summary.offline || 0,
+          lunch: summary.lunch || 0,
+          break: summary.break || 0
+        });
+        
+        // Store the full agents list for modal display
+        setAgentsList(agents);
+      }
+    } catch (err) {
+      console.error('refreshAgentStatus err', err);
+      // Keep previous values on error
+    }
+  };
+
   // Central polling: refresh dynamic dashboard data every 5 seconds
   useEffect(() => {
     if (!token || !user?.businessId) return;
@@ -318,6 +373,7 @@ const Dashboard = () => {
       refreshCallData();
       fetchBusinessActivities(user.businessId);
       refreshLiveCalls();
+      refreshAgentStatus();
     };
     refreshAll();
     const iv = setInterval(refreshAll, 5000);
@@ -393,6 +449,44 @@ const Dashboard = () => {
 
     fetchUserDetails();
   }, [token]);
+
+  // Fetch agent status summary from the new API
+  useEffect(() => {
+    if (!token || !user?.businessId) return;
+    
+    const fetchAgentStatus = async () => {
+      try {
+        const response = await axios.get(getApiUrl('/api/business/agents/status'), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.data && response.data.success && response.data.data && response.data.data.summary) {
+          const summary = response.data.data.summary;
+          const agents = response.data.data.agents || [];
+          
+          setAgentSummary({
+            total: summary.total || 0,
+            online: summary.online || 0,
+            offline: summary.offline || 0,
+            lunch: summary.lunch || 0,
+            break: summary.break || 0
+          });
+          
+          // Store the full agents list for modal display
+          setAgentsList(agents);
+          console.log('Agent status summary updated:', summary);
+        }
+      } catch (error) {
+        console.warn("Agent status API failed:", error.message);
+        // Keep previous values on error
+      }
+    };
+
+    fetchAgentStatus();
+  }, [token, user?.businessId]);
 
   // Fetch break/lunch/offline states when business id is available
   useEffect(() => {
@@ -603,6 +697,14 @@ const Dashboard = () => {
   };
 
   const chartData = (() => {
+    // Check if there are any calls today
+    const hasCalls = callStats?.totalCalls && callStats.totalCalls > 0;
+    
+    // If no calls, return null (don't show dummy data)
+    if (!hasCalls) {
+      return null;
+    }
+
     // 1) If perAgent data exists, show agent-wise breakdown (Outbound/Inbound/Missed)
     if (callStats && Array.isArray(callStats.perAgent) && callStats.perAgent.length) {
       const labels = callStats.perAgent.map(a => a.name || a.agentId || 'Agent');
@@ -636,8 +738,8 @@ const Dashboard = () => {
       };
     }
 
-    // 3) Fallback sample data
-    return fallbackChartData;
+    // 3) No real data available
+    return null;
   })();
 
   const chartOptions = {
@@ -651,200 +753,501 @@ const Dashboard = () => {
   };
 
   return (
-    <>
-      <Box sx={{ my: 2 }}>
-            <Typography variant="h4" className="contact-list-title" sx={{ fontWeight: 700 }}>{greeting}, {user?.name || 'User'}</Typography>
-          </Box>
+    <Box className="page-container" sx={{ p: 2 }}>
+      {/* Header Section */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          {greeting}, {user?.name || 'User'}
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+          Monitor your business communication metrics and agent status
+        </Typography>
+      </Box>
 
+      {/* Stats Cards Grid */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            onClick={() => {
+              const today = getTodayDateString();
+              navigate(`/callogs?from=${today}&to=${today}`);
+            }}
+            sx={{ borderRadius: 2, height: '100%', className: 'dashboard-stat-card', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Total Calls</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>
+                    {callStats?.totalCalls ?? 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(108, 92, 231, 0.1)' }}>
+                  <CallIcon sx={{ color: 'var(--primary-500)', fontSize: 24 }} />
+                </Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#6b7280' }}>Today</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            onClick={() => {
+              const today = getTodayDateString();
+              navigate(`/callogs?filter=Answered&from=${today}&to=${today}`);
+            }}
+            sx={{ borderRadius: 2, height: '100%', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Answered</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: 'var(--completed)' }}>
+                    {callStats?.answered ?? 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0, 184, 148, 0.1)' }}>
+                  <CallReceivedIcon sx={{ color: 'var(--completed)', fontSize: 24 }} />
+                </Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#6b7280' }}>Completed</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            onClick={() => {
+              const today = getTodayDateString();
+              navigate(`/callogs?filter=Missed&from=${today}&to=${today}`);
+            }}
+            sx={{ borderRadius: 2, height: '100%', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Missed</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: 'var(--missed)' }}>
+                    {callStats?.missedCalls ?? 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(253, 203, 110, 0.1)' }}>
+                  <CallMissedIcon sx={{ color: 'var(--missed)', fontSize: 24 }} />
+                </Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#6b7280' }}>Not answered</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card 
+            onClick={() => navigate('/callmonitor')}
+            sx={{ borderRadius: 2, height: '100%', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Live Now</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: 'var(--outgoing)' }}>
+                    {liveCallsCount ?? 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(253, 121, 168, 0.1)' }}>
+                  <PhoneIcon sx={{ color: 'var(--outgoing)', fontSize: 24 }} />
+                </Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#6b7280' }}>Active calls</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Main Content Grid */}
       <Grid container spacing={2}>
-        {/* Left main area */}
-        <Grid item xs={12} md={8}>
+        {/* Left Section - Chart and Calls */}
+        <Grid item xs={12} lg={8}>
           <Grid container spacing={2}>
+            {/* Chart Card */}
             <Grid item xs={12}>
-              <Card sx={{ borderRadius: 2, position: 'relative', overflow: 'visible', color: '#fff', background: 'linear-gradient(135deg, #1976d2, #1565c0)', p: 2 }}>
-                <CardContent sx={{ position: 'relative', zIndex: 2 }}>
-                  <IconButton aria-label="redirect" onClick={() => navigate('/callogs')} sx={{ position: 'absolute', top: 12, right: 12, zIndex: 3, pointerEvents: 'auto', bgcolor: 'rgba(255,255,255,0.12)', color: '#fff', width: 40, height: 40, '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
-                    <OpenInNewIcon fontSize="small" />
-                  </IconButton>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box>
-                        <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Total Calls</Typography>
-                        <Typography variant="h2" sx={{ mt: 1, fontWeight: 900, fontSize: '2.4rem', lineHeight: 1 }}>{callStats?.totalCalls ?? 0}</Typography>
-                        <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>Calls today</Typography>
+              <Card sx={{ borderRadius: 2 }}>
+                <CardHeader
+                  title={
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>Call Statistics Today</Typography>
+                      <Typography variant="caption" sx={{ color: '#6b7280' }}>Inbound, outbound, and missed calls breakdown</Typography>
+                    </Box>
+                  }
+                  action={
+                    <Button
+                      size="small"
+                      startIcon={<OpenInNewIcon fontSize="small" />}
+                      onClick={() => navigate('/callogs')}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      View All Calls
+                    </Button>
+                  }
+                />
+                <CardContent>
+                  <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Inbound</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--incoming)', mt: 0.5 }}>
+                        {callStats?.inboundCalls ?? 0}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Outbound</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--outgoing)', mt: 0.5 }}>
+                        {callStats?.outboundCalls ?? 0}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Answered</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--completed)', mt: 0.5 }}>
+                        {callStats?.answered ?? 0}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  {chartData ? (
+                    <Box sx={{ height: 340, className: 'dashboard-chart-container' }}>
+                      <Bar data={chartData} options={chartOptions} />
+                    </Box>
+                  ) : (
+                    <Box sx={{ height: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f9fafb', borderRadius: 1, border: '1px dashed #e5e7eb' }}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <CallIcon sx={{ fontSize: 48, color: '#d1d5db', mb: 1 }} />
+                        <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                          No calls today
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mt: 0.5 }}>
+                          Call data will appear here when calls are made
+                        </Typography>
                       </Box>
                     </Box>
-
-                    <Box sx={{ textAlign: 'right', pr: 6 }}>
-                      <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>Answered Calls</Typography>
-                      <Typography variant="h2" sx={{ mt: 1, fontWeight: 900, fontSize: '2.4rem', lineHeight: 1 }}>{callStats?.answered ?? 0}</Typography>
-                      <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>Answered today</Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', gap: 4, mt: 2, alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Missed</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{callStats?.missedCalls ?? 0}</Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Inbound</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{callStats?.inboundCalls ?? 0}</Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Outbound</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{callStats?.outboundCalls ?? 0}</Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ position: 'absolute', right: -32, top: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', zIndex: 1, pointerEvents: 'none' }} />
+                  )}
                 </CardContent>
               </Card>
             </Grid>
 
+            {/* Most Handled Numbers Card */}
             <Grid item xs={12}>
               <Card sx={{ borderRadius: 2 }}>
+                <CardHeader
+                  title={
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>Most Handled Numbers</Typography>
+                      <Typography variant="caption" sx={{ color: '#6b7280' }}>Top virtual numbers by call volume</Typography>
+                    </Box>
+                  }
+                  action={
+                    <Button
+                      size="small"
+                      startIcon={<OpenInNewIcon fontSize="small" />}
+                      onClick={() => navigate('/virtual-numbers')}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Manage Numbers
+                    </Button>
+                  }
+                />
                 <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2 }}>Call Chart (Today)</Typography>
-                  <Box sx={{ height: 340 }}>
-                    {/* Stacked bar chart (uses API trend data when available) */}
-                    <Bar
-                      data={chartData}
-                      options={chartOptions}
-                    />
-                  </Box>
+                  {topNumber ? (
+                    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 1.5, bgcolor: 'rgba(108, 92, 231, 0.05)' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 700 }}>{topNumber.virtualNumber || topNumber.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{getAssignedName(topNumber)}</Typography>
+                        </Box>
+                        <Chip label={`${topNumber.totalCalls || 0} calls`} color="primary" variant="outlined" />
+                      </Box>
+                    </Paper>
+                  ) : null}
+                  <List dense sx={{ p: 0 }}>
+                    {(numbersList || []).slice(0, 5).map((it, i) => (
+                      <ListItem key={i} sx={{ px: 0, py: 1, display: 'flex', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>{it.virtualNumber || it.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{getAssignedName(it)}</Typography>
+                        </Box>
+                        <Typography sx={{ fontWeight: 600 }}>{it.totalCalls || 0}</Typography>
+                      </ListItem>
+                    ))}
+                  </List>
                 </CardContent>
               </Card>
             </Grid>
           </Grid>
         </Grid>
 
-        {/* Right side panel */}
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Card sx={{ borderRadius: 2, position: 'relative', overflow: 'visible', color: '#fff', background: 'linear-gradient(90deg, #2e7d32, #43a047)', p: 2, minHeight: 120 }}>
-                <CardContent sx={{ p: 0 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Right Section - Agent Status & Info */}
+        <Grid item xs={12} lg={4}>
+          <Grid container spacing={2}>
+            {/* Agent Status Card */}
+            <Grid item xs={12} sm={6} lg={12}>
+              <Card sx={{ borderRadius: 2 }}>
+                <CardHeader
+                  title={
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>Agent Status</Typography>
+                      <Typography variant="caption" sx={{ color: '#6b7280' }}>Real-time agent availability</Typography>
+                    </Box>
+                  }
+                  action={
+                    <Button
+                      size="small"
+                      startIcon={<OpenInNewIcon fontSize="small" />}
+                      onClick={() => navigate('/branch')}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Manage
+                    </Button>
+                  }
+                />
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box sx={{ width: 44, height: 44, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <GroupIcon sx={{ color: '#fff' }} />
+                      <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(108, 92, 231, 0.1)' }}>
+                        <GroupIcon sx={{ color: 'var(--primary-500)', fontSize: 24 }} />
                       </Box>
                       <Box>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.95)' }}>Total Agents</Typography>
-                        <Typography variant="h6" sx={{ mt: 0.5, fontWeight: 800 }}>{agents ?? 0}</Typography>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Total Agents</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>{agentSummary?.total ?? agents ?? 0}</Typography>
                       </Box>
                     </Box>
+                  </Box>
 
-                    <Box sx={{ textAlign: 'right', pr: 6 }}>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.95)' }}>Active Agents</Typography>
-                      <Typography variant="h6" sx={{ mt: 0.5, fontWeight: 800 }}>{agentStatuses?.active ?? 0}</Typography>
+                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                    <Box
+                      ref={onlineStatusRef}
+                      onClick={(e) => {
+                        setSelectedAgentStatus('online');
+                        setAgentPopperAnchor(e.currentTarget);
+                      }}
+                      sx={{
+                        flex: 1,
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        bgcolor: 'rgba(0, 184, 148, 0.05)',
+                        border: '1px solid rgba(0, 184, 148, 0.2)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: 'rgba(0, 184, 148, 0.1)', borderColor: 'rgba(0, 184, 148, 0.4)', transform: 'translateY(-2px)' }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Online</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--completed)' }}>
+                        {agentSummary?.online ?? 0}
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      ref={offlineStatusRef}
+                      onClick={(e) => {
+                        setSelectedAgentStatus('offline');
+                        setAgentPopperAnchor(e.currentTarget);
+                      }}
+                      sx={{
+                        flex: 1,
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        bgcolor: 'rgba(85, 163, 255, 0.05)',
+                        border: '1px solid rgba(85, 163, 255, 0.2)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: 'rgba(85, 163, 255, 0.1)', borderColor: 'rgba(85, 163, 255, 0.4)', transform: 'translateY(-2px)' }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Offline</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--incoming)' }}>
+                        {agentSummary?.offline ?? 0}
+                      </Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 3, mt: 2 }}>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Online</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{agentStatuses?.online ?? 0}</Typography>
+
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Box 
+                      onClick={(e) => {
+                        setSelectedAgentStatus('break');
+                        setAgentPopperAnchor(e.currentTarget);
+                      }}
+                      sx={{ 
+                        flex: 1, 
+                        p: 1.5, 
+                        borderRadius: 1.5, 
+                        bgcolor: 'rgba(249, 115, 22, 0.05)',
+                        border: '1px solid rgba(249, 115, 22, 0.2)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { 
+                          bgcolor: 'rgba(249, 115, 22, 0.1)', 
+                          borderColor: 'rgba(249, 115, 22, 0.4)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Break</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#f59e0b' }}>{agentSummary?.break ?? 0}</Typography>
                     </Box>
 
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Offline</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{agentStatuses?.offline ?? 0}</Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Break</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{agentStatuses?.break ?? 0}</Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)' }}>Lunch</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>{agentStatuses?.lunch ?? 0}</Typography>
+                    <Box 
+                      onClick={(e) => {
+                        setSelectedAgentStatus('lunch');
+                        setAgentPopperAnchor(e.currentTarget);
+                      }}
+                      sx={{ 
+                        flex: 1, 
+                        p: 1.5, 
+                        borderRadius: 1.5, 
+                        bgcolor: 'rgba(59, 130, 246, 0.05)',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { 
+                          bgcolor: 'rgba(59, 130, 246, 0.1)', 
+                          borderColor: 'rgba(59, 130, 246, 0.4)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Lunch</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#3b82f6' }}>{agentSummary?.lunch ?? 0}</Typography>
                     </Box>
                   </Box>
                 </CardContent>
-                <IconButton aria-label="redirect" onClick={() => navigate('/branch')} sx={{ position: 'absolute', right: 12, top: 12, zIndex: 3, pointerEvents: 'auto', bgcolor: 'rgba(255,255,255,0.12)', color: '#fff', width: 40, height: 40, '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
-                  <OpenInNewIcon fontSize="small" />
-                </IconButton>
-              </Card> 
+              </Card>
+            </Grid>
 
-            <Card sx={{ borderRadius: 2, position: 'relative', overflow: 'visible', color: '#fff', background: 'linear-gradient(90deg, var(--primary-500), var(--primary-600))', p: 2 }}>
-              <CardContent sx={{ p: 0 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 48, height: 48, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <AccountBalanceWalletIcon sx={{ color: '#fff' }} />
-                  </Box>
-
-                  <Box>
-                    <Typography variant="h6" sx={{ color: '#fff', fontWeight: 800 }}>{liveCallsCount ?? 0}</Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }}>Live Calls</Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-
-              <IconButton aria-label="redirect" onClick={() => navigate('/callmonitor')} sx={{ position: 'absolute', right: 12, top: 12, zIndex: 3, pointerEvents: 'auto', bgcolor: 'rgba(255,255,255,0.12)', color: '#fff', width: 40, height: 40, '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}>
-                <OpenInNewIcon fontSize="small" />
-              </IconButton>
-            </Card>
-
-            {/* Secondary white info card (matches reference image) */}
-            <Card sx={{ borderRadius: 2, p: 1, bgcolor: '#fff', boxShadow: '0 6px 18px rgba(16,24,40,0.06)', position: 'relative' }}>
-              <CardContent sx={{ p: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 44, height: 44, borderRadius: 1.5, bgcolor: '#fff8e6', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0,0,0,0.03)' }}>
-                    <StorefrontIcon sx={{ color: '#f0b400' }} />
-                  </Box>
-
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{callStats?.assignedNumbers ?? (callStats?.byNumber?.length ?? 0)}</Typography>
-                    <Typography variant="body2" color="text.secondary">Assigned Numbers</Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-
-              <IconButton aria-label="redirect" onClick={() => navigate('/virtual-numbers')} sx={{ position: 'absolute', right: 12, top: 12, zIndex: 3, pointerEvents: 'auto', bgcolor: 'var(--primary-600)', color: '#fff', width: 40, height: 40, '&:hover': { bgcolor: 'var(--primary-500)' }, boxShadow: '0 6px 18px rgba(90,70,235,0.12)' }}>
-                <OpenInNewIcon fontSize="small" />
-              </IconButton>
-            </Card>
-
-            <Card sx={{ borderRadius: 2, p: 2 }}>
-              <CardContent sx={{ p: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="h6">Most Handled Calls</Typography>
-                  <IconButton size="small" aria-label="redirect" onClick={() => navigate('/agent-performance')} sx={{ color: 'text.secondary' }}>
-                    <OpenInNewIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-
-                <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, bgcolor: 'rgba(98,78,255,0.06)' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography sx={{ fontWeight: 700 }}>{topNumber ? (topNumber.virtualNumber || topNumber.name) : '—'}</Typography>
-                      <Typography variant="caption" color="text.secondary">{topNumber ? getAssignedName(topNumber) : ''}</Typography>
-                    </Box>
-                    <Typography sx={{ fontWeight: 700 }}>{topNumber ? `${topNumber.totalCalls || 0} calls` : '—'}</Typography>
-                  </Box>
-                </Paper>
-
-                <List dense sx={{ p: 0 }}>
-                  {(numbersList || []).map((it, i) => (
-                    <ListItem key={i} sx={{ px: 0, display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                        <Typography sx={{ fontWeight: 700 }}>{it.virtualNumber || it.name || `Number ${i+1}`}</Typography>
-                        <Typography variant="caption" color="text.secondary">{getAssignedName(it)}</Typography>
+            {/* Assigned Numbers Card */}
+            <Grid item xs={12} sm={6} lg={12}>
+              <Card sx={{ borderRadius: 2 }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(240, 180, 0, 0.1)' }}>
+                        <StorefrontIcon sx={{ color: '#f0b400', fontSize: 24 }} />
                       </Box>
-                      <Typography sx={{ fontWeight: 700, ml: 'auto' }}>{(it.totalCalls != null) ? `${it.totalCalls} calls` : '-'}</Typography>
-                    </ListItem>
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Assigned Numbers</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>{callStats?.assignedNumbers ?? (callStats?.byNumber?.length ?? 0)}</Typography>
+                      </Box>
+                    </Box>
+                    <Button
+                      size="small"
+                      onClick={() => navigate('/virtual-numbers')}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      View
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         </Grid>
       </Grid>
-    </>
+
+      {/* Agent Modal - Centered */}
+      <Modal
+        open={Boolean(agentPopperAnchor)}
+        onClose={() => setAgentPopperAnchor(null)}
+        BackdropComponent={Backdrop}
+        BackdropProps={{
+          sx: { 
+            backdropFilter: 'blur(3px)', 
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 1300
+          }
+        }}
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1300
+        }}
+      >
+        <Card 
+          sx={{ 
+            width: '90%',
+            maxWidth: 450,
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            borderRadius: 3,
+            animation: 'fadeInScale 0.3s ease-out',
+            position: 'relative',
+            zIndex: 1350,
+            backgroundColor: '#ffffff'
+          }}
+        >
+          <CardHeader
+            title={
+              <Typography variant="h6" sx={{ fontWeight: 700, textTransform: 'capitalize', color: '#1f2937' }}>
+                {selectedAgentStatus === 'online' ? '🟢 Online Agents' : 
+                 selectedAgentStatus === 'offline' ? '🔴 Offline Agents' :
+                 selectedAgentStatus === 'break' ? '⏸️ Agents on Break' :
+                 selectedAgentStatus === 'lunch' ? '🍽️ Agents on Lunch' : 'Agents'}
+              </Typography>
+            }
+            sx={{ 
+              backgroundColor: 
+                selectedAgentStatus === 'online' ? 'rgba(0, 184, 148, 0.05)' : 
+                selectedAgentStatus === 'offline' ? 'rgba(229, 231, 235, 0.5)' :
+                selectedAgentStatus === 'break' ? 'rgba(249, 115, 22, 0.05)' :
+                selectedAgentStatus === 'lunch' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(229, 231, 235, 0.5)',
+              borderBottom: '1px solid #e5e7eb'
+            }}
+          />
+          <CardContent sx={{ p: 2 }}>
+            <List sx={{ p: 0 }}>
+              {agentsList
+                .filter(agent => agent.status?.toLowerCase() === selectedAgentStatus)
+                .map((agent, index) => (
+                  <ListItem
+                    key={agent.id || index}
+                    sx={{
+                      px: 1.5,
+                      py: 1.5,
+                      borderBottom: '1px solid #e5e7eb',
+                      '&:last-child': { borderBottom: 'none' },
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { 
+                        bgcolor: 'rgba(108, 92, 231, 0.08)',
+                        paddingLeft: 2.5
+                      }
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', mb: 0.5, color: '#1f2937' }}>
+                      {agent.name || 'Unknown Agent'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 0.25, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      📧 {agent.email || 'N/A'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      📱 {agent.phone || 'N/A'}
+                    </Typography>
+                    {selectedAgentStatus === 'offline' && agent.lastSeen && (
+                      <Typography variant="caption" sx={{ mt: 0.5, color: '#999', fontSize: '0.8rem' }}>
+                        Last seen: {new Date(agent.lastSeen).toLocaleString()}
+                      </Typography>
+                    )}
+                  </ListItem>
+                ))}
+              {agentsList.filter(agent => agent.status?.toLowerCase() === selectedAgentStatus).length === 0 && (
+                <Typography color="text.secondary" sx={{ textAlign: 'center', py: 3, fontStyle: 'italic', fontSize: '0.9rem' }}>
+                  No {selectedAgentStatus} agents at the moment
+                </Typography>
+              )}
+            </List>
+          </CardContent>
+        </Card>
+      </Modal>
+    </Box>
   );
 };
 

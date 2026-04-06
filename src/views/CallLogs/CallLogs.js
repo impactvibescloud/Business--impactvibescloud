@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Box,
   Button,
@@ -46,6 +47,7 @@ import '../Leads/CallLogsWebpage.css'
 import { ENDPOINTS, apiCall, getBaseURL } from '../../config/api'
 
 const CallLogs = () => {
+  const location = useLocation()
   const [callLogs, setCallLogs] = useState([])
   // Fixed page size: show 10 records per page only
   const [pageSize, setPageSize] = useState(10)
@@ -176,6 +178,35 @@ const CallLogs = () => {
 
     getBusinessId()
   }, [])
+
+  // Initialize filters from URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const filterParam = params.get('filter')
+    const fromParam = params.get('from')
+    const toParam = params.get('to')
+
+    // Set filter if provided
+    if (filterParam) {
+      // Map filter names from dashboard redirects to CallLogs filter names
+      const filterMap = {
+        'Answered': 'Answered',
+        'Missed': 'Missed',
+        'Outgoing': 'Outgoing',
+        'Incoming': 'Incoming'
+      }
+      const mappedFilter = filterMap[filterParam] || filterParam
+      setActiveFilter(mappedFilter)
+    }
+
+    // Set date range if provided
+    if (fromParam) {
+      setDateFrom(fromParam)
+    }
+    if (toParam) {
+      setDateTo(toParam)
+    }
+  }, [location.search])
 
   // Build endpoint helper with applied filters
   const buildLogsEndpoint = (page = 1, limit = pageSize) => {
@@ -1083,7 +1114,7 @@ const CallLogs = () => {
       case 'rejected_by': return log.callRejectedBy || ''
       case 'team': return log.team || ''
       case 'hangup_by': return log.hangUpBy || log.hangupBy || ''
-      case 'duration': return formatDuration(log.callDuration || log.duration)
+      case 'duration': return formatDuration(log.callDuration)
       case 'cost': return log.cost != null ? Number(log.cost).toFixed(2) : ''
       case 'notes': return log.notes || log.notebyagent || ''
       case 'status': return formatCallStatus(log.status)
@@ -1219,7 +1250,7 @@ const CallLogs = () => {
             csvEscape(log.callRejectedBy || ''),
             csvEscape(log.team || ''),
             csvEscape(log.hangUpBy || ''),
-            csvEscape(formatDuration(log.callDuration || log.duration)),
+            csvEscape(formatDuration(log.callDuration)),
             csvEscape(log.cost != null ? Number(log.cost).toFixed(2) : ''),
             csvEscape(log.notes || log.notebyagent || ''),
             csvEscape(formatCallStatus(log.status)),
@@ -1387,7 +1418,7 @@ const CallLogs = () => {
                     const callType = String((log.callType || log.type || '').toLowerCase())
                     const isIncoming = callType === 'inbound' || callType === 'incoming'
                     const isMissed = (log.status || '').toLowerCase().includes('miss') || (log.hangupby || '').toLowerCase() === 'caller'
-                    const duration = formatDuration(log.callDuration || log.duration);
+                    const duration = formatDuration(log.callDuration);
                     const callId = log.callId || log.call_id || log._id || '';
                     const solution = log.solution || log.callType || '';
                     let agents = []
@@ -1586,53 +1617,57 @@ const CallLogs = () => {
                       </TableCell>
 
                       <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          {(() => {
-                            const rowKey = log._id || callId || index
-                            const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
-                            const isPlayingRow = playingId === String(rowKey)
-                            return (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!rowUrl) return
-                                  if (isPlayingRow) handleStopPlayback()
-                                  else handlePlayRecording(rowUrl, rowKey)
-                                }}
-                                disabled={!rowUrl}
-                                startIcon={recordingLoading && isPlayingRow ? <CircularProgress size={16} /> : (isPlayingRow ? <StopIcon /> : <PlayArrowIcon />)}
-                                sx={{ minWidth: 'auto', textTransform: 'none', fontSize: '0.8rem' }}
-                              >
-                                {recordingLoading && isPlayingRow ? 'Loading' : (isPlayingRow ? 'Stop' : 'Play')}
-                              </Button>
-                            )
-                          })()}
+                        {log.status === 'missed' ? (
+                          <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>No recording available</Typography>
+                        ) : (
+                          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                            {(() => {
+                              const rowKey = log._id || callId || index
+                              const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
+                              const isPlayingRow = playingId === String(rowKey)
+                              return (
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!rowUrl) return
+                                    if (isPlayingRow) handleStopPlayback()
+                                    else handlePlayRecording(rowUrl, rowKey)
+                                  }}
+                                  disabled={!rowUrl}
+                                  startIcon={recordingLoading && isPlayingRow ? <CircularProgress size={16} /> : (isPlayingRow ? <StopIcon /> : <PlayArrowIcon />)}
+                                  sx={{ minWidth: 'auto', textTransform: 'none', fontSize: '0.8rem' }}
+                                >
+                                  {recordingLoading && isPlayingRow ? 'Loading' : (isPlayingRow ? 'Stop' : 'Play')}
+                                </Button>
+                              )
+                            })()}
 
-                          {(() => {
-                            const fname = recording && String(recording).split('/').pop() || (matchedFiles && matchedFiles[0])
-                            const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
-                            const downloadKey = fname || rowUrl
-                            const isDownloading = Boolean(downloadLoadingMap && downloadKey && downloadLoadingMap[String(downloadKey)])
-                            return (
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!rowUrl) return
-                                  handleDownloadRecording(rowUrl, fname)
-                                }}
-                                disabled={!rowUrl || isDownloading}
-                                startIcon={isDownloading ? <CircularProgress size={16} /> : <FileDownloadIcon />}
-                                sx={{ minWidth: 'auto', textTransform: 'none', fontSize: '0.8rem' }}
-                              >
-                                {isDownloading ? 'Saving' : 'Download'}
-                              </Button>
-                            )
-                          })()}
-                        </Box>
+                            {(() => {
+                              const fname = recording && String(recording).split('/').pop() || (matchedFiles && matchedFiles[0])
+                              const rowUrl = recording ? buildRecordingApiUrl(recording) : (matchedFiles && matchedFiles[0] ? buildRecordingApiUrl(matchedFiles[0]) : null)
+                              const downloadKey = fname || rowUrl
+                              const isDownloading = Boolean(downloadLoadingMap && downloadKey && downloadLoadingMap[String(downloadKey)])
+                              return (
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (!rowUrl) return
+                                    handleDownloadRecording(rowUrl, fname)
+                                  }}
+                                  disabled={!rowUrl || isDownloading}
+                                  startIcon={isDownloading ? <CircularProgress size={16} /> : <FileDownloadIcon />}
+                                  sx={{ minWidth: 'auto', textTransform: 'none', fontSize: '0.8rem' }}
+                                >
+                                  {isDownloading ? 'Saving' : 'Download'}
+                                </Button>
+                              )
+                            })()}
+                          </Box>
+                        )}
                       </TableCell>
                     </TableRow>
                   )
@@ -1746,7 +1781,7 @@ const CallLogs = () => {
                 <Typography variant="body2">Rejected By: {selectedLog.callRejectedBy || 'N/A'}</Typography>
                 <Typography variant="body2">Team: {selectedLog.team || 'N/A'}</Typography>
                 <Typography variant="body2">Hang Up By: {selectedLog.hangUpBy || 'Unknown'}</Typography>
-                <Typography variant="body2">Duration: {formatDuration(selectedLog.callDuration || selectedLog.duration)}</Typography>
+                <Typography variant="body2">Duration: {formatDuration(selectedLog.callDuration)}</Typography>
                 <Typography variant="body2">Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</Typography>
                 <Typography variant="body2">Status: {formatCallStatus(selectedLog.status)}</Typography>
                 <Typography variant="body2">Notes: {selectedLog.notes || selectedLog.notebyagent || 'N/A'}</Typography>
