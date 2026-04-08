@@ -728,6 +728,10 @@ const AgentPerformance = () => {
             const totalHandled = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['handledCalls','handled','total','calls'])), 0)
             const totalAnswered = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['answeredCalls','answered'])), 0)
             const totalMissed = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['missedCalls','missed'])), 0)
+            const totalBusy = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['busyCalls','busy'])), 0)
+            const totalNotAnswered = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['notAnsweredOutbound','notAnswered','not_answered'])), 0)
+            const totalRejected = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['rejectedCalls','rejected'])), 0)
+            const totalFailed = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['failedCalls','failed'])), 0)
             const totalDialerCalls = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['dialerCalls','dialer_calls'])), 0)
             const answerRate = totalHandled > 0 ? ((totalAnswered / totalHandled) * 100).toFixed(2) : 0
             
@@ -738,7 +742,7 @@ const AgentPerformance = () => {
             while (sampleVol.length < 11) sampleVol.push(0)
             
             const aggStats = [
-              { title: 'Total Calls', value: totalHandled, note: `${totalAnswered} answered, ${totalMissed} missed, ${totalDialerCalls} dialer`, onNavigate: () => navigate('/callogs') },
+              { title: 'Total Calls', value: totalHandled, note: `${totalAnswered} answered, ${totalMissed} missed, ${totalBusy} busy, ${totalNotAnswered} not answered`, onNavigate: () => navigate('/callogs') },
               { title: 'Answer Rate', value: `${answerRate}%`, note: 'Answered / Handled' },
               { title: 'Avg Occupancy %', value: avgOccupancy, note: 'Average across agents', isDonut: true, percent: parseFloat(avgOccupancy) || 0 },
               { title: 'Call Volume', volumeSample: sampleVol, note: '', isVolume: true }
@@ -941,6 +945,10 @@ const AgentPerformance = () => {
               const handled = pick(a, ['handledCalls','handled','totalCalls','total','calls']) || 0
               const answered = pick(a, ['answeredCalls','answered','successful']) || 0
               const missed = pick(a, ['missedCalls','missed']) || 0
+              const busy = pick(a, ['busyCalls','busy']) || 0
+              const notAnswered = pick(a, ['notAnsweredOutbound','notAnswered','not_answered']) || 0
+              const rejected = pick(a, ['rejectedCalls','rejected']) || 0
+              const failed = pick(a, ['failedCalls','failed']) || 0
               const avgAHT = pick(a, ['avgAHTSeconds','avgAHT','averageHandleSeconds','avgHandle'])
               const avgASA = pick(a, ['avgASASeconds','avgASA','averageSpeedSeconds','avgAnswer'])
               const totalTalk = pick(a, ['totalTalkSeconds','totalTalk','talkSeconds','talk'])
@@ -1039,6 +1047,30 @@ const AgentPerformance = () => {
                           <Typography variant="caption" sx={{ color: '#6b7280' }}>Transferred:</Typography>
                           <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
                             {transferred}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Busy:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {busy}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Not Answered:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {notAnswered}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Rejected:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {rejected}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Failed:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {failed}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>

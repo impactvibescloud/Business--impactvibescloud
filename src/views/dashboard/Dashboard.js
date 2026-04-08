@@ -851,7 +851,7 @@ const Dashboard = () => {
                   <CallMissedIcon sx={{ color: 'var(--missed)', fontSize: 24 }} />
                 </Box>
               </Box>
-              <Typography variant="caption" sx={{ color: '#6b7280' }}>Not answered</Typography>
+              <Typography variant="caption" sx={{ color: '#6b7280' }}>Inbound missed</Typography>
             </CardContent>
           </Card>
         </Grid>

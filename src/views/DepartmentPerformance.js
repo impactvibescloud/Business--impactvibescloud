@@ -231,9 +231,9 @@ const DepartmentPerformance = () => {
       // If no filtered rows are selected, fallback to full data set
       const rowsToExport = (filtered && filtered.length > 0) ? filtered : (data || [])
       console.debug('DepartmentPerformance: downloadReport rows', rowsToExport.length)
-      let csv = 'Department,Members,Handled Calls,Answered Calls,Missed Calls,Dialer Calls,Rejected Calls,Failed Calls,Transferred Calls,Avg AHT (sec),Avg ASA (sec),Total Talk Time (sec),Transfer Rate %,Occupancy %,Logged Hours,Presence %,Online Agents\n'
+      let csv = 'Department,Members,Online Agents,Answered Calls,Missed Calls,Busy Calls,Not Answered,Avg AHT (sec),Avg ASA (sec),Total Talk Time (sec),Occupancy %\n'
       rowsToExport.forEach(r => { 
-        csv += `"${r.departmentName || r.name}","${r.membersCount||''}","${r.handledCalls||0}","${r.answeredCalls||0}","${r.missedCalls||0}","${r.dialerCalls||0}","${r.rejectedCalls||0}","${r.failedCalls||0}","${r.transferredCalls||0}","${r.avgAHTSeconds||''}","${r.avgASASeconds||''}","${r.totalTalkSeconds||0}","${r.transferRatePercent||''}","${r.occupancyPercent||''}","${r.loggedHours||0}","${r.presencePercent||''}","${r.onlineAgentsCount||0}"\n` 
+        csv += `"${r.departmentName || r.name}","${r.membersCount||''}","${r.onlineAgentsCount||0}","${r.answeredCalls||0}","${r.missedCalls||0}","${r.busyCalls||0}","${r.notAnsweredOutbound||0}","${r.avgAHTSeconds||''}","${r.avgASASeconds||''}","${r.totalTalkSeconds||0}","${r.occupancyPercent||''}"\n` 
       })
       // prepend BOM so Excel recognizes UTF-8
       const bom = '\uFEFF'
@@ -287,13 +287,14 @@ const DepartmentPerformance = () => {
   const totalHandledCalls = filtered.reduce((s, d) => s + (d.handledCalls || 0), 0)
   const totalAnswered = filtered.reduce((s, d) => s + (d.answeredCalls || 0), 0)
   const totalMissed = filtered.reduce((s, d) => s + (d.missedCalls || 0), 0)
+  const totalBusy = filtered.reduce((s, d) => s + (d.busyCalls || 0), 0)
+  const totalNotAnswered = filtered.reduce((s, d) => s + (d.notAnsweredOutbound || 0), 0)
   const totalOccupancySum = filtered.reduce((s, d) => s + (parseFloat(d.occupancyPercent) || 0), 0)
   const avgOccupancy = filtered.length > 0 ? (totalOccupancySum / filtered.length).toFixed(2) : '0.00'
   const answerRate = totalHandledCalls > 0 ? ((totalAnswered / totalHandledCalls) * 100).toFixed(2) : 0
-  const totalDialerCalls = filtered.reduce((s, d) => s + (d.dialerCalls || 0), 0)
   
   // Compose stats similar to AgentPerformance layout
-  stats.push({ title: 'Total Handled Calls', value: totalHandledCalls, note: `${totalAnswered} answered, ${totalMissed} missed, ${totalDialerCalls} dialer`, onNavigate: () => navigate('/callogs') })
+  stats.push({ title: 'Total Handled Calls', value: totalHandledCalls, note: `${totalAnswered} answered, ${totalMissed} missed, ${totalBusy} busy, ${totalNotAnswered} not answered`, onNavigate: () => navigate('/callogs') })
   stats.push({ title: 'Answer Rate', value: `${answerRate}%`, note: 'Answered / Handled' })
   stats.push({ title: 'Avg Occupancy %', value: `${avgOccupancy}%`, note: 'Average across departments', isDonut: true, percent: parseFloat(avgOccupancy) || 0 })
   // Call volume by department
@@ -483,15 +484,15 @@ const DepartmentPerformance = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Department Name</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Members</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Handled Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Online</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Answered</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Missed</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Dialer Calls</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Busy</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Not Answered</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Avg AHT (sec)</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Avg ASA (sec)</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Talk (sec)</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>Occupancy %</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Presence %</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -506,15 +507,15 @@ const DepartmentPerformance = () => {
                     <TableRow key={dept.departmentId || dept._id || dept.departmentName} hover>
                       <TableCell sx={{ fontWeight: 500 }}>{dept.departmentName}</TableCell>
                       <TableCell align="right">{dept.membersCount ?? '-'}</TableCell>
-                      <TableCell align="right">{dept.handledCalls ?? 0}</TableCell>
+                      <TableCell align="right">{dept.onlineAgentsCount ?? 0}</TableCell>
                       <TableCell align="right">{dept.answeredCalls ?? 0}</TableCell>
                       <TableCell align="right">{dept.missedCalls ?? 0}</TableCell>
-                      <TableCell align="right">{dept.dialerCalls ?? 0}</TableCell>
+                      <TableCell align="right">{dept.busyCalls ?? 0}</TableCell>
+                      <TableCell align="right">{dept.notAnsweredOutbound ?? 0}</TableCell>
                       <TableCell align="right">{dept.avgAHTSeconds ? dept.avgAHTSeconds.toFixed(2) : '-'}</TableCell>
                       <TableCell align="right">{dept.avgASASeconds ? dept.avgASASeconds.toFixed(2) : '-'}</TableCell>
                       <TableCell align="right">{dept.totalTalkSeconds ?? 0}</TableCell>
                       <TableCell align="right">{dept.occupancyPercent ? dept.occupancyPercent.toFixed(2) : '-'}%</TableCell>
-                      <TableCell align="right">{dept.presencePercent ? dept.presencePercent.toFixed(2) : '-'}%</TableCell>
                     </TableRow>
                   ))
                 )}
