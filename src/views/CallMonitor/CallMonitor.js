@@ -459,7 +459,7 @@ const CallMonitor = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Typography variant="h5" sx={{ fontWeight: 600, m: 0 }}>Call Monitor</Typography>
                   <Chip
-                    label={regStatus}
+                    label={regStatus === 'registered' ? 'Online' : regStatus === 'connecting' ? 'Connecting' : 'Offline'}
                     size="small"
                     color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'default'}
                     variant="outlined"

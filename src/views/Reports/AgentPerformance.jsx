@@ -346,6 +346,7 @@ const AgentPerformance = () => {
         const totalRejected = arr.reduce((s, a) => s + toNumber(a.rejectedCalls || a.rejected), 0)
         const totalFailed = arr.reduce((s, a) => s + toNumber(a.failedCalls || a.failed), 0)
         const totalTransferred = arr.reduce((s, a) => s + toNumber(a.transferredCalls || a.transferred), 0)
+        const totalDialerCalls = arr.reduce((s, a) => s + toNumber(a.dialerCalls || a.dialer_calls), 0)
         const totalTalkSeconds = arr.reduce((s, a) => s + toNumber(a.totalTalkSeconds || a.talkSeconds || a.talk), 0)
         const loggedHoursTotal = arr.reduce((s, a) => s + toNumber(a.loggedHours || a.logged_hours || 0), 0)
 
@@ -399,6 +400,7 @@ const AgentPerformance = () => {
           { title: 'Average Speed Of Answer', value: avgASA ? formatSeconds(avgASA) : '-', note: 'Average across agents' },
           { title: 'Average Handle Time', value: avgAHT ? formatSeconds(avgAHT) : '-', note: 'Average across agents' },
           { title: 'Transferred Calls', value: totalTransferred, note: 'Combined across agents' },
+          { title: 'Dialer Calls', value: totalDialerCalls, note: 'Combined across agents' },
           { title: 'Total Talk Time', value: formatSeconds(totalTalkSeconds), note: 'Sum of talk seconds' },
           { title: 'Logged Hours', value: formatHours(loggedHoursTotal), note: 'Sum of logged hours' }
         ]
@@ -726,6 +728,7 @@ const AgentPerformance = () => {
             const totalHandled = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['handledCalls','handled','total','calls'])), 0)
             const totalAnswered = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['answeredCalls','answered'])), 0)
             const totalMissed = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['missedCalls','missed'])), 0)
+            const totalDialerCalls = agentPerf.reduce((s, a) => s + toNumber(pick(a, ['dialerCalls','dialer_calls'])), 0)
             const answerRate = totalHandled > 0 ? ((totalAnswered / totalHandled) * 100).toFixed(2) : 0
             
             const occupancyVals = agentPerf.map(a => a.occupancyPercent).filter(v => v != null).map(Number).filter(Number.isFinite)
@@ -735,7 +738,7 @@ const AgentPerformance = () => {
             while (sampleVol.length < 11) sampleVol.push(0)
             
             const aggStats = [
-              { title: 'Total Calls', value: totalHandled, note: `${totalAnswered} answered, ${totalMissed} missed`, onNavigate: () => navigate('/callogs') },
+              { title: 'Total Calls', value: totalHandled, note: `${totalAnswered} answered, ${totalMissed} missed, ${totalDialerCalls} dialer`, onNavigate: () => navigate('/callogs') },
               { title: 'Answer Rate', value: `${answerRate}%`, note: 'Answered / Handled' },
               { title: 'Avg Occupancy %', value: avgOccupancy, note: 'Average across agents', isDonut: true, percent: parseFloat(avgOccupancy) || 0 },
               { title: 'Call Volume', volumeSample: sampleVol, note: '', isVolume: true }
@@ -942,6 +945,7 @@ const AgentPerformance = () => {
               const avgASA = pick(a, ['avgASASeconds','avgASA','averageSpeedSeconds','avgAnswer'])
               const totalTalk = pick(a, ['totalTalkSeconds','totalTalk','talkSeconds','talk'])
               const transferred = pick(a, ['transferredCalls','transferred']) || 0
+              const dialerCalls = pick(a, ['dialerCalls','dialer_calls']) || 0
               const loggedHours = pick(a, ['loggedHours','logged_hours'])
               const liveStatus = a.liveStatus || a.status || '-'
               const lastSeen = a.lastSeen || a.last_seen || a.updatedAt || a.lastActive
@@ -1035,6 +1039,12 @@ const AgentPerformance = () => {
                           <Typography variant="caption" sx={{ color: '#6b7280' }}>Transferred:</Typography>
                           <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
                             {transferred}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Dialer Calls:</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500, color: '#111827' }}>
+                            {dialerCalls}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>

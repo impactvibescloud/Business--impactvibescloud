@@ -1314,7 +1314,7 @@ const CallLogs = () => {
               variant="outlined"
               startIcon={<CalendarTodayIcon />}
               onClick={openDateModal}
-              sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+              sx={{ textTransform: 'none', whiteSpace: 'nowrap', height: '40px', display: 'flex', alignItems: 'center' }}
             >
               {dateFrom && dateTo ? `${dateFrom} - ${dateTo}` : 'Date range'}
             </Button>
@@ -1354,9 +1354,10 @@ const CallLogs = () => {
                 size="small"
                 onClick={exportAllCallLogs}
                 disabled={exporting}
-                startIcon={exporting ? <CircularProgress size={18} /> : <GetAppIcon />}
+                title={exporting ? 'Exporting...' : 'Export call logs'}
+                sx={{ height: '40px', width: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'unset', p: 0 }}
               >
-                {exporting ? 'Exporting' : 'Export'}
+                {exporting ? <CircularProgress size={18} /> : <GetAppIcon />}
               </Button>
               <Button
                 variant={autoRefresh ? 'contained' : 'outlined'}
@@ -1368,18 +1369,19 @@ const CallLogs = () => {
                     return next
                   })
                 }}
-                startIcon={<RefreshIcon sx={{ animation: autoRefresh ? 'spin 1s linear infinite' : 'none' }} />}
                 title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+                sx={{ height: '40px', width: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'unset', p: 0 }}
               >
-                Auto
+                <RefreshIcon sx={{ animation: autoRefresh ? 'spin 1s linear infinite' : 'none' }} />
               </Button>
               <Button
                 variant="outlined"
                 size="small"
                 onClick={() => setShowColumnsModal(true)}
-                startIcon={<MoreVertIcon />}
+                title="Customize columns"
+                sx={{ height: '40px', width: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'unset', p: 0 }}
               >
-                Columns
+                <MoreVertIcon />
               </Button>
             </Box>
           </Box>
@@ -1542,8 +1544,20 @@ const CallLogs = () => {
                               width: 40,
                               height: 40,
                               borderRadius: '50%',
-                              backgroundColor: isIncoming ? '#e3f2fd' : isMissed ? '#ffebee' : '#f5f5f5',
-                              color: isIncoming ? '#1565c0' : isMissed ? '#c62828' : '#388e3c',
+                              backgroundColor: (() => {
+                                if (log.status === 'missed') return '#ffebee'
+                                if (log.status === 'answered') return '#f1f8e9'
+                                if (log.status === 'busy') return '#e3f2fd'
+                                if (log.status === 'not-answered') return '#fff3e0'
+                                return '#f5f5f5'
+                              })(),
+                              color: (() => {
+                                if (log.status === 'missed') return '#d32f2f'
+                                if (log.status === 'answered') return '#388e3c'
+                                if (log.status === 'busy') return '#1976d2'
+                                if (log.status === 'not-answered') return '#f57c00'
+                                return '#6b7280'
+                              })(),
                             }}
                           >
                             {isMissed ? (
@@ -1571,23 +1585,31 @@ const CallLogs = () => {
                           {(() => {
                             const isMissed = log.status === 'missed'
                             const isAnswered = log.status === 'answered'
+                            const isBusy = log.status === 'busy'
+                            const isNotAnswered = log.status === 'not-answered'
                             const isIncoming = log.callType === 'inbound' || log.callType === 'Inbound'
                             const isOutgoing = log.callType === 'outbound' || log.callType === 'Outbound'
                             
-                            if (isMissed && isIncoming) {
-                              return <ArrowDownwardIcon sx={{ color: '#d32f2f', fontSize: 20 }} />
-                            } else if (isMissed && isOutgoing) {
-                              return <ArrowUpwardIcon sx={{ color: '#d32f2f', fontSize: 20 }} />
-                            } else if (isAnswered) {
-                              return <CallReceivedIcon sx={{ color: '#388e3c', fontSize: 20, transform: 'rotate(90deg)' }} />
+                            // Determine color based on status
+                            let statusColor = '#6b7280' // default gray
+                            if (isMissed) statusColor = '#d32f2f' // red
+                            else if (isAnswered) statusColor = '#388e3c' // green
+                            else if (isBusy) statusColor = '#1976d2' // blue
+                            else if (isNotAnswered) statusColor = '#f57c00' // orange
+                            
+                            // Determine icon based on call direction
+                            if (isIncoming) {
+                              return <CallReceivedIcon sx={{ color: statusColor, fontSize: 20 }} />
+                            } else if (isOutgoing) {
+                              return <CallMakeIcon sx={{ color: statusColor, fontSize: 20 }} />
                             }
                             return null
                           })()}
                           <Chip 
                             label={formatCallStatus(log.status)} 
                             size="small"
-                            color={log.status === 'missed' ? 'error' : log.status === 'answered' ? 'success' : 'default'}
-                            variant={log.status === 'missed' || log.status === 'answered' ? 'filled' : 'outlined'}
+                            color={log.status === 'missed' ? 'error' : log.status === 'answered' ? 'success' : log.status === 'busy' ? 'primary' : log.status === 'not-answered' ? 'warning' : 'default'}
+                            variant={log.status === 'missed' || log.status === 'answered' || log.status === 'busy' || log.status === 'not-answered' ? 'filled' : 'outlined'}
                           />
                         </Box>
                       </TableCell>
@@ -1617,7 +1639,7 @@ const CallLogs = () => {
                       </TableCell>
 
                       <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
-                        {log.status === 'missed' ? (
+                        {log.status === 'missed' || log.status === 'busy' || log.status === 'not-answered' ? (
                           <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>No recording available</Typography>
                         ) : (
                           <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>

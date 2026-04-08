@@ -28,6 +28,11 @@ import {
 import GetAppIcon from '@mui/icons-material/GetApp'
 import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import StopIcon from '@mui/icons-material/Stop'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
+import CallMakeIcon from '@mui/icons-material/CallMade'
 import { apiCall, getBaseURL } from '../../config/api'
 import '../Branches/Branches.css'
 import './CDR.css'
@@ -739,9 +744,41 @@ const CDR = () => {
                       <React.Fragment key={d._id}>
                         <TableRow hover onClick={() => toggleRow(d._id)} sx={{ cursor: 'pointer' }}>
                           <TableCell sx={{ fontSize: '0.9rem' }}>
-                            <Box>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>{leftTitle}</Typography>
-                              <Typography variant="caption" sx={{ color: '#6c757d' }}>{rightTitle}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: '50%',
+                                  backgroundColor: (() => {
+                                    if (d.callLog?.status === 'missed') return '#ffebee'
+                                    if (d.callLog?.status === 'answered') return '#f1f8e9'
+                                    if (d.callLog?.status === 'busy') return '#e3f2fd'
+                                    if (d.callLog?.status === 'not-answered') return '#fff3e0'
+                                    return '#f5f5f5'
+                                  })(),
+                                  color: (() => {
+                                    if (d.callLog?.status === 'missed') return '#d32f2f'
+                                    if (d.callLog?.status === 'answered') return '#388e3c'
+                                    if (d.callLog?.status === 'busy') return '#1976d2'
+                                    if (d.callLog?.status === 'not-answered') return '#f57c00'
+                                    return '#6b7280'
+                                  })(),
+                                }}
+                              >
+                                {isInbound ? (
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 12c0 1.1.9 2 2 2h4v-2H5v-2h4V8H5c-1.1 0-2 .9-2 2v4zm18-2v2h-4v2h4c1.1 0 2-.9 2-2v-4c0-1.1-.9-2-2-2h-4v2h4zm-7-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm0 8c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                                ) : (
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 1h-8C6.12 1 5 2.12 5 3.5v17C5 21.88 6.12 23 7.5 23h8c1.38 0 2.5-1.12 2.5-2.5v-17C18 2.12 16.88 1 15.5 1zm-4 21c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-4H7V4h9v14z"/></svg>
+                                )}
+                              </Box>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>{leftTitle}</Typography>
+                                <Typography variant="caption" sx={{ color: '#6c757d' }}>{rightTitle}</Typography>
+                              </Box>
                             </Box>
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.9rem' }}>{dateOnly}</TableCell>
@@ -764,8 +801,8 @@ const CDR = () => {
                                 label={d.callLog?.status || ''}
                                 size="small"
                                 sx={{
-                                  backgroundColor: d.callLog?.status === 'answered' ? '#c8e6c9' : d.callLog?.status === 'missed' ? '#ffcdd2' : '#e0e0e0',
-                                  color: d.callLog?.status === 'answered' ? '#2e7d32' : d.callLog?.status === 'missed' ? '#c62828' : '#424242',
+                                  backgroundColor: d.callLog?.status === 'answered' ? '#c8e6c9' : d.callLog?.status === 'missed' ? '#ffcdd2' : d.callLog?.status === 'busy' ? '#bbdefb' : d.callLog?.status === 'not-answered' ? '#ffe0b2' : '#e0e0e0',
+                                  color: d.callLog?.status === 'answered' ? '#2e7d32' : d.callLog?.status === 'missed' ? '#c62828' : d.callLog?.status === 'busy' ? '#1565c0' : d.callLog?.status === 'not-answered' ? '#e65100' : '#424242',
                                   fontWeight: 500,
                                   mt: 0.5,
                                 }}
@@ -791,7 +828,7 @@ const CDR = () => {
                                     <Typography variant="body2">{d.callLog?.duration ? `${d.callLog.duration}s` : '—'}</Typography>
                                   </Box>
                                   <Box sx={{ ml: 'auto' }}>
-                                    {d.callLog?.status === 'missed' ? (
+                                    {d.callLog?.status === 'missed' || d.callLog?.status === 'busy' || d.callLog?.status === 'not-answered' ? (
                                       <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>No recording available</Typography>
                                     ) : (
                                       <RecordingPlayer recordingFilename={getRecordingFilename(d)} onDownload={() => handleDownloadRecording(d)} />

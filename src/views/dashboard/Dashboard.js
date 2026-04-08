@@ -104,7 +104,11 @@ const Dashboard = () => {
     callsPerDay: 0,
     inboundCalls: 0,
     missedCalls: 0,
-    rejectedCalls: 0
+    busyCalls: 0,
+    notAnsweredCalls: 0,
+    answeredCalls: 0,
+    rejectedCalls: 0,
+    dialerCalls: 0
   });
   const [callLogs, setCallLogs] = useState([]);
   // Fetch call logs for the business and calculate stats
@@ -145,21 +149,27 @@ const Dashboard = () => {
             trend = { labels, outbound, inbound, missed }
           }
           setCallLogs([]) // dashboard widgets derive numbers from stats, not full logs
-          setCallStats({
+          const statsData = {
             totalCalls: totals.totalCalls || 0,
             totalDuration: totals.totalDuration || 0,
             answered: byStatus.answered || 0,
+            answeredCalls: byStatus.answered || 0,
+            busyCalls: byStatus.busy || 0,
+            notAnsweredCalls: byStatus['not-answered'] || 0,
             successful: totals.successful || 0,
             failed: totals.failed || 0,
             outboundCalls: byType.outbound || 0,
             inboundCalls: byType.inbound || 0,
-            missedCalls: totals.missed || 0,
+            missedCalls: byStatus.missed || totals.missed || 0,
             rejectedCalls: totals.rejected || 0,
+            dialerCalls: totals.dialer || 0,
             assignedNumbers: response.data.assignedNumbers || (Array.isArray(data.byNumber) ? data.byNumber.length : 0),
             perAgent: response.data.perAgent || [],
             byNumber: response.data.byNumber || [],
             trend: trend
-          })
+          }
+          console.log('Setting callStats:', statsData)
+          setCallStats(statsData)
         } else {
           setCallLogs([])
           setCallStats({
@@ -169,7 +179,11 @@ const Dashboard = () => {
             callsPerDay: 0,
             inboundCalls: 0,
             missedCalls: 0,
-            rejectedCalls: 0
+            busyCalls: 0,
+            notAnsweredCalls: 0,
+            answeredCalls: 0,
+            rejectedCalls: 0,
+            dialerCalls: 0
           })
         }
       } catch (err) {
@@ -181,7 +195,11 @@ const Dashboard = () => {
           callsPerDay: 0,
           inboundCalls: 0,
           missedCalls: 0,
-          rejectedCalls: 0
+          busyCalls: 0,
+          notAnsweredCalls: 0,
+          answeredCalls: 0,
+          rejectedCalls: 0,
+          dialerCalls: 0
         });
       }
     };
@@ -266,8 +284,11 @@ const Dashboard = () => {
           failed: totals.failed || 0,
           outboundCalls: byType.outbound || 0,
           inboundCalls: byType.inbound || 0,
-          missedCalls: totals.missed || 0,
+          missedCalls: byStatus.missed || totals.missed || 0,
+          busyCalls: byStatus.busy || 0,
+          notAnsweredCalls: byStatus['not-answered'] || 0,
           rejectedCalls: totals.rejected || 0,
+          dialerCalls: totals.dialer || 0,
           assignedNumbers: response.data.assignedNumbers || (Array.isArray(data.byNumber) ? data.byNumber.length : 0),
           perAgent: response.data.perAgent || [],
           byNumber: response.data.byNumber || [],
@@ -290,6 +311,8 @@ const Dashboard = () => {
           callsPerDay: 0,
           inboundCalls: 0,
           missedCalls: 0,
+          busyCalls: 0,
+          notAnsweredCalls: 0,
           rejectedCalls: 0
         });
         setCallUses([]);
@@ -304,6 +327,8 @@ const Dashboard = () => {
         callsPerDay: 0,
         inboundCalls: 0,
         missedCalls: 0,
+        busyCalls: 0,
+        notAnsweredCalls: 0,
         rejectedCalls: 0
       });
       setCallUses([]);
@@ -705,41 +730,16 @@ const Dashboard = () => {
       return null;
     }
 
-    // 1) If perAgent data exists, show agent-wise breakdown (Outbound/Inbound/Missed)
-    if (callStats && Array.isArray(callStats.perAgent) && callStats.perAgent.length) {
-      const labels = callStats.perAgent.map(a => a.name || a.agentId || 'Agent');
-      const outbound = callStats.perAgent.map(a => pickNum(a, ['outbound', 'outboundCalls', 'outbound_calls', 'outbound_count', 'out']));
-      const inbound = callStats.perAgent.map(a => pickNum(a, ['inbound', 'inboundCalls', 'inbound_calls', 'inbound_count', 'in']));
-      const missed = callStats.perAgent.map(a => pickNum(a, ['missed', 'missedCalls', 'missed_calls', 'missed_count', 'miss']));
-      return {
-        labels,
-        datasets: [
-          { label: 'Outbound', data: outbound, backgroundColor: '#1976d2' },
-          { label: 'Inbound', data: inbound, backgroundColor: '#388e3c' },
-          { label: 'Missed', data: missed, backgroundColor: '#ff7043' }
-        ]
-      };
-    }
-
-    // 2) Next prefer the time-series trend from API
-    if (callStats && callStats.trend && Array.isArray(callStats.trend.labels) && callStats.trend.labels.length) {
-      // trend.* are arrays aligned with labels; attempt to use them, falling back to 0
-      const outArr = Array.isArray(callStats.trend.outbound) ? callStats.trend.outbound.map(n => n || 0) : [];
-      const inArr = Array.isArray(callStats.trend.inbound) ? callStats.trend.inbound.map(n => n || 0) : [];
-      const missArr = Array.isArray(callStats.trend.missed) ? callStats.trend.missed.map(n => n || 0) : [];
-      // If missed array is all zeros but total missedCalls exists, try alternative trend fields preserved on trend.raw (if any)
-      return {
-        labels: callStats.trend.labels,
-        datasets: [
-          { label: 'Outbound', data: outArr.length ? outArr : (callStats.trend.outbound || []), backgroundColor: '#1976d2' },
-          { label: 'Inbound', data: inArr.length ? inArr : (callStats.trend.inbound || []), backgroundColor: '#388e3c' },
-          { label: 'Missed', data: missArr.length ? missArr : (callStats.trend.missed || []), backgroundColor: '#ff7043' }
-        ]
-      };
-    }
-
-    // 3) No real data available
-    return null;
+    // Show status breakdown (Answered, Missed, Busy, Not Answered)
+    return {
+      labels: ['Call Status Breakdown'],
+      datasets: [
+        { label: 'Answered', data: [callStats?.answered ?? 0], backgroundColor: '#388e3c' },
+        { label: 'Missed', data: [callStats?.missedCalls ?? 0], backgroundColor: '#d32f2f' },
+        { label: 'Busy', data: [callStats?.busyCalls ?? 0], backgroundColor: '#1976d2' },
+        { label: 'Not Answered', data: [callStats?.notAnsweredCalls ?? 0], backgroundColor: '#f57c00' }
+      ]
+    };
   })();
 
   const chartOptions = {
@@ -747,8 +747,8 @@ const Dashboard = () => {
     maintainAspectRatio: false,
     plugins: { legend: { position: 'bottom' } },
     scales: {
-      x: { stacked: true, grid: { display: false } },
-      y: { stacked: true }
+      x: { stacked: false, grid: { display: false } },
+      y: { stacked: false, beginAtZero: true }
     }
   };
 
@@ -786,7 +786,22 @@ const Dashboard = () => {
                   <CallIcon sx={{ color: 'var(--primary-500)', fontSize: 24 }} />
                 </Box>
               </Box>
-              <Typography variant="caption" sx={{ color: '#6b7280' }}>Today</Typography>
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>Outbound</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {callStats?.outboundCalls ?? 0}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: '#d1d5db' }}>|</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>Inbound</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {callStats?.inboundCalls ?? 0}
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#6b7280', mt: 1 }}>Today</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -876,7 +891,7 @@ const Dashboard = () => {
                   title={
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>Call Statistics Today</Typography>
-                      <Typography variant="caption" sx={{ color: '#6b7280' }}>Inbound, outbound, and missed calls breakdown</Typography>
+                      <Typography variant="caption" sx={{ color: '#6b7280' }}>Answered, missed, busy, and not answered calls breakdown</Typography>
                     </Box>
                   }
                   action={
@@ -893,21 +908,27 @@ const Dashboard = () => {
                 <CardContent>
                   <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
                     <Box>
-                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Inbound</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--incoming)', mt: 0.5 }}>
-                        {callStats?.inboundCalls ?? 0}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Outbound</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--outgoing)', mt: 0.5 }}>
-                        {callStats?.outboundCalls ?? 0}
-                      </Typography>
-                    </Box>
-                    <Box>
                       <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Answered</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--completed)', mt: 0.5 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#388e3c', mt: 0.5 }}>
                         {callStats?.answered ?? 0}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Missed</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#d32f2f', mt: 0.5 }}>
+                        {callStats?.missedCalls ?? 0}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Busy</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#1976d2', mt: 0.5 }}>
+                        {callStats?.busyCalls ?? 0}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Not Answered</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#f57c00', mt: 0.5 }}>
+                        {callStats?.notAnsweredCalls ?? 0}
                       </Typography>
                     </Box>
                   </Box>
