@@ -277,7 +277,8 @@ const CallLogs = () => {
 
         // Build a simple key for the current date filters so we can cache the
         // filtered dataset and avoid refetching when the user only changes page.
-        const dateFilterKey = `${dateFrom || ''}|${dateTo || ''}|${businessId || ''}`
+        // IMPORTANT: Include searchTerm in the key so that search term changes trigger a refetch
+        const dateFilterKey = `${dateFrom || ''}|${dateTo || ''}|${searchTerm || ''}|${businessId || ''}`
 
         let res = null
         let logs = []

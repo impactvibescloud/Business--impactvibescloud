@@ -1,285 +1,14 @@
-import React, { useEffect, useRef } from "react";
-// Add modern form styles using useEffect to inject CSS only once
-const MODERN_LOGIN_CSS = [
-  '/* Fullscreen soft background with subtle radial glow */',
-  '.login-modern-bg {',
-  '  min-height: 100vh;',
-  '  width: 100vw;',
-  '  display: flex;',
-  '  align-items: center;',
-  '  justify-content: center;',
-  '  background: linear-gradient(180deg, #f6fbff 0%, #ffffff 60%);',
-  '  position: relative;',
-  '  overflow: hidden;',
-  '}',
-  '.advertise-panel {',
-  '  flex: 1 1 0;',
-  '  min-width: 0;',
-  '  min-height: 420px;',
-  '  background: #f3f6fa;',
-  '  border-radius: 16px;',
-  '  margin-right: 0;',
-  '  box-shadow: 0 2px 16px rgba(37,99,235,0.06);',
-  '  display: flex;',
-  '  align-items: stretch;',
-  '  justify-content: center;',
-  '  padding: 0;',
-  '  z-index: 2;',
-  '  overflow: hidden;',
-  '  height: 100vh;',
-  '  max-height: 100vh;',
-  '}',
-  '.advertise-panel img {',
-  '  width: 100%;',
-  '  height: 100%;',
-  '  min-height: 100%;',
-  '  object-fit: cover;',
-  '  display: block;',
-  '}',
-  '.login-modern-bg::before {',
-  '  content: "";',
-  '  position: absolute;',
-  '  top: -20%;',
-  '  left: 50%;',
-  '  transform: translateX(-50%);',
-  '  width: 1100px;',
-  '  height: 1100px;',
-  '  border-radius: 50%;',
-  '  background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.12), transparent 20%), radial-gradient(circle at 70% 70%, rgba(59,130,246,0.06), transparent 30%);',
-  '  filter: blur(40px);',
-  '  pointer-events: none;',
-  '}',
-  '.modern-login-card {',
-  '  display: none;',
-  '}',
-  '.login-content {',
-  '  flex: 0 0 auto;',
-  '  min-width: 0;',
-  '  max-width: 520px;',
-  '  width: 100%;',
-  '  min-height: 420px;',
-  '  margin: 0 24px;',
-  '  background: transparent;',
-  '  border-radius: 8px;',
-  '  padding: 40px 24px;',
-  '  position: relative;',
-  '  order: 2;',
-  '  z-index: 2;',
-  '  display: flex;',
-  '  flex-direction: column;',
-  '  justify-content: center;',
-  '  align-items: center;',
-  '  overflow-y: auto;',
-  '  height: auto;',
-  '}',
-  '.login-content .brand {',
-  '  display: flex;',
-  '  align-items: center;',
-  '  gap: 12px;',
-  '  margin-bottom: 24px;',
-  '  text-align: center;',
-  '  justify-content: center;',
-  '  flex-direction: row;',
-  '}',
-  '.login-content .brand img {',
-  '  width: 96px;',
-  '  height: 96px;',
-  '  object-fit: contain;',
-  '  flex-shrink: 0;',
-  '}',
-  '.login-content .brand-text {',
-  '  display: flex;',
-  '  flex-direction: column;',
-  '  gap: 2px;',
-  '  align-items: flex-start;',
-  '}',
-  '.login-content .brand-text .title {',
-  '  display: flex;',
-  '  gap: 0;',
-  '  align-items: baseline;',
-  '  justify-content: flex-start;',
-  '  font-weight: 800;',
-  '  font-size: 20px;',
-  '}',
-  '.login-content .brand-text .subtitle {',
-  '  font-size: 13px;',
-  '  color: #6b7280;',
-  '  text-align: left;',
-  '  font-weight: 700;',
-  '}',
-  '.login-content .modern-login-form {',
-  '  margin-top: 6px;',
-  '}',
-  // sign-in header and subtitle removed per design
-  '.modern-login-card h2 {',
-  '  margin: 8px 0 0 0;',
-  '  font-size: 26px;',
-  '  font-weight: 700;',
-  '  color: #111827;',
-  '}',
-  '.modern-login-card p.lead {',
-  '  margin: 6px 0 18px 0;',
-  '  color: #6b7280;',
-  '}',
-  '.modern-login-form label {',
-  '  font-weight: 600;',
-  '  color: #111827;',
-  '  margin-bottom: 6px;',
-  '  display: block;',
-  '  text-align: left;',
-  '  width: 100%;',
-  '  max-width: 100%;',
-  '  margin-left: 0;',
-  '  margin-right: 0;',
-  '  padding-left: 8px;',
-  '}',
-  '.modern-input {',
-  '  background: #ffffff;',
-  '  border: 1px solid rgba(15,23,42,0.06);',
-  '  border-radius: 12px;',
-  '  padding: 12px 12px 12px 44px;',
-  '  font-size: 15px;',
-  '  transition: box-shadow 0.15s, border-color 0.15s;',
-  '  width: 100%;',
-  '  max-width: 100%;',
-  '  box-sizing: border-box;',
-  '  margin: 0;',
-  '}',
-  '.modern-input:focus {',
-  '  outline: none;',
-  '  box-shadow: 0 6px 18px rgba(37,99,235,0.08);',
-  '  border-color: rgba(37,99,235,0.25);',
-  '}',
-  '.modern-login-btn {',
-  '  background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);',
-  '  border: none;',
-  '  color: #fff;',
-  '  padding: 12px 18px;',
-  '  border-radius: 12px;',
-  '  font-size: 16px;',
-  '  width: 100%;',
-  '  max-width: 420px;',
-  '  margin: 12px auto 0 auto;',
-  '}',
-  '.modern-login-footer {',
-  '  position: absolute;',
-  '  bottom: 18px;',
-  '  left: 0;',
-  '  right: 0;',
-  '  text-align: center;',
-  '  color: rgba(17,24,39,0.55);',
-  '  font-size: 13px;',
-  '  margin: 0 auto;',
-  '  background: transparent;',
-  '}',
-
-  '/* Responsive layout: show panel left on wide screens, stack on small screens */',
-  '@media (min-width: 992px) {',
-  '  .login-modern-bg {',
-  '    flex-direction: row;',
-  '    padding: 0;',
-  '    gap: 0;',
-  '    justify-content: center;',
-  '    align-items: stretch;',
-  '    min-height: 100vh;',
-  '    height: 100vh;',
-  '  }',
-  '  .advertise-panel {',
-  '    display: flex;',
-  '    order: 1;',
-  '    min-width: 0;',
-  '    min-height: 100vh;',
-  '    flex: 0 0 50%;',
-  '    width: 50%;',
-  '    max-width: 50%;',
-  '    max-height: 100vh;',
-  '    height: 100vh;',
-  '    margin: 0;',
-  '    border-radius: 0 16px 16px 0;',
-  '  }',
-  '  .login-content {',
-  '    order: 2;',
-  '    min-width: 0;',
-  '    min-height: 420px;',
-  '    flex: 0 0 50%;',
-  '    width: 50%;',
-  '    max-width: 50%;',
-  '    height: 100vh;',
-  '    margin: 0;',
-  '    border-radius: 16px 0 0 16px;',
-  '    align-self: stretch;',
-  '    box-shadow: 0 2px 16px rgba(37,99,235,0.06);',
-  '    display: flex;',
-  '    flex-direction: column;',
-  '    justify-content: center;',
-  '    align-items: center;',
-  '    padding: 48px 32px;',
-  '  }',
-  '  .login-content .brand, .login-content .modern-login-form {',
-  '    max-width: 420px;',
-  '    width: 100%;',
-  '    box-sizing: border-box;',
-  '    margin: 0 auto;',
-  '  }',
-  '}',
-  '@media (max-width: 991px) {',
-  '  .login-modern-bg {',
-  '    flex-direction: column;',
-  '    padding: 24px;',
-  '    gap: 24px;',
-  '    align-items: stretch;',
-  '  }',
-  '  .advertise-panel, .login-content {',
-  '    min-width: 0;',
-  '    width: 100%;',
-  '    max-width: 100%;',
-  '    min-height: 220px;',
-  '    height: auto;',
-  '  }',
-  '}',
-  '@media (max-width: 575px) {',
-  '  .advertise-panel { display: none; }',
-  '  .modern-login-btn { font-size: 15px; padding: 10px 14px; }',
-  '}',
-  '.validation-error {',
-  '  font-size: 12px;',
-  '}',
-].join('\n');
-
-function useModernLoginCss() {
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !document.head.querySelector('style[data-modern-login]')) {
-      const style = document.createElement('style');
-      style.setAttribute('data-modern-login', 'true');
-      style.innerHTML = MODERN_LOGIN_CSS;
-      document.head.appendChild(style);
-    }
-  }, []);
-}
-import { Link, useNavigate } from "react-router-dom";
-import {
-  CButton,
-  CCard,
-  CCardBody,
-  CCardGroup,
-  CCol,
-  CContainer,
-  CForm,
-  CFormInput,
-  CInputGroup,
-  CInputGroupText,
-  CRow,
-} from "@coreui/react";
+import React, { useEffect, useRef } from 'react';
+import './ModernLogin.css';
+import { Link, useNavigate } from 'react-router-dom';
 import CIcon from "@coreui/icons-react";
 import { cilLockLocked, cilUser } from "@coreui/icons";
 import ClipLoader from "react-spinners/ClipLoader";
 import { useState } from "react";
 import axios from "axios";
-import { useHistory } from "react-router-dom";
 import swal from "sweetalert";
 
 const Login = () => {
-  useModernLoginCss();
   const [loading, setLoading] = useState(false);
   const [auth, setAuth] = useState({
     email: "",
@@ -298,6 +27,7 @@ const Login = () => {
   );
   const history = useNavigate();
   const submitGuardRef = useRef(false);
+
   // Sync DOM values into React state on mount (handles browser autofill that doesn't trigger React events)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -321,11 +51,7 @@ const Login = () => {
   // Use the public logos sidebar icon from the `public/logos` folder (case-sensitive on Linux)
   const adminLogo = process.env.PUBLIC_URL + "/logos/sidebarlogo.ico";
   const publicLogoPath = process.env.PUBLIC_URL + "/logos/sidebarlogo.ico";
-  const dark = typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('c-dark-theme');
-  // const handleChange = (e) => (event) => {
 
-  //   setAuth({ ...auth, [e]: event.target.value });
-  // };
   const validateForm = () => {
     let valid = true;
     Object.values(errors).forEach((val) => {
@@ -436,131 +162,154 @@ const Login = () => {
   };
 
   return (
-    <div className="login-modern-bg">
-      <div className="advertise-panel">
-        <img src={process.env.PUBLIC_URL + "/logos/product1.png"} alt="Product" />
+    <div className="login-modern-container">
+      {/* Left Panel - Advertisement Area (Empty/Ready for Images) */}
+      <div className="login-advertise-panel">
+        <div className="login-advertise-content">
+          {/* Advertisement images can be placed here */}
+        </div>
       </div>
-      <div className="login-content">
-        <div className="brand">
-          <img src={adminLogo ? adminLogo : publicLogoPath} alt="JustConnect" />
-          <div className="brand-text">
-            <div className="title">
-              <div style={{ color: '#0760c7' }}>just</div>
-              <div style={{ color: '#f97316' }}>Connect</div>
+
+      {/* Right Panel - Login Form */}
+      <div className="login-card-wrapper">
+        <div className="login-card-content">
+          {/* Brand Section - Logo with Title and Subtitle */}
+          <div className="login-brand-section">
+            <img
+              src={adminLogo ? adminLogo : publicLogoPath}
+              alt="JustConnect"
+              className="brand-logo"
+            />
+            <div className="login-brand-text">
+              <div className="brand-title">
+                <span className="title-just">just</span>
+                <span className="title-connect">Connect</span>
+              </div>
+              <div className="brand-subtitle">Enterprise Conversations Simplified</div>
             </div>
-            <div className="subtitle">Enterprise Conversations Simplified</div>
+          </div>
+
+          {/* Login Form Section */}
+          <div className="login-form-section">
+            <form className="login-form">
+              {/* Email Field */}
+              <div className="login-form-group">
+                <label htmlFor="email">Email</label>
+                <div className="login-input-wrapper">
+                  <div className="login-input-icon">
+                    <CIcon icon={cilUser} />
+                  </div>
+                  <input
+                    type="email"
+                    className="login-modern-input"
+                    id="email"
+                    placeholder="jane.doe@gmail.com"
+                    onChange={handleChange}
+                    value={auth.email}
+                    name="email"
+                    autoComplete="email"
+                  />
+                </div>
+                {errors.emailError && (
+                  <span className="login-error-message">{errors.emailError}</span>
+                )}
+              </div>
+
+              {/* Password Field */}
+              <div className="login-form-group">
+                <label htmlFor="password">Password</label>
+                <div className="login-input-wrapper">
+                  <div className="login-input-icon">
+                    <CIcon icon={cilLockLocked} />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    className="login-modern-input"
+                    id="password"
+                    placeholder="Enter your password"
+                    name="password"
+                    value={auth.password}
+                    onChange={handleChange}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M15 9.5a3 3 0 11-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {errors.passwordError && (
+                  <span className="login-error-message">{errors.passwordError}</span>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="login-actions">
+                <button
+                  type="button"
+                  className="login-submit-btn"
+                  onMouseUp={() => {
+                    if (loading) return;
+                    if (!isValid) {
+                      swal("Error!", "Please enter valid credentials", "error");
+                      return;
+                    }
+                    if (!submitGuardRef.current) {
+                      submitGuardRef.current = true;
+                      Login();
+                    }
+                  }}
+                  onClick={(e) => {
+                    if (loading) {
+                      e.preventDefault();
+                      return;
+                    }
+                    if (submitGuardRef.current) {
+                      e.preventDefault();
+                      return;
+                    }
+                    if (!isValid) {
+                      e.preventDefault();
+                      swal("Error!", "Please enter valid credentials", "error");
+                      return;
+                    }
+                    Login();
+                  }}
+                  disabled={loading}
+                >
+                  {loading && <ClipLoader loading={loading} size={16} color="#ffffff" />}
+                  {!loading && 'Sign In'}
+                </button>
+              </div>
+
+              {/* Footer Links */}
+              <div className="login-footer-section">
+                <span></span>
+                <Link to="/forget-password" className="login-forgot-password-link">
+                  Forgot password?
+                </Link>
+              </div>
+
+              {/* Copyright */}
+              <div className="login-copyright">©2026 justConnect. All rights reserved.</div>
+            </form>
           </div>
         </div>
-        {/* Sign-in header and subtitle removed */}
-
-        <CForm className="modern-login-form">
-          <div className="mb-3">
-            <label htmlFor="email">Email</label>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 18, opacity: 0.7 }}>
-                <CIcon icon={cilUser} />
-              </span>
-              <input
-                type="email"
-                className="form-control modern-input"
-                id="email"
-                placeholder="jane.doe@gmail.com"
-                onChange={handleChange}
-                value={auth.email}
-                name="email"
-                autoComplete="email"
-                style={{ paddingLeft: 44 }}
-              />
-            </div>
-          </div>
-            {errors.emailError && <p className="text-danger validation-error mb-2">{errors.emailError}</p>}
-
-          <div className="mb-3">
-            <label htmlFor="password">Password</label>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 18, opacity: 0.7 }}>
-                <CIcon icon={cilLockLocked} />
-              </span>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-control modern-input"
-                id="password"
-                placeholder="Password"
-                name="password"
-                value={auth.password}
-                onChange={handleChange}
-                autoComplete="current-password"
-                style={{ paddingLeft: 44, paddingRight: 44 }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 14, color: '#2563eb' }}
-                tabIndex={-1}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M15 9.5a3 3 0 11-4 4" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <line x1="2" y1="2" x2="22" y2="22" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M2.25 12C3.75 7.5 7.5 4 12 4s8.25 3.5 9.75 8c-1.5 4.5-5.25 8-9.75 8S3.75 16.5 2.25 12z" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <circle cx="12" cy="12" r="3" stroke="#374151" strokeWidth="1.5"/>
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
-          {errors.passwordError && <p className="text-danger validation-error mb-2">{errors.passwordError}</p>}
-
-          <div className="d-grid mb-3">
-            <CButton
-              type="button"
-              className="modern-login-btn"
-              onMouseUp={() => {
-                if (loading) return;
-                if (!isValid) {
-                  swal("Error!", "Please enter valid credentials", "error");
-                  return;
-                }
-                if (!submitGuardRef.current) {
-                  submitGuardRef.current = true;
-                  Login();
-                }
-              }}
-              onClick={(e) => {
-                if (loading) {
-                  e.preventDefault();
-                  return;
-                }
-                if (submitGuardRef.current) {
-                  e.preventDefault();
-                  return;
-                }
-                // fallback: ensure validation before submitting
-                if (!isValid) {
-                  e.preventDefault();
-                  swal("Error!", "Please enter valid credentials", "error");
-                  return;
-                }
-                Login();
-              }}
-            >
-              <ClipLoader loading={loading} size={16} />
-              {!loading && 'Sign In'}
-            </CButton>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: 14, color: '#6b7280' }} />
-            <Link to="/forget-password" style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none' }}>Forgot password?</Link>
-          </div>
-
-          <div className="modern-login-footer">©2026 justConnect. All rights reserved.</div>
-        </CForm>
       </div>
     </div>
   );
