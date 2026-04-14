@@ -109,9 +109,10 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin: 0 auto 24px;
   justify-content: flex-start;
   flex-wrap: nowrap;
+  width: fit-content;
 }
 
 .login-brand-section .brand-logo {
@@ -477,15 +478,64 @@
   }
 }
 
+/* Force light theme for login page (overrides prefers-color-scheme) */
+.login-modern-container {
+  color-scheme: light;
+  background: #ffffff !important;
+  color: var(--text-dark) !important;
+}
+.login-card-wrapper {
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+.login-card-content {
+  color: var(--text-dark) !important;
+}
+.login-brand-section,
+.login-brand-text,
+.login-brand-text .brand-subtitle,
+.login-form-group label,
+.login-footer-section,
+.login-copyright {
+  color: inherit !important;
+}
+.login-modern-input {
+  background: #ffffff !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-dark) !important;
+}
+.login-input-icon,
+.login-password-toggle {
+  color: #94a3b8 !important;
+}
+.login-submit-btn {
+  background: linear-gradient(90deg, var(--button-orange) 0%, var(--button-orange-light) 100%) !important;
+  color: #ffffff !important;
+}
+
+/* Ensure mobile keeps left-aligned text under the centered brand block */
+@media (max-width: 480px) {
+  .login-brand-section {
+    width: 100% !important;
+    margin: 0 0 16px 0 !important;
+    align-items: flex-start !important;
+  }
+  .login-brand-text {
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+}
+
 
 /* Brand section - Preserved as per user requirement */
 .login-brand-section {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-  justify-content: center;
-  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 auto 24px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  width: fit-content;
 }
 
 .login-brand-section .brand-logo {
@@ -498,16 +548,16 @@
 .login-brand-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  align-items: center;
-  text-align: center;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .login-brand-text .brand-title {
   display: flex;
   gap: 0;
   align-items: baseline;
-  justify-content: center;
+  justify-content: flex-start;
   font-weight: 800;
   font-size: 22px;
   letter-spacing: -0.5px;
@@ -758,7 +808,8 @@
   }
 
   .login-brand-text {
-    align-items: center;
+    align-items: flex-start;
+    text-align: left;
   }
 
   .login-brand-text .brand-title {
