@@ -130,9 +130,11 @@ export const setupAxiosInterceptors = () => {
           }
         }      // Add retry configuration for important requests
       if (!config.retry) {
+        // Disable automatic retries by default to reduce added latency.
+        // Individual requests can enable retries if needed.
         config.retry = {
-          retries: 3,
-          retryDelay: 1000,
+          retries: 0,
+          retryDelay: 500,
           retryCondition: (error) => {
             return error.code === 'ERR_NETWORK' || 
                    error.code === 'ERR_CONNECTION_REFUSED' ||

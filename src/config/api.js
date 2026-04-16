@@ -111,6 +111,8 @@ export const ENDPOINTS = {
 // Configure axios defaults: baseURL is the host only (no /api). apiCall will
 // prefix API_PATH ('/api') for relative endpoints.
 axios.defaults.baseURL = getBaseURL();
+// Fail-fast timeout to avoid long-hanging requests (10 seconds)
+axios.defaults.timeout = 10000; // 10s
 
 export const apiCall = async (endpoint, method = 'GET', data = null, options = {}) => {
   // Internal function to make the actual request

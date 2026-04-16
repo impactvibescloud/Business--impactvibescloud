@@ -1,8 +1,8 @@
 // API debouncer utility to prevent excessive API calls
 import { debounce } from 'lodash'
 
-// Create a debounced version of API calls
-const createDebouncedApiCall = (delay = 300) => {
+// Create a debounced version of API calls (shorter default for snappier UX)
+const createDebouncedApiCall = (delay = 100) => {
   return debounce(async (apiFunction, ...args) => {
     try {
       return await apiFunction(...args)
@@ -13,8 +13,8 @@ const createDebouncedApiCall = (delay = 300) => {
   }, delay)
 }
 
-// Default debounced API call with 300ms delay
-export const debouncedApiCall = createDebouncedApiCall(300)
+// Default debounced API call with 100ms delay
+export const debouncedApiCall = createDebouncedApiCall(100)
 
 // Create debounced API calls with custom delays
 export const createDebouncer = (delay) => createDebouncedApiCall(delay)

@@ -54,6 +54,14 @@ class BrowserKeepAlive {
       
       for (const endpoint of endpoints) {
         try {
+          // Use AbortController to enforce a timeout on fetch (fetch doesn't
+          // support a timeout option natively). This prevents heartbeats from
+          // hanging indefinitely and adding to perceived slowness.
+          const controller = new AbortController()
+          const signal = controller.signal
+          const timeoutMs = 8000
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
           const response = await fetch(endpoint, {
             method: 'GET',
             headers: {
@@ -61,16 +69,22 @@ class BrowserKeepAlive {
               'Cache-Control': 'no-cache',
               'X-Heartbeat': timestamp.toString()
             },
-            timeout: 10000
+            signal
           })
-          
-          if (response.ok) {
+
+          clearTimeout(timeoutId)
+
+          if (response && response.ok) {
             console.log(`💓 Heartbeat successful via ${endpoint}`)
             localStorage.setItem('lastHeartbeat', timestamp.toString())
             return
           }
         } catch (endpointError) {
-          console.warn(`⚠️ Heartbeat failed for ${endpoint}:`, endpointError.message)
+          if (endpointError && endpointError.name === 'AbortError') {
+            console.warn(`⚠️ Heartbeat timeout for ${endpoint}`)
+          } else {
+            console.warn(`⚠️ Heartbeat failed for ${endpoint}:`, endpointError?.message || endpointError)
+          }
         }
       }
       
