@@ -33,9 +33,11 @@ import {
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
 import BlockIcon from '@mui/icons-material/Block'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import LockResetIcon from '@mui/icons-material/LockReset'
 import SearchIcon from '@mui/icons-material/Search'
 import LockIcon from '@mui/icons-material/Lock'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -482,8 +484,43 @@ const Branches = () => {
   };
 
 
-  const handleDeleteBranch = (branchId) => {
-    console.log("Delete branch:", branchId);
+  const handleDeleteBranch = async (branch) => {
+    const branchId = branch?._id || branch?.id;
+    if (!branchId) {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Agent ID not found.' });
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: 'Are you sure?',
+      text: `This will permanently delete agent "${branch.branchName}". This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      await apiCall(`/branch/delete/${branchId}`, 'DELETE');
+      fetchBranches();
+      setSuccessAlert({
+        show: true,
+        message: `Agent "${branch.branchName}" deleted successfully!`,
+      });
+      setTimeout(() => {
+        setSuccessAlert({ show: false, message: '' });
+      }, 5000);
+    } catch (error) {
+      console.error('Error deleting branch:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error?.response?.data?.message || 'Failed to delete agent.',
+      });
+    }
   };
 
   const handleResetPassword = async (email) => {
@@ -858,19 +895,24 @@ const Branches = () => {
                             <Chip label={branch.isSuspended ? 'Suspended' : 'Active'} color={branch.isSuspended ? 'warning' : 'success'} size="small" />
                           </TableCell>
                           <TableCell>{Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers[0] : 'Not Assigned'}</TableCell>
-                          <TableCell align="center">
-                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditBranch(branch); }}>
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <Button size="small" variant="outlined" color={branch.isSuspended ? 'success' : 'warning'} onClick={(e) => { e.stopPropagation(); handleSuspendBranch(branch.id); }} sx={{ mx: 1 }}>
-                              {branch.isSuspended ? 'Activate' : 'Suspend'}
-                            </Button>
-                            <Button size="small" variant="outlined" color="info" onClick={(e) => { e.stopPropagation(); handleResetPassword(branch.manager?.email); }}>
-                              Reset
-                            </Button>
-                            <Button size="small" variant="outlined" startIcon={<LockIcon />} onClick={(e) => { e.stopPropagation(); handleOpenChangePassword(branch); }} sx={{ mx: 1 }}>
-                              Change Password
-                            </Button>
+                          <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+                              <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditBranch(branch); }} title="Edit Agent">
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color={branch.isSuspended ? 'success' : 'warning'} onClick={(e) => { e.stopPropagation(); handleSuspendBranch(branch.id); }} title={branch.isSuspended ? 'Activate Agent' : 'Suspend Agent'}>
+                                {branch.isSuspended ? <CheckCircleIcon fontSize="small" /> : <BlockIcon fontSize="small" />}
+                              </IconButton>
+                              <IconButton size="small" color="info" onClick={(e) => { e.stopPropagation(); handleResetPassword(branch.manager?.email); }} title="Reset Password (Email)">
+                                <LockResetIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); handleOpenChangePassword(branch); }} title="Change Password">
+                                <LockIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteBranch(branch); }} title="Delete Agent">
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </TableCell>
                         </TableRow>
                         <TableRow>
