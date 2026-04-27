@@ -29,6 +29,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import PhoneIcon from '@mui/icons-material/Phone'
 import DeleteIcon from '@mui/icons-material/Delete'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
+import SettingsIcon from '@mui/icons-material/Settings'
 import '../Leads/CallLogsWebpage.css'
 
 function VirtualNumbers() {
@@ -42,6 +43,9 @@ function VirtualNumbers() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [user, setUser] = useState(null)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [selectedNumberForAssign, setSelectedNumberForAssign] = useState(null)
+  const DidAssignmentsDialog = React.lazy(() => import('../../components/Numbers/DidAssignmentsDialog'))
   const token = isAutheticated()
 
   // Fetch user details first
@@ -378,6 +382,18 @@ function VirtualNumbers() {
       setReleasingNumber(null)
     }
   }
+
+  const openAssignDialog = (num) => {
+    setSelectedNumberForAssign(num)
+    setAssignDialogOpen(true)
+  }
+
+  const closeAssignDialog = () => {
+    setAssignDialogOpen(false)
+    setSelectedNumberForAssign(null)
+  }
+
+  
   
   return (
     <Box className="page-container contact-list-container">
@@ -484,6 +500,13 @@ function VirtualNumbers() {
                           )}
                         </TableCell>
                         <TableCell>
+                          <Tooltip title="Manage assignments">
+                            <span>
+                              <IconButton color="primary" size="small" onClick={() => openAssignDialog(num)}>
+                                <SettingsIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                           <Tooltip title="Release this number">
                             <span>
                               <IconButton color="error" size="small" onClick={() => releaseNumber(num._id)} disabled={releasingNumber === num._id}>
@@ -507,6 +530,11 @@ function VirtualNumbers() {
           </Grid>
         </Grid>
       </Paper>
+      {assignDialogOpen && selectedNumberForAssign && (
+        <React.Suspense fallback={<div/>}>
+          <DidAssignmentsDialog open={assignDialogOpen} onClose={closeAssignDialog} number={selectedNumberForAssign} />
+        </React.Suspense>
+      )}
     </Box>
   )
 }

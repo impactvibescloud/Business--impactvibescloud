@@ -38,6 +38,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import BusinessIcon from '@mui/icons-material/Business'
 import axios from 'axios'
+import Swal from 'sweetalert2'
+import SyncIcon from '@mui/icons-material/Sync'
 import { apiCall, ENDPOINTS, API_CONFIG, getBaseURL } from '../../config/api'
 import { errorLog } from '../../utils/logger'
 import './Department.css'
@@ -70,6 +72,8 @@ function Department() {
   const [businessName, setBusinessName] = useState('')
   const [availableAgents, setAvailableAgents] = useState([])
   const [availableBranches, setAvailableBranches] = useState([])
+  const [didNumbers, setDidNumbers] = useState([])
+  const [syncingMap, setSyncingMap] = useState({})
   const [selectedMemberIds, setSelectedMemberIds] = useState([]) // For multi-select UI
   const [selectedDepartmentHeadBranchId, setSelectedDepartmentHeadBranchId] = useState('') // For department head dropdown UI
   const [formData, setFormData] = useState({
@@ -168,17 +172,26 @@ function Department() {
         console.log('No branch data found, using empty array');
       }
       if (branchData.length > 0) {
-        branchData = branchData.map(branch => ({
-          _id: branch._id || branch.id || `branch-${Math.random().toString(36).substring(2, 9)}`,
-          id: branch.id || branch._id || `branch-${Math.random().toString(36).substring(2, 9)}`,
-          branchName: branch.branchName || branch.name || 'Unnamed Branch',
-          name: branch.name || branch.branchName || 'Unnamed Branch',
-          // didNumbers is an array, so we take the first one or empty string
-          didNumber: (branch.didNumbers && branch.didNumbers.length > 0) ? branch.didNumbers[0] : (branch.didNumber || branch.did || ''),
-          userId: branch.user?._id || branch.user?.id || branch.userId || '',
-          phone: branch.user?.phone || branch.phone || '',
-          role: 'branch' // Default role for branch members
-        }));
+        branchData = branchData.map(branch => {
+          const _id = branch._id || branch.id || `branch-${Math.random().toString(36).substring(2, 9)}`
+          const id = branch.id || branch._id || `branch-${Math.random().toString(36).substring(2, 9)}`
+          const branchName = branch.branchName || branch.name || 'Unnamed Branch'
+          const name = branch.name || branch.branchName || 'Unnamed Branch'
+          const didNumber = (branch.didNumbers && branch.didNumbers.length > 0) ? branch.didNumbers[0] : (branch.didNumber || branch.did || '')
+          const userId = branch.user?._id || branch.user?.id || branch.userId || ''
+          const phone = branch.user?.phone || branch.phone || ''
+          return {
+            ...branch,
+            _id,
+            id,
+            branchName,
+            name,
+            didNumber,
+            userId,
+            phone,
+            role: 'branch'
+          }
+        });
         console.log('Processed branch data with user info:', branchData);
       }
       setAvailableBranches(branchData);
@@ -233,8 +246,22 @@ function Department() {
   useEffect(() => {
     if (currentBusinessId) {
       fetchDepartments()
+      fetchDidNumbers()
     }
   }, [currentBusinessId])
+
+  const fetchDidNumbers = async () => {
+    try {
+      if (!currentBusinessId) return
+      const res = await apiCall(`/numbers/assigned-to/${currentBusinessId}`, 'GET')
+      const list = res?.data || res?.numbers || res || []
+      const mapped = (Array.isArray(list) ? list : []).map(d => ({ id: d._id || d.id, number: d.number }))
+      setDidNumbers(mapped)
+    } catch (err) {
+      console.error('Error fetching DID numbers:', err)
+      setDidNumbers([])
+    }
+  }
 
   const fetchDepartments = async () => {
     setLoading(true)
@@ -694,6 +721,79 @@ function Department() {
     }
   }
 
+  const syncDepartmentDid = async (department) => {
+    // mark syncing
+    setSyncingMap(prev => ({ ...prev, [department._id || department.id]: true }))
+    if (!department?.didNumber) {
+      Swal.fire('No DID assigned', 'Please assign a DID to this department first.', 'warning')
+      setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+      return
+    }
+
+    try {
+      if (!didNumbers || didNumbers.length === 0) await fetchDidNumbers()
+      const didObj = (didNumbers || []).find(d => String(d.number) === String(department.didNumber) || String(d.id) === String(department.didNumber) || String(d._id) === String(department.didNumber))
+      if (!didObj) {
+        Swal.fire('DID not found', 'Department DID is not available in your DID list.', 'error')
+        return
+      }
+      const didId = didObj.id || didObj._id
+
+      const branchIds = []
+      if (Array.isArray(department.members) && department.members.length) {
+        department.members.forEach(m => {
+          const memberUserId = m.userId || m.user || m._id || m.id
+          const branch = availableBranches.find(b => String(b.userId) === String(memberUserId) || String(b._id) === String(memberUserId) || String(b.id) === String(memberUserId) || String(b.didNumber) === String(m.didNumber))
+          if (branch && branch._id && !branchIds.includes(branch._id)) branchIds.push(branch._id)
+        })
+      }
+
+      // Also include department head's branch if present
+      const departmentHeadUserId = typeof department.departmentHead === 'object' ? (department.departmentHead._id || department.departmentHead.id) : department.departmentHead
+      const headBranch = availableBranches.find(b => String(b.userId) === String(departmentHeadUserId))
+      if (headBranch && headBranch._id && !branchIds.includes(headBranch._id)) branchIds.push(headBranch._id)
+
+      if (branchIds.length === 0) {
+        Swal.fire('No agents found', 'Could not identify any agents to assign the DID to.', 'info')
+        return
+      }
+
+      const confirm = await Swal.fire({ title: 'Sync DID', html: `Assign DID <b>${department.didNumber}</b> to <b>${branchIds.length}</b> agents?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, sync' })
+      if (!confirm.isConfirmed) return
+
+      // Simple sync: update each branch's didNumbers via branch edit API
+      const failed = []
+
+      for (const branchId of branchIds) {
+        try {
+          await apiCall(`/branch/edit/${branchId}`, 'PATCH', { didNumbers: [department.didNumber] })
+        } catch (err) {
+          console.warn('Failed to update branch DID', branchId, err)
+          failed.push(branchId)
+        }
+      }
+
+      // refresh branches and DID lists so UI reflects changes
+      try {
+        await fetchAvailableAgents(currentBusinessId)
+        await fetchDepartments()
+        await fetchDidNumbers()
+      } catch (e) {
+        console.warn('Failed to refresh data after sync', e)
+      }
+
+      if (failed.length === 0) Swal.fire('Synced', 'All agents updated successfully', 'success')
+      else Swal.fire('Partial sync', `${branchIds.length - failed.length} succeeded, ${failed.length} failed`, 'warning')
+
+      setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+
+    } catch (err) {
+      console.error('syncDepartmentDid error', err)
+      Swal.fire('Error', 'Sync failed: ' + (err.message || 'Unknown error'), 'error')
+      setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+    }
+  }
+
   const filteredDepartments = departments.filter(dept =>
     dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (dept.description && dept.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -817,6 +917,11 @@ function Department() {
                       <TableCell>{getStatusBadge(department.status)}</TableCell>
                       <TableCell>{department.default ? <Chip label="Default" size="small" color="primary" variant="filled" /> : '-'}</TableCell>
                       <TableCell>
+                        {syncingMap[department._id || department.id] ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <IconButton size="small" onClick={() => syncDepartmentDid(department)} title="Sync DID"><SyncIcon fontSize="small" /></IconButton>
+                        )}
                         <IconButton size="small" onClick={() => handleEdit(department)}><EditIcon fontSize="small"/></IconButton>
                         <IconButton size="small" onClick={() => handleDeleteConfirm(department.id || department._id)}><DeleteIcon fontSize="small"/></IconButton>
                       </TableCell>
@@ -863,6 +968,17 @@ function Department() {
                 ))}
               </Select>
               <Typography variant="caption" color="text.secondary">Hold Ctrl (Cmd on Mac) to select multiple members</Typography>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="department-did-label">Department DID</InputLabel>
+              <Select labelId="department-did-label" name="didNumber" value={formData.didNumber || ''} label="Department DID" onChange={handleInputChange}>
+                <MenuItem value=""><em>None</em></MenuItem>
+                {didNumbers.map(d => (
+                  <MenuItem key={d.id || d.number} value={d.number}>{d.number}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant="caption" color="text.secondary">Assign a DID to this department</Typography>
             </FormControl>
 
             <FormControlLabel

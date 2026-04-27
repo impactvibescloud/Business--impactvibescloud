@@ -106,29 +106,9 @@ const Branches = () => {
   const [didNumbers, setDidNumbers] = useState([]);
   // For dropdowns: only show DIDs not assigned to any branch, or the one assigned to the current agent (for edit)
   const getAvailableDidNumbers = (currentBranchId = null) => {
-    // Find all assigned DIDs from all branches (except the current branch if editing)
-    const assignedDidNumbers = new Set();
-    branches.forEach(branch => {
-      // Exclude current branch if editing
-      if (!currentBranchId || branch._id !== currentBranchId) {
-        if (Array.isArray(branch.didNumbers)) {
-          branch.didNumbers.forEach(num => assignedDidNumbers.add(num));
-        } else if (branch.didNumber) {
-          assignedDidNumbers.add(branch.didNumber);
-        }
-      }
-    });
-    // Only return DIDs not assigned, or the one assigned to the current branch (for edit)
-    return didNumbers.filter(did => {
-      // If editing, allow the currently assigned DID
-      if (currentBranchId) {
-        const currentBranch = branches.find(b => b._id === currentBranchId);
-        const currentAssigned = currentBranch && (Array.isArray(currentBranch.didNumbers) ? currentBranch.didNumbers[0] : currentBranch.didNumber);
-        if (did.id === selectedDid || did.number === currentAssigned) return true;
-      }
-      // Otherwise, only show if not assigned
-      return !assignedDidNumbers.has(did.number);
-    });
+    // Allow all DIDs to be selectable so the same DID can be assigned to multiple branches/agents.
+    // Previously we filtered out DIDs already assigned to other branches; remove that restriction.
+    return didNumbers || [];
   };
   const [selectedDid, setSelectedDid] = useState("");
   const [departments, setDepartments] = useState([]);
@@ -211,7 +191,7 @@ const Branches = () => {
           return { _id: String(d), name: String(d) };
         })(),
         id: branch._id,
-        didNumber: branch.didNumbers?.[0] || '',
+        didNumber: branch.assignedNumbers?.[0]?.number || branch.didNumbers?.[0] || '',
       }));
 
       setBranches(formattedBranches);
@@ -282,8 +262,9 @@ const Branches = () => {
         timeGroup: timeGroup
       };
       // Fetch DID extension and include it in payload if available
+      let extension = null;
       if (didNumberValue) {
-        const extension = await fetchDidExtension(didNumberValue);
+        extension = await fetchDidExtension(didNumberValue);
         if (extension) {
           requestBody.extension = String(extension);
         }
@@ -298,14 +279,44 @@ const Branches = () => {
       // Create the branch first using apiCall
   const res = await apiCall('/branch/create/new', 'POST', requestBody);
 
-      // Assign DID to branch if selectedDid is present
+      // Create a NumberAssignment for this branch (prefer multi-assign)
       if (selectedDid && res.data && (res.data.branch?._id || res.data.data?._id)) {
         const branchId = res.data.branch?._id || res.data.data?._id;
         const didId = selectedDid;
-        try {
-          await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-        } catch (err) {
-          console.error('Error assigning DID to branch:', err);
+        const extToAssign = extension || requestBody.extension || (didNumberValue ? await fetchDidExtension(didNumberValue) : null);
+        if (extToAssign) {
+          try {
+            await apiCall(`/numbers/${didId}/assign`, 'POST', { extensionNumber: String(extToAssign), assignedToBranch: branchId, assignedToBusiness: user.businessId });
+
+            // After creating the assignment, ensure the NumberInventory has a primary pointer
+            try {
+              const numResp = await apiCall(`/numbers/${didId}`, 'GET');
+              const numObj = (numResp && (numResp.data || numResp)) || null;
+              const currentlyAssigned = numObj?.assigned_to_branch || numObj?.assignedToBranch || null;
+              if (!currentlyAssigned) {
+                try {
+                  await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
+                } catch (e) {
+                  console.warn('Failed to set primary assigned_to_branch for DID', didId, e);
+                }
+              }
+            } catch (e) {
+              console.warn('Could not verify/set primary assigned_to_branch after assignment', didId, e);
+            }
+          } catch (err) {
+            if (err?.response?.status === 409) {
+              console.info('Assignment already exists for', extToAssign);
+            } else {
+              console.error('Error creating number assignment:', err);
+            }
+          }
+        } else {
+          // Fallback: preserve legacy single-pointer behavior if no extension available
+          try {
+            await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
+          } catch (err) {
+            console.error('Error assigning DID to branch (fallback):', err);
+          }
         }
       }
 
@@ -370,14 +381,19 @@ const Branches = () => {
     }
     
     setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
-    // Find the DID id from didNumbers list that matches the assigned number
+    // Find the DID id from assignedNumbers (assignments) or didNumbers list that matches the assigned number
     let assignedDidId = "";
-    if (Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0) {
-      const assignedNumber = branch.didNumbers[0];
-      const foundDid = didNumbers.find(did => did.number === assignedNumber);
-      assignedDidId = foundDid ? foundDid.id : "";
+    let assignedNumberVal = null;
+    if (Array.isArray(branch.assignedNumbers) && branch.assignedNumbers.length > 0) {
+      assignedNumberVal = branch.assignedNumbers[0].number || branch.assignedNumbers[0];
+    } else if (Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0) {
+      assignedNumberVal = branch.didNumbers[0];
     } else if (branch.didNumber) {
-      const foundDid = didNumbers.find(did => did.number === branch.didNumber);
+      assignedNumberVal = branch.didNumber;
+    }
+
+    if (assignedNumberVal) {
+      const foundDid = didNumbers.find((did) => did.number === assignedNumberVal || did.id === assignedNumberVal || String(did._id) === String(assignedNumberVal));
       assignedDidId = foundDid ? foundDid.id : "";
     }
     setSelectedDid(assignedDidId);
@@ -408,22 +424,53 @@ const Branches = () => {
         ...(department ? { department } : {})
       };
   // Fetch DID extension and include it in payload if available
+  let extension = null;
   if (didNumberValue) {
-    const extension = await fetchDidExtension(didNumberValue);
+    extension = await fetchDidExtension(didNumberValue);
     if (extension) updatePayload.extension = String(extension);
   }
   if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
   if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
   const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
 
-      // Assign DID to branch if selectedDid is present
+      // Create a NumberAssignment for this branch (prefer multi-assign)
       if (selectedDid && (selectedBranch._id || (res.data && (res.data.branch?._id || res.data.data?._id)))) {
         const branchId = selectedBranch._id || res.data.branch?._id || res.data.data?._id;
         const didId = selectedDid;
-        try {
-          await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-        } catch (err) {
-          console.error('Error assigning DID to branch:', err);
+        const extToAssign = extension || updatePayload.extension || (didNumberValue ? await fetchDidExtension(didNumberValue) : null);
+        if (extToAssign) {
+          try {
+            await apiCall(`/numbers/${didId}/assign`, 'POST', { extensionNumber: String(extToAssign), assignedToBranch: branchId, assignedToBusiness: user.businessId });
+
+            // Ensure NumberInventory has a primary pointer if unset
+            try {
+              const numResp = await apiCall(`/numbers/${didId}`, 'GET');
+              const numObj = (numResp && (numResp.data || numResp)) || null;
+              const currentlyAssigned = numObj?.assigned_to_branch || numObj?.assignedToBranch || null;
+              if (!currentlyAssigned) {
+                try {
+                  await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
+                } catch (e) {
+                  console.warn('Failed to set primary assigned_to_branch for DID', didId, e);
+                }
+              }
+            } catch (e) {
+              console.warn('Could not verify/set primary assigned_to_branch after assignment', didId, e);
+            }
+          } catch (err) {
+            if (err?.response?.status === 409) {
+              console.info('Assignment already exists for', extToAssign);
+            } else {
+              console.error('Error creating number assignment:', err);
+            }
+          }
+        } else {
+          // Fallback: preserve legacy single-pointer behavior if no extension available
+          try {
+            await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
+          } catch (err) {
+            console.error('Error assigning DID to branch (fallback):', err);
+          }
         }
       }
 
