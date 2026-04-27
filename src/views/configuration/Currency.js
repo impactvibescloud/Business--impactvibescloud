@@ -513,7 +513,7 @@ const Currency = () => {
                                   className="me-2"
                                   src={item?.CurrencyImage?.secure_url}
                                   width="40"
-                                  alt=""
+                                  alt={item?.CurrencyName ? `${item.CurrencyName} currency icon` : 'Currency icon'}
                                 />
                                 <h5>{} </h5>
                               </td> */}

@@ -137,20 +137,21 @@ const ContactLists = () => {
           throw new Error('No response received from API')
         }
         
-        let data = response.data || response
-        
-        // Handle different API response formats
+        const data = response?.data ?? response ?? null
+
+        // Handle different API response formats. Order matters: explicit
+        // success === false short-circuits before the loose array checks
+        // so an error envelope isn't treated as data.
         let listData = []
-        if (data && data.success && Array.isArray(data.data)) {
+        if (data && data.success === false) {
+          throw new Error(data.message || 'API returned error')
+        } else if (data && data.success === true && Array.isArray(data.data)) {
           listData = data.data
         } else if (data && Array.isArray(data.data)) {
           listData = data.data
         } else if (Array.isArray(data)) {
           listData = data
-        } else if (data && data.success === false) {
-          throw new Error(data.message || 'API returned error')
         } else {
-          console.log('Unexpected API response format:', data)
           listData = []
         }
         

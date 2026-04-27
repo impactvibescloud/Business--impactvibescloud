@@ -82,7 +82,8 @@ function Department() {
     description: '',
     status: 'active', // Changed from 'Active' to 'active' to match API
     departmentHead: '', // User ID of department head
-    didNumber: '', // didNumber of department head
+    didNumber: '', // legacy single DID — mirrored from didNumbers[0]
+    didNumbers: [], // multiple DIDs assignable to this department
     members: [], // Array of member objects {userId, phone, role}
     default: false // Boolean flag for default department
   })
@@ -371,9 +372,10 @@ function Department() {
       businessId: currentBusinessId || '',
       name: '',
       description: '',
-      status: 'active', // Default to active for new departments
+      status: 'active',
       departmentHead: '',
       didNumber: '',
+      didNumbers: [],
       members: [],
       default: false
     })
@@ -497,16 +499,23 @@ function Department() {
       }
     }) : []
 
+    // Hydrate didNumbers[] from the department doc. Prefer didNumbers (new),
+    // fall back to didNumber (legacy single).
+    const incomingDids = Array.isArray(department.didNumbers) && department.didNumbers.length
+      ? department.didNumbers
+      : (department.didNumber ? [department.didNumber] : []);
+    const didList = Array.from(new Set(incomingDids.map(String).filter(Boolean)));
+
     setFormData({
       businessId: department.businessId || currentBusinessId || '',
       name: department.name,
       description: department.description,
       status: department.status || 'active',
-      // Keep the userId in formData for API
       departmentHead: departmentHeadUserId || '',
-      didNumber: department.didNumber || '',
+      didNumber: didList[0] || '',
+      didNumbers: didList,
       members: normalizedMembers,
-      default: department.default || false
+      default: department.default || false,
     })
     setShowDepartmentModal(true)
   }
@@ -608,15 +617,25 @@ function Department() {
         }
       }) : []
 
+      // Build the canonical didNumbers[] from the multi-select value, falling
+      // back to the legacy singular `didNumber` if the form pre-dates the
+      // multi field. The first entry is mirrored to didNumber for legacy.
+      const didList = (Array.isArray(formData.didNumbers) && formData.didNumbers.length
+        ? formData.didNumbers
+        : (formData.didNumber ? [formData.didNumber] : [])
+      ).map(String).filter(Boolean);
+      const dedupedDids = Array.from(new Set(didList));
+
       const departmentData = {
         businessId: formData.businessId,
         name: normalizedName,
         description: formData.description,
         status: formData.status,
         departmentHead: formData.departmentHead,
-        didNumber: formData.didNumber,
-        members: normalizedMembers, // Array of {userId, phone, didNumber, role}
-        default: formData.default // Boolean flag for default department
+        didNumber: dedupedDids[0] || '',
+        didNumbers: dedupedDids,
+        members: normalizedMembers,
+        default: formData.default,
       };
       
       console.log('Department data being sent:', JSON.stringify(departmentData, null, 2));
@@ -639,9 +658,10 @@ function Department() {
             description: formData.description,
             status: formData.status,
             departmentHead: formData.departmentHead,
-            didNumber: formData.didNumber,
+            didNumber: departmentData.didNumber,
+            didNumbers: departmentData.didNumbers,
             members: departmentData.members,
-            default: formData.default
+            default: formData.default,
           },
           { headers }
         );
@@ -971,14 +991,30 @@ function Department() {
             </FormControl>
 
             <FormControl fullWidth>
-              <InputLabel id="department-did-label">Department DID</InputLabel>
-              <Select labelId="department-did-label" name="didNumber" value={formData.didNumber || ''} label="Department DID" onChange={handleInputChange}>
-                <MenuItem value=""><em>None</em></MenuItem>
-                {didNumbers.map(d => (
+              <InputLabel id="department-did-label">Department DIDs</InputLabel>
+              <Select
+                labelId="department-did-label"
+                multiple
+                value={Array.isArray(formData.didNumbers) ? formData.didNumbers : []}
+                label="Department DIDs"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const arr = (typeof v === 'string' ? v.split(',') : v).filter(Boolean);
+                  setFormData((prev) => ({
+                    ...prev,
+                    didNumbers: arr,
+                    didNumber: arr[0] || '',
+                  }));
+                }}
+                renderValue={(selected) => selected.join(', ')}
+              >
+                {didNumbers.map((d) => (
                   <MenuItem key={d.id || d.number} value={d.number}>{d.number}</MenuItem>
                 ))}
               </Select>
-              <Typography variant="caption" color="text.secondary">Assign a DID to this department</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Assign one or more DIDs to this department. Inbound calls to any of these reach the same routing logic.
+              </Typography>
             </FormControl>
 
             <FormControlLabel

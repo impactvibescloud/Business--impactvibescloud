@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './ModernLogin.css';
 import { Link, useNavigate } from 'react-router-dom';
 import CIcon from "@coreui/icons-react";
 import { cilLockLocked, cilUser } from "@coreui/icons";
 import ClipLoader from "react-spinners/ClipLoader";
-import { useState } from "react";
 import axios from "axios";
 import swal from "sweetalert";
+import { debugWarn } from "../../../utils/logger";
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -27,6 +27,15 @@ const Login = () => {
   );
   const history = useNavigate();
   const submitGuardRef = useRef(false);
+  // AbortController for the in-flight login request — lets us cancel on
+  // unmount and prevents a stale response from updating state.
+  const abortRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
 
   // Sync DOM values into React state on mount (handles browser autofill that doesn't trigger React events)
   useEffect(() => {
@@ -108,7 +117,10 @@ const Login = () => {
   };
 
   const Login = async () => {
-    // read current DOM values first (covers autofill) then fall back to state
+    // Re-entrancy guard: if a submission is already in flight, drop this one.
+    if (submitGuardRef.current) return;
+
+    // Read current DOM values first (covers autofill) then fall back to state.
     let emailVal = auth.email || "";
     let passwordVal = auth.password || "";
     if (typeof document !== 'undefined') {
@@ -120,44 +132,75 @@ const Login = () => {
     if (!(emailVal && passwordVal)) {
       return swal("Error!", "All fields are required", "error");
     }
-    setLoading(true);
-    submitGuardRef.current = true;
-    try {
-      const res = await axios.post("/api/v1/user/login/", { email: emailVal, password: passwordVal });
-      console.log(res);
-      if (res.data.success == true) {
-        localStorage.setItem("authToken", res.data.token);
 
-        let response = await axios.get(`/api/v1/user/details`, {
-          headers: {
-            Authorization: `Bearer ${res.data.token}`,
-          },
-        });
+    // Set loading state BEFORE awaiting so the spinner / disabled state
+    // takes effect on the very next render, not after the round-trip.
+    submitGuardRef.current = true;
+    setLoading(true);
+
+    // Cancel any prior in-flight login request.
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await axios.post(
+        "/api/v1/user/login/",
+        { email: emailVal, password: passwordVal },
+        { signal: controller.signal },
+      );
+      if (res?.data?.success === true && res?.data?.token) {
         try {
-          const businessId = response?.data?.user?.businessId || response?.data?.businessId
-          if (businessId) {
-            try { localStorage.setItem('businessId', businessId) } catch (e) {}
-          }
-        } catch (e) {}
-        const data = res.data;
-        if (data.user.role === "business_admin" || data.user.role === "Employee") {
-          history("/dashboard");
-          window.location.reload();
+          localStorage.setItem("authToken", res.data.token);
+        } catch (e) {
+          // Storage may be disabled (private mode / quota exceeded). Surface
+          // a real error instead of pretending the login worked.
+          debugWarn('localStorage.setItem failed:', e);
+          swal("Error!", "Browser storage is unavailable. Please enable cookies/storage and try again.", "error");
           return;
+        }
+
+        const response = await axios.get(`/api/v1/user/details`, {
+          headers: { Authorization: `Bearer ${res.data.token}` },
+          signal: controller.signal,
+        });
+        const businessId =
+          response?.data?.user?.businessId || response?.data?.businessId;
+        if (businessId) {
+          try {
+            localStorage.setItem('businessId', businessId);
+          } catch (e) {
+            debugWarn('localStorage.setItem(businessId) failed:', e);
+          }
+        }
+
+        const role = res?.data?.user?.role;
+        if (role === "business_admin" || role === "Employee") {
+          // Single navigation — no reload(). The auth state is in localStorage
+          // and the protected route reads it on next render, so reloading
+          // only adds a flicker and wipes any in-memory app state.
+          history("/dashboard", { replace: true });
         } else {
           swal("Error!", "please try with admin credential!!", "error");
-          return;
         }
       } else {
         swal("Error!", "Invalid Credentials", "error");
-        return;
       }
     } catch (error) {
+      if (axios.isCancel(error) || error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        // Component unmounted or a new submission superseded this one. Don't
+        // show an error toast — that would be misleading.
+        return;
+      }
       swal("Error!", "Invalid Credentials", "error");
-      return;
     } finally {
-      setLoading(false);
-      submitGuardRef.current = false;
+      // Only clear flags if this controller is still the active one;
+      // otherwise a superseding call has already taken over.
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setLoading(false);
+        submitGuardRef.current = false;
+      }
     }
   };
 
@@ -263,31 +306,15 @@ const Login = () => {
                 <button
                   type="button"
                   className="login-submit-btn"
-                  onMouseUp={() => {
-                    if (loading) return;
-                    if (!isValid) {
-                      swal("Error!", "Please enter valid credentials", "error");
-                      return;
-                    }
-                    if (!submitGuardRef.current) {
-                      submitGuardRef.current = true;
-                      Login();
-                    }
-                  }}
                   onClick={(e) => {
-                    if (loading) {
-                      e.preventDefault();
-                      return;
-                    }
-                    if (submitGuardRef.current) {
-                      e.preventDefault();
-                      return;
-                    }
+                    e.preventDefault();
+                    if (loading || submitGuardRef.current) return;
                     if (!isValid) {
-                      e.preventDefault();
                       swal("Error!", "Please enter valid credentials", "error");
                       return;
                     }
+                    // Login() owns submitGuardRef now — handlers must not pre-set it,
+                    // otherwise the re-entrancy check inside Login() would early-return.
                     Login();
                   }}
                   disabled={loading}
@@ -316,8 +343,3 @@ const Login = () => {
 };
 
 export default Login;
-
-// < Route path = "/" name = "Home" render = {(props) => (
-//   userdata && userdata.role === 'admin' ? <DefaultLayout {...props} /> :
-//     <><Login {...props} /></>
-// )} />

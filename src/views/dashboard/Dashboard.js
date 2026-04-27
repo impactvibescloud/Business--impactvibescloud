@@ -158,8 +158,17 @@ const Dashboard = () => {
             notAnsweredCalls: byStatus['not-answered'] || 0,
             successful: totals.successful || 0,
             failed: totals.failed || 0,
-            outboundCalls: byType.outbound || 0,
-            inboundCalls: byType.inbound || 0,
+            // Prefer the API's direction-split fields. Fall back to byType
+            // (which counts ALL inbound/outbound regardless of outcome).
+            outboundCalls: totals.outboundCalls ?? byType.outbound ?? 0,
+            inboundCalls: totals.inboundCalls ?? byType.inbound ?? 0,
+            // Direction-split outcome metrics — what the cards actually need.
+            // Without these the UI was showing total answered (all directions)
+            // under "Incoming Answered" and hard-coding 0 for outgoing.
+            inboundAnswered: totals.inboundAnswered ?? 0,
+            inboundMissed: totals.inboundMissed ?? 0,
+            outboundAnswered: totals.outboundAnswered ?? 0,
+            outboundMissed: totals.outboundMissed ?? 0,
             missedCalls: byStatus.missed || totals.missed || 0,
             rejectedCalls: totals.rejected || 0,
             dialerCalls: totals.dialer || 0,
@@ -282,8 +291,12 @@ const Dashboard = () => {
           answered: byStatus.answered || 0,
           successful: totals.successful || 0,
           failed: totals.failed || 0,
-          outboundCalls: byType.outbound || 0,
-          inboundCalls: byType.inbound || 0,
+          outboundCalls: totals.outboundCalls ?? byType.outbound ?? 0,
+          inboundCalls: totals.inboundCalls ?? byType.inbound ?? 0,
+          inboundAnswered: totals.inboundAnswered ?? 0,
+          inboundMissed: totals.inboundMissed ?? 0,
+          outboundAnswered: totals.outboundAnswered ?? 0,
+          outboundMissed: totals.outboundMissed ?? 0,
           missedCalls: byStatus.missed || totals.missed || 0,
           busyCalls: byStatus.busy || 0,
           notAnsweredCalls: byStatus['not-answered'] || 0,
@@ -764,121 +777,52 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* Stats Cards Grid */}
+      {/* Legacy top stats cards removed in favor of consolidated metric cards below */}
+
+      {/* Additional Metric Cards (as small cards matching requested fields) */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card 
-            onClick={() => {
-              const today = getTodayDateString();
-              navigate(`/callogs?from=${today}&to=${today}`);
-            }}
-            sx={{ borderRadius: 2, height: '100%', className: 'dashboard-stat-card', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
-          >
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Total Calls</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>
-                    {callStats?.totalCalls ?? 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(108, 92, 231, 0.1)' }}>
-                  <CallIcon sx={{ color: 'var(--primary-500)', fontSize: 24 }} />
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>Outbound</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {callStats?.outboundCalls ?? 0}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" sx={{ color: '#d1d5db' }}>|</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>Inbound</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {callStats?.inboundCalls ?? 0}
-                  </Typography>
-                </Box>
-              </Box>
-              <Typography variant="caption" sx={{ color: '#6b7280', mt: 1 }}>Today</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        {(() => {
+          const today = getTodayDateString();
+          const cards = [
+            { key: 'active', title: 'Active Calls', value: liveCallsCount ?? 0, icon: <PhoneIcon />, onClick: () => navigate('/callmonitor') },
+            { key: 'today', title: 'Calls Today', value: callStats?.totalCalls ?? 0, icon: <CallIcon />, onClick: () => navigate(`/callogs?from=${today}&to=${today}`) },
+            { key: 'incoming', title: 'Incoming Calls', value: callStats?.inboundCalls ?? 0, icon: <CallReceivedIcon />, onClick: () => navigate(`/callogs?type=Inbound&from=${today}&to=${today}`) },
+            { key: 'inc_answered', title: 'Incoming Answered', value: callStats?.inboundAnswered ?? 0, icon: <CallReceivedIcon />, onClick: () => navigate(`/callogs?type=Inbound&filter=Answered&from=${today}&to=${today}`) },
+            { key: 'inc_missed', title: 'Incoming Missed', value: callStats?.inboundMissed ?? 0, icon: <CallMissedIcon />, onClick: () => navigate(`/callogs?type=Inbound&filter=Missed&from=${today}&to=${today}`) },
+            { key: 'outgoing', title: 'Outgoing Calls', value: callStats?.outboundCalls ?? 0, icon: <CallMadeIcon />, onClick: () => navigate(`/callogs?type=Outbound&from=${today}&to=${today}`) },
+            { key: 'out_ans', title: 'Outgoing Answered', value: callStats?.outboundAnswered ?? 0, icon: <CallMadeIcon />, onClick: () => navigate(`/callogs?type=Outbound&filter=Answered&from=${today}&to=${today}`) },
+            { key: 'out_missed', title: 'Outgoing Missed', value: callStats?.outboundMissed ?? 0, icon: <CallMissedIcon />, onClick: () => navigate(`/callogs?type=Outbound&filter=Missed&from=${today}&to=${today}`) },
+            { key: 'total_agents', title: 'Total Agents', value: agentSummary?.total ?? agents ?? 0, icon: <GroupIcon />, onClick: () => navigate('/branch') },
+            // Note: this card counts BUSY CALLS today (status == busy), not
+            // busy agents. The label is "Busy Calls" to match the metric.
+            { key: 'busy_calls', title: 'Busy Calls', value: callStats?.busyCalls ?? 0, icon: <CallIcon />, onClick: () => navigate(`/callogs?filter=Busy&from=${today}&to=${today}`) },
+            { key: 'agents_offline', title: 'Agents Offline', value: agentSummary?.offline ?? agentStatuses.offline ?? 0, icon: <GroupIcon />, onClick: (e) => { setSelectedAgentStatus('offline'); setAgentPopperAnchor(e.currentTarget); } },
+            { key: 'agents_available', title: 'Agents Available', value: agentSummary?.online ?? agentStatuses.online ?? 0, icon: <GroupIcon />, onClick: (e) => { setSelectedAgentStatus('online'); setAgentPopperAnchor(e.currentTarget); } }
+          ];
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card 
-            onClick={() => {
-              const today = getTodayDateString();
-              navigate(`/callogs?filter=Answered&from=${today}&to=${today}`);
-            }}
-            sx={{ borderRadius: 2, height: '100%', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
-          >
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Answered</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: 'var(--completed)' }}>
-                    {callStats?.answered ?? 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(0, 184, 148, 0.1)' }}>
-                  <CallReceivedIcon sx={{ color: 'var(--completed)', fontSize: 24 }} />
-                </Box>
-              </Box>
-              <Typography variant="caption" sx={{ color: '#6b7280' }}>Completed</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card 
-            onClick={() => {
-              const today = getTodayDateString();
-              navigate(`/callogs?filter=Missed&from=${today}&to=${today}`);
-            }}
-            sx={{ borderRadius: 2, height: '100%', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
-          >
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Missed</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: 'var(--missed)' }}>
-                    {callStats?.missedCalls ?? 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(253, 203, 110, 0.1)' }}>
-                  <CallMissedIcon sx={{ color: 'var(--missed)', fontSize: 24 }} />
-                </Box>
-              </Box>
-              <Typography variant="caption" sx={{ color: '#6b7280' }}>Inbound missed</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card 
-            onClick={() => navigate('/callmonitor')}
-            sx={{ borderRadius: 2, height: '100%', cursor: 'pointer', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: 'translateY(-2px)' } }}
-          >
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Live Now</Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: 'var(--outgoing)' }}>
-                    {liveCallsCount ?? 0}
-                  </Typography>
-                </Box>
-                <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(253, 121, 168, 0.1)' }}>
-                  <PhoneIcon sx={{ color: 'var(--outgoing)', fontSize: 24 }} />
-                </Box>
-              </Box>
-              <Typography variant="caption" sx={{ color: '#6b7280' }}>Active calls</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+          return cards.map((c, i) => (
+            <Grid item xs={12} sm={6} md={3} key={c.key}>
+              <Card
+                onClick={c.onClick}
+                sx={{ borderRadius: 2, height: '100%', cursor: c.onClick ? 'pointer' : 'default', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)', transform: c.onClick ? 'translateY(-2px)' : 'none' } }}
+              >
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>{c.title}</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>{c.value}</Typography>
+                    </Box>
+                    <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'rgba(108, 92, 231, 0.1)' }}>
+                      {React.cloneElement(c.icon, { sx: { color: 'var(--primary-500)', fontSize: 24 } })}
+                    </Box>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#6b7280' }}>{c.title}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ));
+        })()}
       </Grid>
-
       {/* Main Content Grid */}
       <Grid container spacing={2}>
         {/* Left Section - Chart and Calls */}

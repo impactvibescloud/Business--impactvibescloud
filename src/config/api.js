@@ -3,23 +3,33 @@
 import axios from 'axios'
 
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         // API Configuration with environment support
-// Helper to normalize env URLs (remove trailing slashes)
+// API configuration. Production URL must come from a build-time env var so a
+// misconfigured deploy can't accidentally talk to the wrong backend. Dev
+// keeps a localhost default since that's what create-react-app proxies to.
 const normalizeUrl = (url = '') => {
   if (!url || typeof url !== 'string') return '';
   return url.replace(/\/$/, '');
 }
 
-export const API_CONFIG = {
-  // Development environment (can be set via REACT_APP_API_URL)
-  DEV_URL: normalizeUrl(process.env.REACT_APP_API_URL) || 'http://localhost:5040',
-  // Production environment: prefer explicit PRODUCTION var, then a generic BASE URL
-  PROD_URL: normalizeUrl(process.env.REACT_APP_PROD_API_URL) || normalizeUrl(process.env.REACT_APP_BASE_URL) || 'https://api.justconnect.biz',
-  // Base API path appended to the host (we will prefix '/api' centrally)
-  API_PATH: '/api'
+const PROD_URL_FROM_ENV =
+  normalizeUrl(process.env.REACT_APP_PROD_API_URL) ||
+  normalizeUrl(process.env.REACT_APP_BASE_URL) ||
+  '';
+
+if (process.env.NODE_ENV === 'production' && !PROD_URL_FROM_ENV) {
+  // Surface the misconfiguration loudly rather than silently pointing at a
+  // baked-in host. With an empty PROD_URL, axios uses same-origin requests.
+  console.error(
+    '[api] REACT_APP_PROD_API_URL / REACT_APP_BASE_URL not set at build time. ' +
+      'Falling back to same-origin requests.',
+  );
 }
 
-// Ensure PROD_URL does not accidentally include a trailing /api
-API_CONFIG.PROD_URL = API_CONFIG.PROD_URL.replace(/\/api$/, '');
+export const API_CONFIG = {
+  DEV_URL: normalizeUrl(process.env.REACT_APP_API_URL) || 'http://localhost:5040',
+  PROD_URL: PROD_URL_FROM_ENV.replace(/\/api$/, ''),
+  API_PATH: '/api',
+}
 
 // Get authentication token
 export const getAuthToken = () => {

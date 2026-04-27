@@ -6,6 +6,7 @@ import { useSelector } from "react-redux";
 import { Toaster } from "react-hot-toast";
 import { isAutheticated } from "./auth";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 import axios from "axios";
 import ForgotPassword from "./views/pages/register/ForgotPassword";
 
@@ -32,18 +33,16 @@ const App = () => {
   const token = isAutheticated();
   const [maintenance, setMaintenance] = useState({ active: false, message: '', estimatedDowntime: '' });
 
-  // Initialize timeout prevention systems
+  // Initialize timeout prevention systems. Mount-only: setupAxios/Fetch
+  // interceptors are idempotent (guarded with their own internal flag) and
+  // setMaintenance is stable from useState, so [] is the correct dep list —
+  // no eslint-disable needed.
   useEffect(() => {
-    console.log('🚀 Initializing timeout prevention systems...')
-    // Setup axios interceptors for better error handling and session management
     setupAxiosInterceptors()
-    // Setup fetch interceptor for any remaining direct fetch calls
     setupFetchInterceptor()
-    // Store session start time for reference
     if (!localStorage.getItem('sessionStart')) {
       localStorage.setItem('sessionStart', Date.now().toString())
     }
-    // Patch axios to globally catch maintenanceMode in responses
     const respInterceptor = axios.interceptors.response.use(
       (response) => {
         if (response?.data?.maintenanceMode) {
@@ -69,7 +68,6 @@ const App = () => {
     return () => {
       axios.interceptors.response.eject(respInterceptor);
     };
-    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
@@ -105,35 +103,38 @@ const App = () => {
     <Router>
       <UserActivityProvider>
         <AuthProvider>
-          <Suspense
-            fallback={
-              <div className="pt-3 text-center">
-                <div className="sk-spinner sk-spinner-pulse"></div>
-              </div>
-            }
-          >
-            <Routes>
-              {/* <Route exact path="/change-password" name="My profile" element={<ChangePassword />} /> */}
-              <Route exact path="/" name="Login Page" element={<Login />} />
-              <Route exact path="/404" name="Page 404" element={<Page404 />} />
-              <Route exact path="/500" name="Page 500" element={<Page500 />} />
-              <Route
-                exact
-                path="/forget-password"
-                name="Page 500"
-                element={<ForgotPassword />}
-              />
-              <Route
-                path="/*"
-                element={<ProtectedRoute element={DefaultLayout} />}
-              />
-              <Route path="*" name="Home" element={<DefaultLayout />} />
-            </Routes>
-            <Toaster />
-            {maintenance.active && (
-              <GlobalMaintenanceModal message={maintenance.message} estimatedDowntime={maintenance.estimatedDowntime} />
-            )}
-          </Suspense>
+          {/* ErrorBoundary catches failures in any lazy chunk (Login,
+              DefaultLayout, error pages); without it a chunk-load error
+              would leave the user staring at the Suspense fallback forever. */}
+          <ErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="pt-3 text-center">
+                  <div className="sk-spinner sk-spinner-pulse"></div>
+                </div>
+              }
+            >
+              <Routes>
+                <Route exact path="/" name="Login Page" element={<Login />} />
+                <Route exact path="/404" name="Page 404" element={<Page404 />} />
+                <Route exact path="/500" name="Page 500" element={<Page500 />} />
+                <Route
+                  exact
+                  path="/forget-password"
+                  name="Forgot password"
+                  element={<ForgotPassword />}
+                />
+                <Route
+                  path="/*"
+                  element={<ProtectedRoute element={DefaultLayout} />}
+                />
+              </Routes>
+              <Toaster />
+              {maintenance.active && (
+                <GlobalMaintenanceModal message={maintenance.message} estimatedDowntime={maintenance.estimatedDowntime} />
+              )}
+            </Suspense>
+          </ErrorBoundary>
         </AuthProvider>
       </UserActivityProvider>
     </Router>

@@ -48,8 +48,21 @@ const log = (type, ...args) => {
   }
 }
 
-// Generate fallback data based on endpoint
+// Throttle fallback. NEVER fabricates user identity, role, or businessId —
+// returning a fake authenticated user from the client is a privilege-
+// escalation vector (the UI will believe the user is logged in as someone
+// they aren't, and any subsequent write that trusts the cached value will
+// hit the wrong tenant). Throttling only returns inert empty payloads;
+// auth-bearing endpoints fall through to the network so a real failure
+// becomes a real error.
 const generateFallbackData = (url) => {
+  if (
+    url.includes('/user/details') ||
+    url.includes('/user/login') ||
+    url.includes('/auth')
+  ) {
+    return null
+  }
   if (url.includes('/config')) {
     return {
       success: true,
@@ -57,33 +70,44 @@ const generateFallbackData = (url) => {
       data: { theme: 'default', features: [] }
     }
   }
-  
-  if (url.includes('/user/details')) {
-    return {
-      success: true,
-      message: 'Fallback user data - reducing API load',
-      user: {
-        role: 'business_admin',
-        name: 'Admin User',
-        email: 'admin@example.com',
-        businessId: '684fe39da8254e8906e99aad',
-        accessTo: {
-          'dashboard': true,
-          'contacts': true,
-          'billing': true,
-          'branches': true,
-          'call-logs': true,
-          'virtual-numbers': true
-        }
-      }
-    }
-  }
-  
-  // For other endpoints, return empty array
   return {
     success: true,
     message: 'Fallback data - reducing API load',
     data: []
+  }
+}
+
+// Endpoints whose response shape includes mutable per-tenant state; any
+// successful write should invalidate cached GETs that share the same prefix
+// so the next read pulls fresh data.
+const CACHE_INVALIDATION_PREFIXES = [
+  '/contacts',
+  '/contact-list',
+  '/branches',
+  '/numbers',
+  '/call-logs',
+  '/billing',
+  '/invoices',
+  '/tickets',
+  '/departments',
+  '/leads',
+  '/business',
+  '/user',
+  '/plans',
+  '/dispositions',
+]
+
+const invalidateCacheFor = (url = '') => {
+  if (!url) return
+  // Drop any cached GET whose URL shares an invalidation prefix with the
+  // mutated URL. This is intentionally coarse — better to refetch a few
+  // extra GETs than to serve stale data after a write.
+  const matched = CACHE_INVALIDATION_PREFIXES.filter((p) => url.includes(p))
+  if (matched.length === 0) return
+  for (const key of Array.from(apiCache.keys())) {
+    if (matched.some((p) => key.includes(p))) {
+      apiCache.delete(key)
+    }
   }
 }
 
@@ -100,15 +124,19 @@ export const setupAxiosInterceptors = () => {
   // This can be explicitly overridden by setting `REACT_APP_USE_DIRECT_BACKEND=true`
   // and optionally `REACT_APP_DIRECT_BACKEND_URL` for a custom URL.
   if (process.env.REACT_APP_USE_DIRECT_BACKEND === 'true') {
-    axios.defaults.baseURL = process.env.REACT_APP_DIRECT_BACKEND_URL || 'https://api.justconnect.biz'
-    console.log('✅ Axios configured to use direct backend:', axios.defaults.baseURL)
+    axios.defaults.baseURL = process.env.REACT_APP_DIRECT_BACKEND_URL || ''
+    if (!axios.defaults.baseURL) {
+      console.error('[axios] REACT_APP_USE_DIRECT_BACKEND=true but REACT_APP_DIRECT_BACKEND_URL is empty')
+    }
   } else if (!axios.defaults.baseURL) {
     if (process.env.NODE_ENV === 'development') {
-      axios.defaults.baseURL = 'http://localhost:5040'
+      axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5040'
     } else {
-      axios.defaults.baseURL = 'https://api.justconnect.biz'
+      // In prod the backend is configured via build-time env vars (see config/api.js).
+      // Falling back to same-origin avoids accidentally targeting a hardcoded host.
+      axios.defaults.baseURL =
+        process.env.REACT_APP_PROD_API_URL || process.env.REACT_APP_BASE_URL || ''
     }
-    console.log('✅ Axios baseURL set to:', axios.defaults.baseURL)
   }
   
   // Enhanced URL rewriting interceptor with session management
@@ -145,13 +173,23 @@ export const setupAxiosInterceptors = () => {
       
       // Clean up any URLs to prevent double api paths
       if (config.url) {
-        // Clean up any double api in the path
         config.url = config.url.replace(/\/api\/api\//g, '/api/')
-        
-        // Strip absolute production host if present so axios uses relative paths
-        // Only do this when not explicitly configured to use the direct backend.
-        if (process.env.REACT_APP_USE_DIRECT_BACKEND !== 'true' && config.url.includes('https://api.justconnect.biz')) {
-          config.url = config.url.replace('https://api.justconnect.biz', '')
+
+        // If anyone leaked a fully-qualified backend URL into a call site,
+        // strip it so axios honours the configured baseURL instead of
+        // talking to a hardcoded host. The list comes from env so prod
+        // hosts aren't baked into source.
+        const knownHosts = [
+          process.env.REACT_APP_PROD_API_URL,
+          process.env.REACT_APP_BASE_URL,
+          process.env.REACT_APP_DIRECT_BACKEND_URL,
+        ].filter(Boolean)
+        if (process.env.REACT_APP_USE_DIRECT_BACKEND !== 'true') {
+          for (const host of knownHosts) {
+            if (host && config.url.includes(host)) {
+              config.url = config.url.replace(host, '')
+            }
+          }
         }
       }
       
@@ -270,15 +308,20 @@ export const setupAxiosInterceptors = () => {
       
       // Cache successful responses for ALL GET requests to improve performance
       const url = response.config.url || ''
-      if (response.config.method === 'get' || !response.config.method) {
-        const cacheKey = `${response.config.method || 'get'}_${url}`
+      const method = (response.config.method || 'get').toLowerCase()
+      if (method === 'get') {
+        const cacheKey = `${method}_${url}`
         apiCache.set(cacheKey, {
           data: response.data,
           timestamp: Date.now()
         })
-        console.log(`💾 Cached successful response for: ${url}`)
+      } else if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        // Mutations on a resource invalidate any cached GETs for that resource;
+        // otherwise the UI would render the pre-mutation snapshot until the
+        // 10-minute TTL elapses.
+        invalidateCacheFor(url)
       }
-      
+
       return response
     },
     async (error) => {
@@ -388,31 +431,19 @@ export const setupAxiosInterceptors = () => {
           })
         }
         
-        // Enhanced fallback data generation for common endpoints
-        // Handle user details API calls
-        if (url.includes('/user/details') || url.includes('/api/v1/user/details')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock user data - ${errorType}`,
-              user: {
-                role: 'business_admin',
-                name: 'Admin User',
-                email: 'admin@example.com',
-                businessId: '684fe39da8254e8906e99aad',
-                accessTo: {
-                  'dashboard': true,
-                  'contacts': true,
-                  'billing': true,
-                  'reports': true,
-                  'settings': true
-                }
-              }
-            }
-          })
+        // Auth-bearing endpoints must never get a fabricated success response —
+        // a fake "logged in" user causes the UI to render an authenticated
+        // shell using a hardcoded businessId, which is a privilege-escalation
+        // vector. Force these failures to surface so ProtectedRoute logs out.
+        if (
+          url.includes('/user/details') ||
+          url.includes('/user/login') ||
+          url.includes('/auth')
+        ) {
+          return Promise.reject(error)
         }
-        
-        // Handle config API calls  
+
+        // Handle config API calls
         if (url.includes('/config') || url.includes('/api/config')) {
           return Promise.resolve({
             data: {

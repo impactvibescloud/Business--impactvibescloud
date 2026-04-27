@@ -67,7 +67,10 @@ const Branches = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [agentPhone, setAgentPhone] = useState("");
-  const [department, setDepartment] = useState("");
+  // departmentIds — a branch/agent can belong to multiple departments now.
+  // The first id in this array is also written to the legacy `department`
+  // field on the API for backward compat.
+  const [departmentIds, setDepartmentIds] = useState([]);
   const [timeGroup, setTimeGroup] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -110,7 +113,11 @@ const Branches = () => {
     // Previously we filtered out DIDs already assigned to other branches; remove that restriction.
     return didNumbers || [];
   };
-  const [selectedDid, setSelectedDid] = useState("");
+  // Multiple DIDs can be assigned to a single branch/agent. selectedDids is
+  // an array of DID inventory ids; the form serializes them to:
+  //   - branch.didNumbers (array of phone numbers)
+  //   - one POST /numbers/:id/assign per DID
+  const [selectedDids, setSelectedDids] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
   const [uploading, setUploading] = useState(false)
@@ -246,76 +253,55 @@ const Branches = () => {
 
   const handleSaveBranch = async () => {
     try {
-      // Find the DID number value from the selectedDid (which may be an id)
-      let didNumberValue = selectedDid;
-      const foundDid = didNumbers.find((did) => did.id === selectedDid);
-      if (foundDid) {
-        didNumberValue = foundDid.number;
-      }
-      // Construct the request body according to the API specification
+      // Translate the array of selected DID-inventory ids into actual phone
+      // numbers (which is what the branch document stores in `didNumbers`).
+      const selectedDidObjs = selectedDids
+        .map((id) => didNumbers.find((d) => d.id === id))
+        .filter(Boolean);
+      const didNumberValues = selectedDidObjs.map((d) => d.number);
+
       const requestBody = {
         branchName,
         branchEmail: managerEmail,
-        phone: agentPhone, // Include phone field
+        phone: agentPhone,
         businessId: user.businessId,
-        didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
-        timeGroup: timeGroup
+        didNumbers: didNumberValues,
+        timeGroup: timeGroup,
       };
-      // Fetch DID extension and include it in payload if available
+      // Resolve an extension for the FIRST chosen DID — this is what the
+      // branch's primary PJSIP endpoint registers as. Subsequent DIDs share
+      // the same extension via NumberAssignment rows.
       let extension = null;
-      if (didNumberValue) {
-        extension = await fetchDidExtension(didNumberValue);
-        if (extension) {
-          requestBody.extension = String(extension);
-        }
+      if (didNumberValues[0]) {
+        extension = await fetchDidExtension(didNumberValues[0]);
+        if (extension) requestBody.extension = String(extension);
       }
-      // Only include start/end times if they have values
       if (startTime && startTime.trim() !== '') requestBody.startTime = startTime;
       if (endTime && endTime.trim() !== '') requestBody.endTime = endTime;
-      if (department) {
-        requestBody.department = department;
+      if (departmentIds.length > 0) {
+        requestBody.departmentIds = departmentIds;
+        requestBody.department = departmentIds[0]; // legacy single-value mirror
       }
 
-      // Create the branch first using apiCall
-  const res = await apiCall('/branch/create/new', 'POST', requestBody);
+      const res = await apiCall('/branch/create/new', 'POST', requestBody);
 
-      // Create a NumberAssignment for this branch (prefer multi-assign)
-      if (selectedDid && res.data && (res.data.branch?._id || res.data.data?._id)) {
-        const branchId = res.data.branch?._id || res.data.data?._id;
-        const didId = selectedDid;
-        const extToAssign = extension || requestBody.extension || (didNumberValue ? await fetchDidExtension(didNumberValue) : null);
-        if (extToAssign) {
+      // Create one NumberAssignment per selected DID. They all bind to the
+      // same extension so the agent receives inbound calls on every DID.
+      const branchId = res?.data?.branch?._id || res?.data?.data?._id || res?.data?._id;
+      if (branchId && selectedDidObjs.length > 0 && extension) {
+        for (const did of selectedDidObjs) {
           try {
-            await apiCall(`/numbers/${didId}/assign`, 'POST', { extensionNumber: String(extToAssign), assignedToBranch: branchId, assignedToBusiness: user.businessId });
-
-            // After creating the assignment, ensure the NumberInventory has a primary pointer
-            try {
-              const numResp = await apiCall(`/numbers/${didId}`, 'GET');
-              const numObj = (numResp && (numResp.data || numResp)) || null;
-              const currentlyAssigned = numObj?.assigned_to_branch || numObj?.assignedToBranch || null;
-              if (!currentlyAssigned) {
-                try {
-                  await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-                } catch (e) {
-                  console.warn('Failed to set primary assigned_to_branch for DID', didId, e);
-                }
-              }
-            } catch (e) {
-              console.warn('Could not verify/set primary assigned_to_branch after assignment', didId, e);
-            }
+            await apiCall(`/numbers/${did.id}/assign`, 'POST', {
+              extensionNumber: String(extension),
+              assignedToBranch: branchId,
+              assignedToBusiness: user.businessId,
+            });
           } catch (err) {
             if (err?.response?.status === 409) {
-              console.info('Assignment already exists for', extToAssign);
+              console.info('Assignment already exists for DID', did.number);
             } else {
-              console.error('Error creating number assignment:', err);
+              console.error('Error creating number assignment for', did.number, err);
             }
-          }
-        } else {
-          // Fallback: preserve legacy single-pointer behavior if no extension available
-          try {
-            await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-          } catch (err) {
-            console.error('Error assigning DID to branch (fallback):', err);
           }
         }
       }
@@ -360,7 +346,16 @@ const Branches = () => {
     setSelectedBranch(branch);
     setBranchName(branch.branchName || "");
     setManagerEmail(branch.user?.email || branch.manager?.email || "");
-    setDepartment(branch.department?._id || "");
+    // Hydrate department selection from departmentIds[] (preferred) or the
+    // legacy single `department` field, normalizing to an array of ids.
+    const deptIds = Array.isArray(branch.departmentIds) && branch.departmentIds.length
+      ? branch.departmentIds.map((d) => (d && d._id) || d).filter(Boolean).map(String)
+      : branch.department?._id
+        ? [String(branch.department._id)]
+        : branch.department
+          ? [String(branch.department)]
+          : [];
+    setDepartmentIds(deptIds);
     // branch.timeGroup may be a string (legacy) or an object { timeGroup, startTime, endTime }
     const tg = branch.timeGroup;
     if (tg && typeof tg === 'object') {
@@ -381,22 +376,30 @@ const Branches = () => {
     }
     
     setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
-    // Find the DID id from assignedNumbers (assignments) or didNumbers list that matches the assigned number
-    let assignedDidId = "";
-    let assignedNumberVal = null;
-    if (Array.isArray(branch.assignedNumbers) && branch.assignedNumbers.length > 0) {
-      assignedNumberVal = branch.assignedNumbers[0].number || branch.assignedNumbers[0];
-    } else if (Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0) {
-      assignedNumberVal = branch.didNumbers[0];
-    } else if (branch.didNumber) {
-      assignedNumberVal = branch.didNumber;
-    }
+    // Hydrate selectedDids[] from every assigned-number-like field on the
+    // branch. We prefer `assignedNumbers` (full assignment objects) since
+    // those carry the DID inventory id; otherwise fall back to `didNumbers`
+    // (raw phone strings) and look the id up in our cached list.
+    const assignedNumberVals = (() => {
+      if (Array.isArray(branch.assignedNumbers) && branch.assignedNumbers.length) {
+        return branch.assignedNumbers.map((a) => (a && (a.number || a)) || null).filter(Boolean);
+      }
+      if (Array.isArray(branch.didNumbers) && branch.didNumbers.length) {
+        return branch.didNumbers;
+      }
+      if (branch.didNumber) return [branch.didNumber];
+      return [];
+    })();
 
-    if (assignedNumberVal) {
-      const foundDid = didNumbers.find((did) => did.number === assignedNumberVal || did.id === assignedNumberVal || String(did._id) === String(assignedNumberVal));
-      assignedDidId = foundDid ? foundDid.id : "";
-    }
-    setSelectedDid(assignedDidId);
+    const ids = assignedNumberVals
+      .map((val) => {
+        const found = didNumbers.find(
+          (d) => d.number === val || d.id === val || String(d._id) === String(val),
+        );
+        return found ? found.id : null;
+      })
+      .filter(Boolean);
+    setSelectedDids(Array.from(new Set(ids)));
     setOpenEditBranch(true);
   };
 
@@ -408,72 +411,49 @@ const Branches = () => {
 
   const handleUpdateBranch = async () => {
     try {
-      // Find the DID number value from the selectedDid (which may be an id)
-      let didNumberValue = selectedDid;
-      const foundDid = didNumbers.find((did) => did.id === selectedDid);
-      if (foundDid) {
-        didNumberValue = foundDid.number;
-      }
-  // Build payload and include start/end only when provided
-  const updatePayload = {
+      const selectedDidObjs = selectedDids
+        .map((id) => didNumbers.find((d) => d.id === id))
+        .filter(Boolean);
+      const didNumberValues = selectedDidObjs.map((d) => d.number);
+
+      const updatePayload = {
         branchName,
         userEmail: managerEmail,
         businessId: user.businessId,
-        didNumbers: didNumberValue ? [didNumberValue] : [],
+        didNumbers: didNumberValues,
         timeGroup: timeGroup,
-        ...(department ? { department } : {})
+        ...(departmentIds.length
+          ? { departmentIds, department: departmentIds[0] }
+          : {}),
       };
-  // Fetch DID extension and include it in payload if available
-  let extension = null;
-  if (didNumberValue) {
-    extension = await fetchDidExtension(didNumberValue);
-    if (extension) updatePayload.extension = String(extension);
-  }
-  if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
-  if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
-  const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
+      let extension = null;
+      if (didNumberValues[0]) {
+        extension = await fetchDidExtension(didNumberValues[0]);
+        if (extension) updatePayload.extension = String(extension);
+      }
+      if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
+      if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
+      const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
 
-      // Create a NumberAssignment for this branch (prefer multi-assign)
-      if (selectedDid && (selectedBranch._id || (res.data && (res.data.branch?._id || res.data.data?._id)))) {
-        const branchId = selectedBranch._id || res.data.branch?._id || res.data.data?._id;
-        const didId = selectedDid;
-        const extToAssign = extension || updatePayload.extension || (didNumberValue ? await fetchDidExtension(didNumberValue) : null);
-        if (extToAssign) {
+      const branchId =
+        selectedBranch._id || res?.data?.branch?._id || res?.data?.data?._id;
+      if (branchId && selectedDidObjs.length > 0 && extension) {
+        for (const did of selectedDidObjs) {
           try {
-            await apiCall(`/numbers/${didId}/assign`, 'POST', { extensionNumber: String(extToAssign), assignedToBranch: branchId, assignedToBusiness: user.businessId });
-
-            // Ensure NumberInventory has a primary pointer if unset
-            try {
-              const numResp = await apiCall(`/numbers/${didId}`, 'GET');
-              const numObj = (numResp && (numResp.data || numResp)) || null;
-              const currentlyAssigned = numObj?.assigned_to_branch || numObj?.assignedToBranch || null;
-              if (!currentlyAssigned) {
-                try {
-                  await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-                } catch (e) {
-                  console.warn('Failed to set primary assigned_to_branch for DID', didId, e);
-                }
-              }
-            } catch (e) {
-              console.warn('Could not verify/set primary assigned_to_branch after assignment', didId, e);
-            }
+            await apiCall(`/numbers/${did.id}/assign`, 'POST', {
+              extensionNumber: String(extension),
+              assignedToBranch: branchId,
+              assignedToBusiness: user.businessId,
+            });
           } catch (err) {
             if (err?.response?.status === 409) {
-              console.info('Assignment already exists for', extToAssign);
+              console.info('Assignment already exists for DID', did.number);
             } else {
-              console.error('Error creating number assignment:', err);
+              console.error('Error creating number assignment for', did.number, err);
             }
-          }
-        } else {
-          // Fallback: preserve legacy single-pointer behavior if no extension available
-          try {
-            await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-          } catch (err) {
-            console.error('Error assigning DID to branch (fallback):', err);
           }
         }
       }
-
       fetchBranches();
       handleCloseEditBranch();
       setSuccessAlert({
@@ -495,13 +475,13 @@ const Branches = () => {
   const resetForm = () => {
     setBranchName("");
     setAgentPhone("");
-    setDepartment("");
+    setDepartmentIds([]);
     setTimeGroup("");
     setStartTime("");
     setEndTime("");
     setManagerEmail("");
     setBranchStatus("Active");
-    setSelectedDid(""); // Reset DID selection
+    setSelectedDids([]);
   };
 
   const handleSuspendBranch = async (branchId) => {
@@ -1072,11 +1052,31 @@ const Branches = () => {
               <TextField label="Agent Phone Number" value={agentPhone} onChange={(e) => setAgentPhone(e.target.value)} fullWidth />
               <TextField label="Email Address" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} fullWidth />
               <FormControl fullWidth>
-                <InputLabel id="department-label">Department</InputLabel>
-                <Select labelId="department-label" id="department" value={department} label="Department" onChange={e => setDepartment(e.target.value)}>
-                  {departments.length === 0 ? <MenuItem value=""><em>Loading departments...</em></MenuItem> : departments.map(dept => (
-                    <MenuItem key={dept._id} value={dept._id || dept.id}>{typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}</MenuItem>
-                  ))}
+                <InputLabel id="department-label">Departments</InputLabel>
+                <Select
+                  labelId="department-label"
+                  id="department"
+                  multiple
+                  value={departmentIds}
+                  label="Departments"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDepartmentIds(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    departments
+                      .filter((d) => selected.includes(d._id))
+                      .map((d) => d.name || 'Unnamed')
+                      .join(', ')
+                  }
+                >
+                  {departments.length === 0
+                    ? <MenuItem disabled value=""><em>Loading departments...</em></MenuItem>
+                    : departments.map((dept) => (
+                        <MenuItem key={dept._id} value={dept._id}>
+                          {dept.name || 'Unnamed Department'}
+                        </MenuItem>
+                      ))}
                 </Select>
               </FormControl>
               <FormControl fullWidth>
@@ -1116,9 +1116,27 @@ const Branches = () => {
                 />
               </Box>
               <FormControl fullWidth>
-                <InputLabel id="assignDid-label">Assign DID</InputLabel>
-                <Select labelId="assignDid-label" id="assignDid" value={selectedDid} label="Assign DID" onChange={e => setSelectedDid(e.target.value)}>
-                  {getAvailableDidNumbers().map(did => <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>)}
+                <InputLabel id="assignDid-label">Assign DIDs</InputLabel>
+                <Select
+                  labelId="assignDid-label"
+                  id="assignDid"
+                  multiple
+                  value={selectedDids}
+                  label="Assign DIDs"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSelectedDids(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    didNumbers
+                      .filter((d) => selected.includes(d.id))
+                      .map((d) => d.number)
+                      .join(', ')
+                  }
+                >
+                  {getAvailableDidNumbers().map((did) => (
+                    <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Box>
@@ -1137,9 +1155,29 @@ const Branches = () => {
               <TextField label="Agent Name" value={branchName} onChange={(e) => setBranchName(e.target.value)} fullWidth />
               <TextField label="Email Address" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} fullWidth />
               <FormControl fullWidth>
-                <InputLabel id="edit-department-label">Department</InputLabel>
-                <Select labelId="edit-department-label" id="editDepartment" value={department} label="Department" onChange={e => setDepartment(e.target.value)}>
-                  {departments.map(dept => <MenuItem key={dept._id} value={dept._id || dept.id}>{typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}</MenuItem>)}
+                <InputLabel id="edit-department-label">Departments</InputLabel>
+                <Select
+                  labelId="edit-department-label"
+                  id="editDepartment"
+                  multiple
+                  value={departmentIds}
+                  label="Departments"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDepartmentIds(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    departments
+                      .filter((d) => selected.includes(d._id))
+                      .map((d) => d.name || 'Unnamed')
+                      .join(', ')
+                  }
+                >
+                  {departments.map((dept) => (
+                    <MenuItem key={dept._id} value={dept._id}>
+                      {dept.name || 'Unnamed Department'}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
               <FormControl fullWidth>
@@ -1179,9 +1217,27 @@ const Branches = () => {
                 />
               </Box>
               <FormControl fullWidth>
-                <InputLabel id="edit-assignDid-label">Assign DID</InputLabel>
-                <Select labelId="edit-assignDid-label" id="editAssignDid" value={selectedDid} label="Assign DID" onChange={e => setSelectedDid(e.target.value)}>
-                  {getAvailableDidNumbers(selectedBranch?._id).map(did => <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>)}
+                <InputLabel id="edit-assignDid-label">Assign DIDs</InputLabel>
+                <Select
+                  labelId="edit-assignDid-label"
+                  id="editAssignDid"
+                  multiple
+                  value={selectedDids}
+                  label="Assign DIDs"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSelectedDids(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    didNumbers
+                      .filter((d) => selected.includes(d.id))
+                      .map((d) => d.number)
+                      .join(', ')
+                  }
+                >
+                  {getAvailableDidNumbers(selectedBranch?._id).map((did) => (
+                    <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Box>

@@ -3,6 +3,7 @@ import { CForm, CCol, CFormLabel, CContainer, CRow, CCardGroup, CCard, CCardBody
 import { Country, City } from 'country-state-city'
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import swal from 'sweetalert'
 import { useNavigate } from 'react-router-dom'
 const NewRegister = () => {
     const [cities, setCities] = useState([])
@@ -33,22 +34,22 @@ const NewRegister = () => {
 
 
     async function handleSubmit() {
-
-        let res = await axios.post(`/owner/signup`, ownerDetails, {
-            headers: {
-                'Content-Type': 'application/json',
-                // 'Authorization': `Bearer ${token}`,
-            }
-        })
+        if (processing) return
         setProcessing(true)
-        console.log(res.data);
-
-        if (res) {
-            // localStorage.setItem("auth", JSON.stringify({
-
-            //     token: res.data.token,
-            // }));
+        try {
+            const res = await axios.post(`/owner/signup`, ownerDetails, {
+                headers: { 'Content-Type': 'application/json' },
+            })
+            if (res?.data?.success === false) {
+                swal('Error', res.data.message || 'Sign up failed', 'error')
+                return
+            }
             history('/')
+        } catch (err) {
+            const message = err?.response?.data?.message || err?.message || 'Sign up failed'
+            swal('Error', message, 'error')
+        } finally {
+            setProcessing(false)
         }
     }
 

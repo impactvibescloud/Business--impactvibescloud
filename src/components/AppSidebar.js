@@ -255,15 +255,21 @@ const AppSidebar = () => {
         },
       }}
     >
-      {/* Sidebar Header / Brand */}
+      {/* Sidebar Header / Brand.
+          Height (48px) is locked to match `.jc-header` so the bottom border
+          of this section lines up with the bottom of the top bar — otherwise
+          the brand block overhangs the topbar by ~22px. */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '4px 0' : '4px 12px',
           borderBottom: '1px solid #e5e7eb',
-          minHeight: '70px',
+          height: '48px',
+          minHeight: '48px',
+          boxSizing: 'border-box',
+          flexShrink: 0,
         }}
       >
         <Link
@@ -271,25 +277,26 @@ const AppSidebar = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: collapsed ? 0 : '8px',
             textDecoration: 'none',
-            flex: 1,
+            flex: collapsed ? '0 0 auto' : 1,
             cursor: 'pointer',
           }}
           onClick={(e) => handleLogoClick(e)}
         >
-          <img 
-            src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'} 
-            alt="Just Connect" 
-            style={{ width: 40, height: 40, objectFit: 'contain' }}
+          <img
+            src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'}
+            alt="Just Connect"
+            style={{ width: 36, height: 36, objectFit: 'contain', display: 'block' }}
           />
           {!collapsed && (
-            <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
               <Box sx={{ display: 'flex', gap: '0', alignItems: 'baseline' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0760c7', fontSize: '0.9rem', margin: 0 }}>just</Typography>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f97316', fontSize: '0.9rem', margin: 0 }}>Connect</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0760c7', fontSize: '0.9rem', margin: 0, lineHeight: 1.1 }}>just</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f97316', fontSize: '0.9rem', margin: 0, lineHeight: 1.1 }}>Connect</Typography>
               </Box>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: '#6b7280', fontSize: '0.6rem', lineHeight: 1.2 }}>Enterprise Conversations Simplified</Typography>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#6b7280', fontSize: '0.6rem', lineHeight: 1.1 }}>Enterprise Conversations Simplified</Typography>
             </Box>
           )}
         </Link>

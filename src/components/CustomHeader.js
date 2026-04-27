@@ -115,7 +115,12 @@ const CustomHeader = () => {
         </div>
         <div className="jc-actions" style={{ position: 'relative' }}>
           
-          <button className="jc-icon-btn" aria-label="Phone">
+          <button
+            className="jc-icon-btn"
+            aria-label="Open call monitor"
+            title="Call Monitor"
+            onClick={() => navigate('/callmonitor')}
+          >
             <CIcon icon={cilPhone} />
           </button>
           <div className="jc-divider"></div>

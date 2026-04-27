@@ -16,6 +16,38 @@ import {
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
+// Icon sizing for the sidebar.
+//   - ICON_SIZE keeps every nav glyph at a single, predictable pixel size.
+//     lucide-react icons render at 24px by default, which looks oversized in
+//     the 80px-wide collapsed rail and inconsistent next to MUI's own icons.
+//   - ICON_SLOT_WIDTH is the width of the ListItemIcon container in BOTH
+//     states so icons share the same vertical axis whether the sidebar is
+//     expanded or collapsed.
+const ICON_SIZE = 20;
+// Width of the active "pill" in collapsed mode. Square so the highlight
+// behind an active item is a square, not a wide rectangle.
+const COLLAPSED_BUTTON = 40;
+
+const iconSlotSx = (collapsed, isActive) => ({
+  minWidth: collapsed ? COLLAPSED_BUTTON : 40,
+  width: collapsed ? '100%' : 'auto',
+  height: collapsed ? '100%' : 'auto',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  margin: 0,
+  color: isActive ? '#6366f1' : '#6b7280',
+  // Force every child SVG (lucide-react, MUI icons, raw <svg>) to one size
+  // regardless of its component-level default. Without this lucide icons
+  // render at 24px and MUI icons at 1.5rem, producing the size mismatch
+  // between expanded and collapsed states.
+  '& svg': {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    flexShrink: 0,
+  },
+});
+
 export const AppSidebarNav = ({ items, collapsed }) => {
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -62,7 +94,9 @@ export const AppSidebarNav = ({ items, collapsed }) => {
         key={`navitem-${index}`}
         sx={{
           display: 'block',
-          px: collapsed ? 0.5 : 1,
+          // Zero side padding when collapsed so the centered 40×40 button has
+          // the full rail width to be perfectly centered in.
+          px: collapsed ? 0 : 1,
           mb: 0.25,
         }}
       >
@@ -73,25 +107,33 @@ export const AppSidebarNav = ({ items, collapsed }) => {
         >
           <ListItemButton
             sx={{
-              minHeight: collapsed ? 32 : 36,
-              borderRadius: collapsed ? '4px' : '6px',
+              // In collapsed mode, lock the button to a square so the active /
+              // hover background renders as a square pill around the icon
+              // instead of stretching across the 72px-wide rail.
+              ...(collapsed
+                ? {
+                    width: 40,
+                    height: 40,
+                    minHeight: 40,
+                    p: 0,
+                    mx: 'auto',
+                    borderRadius: '8px',
+                  }
+                : {
+                    minHeight: 36,
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: '6px',
+                  }),
               backgroundColor: isActive ? '#f3f4f6' : 'transparent',
               '&:hover': {
                 backgroundColor: '#f9fafb',
               },
-              px: collapsed ? 0.5 : 1,
-              py: collapsed ? 0.25 : 0.5,
               justifyContent: collapsed ? 'center' : 'flex-start',
             }}
           >
             {icon && (
-              <ListItemIcon
-                sx={{
-                  minWidth: collapsed ? 'auto' : 40,
-                  color: isActive ? '#6366f1' : '#6b7280',
-                  fontSize: '1.3rem',
-                }}
-              >
+              <ListItemIcon sx={iconSlotSx(collapsed, isActive)}>
                 {icon}
               </ListItemIcon>
             )}
@@ -156,13 +198,7 @@ export const AppSidebarNav = ({ items, collapsed }) => {
             }}
           >
             {icon && (
-              <ListItemIcon
-                sx={{
-                  minWidth: collapsed ? 'auto' : 40,
-                  color: isActive ? '#6366f1' : '#6b7280',
-                  fontSize: '1.3rem',
-                }}
-              >
+              <ListItemIcon sx={iconSlotSx(collapsed, isActive)}>
                 {icon}
               </ListItemIcon>
             )}

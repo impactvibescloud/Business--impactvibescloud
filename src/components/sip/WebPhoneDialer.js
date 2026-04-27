@@ -46,7 +46,50 @@ const WebPhoneDialer = ({ ua, regStatus, sipDomain = 'pbx.justconnect.biz', busi
   const [transferStatus, setTransferStatus] = useState('idle') // idle, transferring, transferred, failed
   const [incomingSession, setIncomingSession] = useState(null)
   const [incomingCallInfo, setIncomingCallInfo] = useState(null)
+  // Caller-ID picker state: list of DIDs assigned to the logged-in user's
+  // extension, plus the currently selected one. Switching the value calls
+  // PUT /numbers/my-caller-id which overwrites the `agent/<ext>` ASTDB key.
+  const [myNumbers, setMyNumbers] = useState([])
+  const [callerId, setCallerId] = useState('')
+  const [callerIdSaving, setCallerIdSaving] = useState(false)
   const durationIntervalRef = React.useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const loadMyNumbers = async () => {
+      try {
+        const res = await apiCall('/numbers/my-numbers', 'GET')
+        if (cancelled) return
+        const list = Array.isArray(res?.data) ? res.data : []
+        setMyNumbers(list)
+        // Pre-select whatever the server currently has as the agent's
+        // outbound CID. We don't have a "read agent/<ext>" endpoint yet, so
+        // fall back to the first DID — which mirrors the dialplan default.
+        if (list.length > 0) setCallerId((prev) => prev || list[0].number)
+      } catch (err) {
+        if (!cancelled) console.warn('[WebPhoneDialer] Failed to load my-numbers:', err)
+      }
+    }
+    loadMyNumbers()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleCallerIdChange = async (newNumber) => {
+    if (!newNumber || newNumber === callerId) return
+    setCallerIdSaving(true)
+    try {
+      await apiCall('/numbers/my-caller-id', 'PUT', { number: newNumber })
+      setCallerId(newNumber)
+    } catch (err) {
+      // Server enforces ownership; surface the message rather than silently failing.
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update caller-ID'
+      setError(msg)
+    } finally {
+      setCallerIdSaving(false)
+    }
+  }
 
   // Update parent component on call state change
   useEffect(() => {
@@ -602,6 +645,25 @@ const WebPhoneDialer = ({ ua, regStatus, sipDomain = 'pbx.justconnect.biz', busi
           <Alert severity="error" sx={{ fontSize: '0.9rem' }}>
             {error}
           </Alert>
+        )}
+
+        {/* Caller-ID picker. Only shown when the agent has more than one DID
+            assigned — single-DID users have nothing to choose. */}
+        {callStatus === 'idle' && myNumbers.length > 1 && (
+          <FormControl fullWidth size="small" disabled={callerIdSaving}>
+            <InputLabel>Call from</InputLabel>
+            <Select
+              value={callerId}
+              label="Call from"
+              onChange={(e) => handleCallerIdChange(e.target.value)}
+            >
+              {myNumbers.map((n) => (
+                <MenuItem key={n._id || n.number} value={n.number}>
+                  {n.number}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         )}
 
         {/* Mode Selector */}

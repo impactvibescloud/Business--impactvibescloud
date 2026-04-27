@@ -16,41 +16,48 @@ const AppContent = () => {
   const token = isAutheticated();
 
   useEffect(() => {
+    let cancelled = false;
     const getUser = async () => {
-      let existanceData = localStorage.getItem("authToken");
+      const existanceData = localStorage.getItem("authToken");
       if (!existanceData) {
-        setuserper(null);
-        setLoading(false);
-      } else {
-        try {
-          let response = await axios.get(`/api/v1/user/details`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const data = response?.data;
-          if (data?.success && data?.user) {
-            setuserper(data.user);
-          } else {
-            // If API succeeds but no user data, create a default admin user
-            setuserper({
-              role: "business_admin",
-              accessTo: {}
-            });
-          }
-        } catch (err) {
-          console.warn('User API failed, using default admin access:', err.message);
-          // If API fails, create a default admin user so routes still work
-          setuserper({
-            role: "business_admin", 
-            accessTo: {}
-          });
+        if (!cancelled) {
+          setuserper(null);
+          setLoading(false);
         }
+        return;
       }
-      setLoading(false);
+      try {
+        const response = await axios.get(`/api/v1/user/details`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = response?.data;
+        if (cancelled) return;
+        if (data?.success && data?.user) {
+          setuserper(data.user);
+        } else {
+          // Server replied but didn't include a user — treat as unauthenticated
+          // rather than promoting the visitor to business_admin (which is what
+          // the previous fallback did and effectively bypassed all gating).
+          setuserper(null);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        // Authentication failure: clear the broken token so ProtectedRoute
+        // bounces the user back to login instead of rendering an admin shell
+        // around an unverified session.
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
+          try { localStorage.removeItem("authToken"); } catch (e) { /* ignore */ }
+        }
+        setuserper(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
     getUser();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const [appRoutes, setAppRoutes] = useState(routes);
 

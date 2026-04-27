@@ -143,7 +143,7 @@ function Logo() {
                                             ? HeaderlogoUrl.image
                                             : Headerlogo
                                         }
-                                        alt=""
+                                        alt="Header logo preview"
                                       />
                                     ) : (
                                       ""
@@ -186,7 +186,7 @@ function Logo() {
                                             ? customerLogoUrl.image
                                             : customerLogo
                                         }
-                                        alt=""
+                                        alt="Customer website logo preview"
                                       />
                                     ) : (
                                       ""
@@ -227,7 +227,7 @@ function Logo() {
                                           ? FooterlogoUrl.image
                                           : Footerlogo
                                       }
-                                      alt=""
+                                      alt="Footer logo preview"
                                     />
                                   ) : (
                                     ""
@@ -266,7 +266,7 @@ function Logo() {
                                           ? AdminlogoUrl.image
                                           : Adminlogo
                                       }
-                                      alt=""
+                                      alt="Admin website logo preview"
                                     />
                                   ) : (
                                     ""
