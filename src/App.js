@@ -71,33 +71,42 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    // Read the token fresh inside the effect rather than relying on the
+    // mount-time `token` const; otherwise login-from-this-tab and
+    // login/logout-from-another-tab don't trigger a re-fetch until a full
+    // page reload. The storage listener below covers the cross-tab case.
     const getUser = async () => {
-      let existanceData = localStorage.getItem("authToken");
+      const existanceData = localStorage.getItem("authToken");
       if (!existanceData) {
         setUserData(false);
-      } else {
-        try {
-          let response = await axios.get(`/api/v1/user/details`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const data = response?.data;
-          if (
-            data?.success 
-            && (data?.user?.role === "business_admin" || data?.user?.role === "Employee")
-          ) {
-            setUserData(data?.user);
-          } else {
-            setUserData(false);
-          }
-        } catch (err) {
+        return;
+      }
+      try {
+        const response = await axios.get(`/api/v1/user/details`, {
+          headers: {
+            Authorization: `Bearer ${existanceData}`,
+          },
+        });
+        const data = response?.data;
+        if (
+          data?.success
+          && (data?.user?.role === "business_admin" || data?.user?.role === "Employee")
+        ) {
+          setUserData(data?.user);
+        } else {
           setUserData(false);
-          console.log(err);
         }
+      } catch (err) {
+        setUserData(false);
+        console.log(err);
       }
     };
     getUser();
+    const onStorage = (e) => {
+      if (e.key === "authToken") getUser();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [token]);
   return (
     <Router>
@@ -115,11 +124,10 @@ const App = () => {
               }
             >
               <Routes>
-                <Route exact path="/" name="Login Page" element={<Login />} />
-                <Route exact path="/404" name="Page 404" element={<Page404 />} />
-                <Route exact path="/500" name="Page 500" element={<Page500 />} />
+                <Route path="/" name="Login Page" element={<Login />} />
+                <Route path="/404" name="Page 404" element={<Page404 />} />
+                <Route path="/500" name="Page 500" element={<Page500 />} />
                 <Route
-                  exact
                   path="/forget-password"
                   name="Forgot password"
                   element={<ForgotPassword />}

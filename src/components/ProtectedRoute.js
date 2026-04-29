@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { jwtDecode } from 'jwt-decode'
 import PropTypes from 'prop-types'
 
@@ -20,6 +20,7 @@ const isTokenValid = (token) => {
 
 const ProtectedRoute = ({ element: Element }) => {
   const navigate = useNavigate()
+  const location = useLocation()
   // Synchronous initial check — render <Navigate> immediately if the token
   // is missing or expired, so we never paint a single frame of authenticated
   // UI to an unauthenticated user.
@@ -53,7 +54,7 @@ const ProtectedRoute = ({ element: Element }) => {
     }
   }, [navigate])
 
-  if (!authorized) return <Navigate to="/" replace />
+  if (!authorized) return <Navigate to="/" replace state={{ from: location }} />
   return <Element />
 }
 

@@ -182,31 +182,27 @@ function Billing() {
     }
   }, [assignedNumbers])
   
-  // Handle save changes
+  // Handle save changes. Previous implementation showed a green "Saved"
+  // message after a setTimeout — no API call, form values were discarded
+  // on refresh. Until the backend exposes a billing-info update endpoint,
+  // surface this honestly so the user can request the change manually
+  // instead of believing they saved successfully.
   const handleSaveChanges = (e) => {
     e.preventDefault()
-    
-    // Get the form element
+
     const form = e.target.closest('form')
-    
-    // Check form validity
     if (form && !form.checkValidity()) {
       form.reportValidity()
       return
     }
-    
-    setIsSaving(true)
-    
-    // Simulate API call with timeout
-    setTimeout(() => {
-      setIsSaving(false)
-      setShowSuccessMessage(true)
-      
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setShowSuccessMessage(false)
-      }, 5000)
-    }, 800)
+
+    setIsSaving(false)
+    setShowSuccessMessage(false)
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(
+        'Saving billing information from this page is not yet available. Please contact support to update your billing details.'
+      )
+    }
   }
   
   // Countries array
@@ -301,34 +297,20 @@ function Billing() {
     setPaymentMethod(e.target.value)
   }
 
-  // Handle payment submission
+  // Handle payment submission. Previous implementation simulated a
+  // payment with setTimeout, then wrote the "purchased" number to
+  // localStorage — no real payment, no server record. The UI showed
+  // "owned" numbers that didn't exist on the backend. Until the real
+  // payment + provisioning endpoint is wired up, refuse honestly.
   const handlePaymentSubmit = () => {
     if (!paymentMethod) return
-    
-    setIsPaymentProcessing(true)
-    
-    // Simulate payment processing
-    setTimeout(() => {
-      // Save purchased number to localStorage
-      if (selectedNumber) {
-        const updatedNumbers = savePurchasedNumber(selectedNumber)
-        setPurchasedNumbers(updatedNumbers)
-        setNumbersByCountry(getPurchasedNumbersByCountry())
-      }
-      
-      setIsPaymentProcessing(false)
-      setPaymentSuccessful(true)
-      
-      // After successful payment, close everything and go back to overview tab
-      setTimeout(() => {
-        setShowPaymentModal(false)
-        setShowBuyNumberView(false)
-        setActiveKey(1)
-        setSelectedNumber(null)
-        setPaymentMethod('')
-        setPaymentSuccessful(false)
-      }, 2000)
-    }, 1500)
+    setIsPaymentProcessing(false)
+    setPaymentSuccessful(false)
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(
+        'Number purchase is not yet available from this page. Please contact your administrator to add new numbers to your account.'
+      )
+    }
   }
 
   return (

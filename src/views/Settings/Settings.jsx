@@ -485,19 +485,19 @@ function Settings() {
     })
   }
   
-  // API Key functions
+  // API Key functions. Previous implementation generated a Math.random key
+  // entirely client-side and never registered it with the backend, so the
+  // displayed key was meaningless — any API call using it would 401.
+  // Until the backend exposes a real "create API key" endpoint, we disable
+  // local key generation and tell the user why instead of pretending.
   const generateApiKey = () => {
-    // Generate a random API key
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let key = '';
-    for (let i = 0; i < 24; i++) {
-      key += characters.charAt(Math.floor(Math.random() * characters.length));
+    setApiKey('')
+    setShowApiKey(false)
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(
+        'API key generation is not yet available. Please contact your administrator to request API access.'
+      )
     }
-    
-    // Format the key with dashes
-    const formattedKey = `${key.slice(0, 8)}-${key.slice(8, 16)}-${key.slice(16, 24)}`;
-    setApiKey(formattedKey);
-    setShowApiKey(true);
   }
   
   const copyApiKey = () => {

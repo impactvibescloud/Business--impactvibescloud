@@ -204,65 +204,15 @@ const ContactLists = () => {
         }))
         
         setContacts(formattedContacts)
-        
-        // If no contacts from API, provide helpful mock data for testing
-        if (formattedContacts.length === 0) {
-          const mockContacts = [
-            {
-              id: 'mock-contact-1',
-              name: 'John Doe',
-              phone: '+1234567890',
-              email: 'john.doe@example.com',
-              company: 'Example Corp'
-            },
-            {
-              id: 'mock-contact-2',
-              name: 'Jane Smith',
-              phone: '+0987654321',
-              email: 'jane.smith@example.com',
-              company: 'Tech Solutions'
-            },
-            {
-              id: 'mock-contact-3',
-              name: 'Bob Wilson',
-              phone: '+1122334455',
-              email: 'bob.wilson@example.com',
-              company: 'Business Inc'
-            }
-          ]
-          
-          setContacts(mockContacts)
-        }
-        
+        // Empty list previously seeded John Doe / Jane Smith / Bob Wilson
+        // mock contacts that were selectable and POSTed back to the server
+        // with `mock-contact-*` IDs that didn't exist — corrupting the list.
+        // Render an honest empty state instead.
+
       } catch (err) {
         console.error('Failed to fetch contacts:', err)
-        
-        // Provide fallback mock data for development
-        const mockContacts = [
-          {
-            id: 'mock-contact-1',
-            name: 'John Doe',
-            phone: '+1234567890',
-            email: 'john.doe@example.com',
-            company: 'Example Corp'
-          },
-          {
-            id: 'mock-contact-2',
-            name: 'Jane Smith',
-            phone: '+0987654321',
-            email: 'jane.smith@example.com',
-            company: 'Tech Solutions'
-          },
-          {
-            id: 'mock-contact-3',
-            name: 'Bob Wilson',
-            phone: '+1122334455',
-            email: 'bob.wilson@example.com',
-            company: 'Business Inc'
-          }
-        ]
-        
-        setContacts(mockContacts)
+        // Show empty list + the catch-block error rather than fake contacts.
+        setContacts([])
       } finally {
         setContactsLoading(false)
       }

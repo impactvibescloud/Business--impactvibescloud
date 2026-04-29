@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './ModernLogin.css';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import CIcon from "@coreui/icons-react";
 import { cilLockLocked, cilUser } from "@coreui/icons";
 import ClipLoader from "react-spinners/ClipLoader";
@@ -26,6 +26,11 @@ const Login = () => {
     /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[^\w\s]).{7,}$/
   );
   const history = useNavigate();
+  const location = useLocation();
+  // If the user was redirected here from a protected route, ProtectedRoute
+  // attaches the original location in `state.from`. Sending them back there
+  // after login restores the flow they intended.
+  const redirectTo = location.state?.from?.pathname || '/dashboard';
   const submitGuardRef = useRef(false);
   // AbortController for the in-flight login request — lets us cancel on
   // unmount and prevents a stale response from updating state.
@@ -179,7 +184,7 @@ const Login = () => {
           // Single navigation — no reload(). The auth state is in localStorage
           // and the protected route reads it on next render, so reloading
           // only adds a flicker and wipes any in-memory app state.
-          history("/dashboard", { replace: true });
+          history(redirectTo, { replace: true });
         } else {
           swal("Error!", "please try with admin credential!!", "error");
         }

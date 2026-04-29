@@ -206,7 +206,12 @@ export const setupAxiosInterceptors = () => {
       // Intelligent caching for GET requests with connection quality awareness
       if (config.method === 'get' || !config.method) {
         const url = config.url || ''
-        const cacheKey = `${config.method || 'get'}_${url}`
+        // Include a short hash of the auth token in the cache key so that
+        // logging out and back in as a different user doesn't serve the
+        // previous user's cached responses.
+        const _tok = (typeof localStorage !== 'undefined' && localStorage.getItem('authToken')) || ''
+        const _tokKey = _tok ? _tok.slice(-12) : 'anon'
+        const cacheKey = `${config.method || 'get'}_${url}_${_tokKey}`
         const cached = apiCache.get(cacheKey)
         
         // For frequently called endpoints, use longer cache duration
@@ -222,7 +227,11 @@ export const setupAxiosInterceptors = () => {
         if (connectionQuality === 'poor') {
           cacheDuration = CACHE_DURATION * 2 // Use longer cache for poor connections
         } else if (connectionQuality === 'offline') {
-          cacheDuration = Infinity // Use cached data indefinitely when offline
+          // Previously: cacheDuration = Infinity. Once a cluster of failures
+          // tripped 'offline', the cache stayed stale forever even after the
+          // network recovered. Cap at 30 minutes so a recovered network is
+          // visible within a sane bound.
+          cacheDuration = CACHE_DURATION * 3
         }
         
         const effectiveCacheDuration = isFrequentEndpoint ? cacheDuration : cacheDuration / 2
@@ -251,26 +260,19 @@ export const setupAxiosInterceptors = () => {
             requestLimit = Math.floor(MAX_REQUESTS_PER_MINUTE / 2)
           }
           
-          // If we've made too many requests recently, serve cached data or fallback
-          if (requestTimestamps.length >= requestLimit) {
-            // Remove throttle warning
-            
-            // Serve cached data even if expired, or fallback data
-            if (cached) {
-              config.metadata = { 
-                ...config.metadata,
-                fromCache: true, 
-                cachedResponse: cached.data,
-                throttled: true
-              }
-            } else {
-              // Serve fallback data based on endpoint
-              config.metadata = { 
-                ...config.metadata,
-                fromCache: true, 
-                cachedResponse: generateFallbackData(url),
-                throttled: true
-              }
+          // If we've made too many requests recently, serve any real
+          // cached response we have (still the user's actual data), but
+          // do NOT fabricate an empty success response when no cache
+          // exists — that masked legitimate failures and made the UI
+          // render "0 contacts" when really the request was rate-limited.
+          // Without cache we let the request through; the server will
+          // 429 us if it needs to and the UI can react to that honestly.
+          if (requestTimestamps.length >= requestLimit && cached) {
+            config.metadata = {
+              ...config.metadata,
+              fromCache: true,
+              cachedResponse: cached.data,
+              throttled: true
             }
           } else {
             // Allow request and track it
@@ -288,9 +290,13 @@ export const setupAxiosInterceptors = () => {
   // Enhanced response interceptor with retry logic and connection monitoring
   axios.interceptors.response.use(
     (response) => {
-      // Track successful requests for connection quality
-      failedRequestCount = Math.max(0, failedRequestCount - 1)
-      if (failedRequestCount === 0 && connectionQuality !== 'good') {
+      // Track successful requests for connection quality. Any successful
+      // response is strong evidence the network is back, so reset the
+      // counter aggressively rather than only when it reaches zero — the
+      // old code could stay 'offline' indefinitely if a single failure
+      // happened during recovery.
+      failedRequestCount = 0
+      if (connectionQuality !== 'good') {
         connectionQuality = 'good'
         console.log('🟢 Connection quality improved to good')
       }
@@ -310,7 +316,9 @@ export const setupAxiosInterceptors = () => {
       const url = response.config.url || ''
       const method = (response.config.method || 'get').toLowerCase()
       if (method === 'get') {
-        const cacheKey = `${method}_${url}`
+        const _tok = (typeof localStorage !== 'undefined' && localStorage.getItem('authToken')) || ''
+        const _tokKey = _tok ? _tok.slice(-12) : 'anon'
+        const cacheKey = `${method}_${url}_${_tokKey}`
         apiCache.set(cacheKey, {
           data: response.data,
           timestamp: Date.now()
@@ -375,31 +383,22 @@ export const setupAxiosInterceptors = () => {
                          error.message.includes('Failed to fetch') ||
                          error.code === 'ERR_BLOCKED_BY_CLIENT'
       
-      // Handle authentication errors specially for long sessions
+      // Handle authentication errors. The previous implementation fired a
+      // `GET /user/details` then `return axios(config)` on the original
+      // request — that re-drove the same 401-producing call in a recursion
+      // loop and caused duplicate POSTs (double-billed payments / duplicate
+      // contacts). Now we force logout once and reject; let the user log
+      // back in cleanly.
       if (isAuthError) {
-        console.warn('🚨 Authentication error detected - session may have expired')
-        
-        // Try to refresh token or validate session
-        const token = localStorage.getItem('authToken')
-        if (token) {
-          try {
-            // Try a simple auth check
-            const authCheck = await axios.get('/api/v1/user/details', {
-              headers: { 'Authorization': `Bearer ${token}` },
-              timeout: 10000
-            })
-            
-            if (authCheck.data) {
-              console.log('✅ Session still valid, retrying original request')
-              return axios(config)
-            }
-          } catch (authError) {
-            console.error('❌ Session validation failed, forcing logout')
-            localStorage.removeItem('authToken')
+        console.warn('🚨 Authentication error detected - forcing logout')
+        if (!config || !config.__authRetried) {
+          try { localStorage.removeItem('authToken') } catch (e) {}
+          try { sessionStorage.removeItem('authToken') } catch (e) {}
+          if (typeof window !== 'undefined' && window.location.pathname !== '/') {
             window.location.href = '/'
-            return Promise.reject(error)
           }
         }
+        return Promise.reject(error)
       }
       
       if (isNetworkError || isTimeoutError || isRateLimited || isCorsError || is404Error) {
@@ -417,7 +416,9 @@ export const setupAxiosInterceptors = () => {
         const url = error.config?.url || ''
         
         // Enhanced cache serving - prioritize any cached data over fallbacks
-        const cacheKey = `${error.config?.method || 'get'}_${url}`
+        const _tok = (typeof localStorage !== 'undefined' && localStorage.getItem('authToken')) || ''
+        const _tokKey = _tok ? _tok.slice(-12) : 'anon'
+        const cacheKey = `${error.config?.method || 'get'}_${url}_${_tokKey}`
         const cached = apiCache.get(cacheKey)
         
         if (cached) {
@@ -443,142 +444,12 @@ export const setupAxiosInterceptors = () => {
           return Promise.reject(error)
         }
 
-        // Handle config API calls
-        if (url.includes('/config') || url.includes('/api/config')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock config data - ${errorType}`,
-              result: [
-                {
-                  logo: [
-                    {
-                      Headerlogo: '',
-                      Footerlogo: '',
-                      Adminlogo: ''
-                    }
-                  ],
-                  copyrightMessage: 'ImpactVibes Cloud'
-                }
-              ]
-            }
-          })
-        }
-        
-        // Handle billing API calls
-        if (url.includes('/billing/business') || url.includes('/api/billing/business')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock billing data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle invoice API calls
-        if (url.includes('/invoices/') || url.includes('/api/invoices/')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock invoice data - ${errorType}`,
-              data: {
-                planId: {
-                  planName: 'Premium Plan',
-                  rental: 3000,
-                  discountPercent: 25,
-                  displayDiscount: 750,
-                  totalAfterDiscount: 2250,
-                  duration: 90,
-                  gracePeriod: 10
-                },
-                totalAmount: 2250,
-                balance: 2655,
-                gst: 405,
-                paymentMode: 'Yearly',
-                amount: 3000
-              }
-            }
-          })
-        }
-        
-        // Handle contacts API calls
-        if (url.includes('/contacts') || url.includes('/api/contacts')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock contacts data - ${errorType}`,
-              data: [],
-              totalContacts: 0
-            }
-          })
-        }
-        
-        // Handle contact lists API calls
-        if (url.includes('/contact-list') || url.includes('/api/contact-list')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock contact lists data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle call logs API calls
-        if (url.includes('/call-logs') || url.includes('/api/call-logs')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock call logs data - ${errorType}`,
-              data: [],
-              totalCallLogs: 0
-            }
-          })
-        }
-        
-        // Handle branches API calls
-        if (url.includes('/branches') || url.includes('/api/branches')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock branches data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle virtual numbers API calls
-        if (url.includes('/numbers') || url.includes('/api/numbers')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock virtual numbers data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle any other common endpoints
-        if (url.includes('/api/')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock data - ${errorType}`,
-              data: [],
-              result: []
-            }
-          })
-        }
-        
-        // For other endpoints during failures, return a standard error response
-        return Promise.resolve({
-          data: {
-            success: false,
-            message: `Service temporarily unavailable - ${errorType}`,
-            data: null
-          }
-        })
+        // No fabricated-success fallback. Previously this block returned a
+        // mock 200 with fake invoices (₹2250), fake contacts (John Doe /
+        // Jane Smith), fake billing — operators could act on rows that
+        // didn't exist on the server, and outage detection was impossible.
+        // Now: surface the real error so the UI's empty/error state shows.
+        return Promise.reject(error)
       }
       
       // For other HTTP errors (401, 403, 404, 500, etc.), let components handle them normally
