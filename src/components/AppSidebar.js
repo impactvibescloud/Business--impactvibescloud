@@ -3,11 +3,19 @@ import './AppSidebar.css';
 import { useSelector, useDispatch } from "react-redux";
 
 import {
-  CSidebar,
-  CSidebarBrand,
-  CSidebarNav,
-} from "@coreui/react";
-import CIcon from "@coreui/icons-react";
+  Drawer,
+  Box,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  IconButton,
+  Collapse,
+  Typography,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 
 import { AppSidebarNav } from "./AppSidebarNav";
 
@@ -16,7 +24,6 @@ import { sygnet } from "src/assets/brand/sygnet";
 
 import SimpleBar from "simplebar-react";
 import "simplebar/dist/simplebar.min.css";
-import { UserActivityStatus } from './index';
 import { getBusinessFeatures, filterNavigationByFeatures, filterNavigationByFeaturesMenu } from '../utils/featureCheck';
 
 // sidebar nav config
@@ -45,6 +52,7 @@ const AppSidebar = () => {
   const [userdata, setUserData] = useState(null);
   const [featuresMap, setFeaturesMap] = useState({});
   const [featuresMenu, setFeaturesMenu] = useState([]);
+  const [featuresLabels, setFeaturesLabels] = useState({});
   const [featuresLoading, setFeaturesLoading] = useState(false);
   const token = isAutheticated();
   // console.log("userDatt", userdata);
@@ -101,8 +109,10 @@ const AppSidebar = () => {
       // businessFeatures now: { featuresMap, featuresMenu }
       const map = businessFeatures.featuresMap || {};
       const menu = Array.isArray(businessFeatures.featuresMenu) ? businessFeatures.featuresMenu : [];
+      const labels = businessFeatures.featuresLabels || {};
       setFeaturesMap(map);
       setFeaturesMenu(menu);
+      setFeaturesLabels(labels);
       setFeaturesLoading(false);
       console.log('Business features loaded:', { map, menu });
     };
@@ -137,9 +147,9 @@ const AppSidebar = () => {
     // Step 2: Filter by business features (if features are loaded)
     if (!featuresLoading) {
       if (Array.isArray(featuresMenu) && featuresMenu.length > 0) {
-        filtered = filterNavigationByFeaturesMenu(filtered, featuresMenu, featuresMap);
-      } else if (Object.keys(featuresMap || {}).length > 0) {
-        filtered = filterNavigationByFeatures(filtered, featuresMap);
+        filtered = filterNavigationByFeaturesMenu(filtered, featuresMenu, featuresMap, featuresLabels);
+      } else if (Object.keys(featuresMap || {}).length > 0 || Object.keys(featuresLabels || {}).length > 0) {
+        filtered = filterNavigationByFeatures(filtered, featuresMap, featuresLabels);
       }
     }
 
@@ -169,6 +179,17 @@ const AppSidebar = () => {
       localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false');
     } catch (err) {}
   };
+
+  // Listen for header-initiated collapse toggle events (keeps behavior identical to sidebar head logo)
+  useEffect(() => {
+    const onToggle = () => {
+      const next = !collapsed;
+      setCollapsed(next);
+      try { localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false'); } catch (e) {}
+    };
+    window.addEventListener('toggleSidebarCollapsed', onToggle);
+    return () => window.removeEventListener('toggleSidebarCollapsed', onToggle);
+  }, [collapsed]);
 
   // Logo click handler: toggle sidebar unless user used a modifier or middle-click (allow navigation)
   const handleLogoClick = (e) => {
@@ -216,76 +237,76 @@ const AppSidebar = () => {
   }, []);
 
   //---------------------------//
+  const DRAWER_WIDTH = collapsed ? 80 : 250;
+
   return (
-    <CSidebar
-      position="fixed"
-      unfoldable={unfoldableFlag}
-      visible={visibleFlag}
-      className={collapsed ? 'c-sidebar c-sidebar-minimized' : 'c-sidebar'}
-      style={{ background: '#FFFFFF', backgroundImage: 'none' }}
-      onVisibleChange={(visible) => {
-        // Prevent redundant dispatches/loops: only update store when value actually changed.
-        const newVisible = Boolean(visible)
-        if (newVisible === visibleFlag) return
-        try {
-          dispatch({ type: "set", payload: { sidebarShow: newVisible } });
-        } catch (e) {
-          console.warn('Failed to dispatch sidebar visibility change', e)
-        }
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: DRAWER_WIDTH,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: DRAWER_WIDTH,
+          boxSizing: 'border-box',
+          backgroundColor: '#ffffff',
+          borderRight: '1px solid #e5e7eb',
+          transition: 'width 0.3s ease',
+          overflowX: 'hidden',
+        },
       }}
     >
-      <CSidebarBrand className="d-none d-md-flex sidebar-brand" style={{ padding: 0, height: 56 }}>
-        <div className="sidebar-brand-inner" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link
-              to="/dashboard"
-              className="sidebar-logo"
-              aria-label="Go to dashboard"
-              onClick={(e) => handleLogoClick(e)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
-            >
-              <img src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'} alt="Just Connect" style={{ width: 44, height: 44, objectFit: 'contain' }} />
-            </Link>
-            <button
-              className="sidebar-title"
-              onClick={(e) => { e.preventDefault(); handleToggle(); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}
-              aria-pressed={collapsed}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              <div className="sidebar-title-main"><span style={{ color: '#0760c7ff' }}>just</span><span style={{ marginLeft: 6, color: '#f97316' }}>Connect</span></div>
-              <div className="sidebar-title-sub">Enterprise Conversations Simplified</div>
-            </button>
-          </div>
+      {/* Sidebar Header / Brand.
+          Height (48px) is locked to match `.jc-header` so the bottom border
+          of this section lines up with the bottom of the top bar — otherwise
+          the brand block overhangs the topbar by ~22px. */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '4px 0' : '4px 12px',
+          borderBottom: '1px solid #e5e7eb',
+          height: '48px',
+          minHeight: '48px',
+          boxSizing: 'border-box',
+          flexShrink: 0,
+        }}
+      >
+        <Link
+          to="/dashboard"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: collapsed ? 0 : '8px',
+            textDecoration: 'none',
+            flex: collapsed ? '0 0 auto' : 1,
+            cursor: 'pointer',
+          }}
+          onClick={(e) => handleLogoClick(e)}
+        >
+          <img
+            src={AdminlogoUrl ? `${AdminlogoUrl}` : '/logos/sidebarlogo.ico'}
+            alt="Just Connect"
+            style={{ width: 36, height: 36, objectFit: 'contain', display: 'block' }}
+          />
+          {!collapsed && (
+            <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <Box sx={{ display: 'flex', gap: '0', alignItems: 'baseline' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0760c7', fontSize: '0.9rem', margin: 0, lineHeight: 1.1 }}>just</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f97316', fontSize: '0.9rem', margin: 0, lineHeight: 1.1 }}>Connect</Typography>
+              </Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#6b7280', fontSize: '0.6rem', lineHeight: 1.1 }}>Enterprise Conversations Simplified</Typography>
+            </Box>
+          )}
+        </Link>
+      </Box>
 
-          <button
-            className="sidebar-toggle-btn"
-            onClick={() => { const next = !collapsed; setCollapsed(next); try { localStorage.setItem('sidebar-collapsed', next ? 'true' : 'false'); } catch (e) {} }}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <span className="sidebar-toggle-icon" aria-hidden>{'›'}</span>
-          </button>
-        </div>
-      </CSidebarBrand>
-      <CSidebarNav>
-        <SimpleBar>
-          <AppSidebarNav items={navigationItem} />
-        </SimpleBar>
-      </CSidebarNav>
-      {/* Sidebar footer: user/profile + status (fixed at bottom) */}
-      {/* Divider to separate main nav from bottom menu */}
-      <div className="sidebar-divider" aria-hidden />
-
-      <div className="sidebar-footer p-2">
-        <div className="sidebar-footer-inner" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Unified user chip: combined avatar, status dot, status controls and settings */}
-          <div className="sidebar-user-status">
-            <UserActivityStatus />
-          </div>
-        </div>
-      </div>
-    </CSidebar>
+      {/* Sidebar Navigation */}
+      <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
+        <AppSidebarNav items={navigationItem} collapsed={collapsed} />
+      </Box>
+    </Drawer>
   );
 };
 

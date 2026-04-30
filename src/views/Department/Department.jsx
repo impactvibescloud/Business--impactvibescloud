@@ -1,37 +1,51 @@
 import React, { useState, useEffect } from 'react'
 import {
-  CCard,
-  CCardBody,
-  CCol,
-  CRow,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CButton,
-  CInputGroup,
-  CFormInput,
-  CPagination,
-  CPaginationItem,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CForm,
-  CFormLabel,
-  CFormSelect,
-  CSpinner,
-  CAlert,
-  CBadge
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilPlus, cilSearch, cilPencil, cilTrash, cilBuilding } from '@coreui/icons'
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  IconButton,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  FormControlLabel,
+  Checkbox,
+  CircularProgress,
+  Alert,
+  Grid,
+  Collapse,
+  Pagination,
+  InputAdornment
+} from '@mui/material'
+import AddIcon from '@mui/icons-material/Add'
+import SearchIcon from '@mui/icons-material/Search'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import BusinessIcon from '@mui/icons-material/Business'
+import axios from 'axios'
+import Swal from 'sweetalert2'
+import SyncIcon from '@mui/icons-material/Sync'
 import { apiCall, ENDPOINTS, API_CONFIG, getBaseURL } from '../../config/api'
 import { errorLog } from '../../utils/logger'
 import './Department.css'
+import '../Leads/CallLogsWebpage.css'
+import { useAuth } from '../../context/authContext'
 
 // Helper function to get API URL
 const getApiUrl = () => {
@@ -59,77 +73,51 @@ function Department() {
   const [businessName, setBusinessName] = useState('')
   const [availableAgents, setAvailableAgents] = useState([])
   const [availableBranches, setAvailableBranches] = useState([])
+  const [didNumbers, setDidNumbers] = useState([])
+  const [syncingMap, setSyncingMap] = useState({})
   const [selectedMemberIds, setSelectedMemberIds] = useState([]) // For multi-select UI
   const [selectedDepartmentHeadBranchId, setSelectedDepartmentHeadBranchId] = useState('') // For department head dropdown UI
+  const [showViewDialog, setShowViewDialog] = useState(false)
+  const [viewDepartment, setViewDepartment] = useState(null)
   const [formData, setFormData] = useState({
     businessId: '',
     name: '',
     description: '',
     status: 'active', // Changed from 'Active' to 'active' to match API
     departmentHead: '', // User ID of department head
-    didNumber: '', // didNumber of department head
-    members: [] // Array of member objects {userId, phone, role}
+    didNumber: '', // legacy single DID — mirrored from didNumbers[0]
+    didNumbers: [], // multiple DIDs assignable to this department
+    members: [], // Array of member objects {userId, phone, role}
+    default: false // Boolean flag for default department
   })
 
-  // Get current user's business ID and fetch business details
+  // Get current businessId from Auth context or localStorage and initialize
+  const { businessId: authBusinessId } = useAuth();
+
   useEffect(() => {
-    const getCurrentUser = async () => {
-      try {
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          const userResponse = await fetch('/api/v1/user/details', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await userResponse.json();
-          if (data?.user?.businessId) {
-            setCurrentBusinessId(data.user.businessId);
-            setFormData(prev => ({
-              ...prev,
-              businessId: data.user.businessId
-            }));
-            // Fetch business details to get business name
-            await fetchBusinessDetails(data.user.businessId);
-            // Fetch available agents/branches
-            await fetchAvailableAgents(data.user.businessId);
-          } else {
-            // If user details don't have businessId, try to get it from localStorage
-            const storedBusinessId = localStorage.getItem('businessId');
-            if (storedBusinessId) {
-              setCurrentBusinessId(storedBusinessId);
-              setFormData(prev => ({
-                ...prev,
-                businessId: storedBusinessId
-              }));
-              await fetchBusinessDetails(storedBusinessId);
-              await fetchAvailableAgents(storedBusinessId);
-            } else {
-              // Use fallback ID if nothing else works
-              const fallbackId = '64f7b1234567890abcdef123';
-              setCurrentBusinessId(fallbackId);
-              setFormData(prev => ({
-                ...prev,
-                businessId: fallbackId
-              }));
-              await fetchBusinessDetails(fallbackId);
-              await fetchAvailableAgents(fallbackId);
-            }
-          }
+    const initBusiness = async () => {
+      const id = authBusinessId || localStorage.getItem('businessId') || '';
+      if (id) {
+        setCurrentBusinessId(id);
+        setFormData(prev => ({ ...prev, businessId: id }));
+        try {
+          await fetchBusinessDetails(id);
+        } catch (e) {
+          errorLog('Error fetching business details during init:', e);
         }
-      } catch (error) {
-        errorLog('Error fetching user details:', error);
-        // Fallback to default businessId
-        const fallbackId = '64f7b1234567890abcdef123';
-        setCurrentBusinessId(fallbackId);
-        setBusinessName('My Business');
-        setFormData(prev => ({
-          ...prev,
-          businessId: fallbackId
-        }));
-        await fetchAvailableAgents(fallbackId);
+        try {
+          await fetchAvailableAgents(id);
+        } catch (e) {
+          errorLog('Error fetching agents during init:', e);
+        }
+      } else {
+        // No businessId available from context or localStorage; show a neutral state
+        setBusinessName('Business not found');
+        console.warn('No businessId available from Auth context or localStorage');
       }
-    };
-    getCurrentUser();
-  }, [])
+    }
+    initBusiness()
+  }, [authBusinessId])
 
   const fetchBusinessDetails = async (businessId) => {
     try {
@@ -188,17 +176,26 @@ function Department() {
         console.log('No branch data found, using empty array');
       }
       if (branchData.length > 0) {
-        branchData = branchData.map(branch => ({
-          _id: branch._id || branch.id || `branch-${Math.random().toString(36).substring(2, 9)}`,
-          id: branch.id || branch._id || `branch-${Math.random().toString(36).substring(2, 9)}`,
-          branchName: branch.branchName || branch.name || 'Unnamed Branch',
-          name: branch.name || branch.branchName || 'Unnamed Branch',
-          // didNumbers is an array, so we take the first one or empty string
-          didNumber: (branch.didNumbers && branch.didNumbers.length > 0) ? branch.didNumbers[0] : (branch.didNumber || branch.did || ''),
-          userId: branch.user?._id || branch.user?.id || branch.userId || '',
-          phone: branch.user?.phone || branch.phone || '',
-          role: 'branch' // Default role for branch members
-        }));
+        branchData = branchData.map(branch => {
+          const _id = branch._id || branch.id || `branch-${Math.random().toString(36).substring(2, 9)}`
+          const id = branch.id || branch._id || `branch-${Math.random().toString(36).substring(2, 9)}`
+          const branchName = branch.branchName || branch.name || 'Unnamed Branch'
+          const name = branch.name || branch.branchName || 'Unnamed Branch'
+          const didNumber = (branch.didNumbers && branch.didNumbers.length > 0) ? branch.didNumbers[0] : (branch.didNumber || branch.did || '')
+          const userId = branch.user?._id || branch.user?.id || branch.userId || ''
+          const phone = branch.user?.phone || branch.phone || ''
+          return {
+            ...branch,
+            _id,
+            id,
+            branchName,
+            name,
+            didNumber,
+            userId,
+            phone,
+            role: 'branch'
+          }
+        });
         console.log('Processed branch data with user info:', branchData);
       }
       setAvailableBranches(branchData);
@@ -253,8 +250,22 @@ function Department() {
   useEffect(() => {
     if (currentBusinessId) {
       fetchDepartments()
+      fetchDidNumbers()
     }
   }, [currentBusinessId])
+
+  const fetchDidNumbers = async () => {
+    try {
+      if (!currentBusinessId) return
+      const res = await apiCall(`/numbers/assigned-to/${currentBusinessId}`, 'GET')
+      const list = res?.data || res?.numbers || res || []
+      const mapped = (Array.isArray(list) ? list : []).map(d => ({ id: d._id || d.id, number: d.number }))
+      setDidNumbers(mapped)
+    } catch (err) {
+      console.error('Error fetching DID numbers:', err)
+      setDidNumbers([])
+    }
+  }
 
   const fetchDepartments = async () => {
     setLoading(true)
@@ -361,13 +372,15 @@ function Department() {
     setSelectedMemberIds([])
     setSelectedDepartmentHeadBranchId('')
     setFormData({
-      businessId: currentBusinessId || '64f7b1234567890abcdef123',
+      businessId: currentBusinessId || '',
       name: '',
       description: '',
-      status: 'active', // Default to active for new departments
+      status: 'active',
       departmentHead: '',
       didNumber: '',
-      members: []
+      didNumbers: [],
+      members: [],
+      default: false
     })
     setShowDepartmentModal(true)
   }
@@ -396,33 +409,40 @@ function Department() {
         didNumber: selectedBranch?.didNumber || ''
       }))
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }))
+      // If the user is editing the department "name", prevent spaces
+      // and convert them automatically to underscores. Allow '-' and '_'.
+      if (name === 'name') {
+        const normalized = (value || '').replace(/\s+/g, '_')
+        setFormData(prev => ({
+          ...prev,
+          [name]: normalized
+        }))
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: value
+        }))
+      }
     }
   }
 
-  // Handle multiple members selection
+  // Handle multiple members selection (MUI Select returns array of selected values)
   const handleMembersChange = (e) => {
-    const options = e.target.options
+    const values = Array.isArray(e.target.value) ? e.target.value : []
     const selectedMembers = []
     const selectedIds = []
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        const branchId = options[i].value
-        selectedIds.push(branchId)
-        // Find the full branch object to get userId, phone, and role
-        const branch = availableBranches.find(b => (b._id === branchId || b.id === branchId))
-        if (branch) {
-          selectedMembers.push({
-            userId: branch.userId || branch._id || branch.id,
-            phone: branch.phone || branch.didNumber || '',
-            role: branch.role || 'branch'
-          })
-        }
+    values.forEach(branchId => {
+      selectedIds.push(branchId)
+      const branch = availableBranches.find(b => (b._id === branchId || b.id === branchId))
+      if (branch) {
+        selectedMembers.push({
+          userId: branch.userId || branch._id || branch.id,
+          phone: branch.phone || branch.didNumber || '',
+          didNumber: branch.didNumber || branch.did || '',
+          role: branch.role || 'branch'
+        })
       }
-    }
+    })
     console.log('Selected members:', selectedMembers)
     setSelectedMemberIds(selectedIds)
     setFormData(prev => ({
@@ -470,17 +490,47 @@ function Department() {
     }
     
     setSelectedMemberIds(memberIds)
+    // Normalize members to ensure didNumber is included where possible
+    const normalizedMembers = (department.members && Array.isArray(department.members)) ? department.members.map(m => {
+      const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
+      return {
+        userId: m.userId || m.user || m._id || '',
+        phone: m.phone || (matchingBranch && (matchingBranch.phone || matchingBranch.didNumber)) || '',
+        didNumber: m.didNumber || (matchingBranch && (matchingBranch.didNumber || matchingBranch.did)) || '',
+        role: m.role || 'branch',
+        _id: m._id || m.id || undefined
+      }
+    }) : []
+
+    // Hydrate didNumbers[] from the department doc. Prefer didNumbers (new),
+    // fall back to didNumber (legacy single).
+    const incomingDids = Array.isArray(department.didNumbers) && department.didNumbers.length
+      ? department.didNumbers
+      : (department.didNumber ? [department.didNumber] : []);
+    const didList = Array.from(new Set(incomingDids.map(String).filter(Boolean)));
+
     setFormData({
-      businessId: department.businessId || currentBusinessId || '64f7b1234567890abcdef123',
+      businessId: department.businessId || currentBusinessId || '',
       name: department.name,
       description: department.description,
       status: department.status || 'active',
-      // Keep the userId in formData for API
       departmentHead: departmentHeadUserId || '',
-      didNumber: department.didNumber || '',
-      members: department.members || []
+      didNumber: didList[0] || '',
+      didNumbers: didList,
+      members: normalizedMembers,
+      default: department.default || false,
     })
     setShowDepartmentModal(true)
+  }
+
+  const handleViewDepartment = (department) => {
+    setViewDepartment(department)
+    setShowViewDialog(true)
+  }
+
+  const handleCloseViewDialog = () => {
+    setShowViewDialog(false)
+    setViewDepartment(null)
   }
 
   const handleDeleteConfirm = (id) => {
@@ -562,15 +612,43 @@ function Department() {
         'Authorization': token ? `Bearer ${token}` : ''
       };
       
-      // Prepare department data
+      // Normalize department name (convert spaces to underscores) to enforce no-space rule
+      const normalizedName = (formData.name || '').replace(/\s+/g, '_')
+      // Ensure formData reflects normalized name (keeps UI in sync)
+      if (normalizedName !== formData.name) {
+        setFormData(prev => ({ ...prev, name: normalizedName }))
+      }
+
+      // Prepare department data and ensure each member has didNumber
+      const normalizedMembers = (formData.members && Array.isArray(formData.members)) ? formData.members.map(m => {
+        const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
+        return {
+          userId: m.userId || m._id || m.id || '',
+          phone: m.phone || (matchingBranch && (matchingBranch.phone || matchingBranch.didNumber)) || '',
+          didNumber: m.didNumber || (matchingBranch && (matchingBranch.didNumber || matchingBranch.did)) || '',
+          role: m.role || 'branch'
+        }
+      }) : []
+
+      // Build the canonical didNumbers[] from the multi-select value, falling
+      // back to the legacy singular `didNumber` if the form pre-dates the
+      // multi field. The first entry is mirrored to didNumber for legacy.
+      const didList = (Array.isArray(formData.didNumbers) && formData.didNumbers.length
+        ? formData.didNumbers
+        : (formData.didNumber ? [formData.didNumber] : [])
+      ).map(String).filter(Boolean);
+      const dedupedDids = Array.from(new Set(didList));
+
       const departmentData = {
         businessId: formData.businessId,
-        name: formData.name,
+        name: normalizedName,
         description: formData.description,
         status: formData.status,
         departmentHead: formData.departmentHead,
-        didNumber: formData.didNumber,
-        members: formData.members // Array of {userId, phone, role} objects
+        didNumber: dedupedDids[0] || '',
+        didNumbers: dedupedDids,
+        members: normalizedMembers,
+        default: formData.default,
       };
       
       console.log('Department data being sent:', JSON.stringify(departmentData, null, 2));
@@ -589,12 +667,14 @@ function Department() {
         response = await axios.default.put(
           `${baseUrl}/api/departments/${departmentId}`,
           {
-            name: formData.name,
+            name: normalizedName,
             description: formData.description,
             status: formData.status,
             departmentHead: formData.departmentHead,
-            didNumber: formData.didNumber,
-            members: formData.members
+            didNumber: departmentData.didNumber,
+            didNumbers: departmentData.didNumbers,
+            members: departmentData.members,
+            default: formData.default,
           },
           { headers }
         );
@@ -674,6 +754,139 @@ function Department() {
     }
   }
 
+  const syncDepartmentDid = async (department) => {
+    // mark syncing
+    setSyncingMap(prev => ({ ...prev, [department._id || department.id]: true }))
+    if (!department?.didNumber) {
+      Swal.fire('No DID assigned', 'Please assign a DID to this department first.', 'warning')
+      setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+      return
+    }
+
+    try {
+      if (!didNumbers || didNumbers.length === 0) await fetchDidNumbers()
+      const didObj = (didNumbers || []).find(d => String(d.number) === String(department.didNumber) || String(d.id) === String(department.didNumber) || String(d._id) === String(department.didNumber))
+      if (!didObj) {
+        Swal.fire('DID not found', 'Department DID is not available in your DID list.', 'error')
+        return
+      }
+      const didId = didObj.id || didObj._id
+
+      const branchTargets = []
+      const addBranchTarget = (branch) => {
+        if (branch && branch._id && !branchTargets.some((b) => String(b._id) === String(branch._id))) {
+          branchTargets.push(branch)
+        }
+      }
+      if (Array.isArray(department.members) && department.members.length) {
+        department.members.forEach(m => {
+          const memberUserId = m.userId || m.user || m._id || m.id
+          const branch = availableBranches.find(b => String(b.userId) === String(memberUserId) || String(b._id) === String(memberUserId) || String(b.id) === String(memberUserId) || String(b.didNumber) === String(m.didNumber))
+          addBranchTarget(branch)
+        })
+      }
+
+      // Also include department head's branch if present
+      const departmentHeadUserId = typeof department.departmentHead === 'object' ? (department.departmentHead._id || department.departmentHead.id) : department.departmentHead
+      const headBranch = availableBranches.find(b => String(b.userId) === String(departmentHeadUserId))
+      addBranchTarget(headBranch)
+
+      if (branchTargets.length === 0) {
+        Swal.fire('No agents found', 'Could not identify any agents to assign the DID to.', 'info')
+        return
+      }
+
+      const confirm = await Swal.fire({ title: 'Sync DID', html: `Assign DID <b>${department.didNumber}</b> to <b>${branchTargets.length}</b> agents?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, sync' })
+      if (!confirm.isConfirmed) return
+
+      const departmentDid = String(department.didNumber).trim()
+      const resolveBranchExtension = async (branch) => {
+        const assigned = Array.isArray(branch.assignedNumbers) ? branch.assignedNumbers : []
+        const assignedExt = assigned.find(n => n?.extensionNumber)?.extensionNumber
+        if (assignedExt) return String(assignedExt)
+
+        const direct = branch.extension || branch.extensionNumber || branch.sip_endpoint || branch.ext
+        if (direct) return String(direct)
+
+        const branchDids = Array.isArray(branch.didNumbers)
+          ? branch.didNumbers
+          : (branch.didNumber ? [branch.didNumber] : [])
+        const candidates = [
+          ...branchDids.filter(d => String(d) !== departmentDid),
+          ...branchDids.filter(d => String(d) === departmentDid),
+        ]
+
+        for (const did of candidates) {
+          try {
+            const res = await apiCall(`/api/v1/numbers/business/by-number/${encodeURIComponent(did)}`, 'GET')
+            const data = res?.data || res
+            const ext = data?.extension_number || data?.extension || data?.sip_endpoint || data?.extensionNumber || data?.ext
+            if (ext) return String(ext)
+          } catch (err) {
+            console.warn('Failed to resolve extension for branch DID', did, err)
+          }
+        }
+        return null
+      }
+
+      // Append the department DID to each branch and create a per-agent
+      // NumberAssignment for that branch's own SIP extension. The shared DID
+      // must not replace the agent's primary DID, because the dialer uses the
+      // primary DID/extension to register SIP.
+      const failed = []
+
+      for (const branch of branchTargets) {
+        const branchId = branch._id
+        try {
+          const existingDids = Array.isArray(branch.didNumbers)
+            ? branch.didNumbers.map(d => String(d).trim()).filter(Boolean)
+            : (branch.didNumber ? [String(branch.didNumber).trim()] : [])
+          const nextDids = existingDids.includes(departmentDid)
+            ? existingDids
+            : [...existingDids, departmentDid]
+          const extension = await resolveBranchExtension(branch)
+
+          await apiCall(`/branch/edit/${branchId}`, 'PATCH', {
+            didNumbers: nextDids,
+            ...(extension ? { extension } : {}),
+          })
+
+          if (extension) {
+            await apiCall(`/numbers/${didId}/assign`, 'POST', {
+              extensionNumber: extension,
+              assignedToBranch: branchId,
+              assignedToBusiness: currentBusinessId,
+            })
+          } else {
+            console.warn('Could not resolve branch extension for department DID sync', branchId)
+          }
+        } catch (err) {
+          console.warn('Failed to update branch DID', branchId, err)
+          failed.push(branchId)
+        }
+      }
+
+      // refresh branches and DID lists so UI reflects changes
+      try {
+        await fetchAvailableAgents(currentBusinessId)
+        await fetchDepartments()
+        await fetchDidNumbers()
+      } catch (e) {
+        console.warn('Failed to refresh data after sync', e)
+      }
+
+      if (failed.length === 0) Swal.fire('Synced', 'All agents updated successfully', 'success')
+      else Swal.fire('Partial sync', `${branchTargets.length - failed.length} succeeded, ${failed.length} failed`, 'warning')
+
+      setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+
+    } catch (err) {
+      console.error('syncDepartmentDid error', err)
+      Swal.fire('Error', 'Sync failed: ' + (err.message || 'Unknown error'), 'error')
+      setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+    }
+  }
+
   const filteredDepartments = departments.filter(dept =>
     dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (dept.description && dept.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -692,9 +905,8 @@ function Department() {
 
   const getStatusBadge = (status) => {
     const normalizedStatus = status?.toLowerCase() || 'inactive'
-    const color = normalizedStatus === 'active' ? 'success' : 'secondary'
     const displayStatus = normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1)
-    return <CBadge color={color}>{displayStatus}</CBadge>
+    return <Chip label={displayStatus} color={normalizedStatus === 'active' ? 'success' : 'default'} size="small" />
   }
 
   // Helper function to get department head name from branches
@@ -726,303 +938,264 @@ function Department() {
   }
 
   return (
-    <div className="contact-list-container">
+    <Box className="contact-list-container page-container" sx={{ p: 2 }}>
       {successAlert.show && (
-        <CAlert color="success" dismissible onClose={() => setSuccessAlert({ show: false, message: '' })}>
-          {successAlert.message}
-        </CAlert>
+        <Alert severity="success" onClose={() => setSuccessAlert({ show: false, message: '' })} sx={{ mb: 2 }}>{successAlert.message}</Alert>
       )}
-      
-      <CCard className="mb-4">
-        <CCardBody>
-          <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
-              <h1 className="contact-list-title">Department Management</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-              <CButton color="primary" className="add-contact-btn" onClick={handleNewDepartment}>
-                <CIcon icon={cilPlus} className="me-2" />
-                New Department
-              </CButton>
-            </CCol>
-          </CRow>
-          
-          <CRow className="mb-4">
-            <CCol md={6}>
-              <CInputGroup>
-                <CFormInput
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                Departments
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                Create and manage departments
+              </Typography>
+            </Box>
+          </Box>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+                <TextField
                   placeholder="Search departments..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  size="small"
+                  fullWidth
+                  InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small"/></InputAdornment>) }}
                 />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </CCol>
-          </CRow>
+              </Box>
+              <Box>
+                <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleNewDepartment} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>New Department</Button>
+              </Box>
+            </Box>
 
-          <CTable hover responsive className="contact-table">
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>DEPARTMENT NAME</CTableHeaderCell>
-                <CTableHeaderCell>DESCRIPTION</CTableHeaderCell>
-                <CTableHeaderCell>DEPARTMENT HEAD</CTableHeaderCell>
-                <CTableHeaderCell>DID NUMBER</CTableHeaderCell>
-                <CTableHeaderCell>MEMBERS</CTableHeaderCell>
-                <CTableHeaderCell>STATUS</CTableHeaderCell>
-                <CTableHeaderCell>ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {loading ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <CSpinner color="primary" />
-                    <div className="mt-3">Loading departments...</div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : currentDepartments.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilBuilding} size="xl" />
+          <TableContainer component={Paper} className="calllogs-table-container">
+            <Table size="small" className="compact-table" sx={{ minWidth: 700 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>S.NO</TableCell>
+                  <TableCell>DEPARTMENT NAME</TableCell>
+                  <TableCell>HEAD</TableCell>
+                  <TableCell>DID NUMBER</TableCell>
+                  <TableCell>MEMBERS</TableCell>
+                  <TableCell>STATUS</TableCell>
+                  <TableCell>DEFAULT</TableCell>
+                  <TableCell align="center">ACTIONS</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <CircularProgress />
+                      <div className="mt-3">Loading departments...</div>
+                    </TableCell>
+                  </TableRow>
+                ) : currentDepartments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <div className="empty-state">
+                        <div className="empty-state-icon"><BusinessIcon sx={{ fontSize: 40 }} /></div>
+                        <Typography variant="h6">No departments found</Typography>
+                        <Typography variant="body2">Create your first department to get started.</Typography>
+                        <Button variant="contained" sx={{ mt: 2 }} onClick={handleNewDepartment}>Create Department</Button>
                       </div>
-                      <h4>No departments found</h4>
-                      <p>Create your first department to get started.</p>
-                      <CButton color="primary" className="mt-3" onClick={handleNewDepartment}>
-                        Create Department
-                      </CButton>
-                    </div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                currentDepartments.map((department, index) => (
-                  <CTableRow key={department.id || department._id}>
-                    <CTableDataCell>
-                      <div className="contact-number">{indexOfFirstItem + index + 1}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-name">{department.name}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-phone">{department.description || 'No description'}</div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-name">
-                        {getDepartmentHeadName(department)}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <div className="contact-phone">
-                        {getDepartmentHeadDidNumber(department)}
-                      </div>
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge color="info">
-                        {department.members && Array.isArray(department.members) ? department.members.length : 0} Members
-                      </CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell>{getStatusBadge(department.status)}</CTableDataCell>
-                    <CTableDataCell>
-                      <CButton
-                        color="info"
-                        variant="ghost"
-                        size="sm"
-                        className="me-2"
-                        onClick={() => handleEdit(department)}
-                      >
-                        <CIcon icon={cilPencil} />
-                      </CButton>
-                      <CButton
-                        color="danger"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteConfirm(department.id || department._id)}
-                      >
-                        <CIcon icon={cilTrash} />
-                      </CButton>
-                    </CTableDataCell>
-                  </CTableRow>
-                ))
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentDepartments.map((department, index) => (
+                      <TableRow key={department.id || department._id} hover>
+                      <TableCell>{indexOfFirstItem + index + 1}</TableCell>
+                      <TableCell>{department.name}</TableCell>
+                      <TableCell>{getDepartmentHeadName(department)}</TableCell>
+                      <TableCell>{getDepartmentHeadDidNumber(department)}</TableCell>
+                      <TableCell><Chip label={`${department.members && Array.isArray(department.members) ? department.members.length : 0} Members`} size="small" /></TableCell>
+                      <TableCell>{getStatusBadge(department.status)}</TableCell>
+                      <TableCell>{department.default ? <Chip label="Default" size="small" color="primary" variant="filled" /> : '-'}</TableCell>
+                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+                          {syncingMap[department._id || department.id] ? (
+                            <CircularProgress size={20} />
+                          ) : (
+                            <IconButton size="small" color="info" onClick={(e) => { e.stopPropagation(); syncDepartmentDid(department); }} title="Sync DID"><SyncIcon fontSize="small" /></IconButton>
+                          )}
+                          <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); handleViewDepartment(department); }} title="View Department"><VisibilityIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEdit(department); }} title="Edit Department"><EditIcon fontSize="small"/></IconButton>
+                          <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteConfirm(department.id || department._id); }} title="Delete Department"><DeleteIcon fontSize="small"/></IconButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+              </Table>
+              {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Pagination count={totalPages} page={currentPage} onChange={(e, page) => handlePageChange(page)} color="primary" />
+                </Box>
               )}
-            </CTableBody>
-          </CTable>
+            </TableContainer>
+        </CardContent>
+      </Card>
 
-          {totalPages > 1 && (
-            <CPagination 
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
-                onClick={() => handlePageChange(currentPage - 1)}
+      {/* Add/Edit Department Dialog */}
+      <Dialog open={showDepartmentModal} onClose={handleCloseModal} maxWidth="md" fullWidth>
+        <DialogTitle>{editingDepartment ? 'Edit Department' : 'Add New Department'}</DialogTitle>
+        <DialogContent dividers>
+          {validationError && <Alert severity="error" sx={{ mb: 2 }}>{validationError}</Alert>}
+          <Box component="form" sx={{ display: 'grid', gap: 2 }}>
+            <TextField name="name" label="Department Name" value={formData.name} onChange={handleInputChange} fullWidth />
+            <TextField name="description" label="Description" value={formData.description} onChange={handleInputChange} fullWidth />
+            <TextField label="Business" value={businessName} disabled fullWidth />
+            <FormControl fullWidth>
+              <InputLabel id="department-head-label">Head</InputLabel>
+              <Select labelId="department-head-label" name="departmentHead" value={selectedDepartmentHeadBranchId || ''} label="Head" onChange={handleInputChange}>
+                <MenuItem value=""><em>Select Head</em></MenuItem>
+                {availableBranches.map(branch => (
+                  <MenuItem key={branch._id || branch.id} value={branch._id || branch.id}>{branch.branchName || branch.name}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant="caption" color="text.secondary">Select the branch that will head this department</Typography>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="members-label">Department Members</InputLabel>
+              <Select labelId="members-label" multiple value={selectedMemberIds} onChange={handleMembersChange} renderValue={(selected) => `${selected.length} selected`}>
+                {availableBranches.map(branch => (
+                  <MenuItem key={branch._id || branch.id} value={branch._id || branch.id}>{branch.branchName || branch.name}{branch.didNumber ? ` (${branch.didNumber})` : ''}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant="caption" color="text.secondary">Hold Ctrl (Cmd on Mac) to select multiple members</Typography>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel id="department-did-label">Department DIDs</InputLabel>
+              <Select
+                labelId="department-did-label"
+                multiple
+                value={Array.isArray(formData.didNumbers) ? formData.didNumbers : []}
+                label="Department DIDs"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const arr = (typeof v === 'string' ? v.split(',') : v).filter(Boolean);
+                  setFormData((prev) => ({
+                    ...prev,
+                    didNumbers: arr,
+                    didNumber: arr[0] || '',
+                  }));
+                }}
+                renderValue={(selected) => selected.join(', ')}
               >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
-                  onClick={() => handlePageChange(i + 1)}
-                >
-                  {i + 1}
-                </CPaginationItem>
-              ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
-          )}
-        </CCardBody>
-      </CCard>
+                {didNumbers.map((d) => (
+                  <MenuItem key={d.id || d.number} value={d.number}>{d.number}</MenuItem>
+                ))}
+              </Select>
+              <Typography variant="caption" color="text.secondary">
+                Assign one or more DIDs to this department. Inbound calls to any of these reach the same routing logic.
+              </Typography>
+            </FormControl>
 
-      {/* Add/Edit Department Modal */}
-      <CModal visible={showDepartmentModal} onClose={handleCloseModal}>
-        <CModalHeader>
-          <CModalTitle>
-            {editingDepartment ? 'Edit Department' : 'Add New Department'}
-          </CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {validationError && (
-            <CAlert color="danger" className="mb-3">
-              {validationError}
-            </CAlert>
-          )}
-          <CForm>
-            <div className="mb-3">
-              <CFormLabel>Department Name</CFormLabel>
-              <CFormInput
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Enter department name"
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Description</CFormLabel>
-              <CFormInput
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Enter department description"
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Business</CFormLabel>
-              <CFormInput
-                value={businessName}
-                placeholder="Business name"
-                disabled
-              />
-              <small className="text-muted">This is automatically set based on your current business</small>
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Department Head</CFormLabel>
-              {availableBranches.length > 0 ? (
-                <CFormSelect
-                  name="departmentHead"
-                  value={selectedDepartmentHeadBranchId}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Select Department Head</option>
-                  {availableBranches.map(branch => (
-                    <option key={branch._id || branch.id} value={branch._id || branch.id}>
-                      {branch.branchName || branch.name}
-                    </option>
-                  ))}
-                </CFormSelect>
-              ) : (
-                <CFormInput value="Loading branches..." disabled />
-              )}
-              <small className="text-muted">Select the branch that will head this department</small>
-            </div>
-            <div className="mb-3">
-              <CFormLabel>Department Members</CFormLabel>
-              {availableBranches.length > 0 ? (
-                <select
-                  multiple
-                  className="form-select"
-                  value={selectedMemberIds}
-                  onChange={handleMembersChange}
-                  style={{ minHeight: '150px' }}
-                >
-                  {availableBranches.map(branch => (
-                    <option key={branch._id || branch.id} value={branch._id || branch.id}>
-                      {branch.branchName || branch.name} {branch.didNumber ? `(${branch.didNumber})` : ''}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <CFormInput value="Loading branches..." disabled />
-              )}
-              <small className="text-muted">Hold Ctrl (Cmd on Mac) to select multiple members</small>
-            </div>
+            <FormControlLabel
+              control={<Checkbox name="default" checked={formData.default} onChange={(e) => setFormData({ ...formData, default: e.target.checked })} />}
+              label="Set as Default Department"
+            />
+
             {editingDepartment && (
-              <div className="mb-3">
-                <CFormLabel>Status</CFormLabel>
-                <CFormSelect
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </CFormSelect>
-              </div>
+              <FormControl fullWidth>
+                <InputLabel id="status-label">Status</InputLabel>
+                <Select labelId="status-label" name="status" value={formData.status} label="Status" onChange={handleInputChange}>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
             )}
-          </CForm>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseModal}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSaveDepartment}>
-            {editingDepartment ? 'Update' : 'Save'} Department
-          </CButton>
-        </CModalFooter>
-      </CModal>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseModal}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveDepartment} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>{editingDepartment ? 'Update' : 'Save'} Department</Button>
+        </DialogActions>
+      </Dialog>
 
-      {/* Delete Confirmation Modal */}
-      <CModal visible={showDeleteModal} onClose={handleDeleteCancel}>
-        <CModalHeader>
-          <CModalTitle>Confirm Delete</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          {deleteError && (
-            <CAlert color="danger" className="mb-3">
-              {deleteError}
-            </CAlert>
-          )}
-          {deleteSuccess ? (
-            <CAlert color="success" className="mb-3">
-              Department deleted successfully!
-            </CAlert>
-          ) : (
-            <p>Are you sure you want to delete this department? This action cannot be undone.</p>
-          )}
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleDeleteCancel} disabled={isDeleting}>
-            Cancel
-          </CButton>
-          <CButton 
-            color="danger" 
-            onClick={handleDelete} 
-            disabled={isDeleting || deleteSuccess}
-          >
-            {isDeleting ? <CSpinner size="sm" className="me-2" /> : null}
-            Delete
-          </CButton>
-        </CModalFooter>
-      </CModal>
-    </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteModal} onClose={handleDeleteCancel}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent dividers>
+          {deleteError && <Alert severity="error" sx={{ mb: 2 }}>{deleteError}</Alert>}
+          {deleteSuccess ? <Alert severity="success">Department deleted successfully!</Alert> : <Typography>Are you sure you want to delete this department? This action cannot be undone.</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={isDeleting}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={handleDelete} disabled={isDeleting || deleteSuccess}>{isDeleting ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}Delete</Button>
+        </DialogActions>
+      </Dialog>
+      {/* View Department Dialog */}
+      <Dialog open={showViewDialog} onClose={handleCloseViewDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Department Details</DialogTitle>
+        <DialogContent dividers>
+          {viewDepartment ? (
+            <Box sx={{ p: 1 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Name</Typography>
+                  <Typography variant="body1">{viewDepartment.name}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Head</Typography>
+                  <Typography variant="body1">{getDepartmentHeadName(viewDepartment)}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">DIDs</Typography>
+                  <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {(Array.isArray(viewDepartment.didNumbers) && viewDepartment.didNumbers.length > 0) ? viewDepartment.didNumbers.map(d => (
+                      <Chip key={d} label={d} size="small" />
+                    )) : (
+                      <Chip label={getDepartmentHeadDidNumber(viewDepartment)} size="small" />
+                    )}
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Members</Typography>
+                  <Box sx={{ mt: 0.5, border: '1px solid #e0e0e0', borderRadius: 1, p: 1, maxHeight: 120, overflowY: 'auto', minHeight: 40 }}>
+                    {viewDepartment.members && Array.isArray(viewDepartment.members) && viewDepartment.members.length > 0 ? (
+                      viewDepartment.members.map((m, i) => {
+                        const name = m?.name || m?.fullName || m?.displayName || m?.user?.name || (() => {
+                          const found = availableBranches.find(b => String(b.userId) === String(m.userId) || String(b._id) === String(m.userId) || String(b.id) === String(m.userId));
+                          return found ? (found.branchName || found.name) : (m?.userId || m?.phone || 'Unknown');
+                        })()
+                        return (
+                          <Typography key={i} variant="body2" sx={{ mb: 0.5 }}>{name}</Typography>
+                        )
+                      })
+                    ) : (
+                      <Typography variant="body2">0 members</Typography>
+                    )}
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary">Description</Typography>
+                  <Typography variant="body1">{viewDepartment.description || '-'}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Status</Typography>
+                  <Box sx={{ mt: 0.5 }}>{getStatusBadge(viewDepartment.status)}</Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Default</Typography>
+                  <Typography variant="body1">{viewDepartment.default ? 'Yes' : 'No'}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseViewDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }
 

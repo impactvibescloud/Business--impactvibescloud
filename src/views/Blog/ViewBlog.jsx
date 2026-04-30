@@ -3,48 +3,58 @@ import Button from "@mui/material/Button";
 import { Link, useParams } from "react-router-dom";
 import swal from "sweetalert";
 import axios from "axios";
+import DOMPurify from "dompurify";
 import { Box } from "@mui/material";
 
 const ViewBlog = () => {
   const [image, setImage] = useState(null);
   const [title, setTitle] = useState("");
   const [tag, setTag] = useState([]);
-  const [blogContent, setBlogContent] = useState(""); // Changed to string
+  const [blogContent, setBlogContent] = useState("");
 
   const { id } = useParams();
 
-  const getBlog = async () => {
-    try {
-      const res = await axios.get(`/api/v1/blog/getoneblog/${id}`);
+  // The blog body is HTML authored by trusted business users, but it still
+  // round-trips through the API and is injected via dangerouslySetInnerHTML.
+  // DOMPurify is the only correct way to defend against XSS here — the previous
+  // regex-based "addStyles" was not a sanitizer and left attribute-based
+  // injection paths (`<img onerror>`, `<a href="javascript:">`, etc.) wide open.
+  const sanitizeBlogHtml = (raw) => {
+    if (!raw || typeof raw !== "string") return "";
+    return DOMPurify.sanitize(raw, {
+      USE_PROFILES: { html: true },
+      FORBID_TAGS: ["script", "style", "iframe", "object", "embed"],
+      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover"],
+    });
+  };
 
-      setTitle(res?.data?.blog?.title);
-      setImage(res?.data?.blog?.image);
-      setTag(res?.data?.blog?.tags);
-      // setBlogContent(res?.data?.blog?.blog_content);
-      setBlogContent(addStylesToHTML(res?.data?.blog?.blog_content));
-    } catch (err) {
-      console.error(err);
-      swal({
-        title: "Error",
-        text: "Unable to fetch the blog",
-        icon: "error",
-        button: "Retry",
-        dangerMode: true,
-      });
-    }
-  };
-  const addStylesToHTML = (content) => {
-    // Example: Add styles to <p> and <ul> elements
-    content = content.replace(
-      /<p>/g,
-      '<p style="fontSize:1.5rem; margin-top: 1rem; text-transform: capitalize;">'
-    );
-    content = content.replace(/<ul>/g, '<ul style="list-style-type: circle;">');
-    return content;
-  };
   useEffect(() => {
+    let cancelled = false;
+    const getBlog = async () => {
+      try {
+        const res = await axios.get(`/api/v1/blog/getoneblog/${id}`);
+        if (cancelled) return;
+        setTitle(res?.data?.blog?.title || "");
+        setImage(res?.data?.blog?.image || null);
+        setTag(Array.isArray(res?.data?.blog?.tags) ? res.data.blog.tags : []);
+        setBlogContent(sanitizeBlogHtml(res?.data?.blog?.blog_content));
+      } catch (err) {
+        if (cancelled) return;
+        console.error(err);
+        swal({
+          title: "Error",
+          text: "Unable to fetch the blog",
+          icon: "error",
+          button: "Retry",
+          dangerMode: true,
+        });
+      }
+    };
     getBlog();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   return (
     <div className="container">
@@ -84,7 +94,7 @@ const ViewBlog = () => {
                 {image && (
                   <img
                     src={image.url}
-                    alt="blog"
+                    alt={title ? `${title} cover` : "Blog cover image"}
                     style={{ width: "100%", height: "50vh" }}
                   />
                 )}
@@ -108,13 +118,13 @@ const ViewBlog = () => {
                   gap: "1rem",
                 }}
               >
-                {tag.map((tag, index) => (
+                {tag.map((t) => (
                   <div
-                    key={index}
+                    key={`tag-${t}`}
                     className="badge bg-primary font-size-14"
                     style={{ padding: "0.5rem" }}
                   >
-                    #{tag}
+                    #{t}
                   </div>
                 ))}
               </Box>

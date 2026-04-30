@@ -1,0 +1,202 @@
+/* Component-scoped: remove focus outlines for inputs/buttons/selects/textarea inside IVRManagement */
+.ivr-no-focus input:focus,
+.ivr-no-focus select:focus,
+.ivr-no-focus textarea:focus,
+.ivr-no-focus button:focus,
+.ivr-no-focus .btn:focus,
+.ivr-no-focus .form-control:focus,
+.ivr-no-focus .form-select:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* also remove focus ring for CoreUI badges/other interactive elements if any */
+.ivr-no-focus [tabindex]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* keep keyboard accessibility — but visually remove focus. If you want to preserve visible focus for keyboard users,
+   change the rules to only apply for :focus:not(:focus-visible) or remove these rules and use better accessible styling. */
+
+/* Modal-specific (covers Bootstrap/CoreUI modal markup and portal-rendered modals) */
+.ivr-no-focus-modal input:focus,
+.ivr-no-focus-modal select:focus,
+.ivr-no-focus-modal textarea:focus,
+.ivr-no-focus-modal button:focus,
+.ivr-no-focus-modal .btn:focus,
+.ivr-no-focus-modal .form-control:focus,
+.ivr-no-focus-modal .form-select:focus,
+.ivr-no-focus-modal [tabindex]:focus,
+.ivr-no-focus-modal *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* also target when modal markup is nested under the component root */
+.ivr-no-focus .modal *:focus,
+.ivr-no-focus .c-modal *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Hide the browser's default "Choose file" / "No file chosen" text
+   for file inputs inside IVR modals — keep only the browse button visible. */
+.ivr-no-focus-modal input[type="file"]::-webkit-file-upload-text,
+.ivr-no-focus-modal input[type="file"]::-webkit-file-upload-button {
+  display: none !important;
+}
+.ivr-no-focus-modal input[type="file"]::-moz-file-upload-text,
+.ivr-no-focus-modal input[type="file"]::-ms-browse {
+  display: none !important;
+}
+.ivr-no-focus-modal input[type="file"]::file-selector-button {
+  margin: 0 !important;
+}
+
+/* Modern SaaS / Soft-UI header and action buttons */
+.ivr-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+.ivr-header .ivr-note {
+  flex: 1;
+  min-width: 0;
+  background: linear-gradient(180deg, rgba(232,246,255,0.9) 0%, rgba(225,243,255,0.95) 60%, rgba(248,253,255,1) 100%);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 10px 30px rgba(14,165,233,0.06), inset 0 1px 0 rgba(255,255,255,0.7);
+  border: 1px solid rgba(14,165,233,0.12);
+  color: #0f172a;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  transition: transform 120ms ease, box-shadow 160ms ease, background 200ms ease;
+}
+/* remove hover lift to keep a flat modern look */
+.ivr-header .ivr-note:hover { transform: none; box-shadow: 0 10px 30px rgba(14,165,233,0.06); }
+
+/* subtle glow using pseudo-element for a soft SaaS feel */
+.ivr-header .ivr-note::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  border-radius: 10px;
+  background: radial-gradient(600px 120px at 10% 20%, rgba(14,165,233,0.04), transparent 30%);
+  z-index: -1;
+}
+
+/* Soft-UI tabs */
+.ivr-tabs-wrap {
+  --soft-accent: rgba(14,165,233,0.12);
+}
+.ivr-tabs-wrap {
+  --soft-accent: rgba(14,165,233,0.12);
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.8) 0%, rgba(248,253,255,1) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(14,165,233,0.06);
+}
+.ivr-tabs-wrap .nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+}
+.ivr-tabs-wrap .nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: #52606d;
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: background 180ms ease, color 120ms ease;
+  cursor: pointer;
+}
+.ivr-tabs-wrap .nav-link:hover {
+  transform: none;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.03);
+}
+.ivr-tabs-wrap .nav-link.active {
+  background: linear-gradient(180deg, rgba(230,246,255,0.95) 0%, rgba(220,242,255,1) 100%);
+  color: #04325a;
+  border: 1px solid var(--soft-accent);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/* make sure the small btn-link styling doesn't override our look */
+.ivr-tabs-wrap .btn-link { text-decoration: none; }
+
+.ivr-header .ivr-note strong {
+  color: #0b4ea2;
+  margin-left: 6px; /* small spacing to avoid collapsed text when using flex layout */
+}
+.ivr-actions {
+  display: flex;
+  gap: 8px;
+}
+.ivr-actions .btn {
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(16,24,40,0.04);
+}
+.ivr-actions .btn.btn-sm { height: 34px; }
+.ivr-actions .btn-outline-success { border-color: rgba(52,211,153,0.12); }
+.ivr-actions .btn-outline-danger { border-color: rgba(255,99,132,0.12); }
+.ivr-actions .btn:hover { transform: none; }
+
+/* make icon-only buttons consistent size */
+.ivr-actions .btn svg, .ivr-actions .btn i { font-size: 1rem; }
+
+
+/* Soft UI filter bar for Settings */
+.soft-filter-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(247,249,250,0.8), rgba(255,255,255,0.6));
+  border: 1px solid rgba(16,24,40,0.04);
+  box-shadow: 0 8px 20px rgba(16,24,40,0.03);
+}
+.soft-filter-bar .form-select, .soft-filter-bar .form-control {
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid rgba(16,24,40,0.06);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* Soft voice card */
+.soft-voice-card {
+  border-radius: 12px;
+  padding: 12px;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
+  border: 1px solid rgba(16,24,40,0.04);
+  box-shadow: 0 8px 24px rgba(16,24,40,0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.soft-voice-card .meta { min-width: 0 }
+.soft-voice-card .meta .title { font-weight: 600; color: #0f172a }
+.soft-voice-card .meta .desc { color: #64748b; font-size: 0.9rem }
+

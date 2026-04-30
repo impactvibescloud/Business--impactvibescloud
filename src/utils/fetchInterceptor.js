@@ -66,99 +66,12 @@ export const setupFetchInterceptor = () => {
       }
       return await originalFetch(url, options)
     } catch (error) {
-      // Handle fetch errors gracefully
-      console.warn('🔄 Fetch error intercepted:', error.message, 'for:', url)
-      
-      // Return mock response for common endpoints
-      if (url.includes('/call-logs')) {
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'Mock call logs data - Network unavailable',
-          data: [
-            {
-              _id: 'fetch-mock-log-1',
-              contact: '+1234567890',
-              callType: 'outgoing',
-              callDate: new Date().toISOString(),
-              status: 'success',
-              createdAt: new Date().toISOString()
-            },
-            {
-              _id: 'fetch-mock-log-2',
-              contact: 'John Doe (+0987654321)',
-              callType: 'incoming',
-              callDate: new Date(Date.now() - 3600000).toISOString(),
-              status: 'success',
-              createdAt: new Date(Date.now() - 3600000).toISOString()
-            }
-          ]
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-      
-      if (url.includes('/contacts')) {
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'Mock contacts data - Network unavailable',
-          data: [
-            {
-              _id: 'fetch-mock-contact-1',
-              name: 'John Doe',
-              phone: '+1234567890',
-              email: 'john.doe@example.com',
-              company: 'Example Corp',
-              notes: 'Sample contact data',
-              tags: ['client', 'priority']
-            },
-            {
-              _id: 'fetch-mock-contact-2',
-              name: 'Jane Smith',
-              phone: '+0987654321',
-              email: 'jane.smith@example.com',
-              company: 'Tech Solutions',
-              notes: 'Another sample contact',
-              tags: ['prospect']
-            }
-          ]
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-      
-      if (url.includes('/numbers')) {
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'Mock virtual numbers data - Network unavailable',
-          data: []
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-      
-      if (url.includes('/branches') || url.includes('/trial-orders')) {
-        return new Response(JSON.stringify({
-          success: true,
-          message: 'Mock branches data - Network unavailable',
-          data: []
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-      
-      // For other endpoints, return empty array
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Mock data - Network unavailable',
-        data: []
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      // No fabricated-success fallback. Previously this block returned
+      // mock contacts (John Doe / Jane Smith) and mock call-logs that the
+      // UI presented as if they were real, masking outages and enabling
+      // users to act on data that didn't exist server-side. Now the real
+      // failure propagates to the caller.
+      throw error
     }
   }
   

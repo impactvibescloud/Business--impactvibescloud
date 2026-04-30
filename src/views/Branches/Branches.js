@@ -1,39 +1,53 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from 'react'
 import {
-  CRow,
-  CCol,
-  CCard,
-  CCardBody,
-  CButton,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
-  CForm,
-  CFormInput,
-  CFormLabel,
-  CFormSelect,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CBadge,
-  CSpinner,
-  CAlert,
-  CInputGroup,
-  CPagination,
-  CPaginationItem
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilPlus, cilPencil, cilTrash, cilSearch } from '@coreui/icons'
-import axios from "axios";
-import { apiCall, getBaseURL } from '../../config/api';
-import Swal from "sweetalert2";
-import './Branches.css'
-import { API_CONFIG } from '../../config/api';
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  IconButton,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  CircularProgress,
+  Alert,
+  Grid,
+  Collapse,
+  Pagination,
+  LinearProgress,
+  InputAdornment
+} from '@mui/material'
+import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
+import BlockIcon from '@mui/icons-material/Block'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import LockResetIcon from '@mui/icons-material/LockReset'
+import SearchIcon from '@mui/icons-material/Search'
+import LockIcon from '@mui/icons-material/Lock'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import axios from 'axios'
+import { apiCall, getBaseURL } from '../../config/api'
+import { formatLastActivity } from '../../components/UserActivityStatus/UserStatusHelpers'
+import Swal from 'sweetalert2'
+import '../Leads/CallLogsWebpage.css'
+import { API_CONFIG } from '../../config/api'
 
 const isAuthenticated = () => localStorage.getItem("authToken");
 
@@ -45,27 +59,35 @@ const Branches = () => {
   const [itemsPerPage] = useState(10);
   const [openAddBranch, setOpenAddBranch] = useState(false);
   const [openEditBranch, setOpenEditBranch] = useState(false);
+  const [openChangePassword, setOpenChangePassword] = useState(false);
+  const [selectedAgentForPassword, setSelectedAgentForPassword] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [agentPhone, setAgentPhone] = useState("");
-  const [department, setDepartment] = useState("");
+  // departmentIds — a branch/agent can belong to multiple departments now.
+  // The first id in this array is also written to the legacy `department`
+  // field on the API for backward compat.
+  const [departmentIds, setDepartmentIds] = useState([]);
   const [timeGroup, setTimeGroup] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
   // Default start/end times for known time groups
-  // Defaults aligned with the UI labels:
-  // Morning Shift (8 AM - 4 PM) => 08:00 - 16:00
-  // Afternoon Shift (12 PM - 8 PM) => 12:00 - 20:00
-  // Evening Shift (4 PM - 12 AM) => 16:00 - 00:00
-  // Night Shift (10 PM - 6 AM) => 22:00 - 06:00
-  // 24 Hours => 00:00 - 23:59
+  // Default start/end times for known time groups (user-defined presets):
+  // Morning Shift — 9 AM → 12 PM
+  // Afternoon Shift — 12 PM → 6 PM
+  // Full Shift — 9 AM → 6 PM
+  // Night Shift — 6 PM → 12 AM
+  // Custom Shift — no defaults (user-entered)
   const TIME_GROUP_DEFAULTS = {
-    morning: { startTime: '08:00', endTime: '16:00' },
+    morning: { startTime: '09:00', endTime: '12:00' },
+    afternoon: { startTime: '12:00', endTime: '18:00' },
     full: { startTime: '09:00', endTime: '18:00' },
-    afternoon: { startTime: '12:00', endTime: '20:00' },
-    evening: { startTime: '16:00', endTime: '00:00' },
-    night: { startTime: '22:00', endTime: '06:00' },
-    '24hours': { startTime: '00:00', endTime: '23:59' },
+    night: { startTime: '18:00', endTime: '00:00' },
   };
 
   const handleTimeGroupChange = (value) => {
@@ -88,31 +110,15 @@ const Branches = () => {
   const [didNumbers, setDidNumbers] = useState([]);
   // For dropdowns: only show DIDs not assigned to any branch, or the one assigned to the current agent (for edit)
   const getAvailableDidNumbers = (currentBranchId = null) => {
-    // Find all assigned DIDs from all branches (except the current branch if editing)
-    const assignedDidNumbers = new Set();
-    branches.forEach(branch => {
-      // Exclude current branch if editing
-      if (!currentBranchId || branch._id !== currentBranchId) {
-        if (Array.isArray(branch.didNumbers)) {
-          branch.didNumbers.forEach(num => assignedDidNumbers.add(num));
-        } else if (branch.didNumber) {
-          assignedDidNumbers.add(branch.didNumber);
-        }
-      }
-    });
-    // Only return DIDs not assigned, or the one assigned to the current branch (for edit)
-    return didNumbers.filter(did => {
-      // If editing, allow the currently assigned DID
-      if (currentBranchId) {
-        const currentBranch = branches.find(b => b._id === currentBranchId);
-        const currentAssigned = currentBranch && (Array.isArray(currentBranch.didNumbers) ? currentBranch.didNumbers[0] : currentBranch.didNumber);
-        if (did.id === selectedDid || did.number === currentAssigned) return true;
-      }
-      // Otherwise, only show if not assigned
-      return !assignedDidNumbers.has(did.number);
-    });
+    // Allow all DIDs to be selectable so the same DID can be assigned to multiple branches/agents.
+    // Previously we filtered out DIDs already assigned to other branches; remove that restriction.
+    return didNumbers || [];
   };
-  const [selectedDid, setSelectedDid] = useState("");
+  // Multiple DIDs can be assigned to a single branch/agent. selectedDids is
+  // an array of DID inventory ids; the form serializes them to:
+  //   - branch.didNumbers (array of phone numbers)
+  //   - one POST /numbers/:id/assign per DID
+  const [selectedDids, setSelectedDids] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [successAlert, setSuccessAlert] = useState({ show: false, message: '' });
   const [uploading, setUploading] = useState(false)
@@ -122,7 +128,90 @@ const Branches = () => {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [callDetails, setCallDetails] = useState({});
   const [loadingCallDetails, setLoadingCallDetails] = useState({});
+  const [branchActivities, setBranchActivities] = useState({})
+  const [teamStatuses, setTeamStatuses] = useState({})
   const token = isAuthenticated();
+
+  // Helper: normalize array responses from multiple possible shapes
+  const normalizeArrayResponse = (res) => {
+    if (!res) return []
+    if (Array.isArray(res)) return res
+    if (res.data && Array.isArray(res.data)) return res.data
+    if (res.data && res.data.data && Array.isArray(res.data.data)) return res.data.data
+    if (res.data && res.data.users && Array.isArray(res.data.users)) return res.data.users
+    if (res.data && res.data.length) return res.data
+    return []
+  }
+
+  const formatMinutes = (mins) => {
+    if (mins == null) return '-'
+    const m = Number(mins)
+    if (!Number.isFinite(m) || m <= 0) return '0m'
+    const h = Math.floor(m / 60)
+    const r = Math.round(m % 60)
+    return h > 0 ? `${h}h ${r}m` : `${r}m`
+  }
+
+  const formatTime = (iso) => {
+    if (!iso) return '-'
+    try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } catch (e) { return String(iso) }
+  }
+
+  const fetchTeamStatuses = async (businessId) => {
+    if (!businessId) return
+    try {
+      // Use business agents status endpoint
+      const res = await apiCall(`/business/agents/status?businessId=${encodeURIComponent(businessId)}`, 'GET')
+      const payload = res?.data || res || {}
+      const list = Array.isArray(payload.agents) ? payload.agents : (Array.isArray(res) ? res : [])
+      const map = {}
+      list.forEach(a => {
+        const id = a.id || a._id || a.agentId || a.email
+        if (id) map[String(id)] = a
+      })
+      setTeamStatuses(map)
+      return map
+    } catch (e) {
+      console.warn('fetchTeamStatuses failed', e)
+      setTeamStatuses({})
+      return {}
+    }
+  }
+
+  const fetchBranchActivities = async (branchesList, teamMap = null) => {
+    if (!branchesList || branchesList.length === 0) return
+    const statuses = teamMap || teamStatuses || {}
+    const map = {}
+    branchesList.forEach((b) => {
+      const managerId = b.manager?.userId || b.manager?._id || b.manager?.id || null
+      // Try direct id match, otherwise match by email/name
+      let agent = null
+      if (managerId && statuses[String(managerId)]) agent = statuses[String(managerId)]
+      if (!agent) {
+        const byEmail = Object.values(statuses).find(x => x && x.email && b.manager?.email && String(x.email).toLowerCase() === String(b.manager.email).toLowerCase())
+        if (byEmail) agent = byEmail
+      }
+      if (!agent) {
+        const byName = Object.values(statuses).find(x => x && x.name && b.manager?.name && String(x.name).toLowerCase() === String(b.manager.name).toLowerCase())
+        if (byName) agent = byName
+      }
+      if (!agent) {
+        map[b.id] = null
+        return
+      }
+      map[b.id] = {
+        loginTime: agent.lastSeen || agent.joinedAt || null,
+        // Detailed durations aren't available from this endpoint; leave null/placeholder
+        totalActive: null,
+        breakDuration: null,
+        idle: null,
+        currentStatus: agent.status || agent.current_status || 'unknown',
+        lastSeen: agent.lastSeen || null,
+        raw: agent
+      }
+    })
+    setBranchActivities(map)
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -193,11 +282,20 @@ const Branches = () => {
           return { _id: String(d), name: String(d) };
         })(),
         id: branch._id,
-        didNumber: branch.didNumbers?.[0] || '',
+        didNumber: branch.assignedNumbers?.[0]?.number || branch.didNumbers?.[0] || '',
       }));
 
       setBranches(formattedBranches);
       setLoading(false);
+
+      // Fetch today's activity/status for branch managers to populate "Active Hours"
+      try {
+        const teamMap = await fetchTeamStatuses(user.businessId)
+        await fetchBranchActivities(formattedBranches, teamMap)
+      } catch (e) {
+        // ignore activity errors — keep branch list visible
+        console.warn('Failed to fetch branch activities', e)
+      }
     } catch (error) {
       console.error("Error fetching branches:", error);
       setLoading(false);
@@ -224,6 +322,19 @@ const Branches = () => {
     }
   };
 
+  // Helper: fetch extension for a DID number using the numbers service
+  const fetchDidExtension = async (didNumber) => {
+    if (!didNumber) return null;
+    try {
+      const res = await apiCall(`/api/v1/numbers/business/by-number/${encodeURIComponent(didNumber)}`, 'GET');
+      const ext = res?.data?.extension ?? res?.data?.sip_endpoint ?? res?.data?.extensionNumber ?? res?.data?.ext ?? null;
+      return ext ?? null;
+    } catch (err) {
+      console.warn('Failed to fetch DID extension for', didNumber, err);
+      return null;
+    }
+  };
+
   const handleAddBranch = () => {
     setOpenAddBranch(true);
   };
@@ -235,41 +346,43 @@ const Branches = () => {
 
   const handleSaveBranch = async () => {
     try {
-      // Find the DID number value from the selectedDid (which may be an id)
-      let didNumberValue = selectedDid;
-      const foundDid = didNumbers.find((did) => did.id === selectedDid);
-      if (foundDid) {
-        didNumberValue = foundDid.number;
-      }
-      // Construct the request body according to the API specification
+      // Translate the array of selected DID-inventory ids into actual phone
+      // numbers (which is what the branch document stores in `didNumbers`).
+      const selectedDidObjs = selectedDids
+        .map((id) => didNumbers.find((d) => d.id === id))
+        .filter(Boolean);
+      const didNumberValues = selectedDidObjs.map((d) => d.number);
+
       const requestBody = {
         branchName,
         branchEmail: managerEmail,
-        phone: agentPhone, // Include phone field
+        phone: agentPhone,
         businessId: user.businessId,
-        didNumbers: didNumberValue ? [didNumberValue] : [], // Use number, not id
-        timeGroup: timeGroup
+        didNumbers: didNumberValues,
+        timeGroup: timeGroup,
       };
-      // Only include start/end times if they have values
+      // Resolve an extension for the FIRST chosen DID — this is what the
+      // branch's primary PJSIP endpoint registers as. Subsequent DIDs share
+      // the same extension via NumberAssignment rows.
+      let extension = null;
+      if (didNumberValues[0]) {
+        extension = await fetchDidExtension(didNumberValues[0]);
+        if (extension) requestBody.extension = String(extension);
+      }
       if (startTime && startTime.trim() !== '') requestBody.startTime = startTime;
       if (endTime && endTime.trim() !== '') requestBody.endTime = endTime;
-      if (department) {
-        requestBody.department = department;
+      if (departmentIds.length > 0) {
+        requestBody.departmentIds = departmentIds;
+        requestBody.department = departmentIds[0]; // legacy single-value mirror
       }
 
-      // Create the branch first using apiCall
-  const res = await apiCall('/branch/create/new', 'POST', requestBody);
+      const res = await apiCall('/branch/create/new', 'POST', requestBody);
 
-      // Assign DID to branch if selectedDid is present
-      if (selectedDid && res.data && (res.data.branch?._id || res.data.data?._id)) {
-        const branchId = res.data.branch?._id || res.data.data?._id;
-        const didId = selectedDid;
-        try {
-          await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-        } catch (err) {
-          console.error('Error assigning DID to branch:', err);
-        }
-      }
+      // Create one NumberAssignment per selected DID. They all bind to the
+      // same extension so the agent receives inbound calls on every DID.
+      // Assignments are handled server-side during branch creation now;
+      // no per-DID POST loop is necessary. Server will create NumberAssignment
+      // rows and trigger telephony sync asynchronously.
 
       fetchBranches();
       handleCloseAddBranch();
@@ -311,7 +424,16 @@ const Branches = () => {
     setSelectedBranch(branch);
     setBranchName(branch.branchName || "");
     setManagerEmail(branch.user?.email || branch.manager?.email || "");
-    setDepartment(branch.department?._id || "");
+    // Hydrate department selection from departmentIds[] (preferred) or the
+    // legacy single `department` field, normalizing to an array of ids.
+    const deptIds = Array.isArray(branch.departmentIds) && branch.departmentIds.length
+      ? branch.departmentIds.map((d) => (d && d._id) || d).filter(Boolean).map(String)
+      : branch.department?._id
+        ? [String(branch.department._id)]
+        : branch.department
+          ? [String(branch.department)]
+          : [];
+    setDepartmentIds(deptIds);
     // branch.timeGroup may be a string (legacy) or an object { timeGroup, startTime, endTime }
     const tg = branch.timeGroup;
     if (tg && typeof tg === 'object') {
@@ -332,17 +454,30 @@ const Branches = () => {
     }
     
     setBranchStatus(branch.isSuspended ? "Suspended" : "Active");
-    // Find the DID id from didNumbers list that matches the assigned number
-    let assignedDidId = "";
-    if (Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0) {
-      const assignedNumber = branch.didNumbers[0];
-      const foundDid = didNumbers.find(did => did.number === assignedNumber);
-      assignedDidId = foundDid ? foundDid.id : "";
-    } else if (branch.didNumber) {
-      const foundDid = didNumbers.find(did => did.number === branch.didNumber);
-      assignedDidId = foundDid ? foundDid.id : "";
-    }
-    setSelectedDid(assignedDidId);
+    // Hydrate selectedDids[] from every assigned-number-like field on the
+    // branch. We prefer `assignedNumbers` (full assignment objects) since
+    // those carry the DID inventory id; otherwise fall back to `didNumbers`
+    // (raw phone strings) and look the id up in our cached list.
+    const assignedNumberVals = (() => {
+      if (Array.isArray(branch.assignedNumbers) && branch.assignedNumbers.length) {
+        return branch.assignedNumbers.map((a) => (a && (a.number || a)) || null).filter(Boolean);
+      }
+      if (Array.isArray(branch.didNumbers) && branch.didNumbers.length) {
+        return branch.didNumbers;
+      }
+      if (branch.didNumber) return [branch.didNumber];
+      return [];
+    })();
+
+    const ids = assignedNumberVals
+      .map((val) => {
+        const found = didNumbers.find(
+          (d) => d.number === val || d.id === val || String(d._id) === String(val),
+        );
+        return found ? found.id : null;
+      })
+      .filter(Boolean);
+    setSelectedDids(Array.from(new Set(ids)));
     setOpenEditBranch(true);
   };
 
@@ -354,36 +489,33 @@ const Branches = () => {
 
   const handleUpdateBranch = async () => {
     try {
-      // Find the DID number value from the selectedDid (which may be an id)
-      let didNumberValue = selectedDid;
-      const foundDid = didNumbers.find((did) => did.id === selectedDid);
-      if (foundDid) {
-        didNumberValue = foundDid.number;
-      }
-  // Build payload and include start/end only when provided
-  const updatePayload = {
+      const selectedDidObjs = selectedDids
+        .map((id) => didNumbers.find((d) => d.id === id))
+        .filter(Boolean);
+      const didNumberValues = selectedDidObjs.map((d) => d.number);
+
+      const updatePayload = {
         branchName,
         userEmail: managerEmail,
         businessId: user.businessId,
-        didNumbers: didNumberValue ? [didNumberValue] : [],
+        didNumbers: didNumberValues,
         timeGroup: timeGroup,
-        ...(department ? { department } : {})
+        ...(departmentIds.length
+          ? { departmentIds, department: departmentIds[0] }
+          : {}),
       };
-  if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
-  if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
-  const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
-
-      // Assign DID to branch if selectedDid is present
-      if (selectedDid && (selectedBranch._id || (res.data && (res.data.branch?._id || res.data.data?._id)))) {
-        const branchId = selectedBranch._id || res.data.branch?._id || res.data.data?._id;
-        const didId = selectedDid;
-        try {
-          await apiCall(`/numbers/${didId}`, 'PUT', { assigned_to_branch: branchId });
-        } catch (err) {
-          console.error('Error assigning DID to branch:', err);
-        }
+      let extension = null;
+      if (didNumberValues[0]) {
+        extension = await fetchDidExtension(didNumberValues[0]);
+        if (extension) updatePayload.extension = String(extension);
       }
+      if (startTime && startTime.trim() !== '') updatePayload.startTime = startTime;
+      if (endTime && endTime.trim() !== '') updatePayload.endTime = endTime;
+      const res = await apiCall(`/branch/edit/${selectedBranch._id}`, 'PATCH', updatePayload);
 
+      // The server will create/cleanup `NumberAssignment` rows for the
+      // branch update. Avoid sending one POST per DID to reduce races and
+      // latency; telephony sync is triggered asynchronously server-side.
       fetchBranches();
       handleCloseEditBranch();
       setSuccessAlert({
@@ -405,13 +537,13 @@ const Branches = () => {
   const resetForm = () => {
     setBranchName("");
     setAgentPhone("");
-    setDepartment("");
+    setDepartmentIds([]);
     setTimeGroup("");
     setStartTime("");
     setEndTime("");
     setManagerEmail("");
     setBranchStatus("Active");
-    setSelectedDid(""); // Reset DID selection
+    setSelectedDids([]);
   };
 
   const handleSuspendBranch = async (branchId) => {
@@ -441,8 +573,43 @@ const Branches = () => {
   };
 
 
-  const handleDeleteBranch = (branchId) => {
-    console.log("Delete branch:", branchId);
+  const handleDeleteBranch = async (branch) => {
+    const branchId = branch?._id || branch?.id;
+    if (!branchId) {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Agent ID not found.' });
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: 'Are you sure?',
+      text: `This will permanently delete agent "${branch.branchName}". This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      await apiCall(`/branch/delete/${branchId}`, 'DELETE');
+      fetchBranches();
+      setSuccessAlert({
+        show: true,
+        message: `Agent "${branch.branchName}" deleted successfully!`,
+      });
+      setTimeout(() => {
+        setSuccessAlert({ show: false, message: '' });
+      }, 5000);
+    } catch (error) {
+      console.error('Error deleting branch:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error?.response?.data?.message || 'Failed to delete agent.',
+      });
+    }
   };
 
   const handleResetPassword = async (email) => {
@@ -482,6 +649,109 @@ const Branches = () => {
         title: 'Error',
         text: error?.response?.data?.message || 'Something went wrong',
       });
+    }
+  };
+
+  const handleOpenChangePassword = (agent) => {
+    setSelectedAgentForPassword(agent);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setOpenChangePassword(true);
+  };
+
+  const handleCloseChangePassword = () => {
+    setOpenChangePassword(false);
+    setSelectedAgentForPassword(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleChangePassword = async () => {
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Validation Error',
+        text: 'Please enter both password fields.',
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Mismatch',
+        text: 'Passwords do not match. Please try again.',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Weak Password',
+        text: 'Password must be at least 6 characters long.',
+      });
+      return;
+    }
+
+    if (!selectedAgentForPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Agent not found.',
+      });
+      return;
+    }
+
+    // Get the user ID (branch-related user, not branch ID)
+    const userId = selectedAgentForPassword.user?._id || selectedAgentForPassword.manager?.userId;
+    if (!userId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'User ID not found for this agent.',
+      });
+      return;
+    }
+
+    setPasswordChangeLoading(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await axios.put(
+        `${getBaseURL()}/api/business/agent/change-password`,
+        {
+          agentId: userId,
+          newPassword,
+          confirmPassword,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Password Changed',
+        text: `Password for agent "${selectedAgentForPassword.branchName}" has been changed successfully.`,
+      });
+      handleCloseChangePassword();
+    } catch (error) {
+      console.error('Error changing password:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error?.response?.data?.message || 'Failed to change password. Please try again.',
+      });
+    } finally {
+      setPasswordChangeLoading(false);
     }
   };
 
@@ -626,529 +896,532 @@ const Branches = () => {
   };
 
   return (
-    <div className="branches-container">
-      {successAlert.show && (
-        <CAlert color="success" dismissible onClose={() => setSuccessAlert({ show: false, message: '' })}>
-          {successAlert.message}
-        </CAlert>
-      )}
-      
-      <CCard className="mb-4">
-        <CCardBody>
-          <CRow className="mb-4 align-items-center">
-            <CCol md={6}>
-              <h1 className="branches-title">Agents</h1>
-            </CCol>
-            <CCol md={6} className="d-flex justify-content-end">
-                <div className="d-flex gap-2">
-                  <CButton color="secondary" className="add-agent-btn" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
-                    Bulk Upload
-                  </CButton>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleFileSelect(e)}
-                  />
-                  <CButton color="primary" className="add-agent-btn" onClick={handleAddBranch}>
-                    <CIcon icon={cilPlus} className="me-2" />
-                    Add Agent
-                  </CButton>
-                </div>
-            </CCol>
-          </CRow>
-          
-          <CRow className="mb-4">
-            <CCol md={6}>
-              <CInputGroup>
-                <CFormInput
+    <Box className="page-container" sx={{ p: 2 }}>
+      <div className="branches-container">
+        {successAlert.show && (
+          <Alert severity="success" onClose={() => setSuccessAlert({ show: false, message: '' })} sx={{ mb: 2 }}>
+            {successAlert.message}
+          </Alert>
+        )}
+
+        <Card className="mb-4" sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  Agents
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                  Create and manage agents
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+                <TextField
                   placeholder="Search agents..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  size="small"
+                  fullWidth
+                  sx={{ minWidth: 200 }}
+                  autoComplete="off"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
-                <CButton type="button" color="primary" variant="outline">
-                  <CIcon icon={cilSearch} />
-                </CButton>
-              </CInputGroup>
-            </CCol>
-          </CRow>
+              </Box>
+              <Box>
+                <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleAddBranch} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>
+                  Add Agent
+                </Button>
+              </Box>
+            </Box>
 
-          <CTable hover responsive className="branches-table">
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>S.NO</CTableHeaderCell>
-                <CTableHeaderCell>AGENT NAME</CTableHeaderCell>
-                <CTableHeaderCell>EMAIL ADDRESS</CTableHeaderCell>
-                <CTableHeaderCell>DEPARTMENT</CTableHeaderCell>
-                <CTableHeaderCell>STATUS</CTableHeaderCell>
-                <CTableHeaderCell>ASSIGNED NUMBER</CTableHeaderCell>
-                <CTableHeaderCell className="text-center">ACTIONS</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-            <CTableBody>
-              {loading ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <CSpinner color="primary" />
-                    <div className="mt-3">Loading agents...</div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : currentBranches.length === 0 ? (
-                <CTableRow>
-                  <CTableDataCell colSpan="8" className="text-center py-5">
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <CIcon icon={cilPlus} size="xl" />
-                      </div>
-                      <h4>No agents found</h4>
-                      <p>Create your first agent to get started.</p>
-                      <CButton color="primary" className="mt-3" onClick={handleAddBranch}>
-                        Add Agent
-                      </CButton>
-                    </div>
-                  </CTableDataCell>
-                </CTableRow>
-              ) : (
-                currentBranches.map((branch, index) => (
-                  <React.Fragment key={branch._id}>
-                    <CTableRow 
-                      onClick={() => handleAgentRowClick(branch)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <CTableDataCell>
-                        <div className="agent-number">{indexOfFirstItem + index + 1}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="agent-name">{branch.branchName}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="manager-email">{branch.manager?.email || "-"}</div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="department-name">
-                          {branch.department 
-                            ? (typeof branch.department === 'object' 
-                               ? (branch.department.name || "No Name") 
-                               : String(branch.department))
-                            : "Not Assigned"}
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <CBadge 
-                          color={branch.isSuspended ? "warning" : "success"}
-                          className="status-badge"
-                        >
-                          {branch.isSuspended ? "Suspended" : "Active"}
-                        </CBadge>
-                      </CTableDataCell>
-                      <CTableDataCell>
-                        <div className="assigned-number">
-                          {Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0
-                            ? branch.didNumbers[0]
-                            : "Not Assigned"}
-                        </div>
-                      </CTableDataCell>
-                      <CTableDataCell className="text-center">
-                        <CButton 
-                          color="light"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditBranch(branch);
-                          }}
-                          className="me-2"
-                          size="sm"
-                        >
-                          <CIcon icon={cilPencil} />
-                        </CButton>
-                        <CButton 
-                          color={branch.isSuspended ? "success" : "warning"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSuspendBranch(branch.id);
-                          }}
-                          className="me-2"
-                          size="sm"
-                        >
-                          {branch.isSuspended ? "Activate" : "Suspend"}
-                        </CButton>
-                        <CButton 
-                          color="info"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleResetPassword(branch.manager.email);
-                          }}
-                          size="sm"
-                        >
-                          Reset
-                        </CButton>
-                      </CTableDataCell>
-                    </CTableRow>
-                    {/* Expanded Details Row */}
-                    {expandedAgent === branch._id && (
-                      <CTableRow>
-                        <CTableDataCell colSpan="8" style={{ padding: 0, backgroundColor: '#f8f9fa' }}>
-                          <div style={{ padding: '20px' }}>
-                            <CRow className="mb-4">
-                              <CCol>
-                                <h5 className="mb-3">Agent Details - {branch.branchName}</h5>
-                              </CCol>
-                            </CRow>
-                            
-                            {/* Call Details Section */}
-                            <CRow className="mb-4">
-                              <CCol>
-                                <h6 className="mb-3">Call Details</h6>
-                                {(() => {
-                                  // Get the user ID for state management consistency
-                                  const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
-                                  return loadingCallDetails[userId] ? (
-                                    <div className="text-center py-4">
-                                      <CSpinner color="primary" />
-                                      <div className="mt-2">Loading call details...</div>
-                                    </div>
-                                  ) : (
-                                    <CRow>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-primary mb-1">
-                                            {callDetails[userId]?.outboundCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Outbound Calls</small>
-                                        </div>
-                                      </CCol>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-success mb-1">
-                                            {callDetails[userId]?.inboundCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Inbound Calls</small>
-                                        </div>
-                                      </CCol>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-warning mb-1">
-                                            {callDetails[userId]?.missedCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Missed Calls</small>
-                                        </div>
-                                      </CCol>
-                                      <CCol md={3}>
-                                        <div className="text-center p-3 border rounded bg-white">
-                                          <h4 className="text-danger mb-1">
-                                            {callDetails[userId]?.hangCalls || 0}
-                                          </h4>
-                                          <small className="text-muted">Hang Calls</small>
-                                        </div>
-                                      </CCol>
-                                    </CRow>
-                                  );
-                                })()}
-                              </CCol>
-                            </CRow>
-
-                            {/* Working Hours Section */}
-                            <CRow className="mb-4">
-                              <CCol>
-                                <h6 className="mb-3">Working Hours</h6>
-                                <div className="p-3 border rounded bg-white">
-                                  <CRow>
-                                    <CCol md={6}>
-                                      <div className="mb-2">
-                                        <strong>Start Time:</strong> 9:00 AM
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>End Time:</strong> 6:00 PM
-                                      </div>
-                                    </CCol>
-                                    <CCol md={6}>
-                                      <div className="mb-2">
-                                        <strong>Break Time:</strong> 1:00 PM - 2:00 PM
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Total Hours:</strong> 8 hours
-                                      </div>
-                                    </CCol>
-                                  </CRow>
-                                </div>
-                              </CCol>
-                            </CRow>
-
-                            {/* Active Hours Section */}
-                            <CRow>
-                              <CCol>
-                                <h6 className="mb-3">Active Hours (Today)</h6>
-                                <div className="p-3 border rounded bg-white">
-                                  <CRow>
-                                    <CCol md={4}>
-                                      <div className="mb-2">
-                                        <strong>Login Time:</strong> 9:15 AM
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Total Active Time:</strong> 6h 45m
-                                      </div>
-                                    </CCol>
-                                    <CCol md={4}>
-                                      <div className="mb-2">
-                                        <strong>Break Duration:</strong> 1h 15m
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Idle Time:</strong> 30m
-                                      </div>
-                                    </CCol>
-                                    <CCol md={4}>
-                                      <div className="mb-2">
-                                        <strong>Current Status:</strong> 
-                                        <CBadge color="success" className="ms-2">Online</CBadge>
-                                      </div>
-                                      <div className="mb-2">
-                                        <strong>Last Activity:</strong> 2 minutes ago
-                                      </div>
-                                    </CCol>
-                                  </CRow>
-                                </div>
-                              </CCol>
-                            </CRow>
+            <TableContainer component={Paper} className="calllogs-table-container">
+              <Table size="small" className="compact-table" sx={{ minWidth: 650 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>S.NO</TableCell>
+                    <TableCell>AGENT NAME</TableCell>
+                    <TableCell>DEPARTMENT</TableCell>
+                    <TableCell>STATUS</TableCell>
+                    <TableCell>ASSIGNED DID</TableCell>
+                    <TableCell align="center">ACTIONS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <CircularProgress />
+                        <div className="mt-3">Loading agents...</div>
+                      </TableCell>
+                    </TableRow>
+                  ) : currentBranches.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon">
+                            <AddIcon style={{ fontSize: 40 }} />
                           </div>
-                        </CTableDataCell>
-                      </CTableRow>
-                    )}
-                  </React.Fragment>
-                ))
-              )}
-            </CTableBody>
-          </CTable>
+                          <h4>No agents found</h4>
+                          <p>Create your first agent to get started.</p>
+                          <Button variant="contained" color="primary" onClick={handleAddBranch} sx={{ mt: 2 }}>
+                            Add Agent
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentBranches.map((branch, index) => (
+                      <React.Fragment key={branch._id}>
+                        <TableRow hover onClick={() => handleAgentRowClick(branch)} sx={{ cursor: 'pointer' }}>
+                          <TableCell>{indexOfFirstItem + index + 1}</TableCell>
+                          <TableCell>{branch.branchName}</TableCell>
+                          <TableCell>{branch.department ? (typeof branch.department === 'object' ? (branch.department.name || 'No Name') : String(branch.department)) : 'Not Assigned'}</TableCell>
+                          <TableCell>
+                            <Chip label={branch.isSuspended ? 'Suspended' : 'Active'} color={branch.isSuspended ? 'warning' : 'success'} size="small" />
+                          </TableCell>
+                          <TableCell>{Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers[0] : 'Not Assigned'}</TableCell>
+                          <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+                              <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditBranch(branch); }} title="Edit Agent">
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color={branch.isSuspended ? 'success' : 'warning'} onClick={(e) => { e.stopPropagation(); handleSuspendBranch(branch.id); }} title={branch.isSuspended ? 'Activate Agent' : 'Suspend Agent'}>
+                                {branch.isSuspended ? <CheckCircleIcon fontSize="small" /> : <BlockIcon fontSize="small" />}
+                              </IconButton>
+                              <IconButton size="small" color="info" onClick={(e) => { e.stopPropagation(); handleResetPassword(branch.manager?.email); }} title="Reset Password (Email)">
+                                <LockResetIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); handleOpenChangePassword(branch); }} title="Change Password">
+                                <LockIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteBranch(branch); }} title="Delete Agent">
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+                            <Collapse in={expandedAgent === branch._id} timeout="auto" unmountOnExit>
+                              <Box sx={{ margin: 2, backgroundColor: '#f8f9fa', p: 2, borderRadius: 1 }}>
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle1">Agent Details - {branch.branchName}</Typography>
+                                  </Grid>
+                                  {/* Call Details section removed as requested */}
+                                  {/* Working Hours section removed as requested */}
+                                  <Grid item xs={12}>
+                                      {(() => {
+                                        const key = branch.id || branch._id
+                                        const act = branchActivities && branchActivities[key] ? branchActivities[key] : null
+                                        const currentStatus = act ? (act.currentStatus || '-') : '-'
+                                        const lastAct = act ? formatLastActivity(act.lastSeen) : '-'
+                                        const userObj = branch.user || branch.manager || branch.owner || {}
+                                        const businessName = (branch.business && (branch.business.businessName || branch.business.business_name)) || branch.business || '-'
+                                        const dids = Array.isArray(branch.didNumbers) ? branch.didNumbers.join(', ') : (branch.didNumbers || 'Not Assigned')
+                                        const deptName = branch.department ? (branch.department.name || branch.department) : 'Not Assigned'
+                                        const formatShift = (s) => (s && String(s).length === 4) ? `${String(s).slice(0,2)}:${String(s).slice(2)}` : (s || '-')
+                                        const shiftDisplay = (branch.defaultShiftStart && branch.defaultShiftEnd) ? `${formatShift(branch.defaultShiftStart)} - ${formatShift(branch.defaultShiftEnd)}` : (branch.timeGroup || '-')
+                                        const formatDate = (d) => { try { return d ? (new Date(d)).toLocaleString() : '-' } catch (e) { return d } }
+                                        const extShifts = (Array.isArray(branch.extensionShifts) && branch.extensionShifts.length) ? branch.extensionShifts.map(s => `${s.extension}: ${formatShift(s.start)}-${formatShift(s.end)}`).join(', ') : ''
 
-          {totalPages > 1 && (
-            <CPagination 
-              aria-label="Page navigation example"
-              className="justify-content-center mt-4"
-            >
-              <CPaginationItem 
-                disabled={currentPage === 1} 
-                onClick={() => handlePageChange(currentPage - 1)}
-              >
-                Previous
-              </CPaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <CPaginationItem 
-                  key={i} 
-                  active={i + 1 === currentPage} 
-                  onClick={() => handlePageChange(i + 1)}
+                                        const statusColor = (() => {
+                                          const low = String(currentStatus || '').toLowerCase()
+                                          if (low === 'online' || low === 'available' || low === 'active') return 'success'
+                                          if (low === 'offline') return 'default'
+                                          if (low === 'lunch' || low === 'break') return 'warning'
+                                          if (low === 'busy' || low === 'oncall' || low === 'ringing') return 'info'
+                                          return 'default'
+                                        })()
+
+                                        return (
+                                          <Box sx={{ mt: 1 }}>
+                                            <Grid container spacing={2}>
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Current Status</Typography>
+                                                <Box sx={{ mt: 0.5 }}>
+                                                  <Chip label={String(currentStatus).toUpperCase()} color={statusColor} variant="outlined" size="small" />
+                                                </Box>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Last Activity</Typography>
+                                                <Typography variant="body2">{lastAct}</Typography>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Email</Typography>
+                                                <Box sx={{ mt: 0.5 }}><Chip label={userObj?.email || '-'} variant="outlined" color="info" size="small" /></Box>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Phone</Typography>
+                                                <Box sx={{ mt: 0.5 }}><Chip label={userObj?.phone || userObj?.mobile || '-'} variant="outlined" color="secondary" size="small" /></Box>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Business</Typography>
+                                                <Box sx={{ mt: 0.5 }}><Chip label={businessName} variant="outlined" color="success" size="small" /></Box>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Department</Typography>
+                                                <Box sx={{ mt: 0.5 }}><Chip label={deptName} color="primary" variant="outlined" size="small" /></Box>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6} md={4}>
+                                                <Typography variant="caption" color="text.secondary">Shift</Typography>
+                                                <Box sx={{ mt: 0.5 }}><Chip label={shiftDisplay} variant="outlined" color="warning" size="small" /></Box>
+                                              </Grid>
+
+                                              <Grid item xs={12}>
+                                                <Typography variant="caption" color="text.secondary">DIDs</Typography>
+                                                <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                  {Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers.map(d => (
+                                                    <Chip key={d} label={d} variant="outlined" color="info" size="small" />
+                                                  )) : (
+                                                    <Chip label={dids} variant="outlined" color="info" size="small" />
+                                                  )}
+                                                </Box>
+                                              </Grid>
+
+                                              
+
+                                              <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Created</Typography>
+                                                <Typography variant="body2">{formatDate(branch.createdAt)}</Typography>
+                                              </Grid>
+
+                                              <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Updated</Typography>
+                                                <Typography variant="body2">{formatDate(branch.updatedAt)}</Typography>
+                                              </Grid>
+                                            </Grid>
+                                          </Box>
+                                        )
+                                      })()}
+                                  </Grid>
+                                </Grid>
+                              </Box>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {totalPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                <Pagination count={totalPages} page={currentPage} onChange={(e, page) => handlePageChange(page)} color="primary" />
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Add Agent Dialog */}
+        <Dialog open={openAddBranch} onClose={handleCloseAddBranch} maxWidth="md" fullWidth>
+          <DialogTitle>Add New Agent</DialogTitle>
+          <DialogContent dividers>
+            <Box component="form" sx={{ display: 'grid', gap: 2 }}>
+              <TextField label="Agent Name" value={branchName} onChange={(e) => setBranchName(e.target.value)} fullWidth />
+              <TextField label="Agent Phone Number" value={agentPhone} onChange={(e) => setAgentPhone(e.target.value)} fullWidth />
+              <TextField label="Email Address" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel id="department-label">Departments</InputLabel>
+                <Select
+                  labelId="department-label"
+                  id="department"
+                  multiple
+                  value={departmentIds}
+                  label="Departments"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDepartmentIds(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    departments
+                      .filter((d) => selected.includes(d._id))
+                      .map((d) => d.name || 'Unnamed')
+                      .join(', ')
+                  }
                 >
-                  {i + 1}
-                </CPaginationItem>
-              ))}
-              <CPaginationItem 
-                disabled={currentPage === totalPages} 
-                onClick={() => handlePageChange(currentPage + 1)}
-              >
-                Next
-              </CPaginationItem>
-            </CPagination>
-          )}
-        </CCardBody>
-      </CCard>
+                  {departments.length === 0
+                    ? <MenuItem disabled value=""><em>Loading departments...</em></MenuItem>
+                    : departments.map((dept) => (
+                        <MenuItem key={dept._id} value={dept._id}>
+                          {dept.name || 'Unnamed Department'}
+                        </MenuItem>
+                      ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="timegroup-label">Shift</InputLabel>
+                <Select labelId="timegroup-label" id="timeGroup" value={timeGroup} label="Shift" onChange={e => handleTimeGroupChange(e.target.value)}>
+                  <MenuItem value=""><em>Select Shift</em></MenuItem>
+                  <MenuItem value="morning">Morning Shift (9 AM - 12 PM)</MenuItem>
+                  <MenuItem value="afternoon">Afternoon Shift (12 PM - 6 PM)</MenuItem>
+                  <MenuItem value="full">Full Shift (9 AM - 6 PM)</MenuItem>
+                  <MenuItem value="night">Night Shift (6 PM - 12 AM)</MenuItem>
+                  <MenuItem value="custom">Custom Shift</MenuItem>
+                </Select>
+              </FormControl>
+              {/* Start / End time — editable when Custom is selected, read-only for presets */}
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Start Time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+                <TextField
+                  label="End Time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+              </Box>
+              <FormControl fullWidth>
+                <InputLabel id="assignDid-label">Assign DIDs</InputLabel>
+                <Select
+                  labelId="assignDid-label"
+                  id="assignDid"
+                  multiple
+                  value={selectedDids}
+                  label="Assign DIDs"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSelectedDids(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    didNumbers
+                      .filter((d) => selected.includes(d.id))
+                      .map((d) => d.number)
+                      .join(', ')
+                  }
+                >
+                  {getAvailableDidNumbers().map((did) => (
+                    <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseAddBranch}>Cancel</Button>
+            <Button variant="contained" onClick={handleSaveBranch} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>Save Agent</Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Add Agent Modal */}
-      <CModal visible={openAddBranch} onClose={handleCloseAddBranch} size="lg">
-        <CModalHeader>
-          <CModalTitle>Add New Agent</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <CForm>
-            <div className="mb-3">
-              <CFormLabel htmlFor="agentName">Agent Name</CFormLabel>
-              <CFormInput
-                type="text"
-                id="agentName"
-                value={branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                placeholder="Enter agent name"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="agentPhone">Agent Phone Number</CFormLabel>
-              <CFormInput
-                type="text"
-                id="agentPhone"
-                value={agentPhone}
-                onChange={e => setAgentPhone(e.target.value)}
-                placeholder="Enter agent phone number"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="managerEmail">Email Address</CFormLabel>
-              <CFormInput
-                type="email"
-                id="managerEmail"
-                value={managerEmail}
-                onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="Enter email address"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="department">Department</CFormLabel>
-              <CFormSelect
-                id="department"
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                required
-              >
-                <option value="">Select Department</option>
-                {departments.length === 0 ? (
-                  <option value="" disabled>Loading departments...</option>
-                ) : (
-                  departments.map((dept) => (
-                    <option key={dept._id} value={dept._id || dept.id}>
-                      {typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}
-                    </option>
-                  ))
-                )}
-              </CFormSelect>
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="timeGroup">Shift</CFormLabel>
-              <CFormSelect
-                id="timeGroup"
-                value={timeGroup}
-                onChange={e => handleTimeGroupChange(e.target.value)}
-                required
-              >
-                <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (8 AM - 4 PM)</option>
-                <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
-                <option value="evening">Evening Shift (4 PM - 12 AM)</option>
-                <option value="full">Full Shift (9 AM - 6 PM)</option>
-                <option value="night">Night Shift (10 PM - 6 AM)</option>
-                <option value="24hours">24 Hours</option>
-              </CFormSelect>
-              
-            </div>
-            
-            <div className="mb-3">
-              <CFormLabel htmlFor="assignDid">Assign DID</CFormLabel>
-              <CFormSelect
-                id="assignDid"
-                value={selectedDid}
-                onChange={(e) => setSelectedDid(e.target.value)}
-                required
-              >
-                <option value="">Select DID Number</option>
-                {getAvailableDidNumbers().map((did) => (
-                  <option key={did.id} value={did.id}>
-                    {did.number}
-                  </option>
-                ))}
-              </CFormSelect>
-            </div>
-          </CForm>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseAddBranch}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleSaveBranch}>
-            Save Agent
-          </CButton>
-        </CModalFooter>
-      </CModal>
+        {/* Edit Agent Dialog */}
+        <Dialog open={openEditBranch} onClose={handleCloseEditBranch} maxWidth="md" fullWidth>
+          <DialogTitle>Edit Agent</DialogTitle>
+          <DialogContent dividers>
+            <Box component="form" sx={{ display: 'grid', gap: 2 }}>
+              <TextField label="Agent Name" value={branchName} onChange={(e) => setBranchName(e.target.value)} fullWidth />
+              <TextField label="Email Address" type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} fullWidth />
+              <FormControl fullWidth>
+                <InputLabel id="edit-department-label">Departments</InputLabel>
+                <Select
+                  labelId="edit-department-label"
+                  id="editDepartment"
+                  multiple
+                  value={departmentIds}
+                  label="Departments"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDepartmentIds(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    departments
+                      .filter((d) => selected.includes(d._id))
+                      .map((d) => d.name || 'Unnamed')
+                      .join(', ')
+                  }
+                >
+                  {departments.map((dept) => (
+                    <MenuItem key={dept._id} value={dept._id}>
+                      {dept.name || 'Unnamed Department'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="edit-timegroup-label">Shift</InputLabel>
+                <Select labelId="edit-timegroup-label" id="editTimeGroup" value={timeGroup} label="Shift" onChange={e => handleTimeGroupChange(e.target.value)}>
+                  <MenuItem value=""><em>Select Shift</em></MenuItem>
+                  <MenuItem value="morning">Morning Shift (9 AM - 12 PM)</MenuItem>
+                  <MenuItem value="afternoon">Afternoon Shift (12 PM - 6 PM)</MenuItem>
+                  <MenuItem value="full">Full Shift (9 AM - 6 PM)</MenuItem>
+                  <MenuItem value="night">Night Shift (6 PM - 12 AM)</MenuItem>
+                  <MenuItem value="custom">Custom Shift</MenuItem>
+                </Select>
+              </FormControl>
+              {/* Start / End time — editable when Custom is selected, read-only for presets */}
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Start Time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+                <TextField
+                  label="End Time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ step: 300 }}
+                  size="small"
+                  sx={{ flex: 1 }}
+                  disabled={timeGroup !== 'custom'}
+                />
+              </Box>
+              <FormControl fullWidth>
+                <InputLabel id="edit-assignDid-label">Assign DIDs</InputLabel>
+                <Select
+                  labelId="edit-assignDid-label"
+                  id="editAssignDid"
+                  multiple
+                  value={selectedDids}
+                  label="Assign DIDs"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSelectedDids(typeof v === 'string' ? v.split(',') : v);
+                  }}
+                  renderValue={(selected) =>
+                    didNumbers
+                      .filter((d) => selected.includes(d.id))
+                      .map((d) => d.number)
+                      .join(', ')
+                  }
+                >
+                  {getAvailableDidNumbers(selectedBranch?._id).map((did) => (
+                    <MenuItem key={did.id} value={did.id}>{did.number}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseEditBranch}>Cancel</Button>
+            <Button variant="contained" onClick={handleUpdateBranch} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>Update Agent</Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Edit Agent Modal */}
-      <CModal visible={openEditBranch} onClose={handleCloseEditBranch} size="lg">
-        <CModalHeader>
-          <CModalTitle>Edit Agent</CModalTitle>
-        </CModalHeader>
-        <CModalBody>
-          <CForm>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editAgentName">Agent Name</CFormLabel>
-              <CFormInput
-                type="text"
-                id="editAgentName"
-                value={branchName}
-                onChange={(e) => setBranchName(e.target.value)}
-                placeholder="Enter agent name"
-                required
+        {/* Change Password Dialog */}
+        <Dialog 
+          open={openChangePassword} 
+          onClose={handleCloseChangePassword} 
+          maxWidth="sm" 
+          fullWidth
+          disableEscapeKeyDown={false}
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LockIcon />
+            Change Agent Password
+          </DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: 'grid', gap: 2, pt: 2 }}>
+              {selectedAgentForPassword && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Changing password for: <strong>{selectedAgentForPassword.branchName}</strong> ({selectedAgentForPassword.manager?.email})
+                </Typography>
+              )}
+              <TextField
+                label="New Password"
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                fullWidth
+                placeholder="Enter new password (min 6 characters)"
+                autoFocus
+                autoComplete="new-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        edge="end"
+                        size="small"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
-            </div>
-            {/* Manager Name removed per request */}
-            <div className="mb-3">
-              <CFormLabel htmlFor="editManagerEmail">Email Address</CFormLabel>
-              <CFormInput
-                type="email"
-                id="editManagerEmail"
-                value={managerEmail}
-                onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="Enter email address"
-                required
+              <TextField
+                label="Confirm Password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                fullWidth
+                placeholder="Re-enter password to confirm"
+                autoComplete="new-password"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        edge="end"
+                        size="small"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editDepartment">Department</CFormLabel>
-              <CFormSelect
-                id="editDepartment"
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                required
-              >
-                <option value="">Select Department</option>
-                {departments.map((dept) => (
-                  <option key={dept._id} value={dept._id || dept.id}>
-                    {typeof dept === 'object' ? (dept.name || 'Unnamed Department') : String(dept)}
-                  </option>
-                ))}
-              </CFormSelect>
-            </div>
-            <div className="mb-3">
-              <CFormLabel htmlFor="editTimeGroup">Shift</CFormLabel>
-              <CFormSelect
-                id="editTimeGroup"
-                value={timeGroup}
-                onChange={e => handleTimeGroupChange(e.target.value)}
-                required
-              >
-                <option value="">Select Shift</option>
-                <option value="morning">Morning Shift (8 AM - 4 PM)</option>
-                <option value="afternoon">Afternoon Shift (12 PM - 8 PM)</option>
-                <option value="evening">Evening Shift (4 PM - 12 AM)</option>
-                <option value="full">Full Shift (9 AM - 6 PM)</option>
-                <option value="night">Night Shift (10 PM - 6 AM)</option>
-                <option value="24hours">24 Hours</option>
-              </CFormSelect>
-              
-            </div>
-            
-            <div className="mb-3">
-              <CFormLabel htmlFor="editAssignDid">Assign DID</CFormLabel>
-              <CFormSelect
-                id="editAssignDid"
-                value={selectedDid}
-                onChange={(e) => setSelectedDid(e.target.value)}
-              >
-                <option value="">Select DID Number</option>
-                {getAvailableDidNumbers(selectedBranch?._id).map((did) => (
-                  <option key={did.id} value={did.id}>
-                    {did.number}
-                  </option>
-                ))}
-              </CFormSelect>
-            </div>
-          </CForm>
-        </CModalBody>
-        <CModalFooter>
-          <CButton color="secondary" onClick={handleCloseEditBranch}>
-            Cancel
-          </CButton>
-          <CButton color="primary" onClick={handleUpdateBranch}>
-            Update Agent
-          </CButton>
-        </CModalFooter>
-      </CModal>
-    </div>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                • Password must be at least 6 characters long<br />
+                • Use a mix of uppercase, lowercase, numbers, and symbols for security
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseChangePassword} disabled={passwordChangeLoading}>Cancel</Button>
+            <Button 
+              variant="contained" 
+              onClick={handleChangePassword}
+              disabled={passwordChangeLoading}
+              sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}
+            >
+              {passwordChangeLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+              {passwordChangeLoading ? 'Changing...' : 'Change Password'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </div>
+    </Box>
   );
 };
 

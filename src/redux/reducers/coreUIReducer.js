@@ -1,5 +1,7 @@
 const initialState = {
     sidebarShow: true,
+    dialerOpen: false,
+    dialerNumber: '',
   };
   
   export const coreUIReducer = (state = initialState, action) => {

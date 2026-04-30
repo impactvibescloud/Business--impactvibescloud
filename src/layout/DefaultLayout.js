@@ -5,6 +5,7 @@ import {
   AppSidebar,
   MaintenanceAlert,
 } from "../components/index";
+import CustomHeader from "../components/CustomHeader";
 import { getMaintenanceConfig, isInMaintenanceWindow } from "../config/maintenanceConfig";
 
 const DefaultLayout = () => {
@@ -46,7 +47,7 @@ const DefaultLayout = () => {
     <div className="main-layout">
       <AppSidebar />
       <div className="wrapper d-flex flex-column min-vh-100 bg-light">
-        {/* Header removed - profile and status moved to sidebar footer */}
+        <CustomHeader />
         {loading ? (
           <div>Loading maintenance status...</div>
         ) : showMaintenance ? (

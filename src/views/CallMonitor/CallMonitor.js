@@ -1,22 +1,29 @@
 import React, { useEffect, useState, useRef } from 'react'
 import {
-  CRow,
-  CCol,
-  CCard,
-  CCardBody,
-  CButton,
-  CTable,
-  CTableHead,
-  CTableRow,
-  CTableHeaderCell,
-  CTableBody,
-  CTableDataCell,
-  CSpinner,
-  CBadge,
-} from '@coreui/react'
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  CircularProgress,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Paper,
+  Typography,
+  Alert,
+} from '@mui/material'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import CallMissedIcon from '@mui/icons-material/CallMissed'
+import CallReceivedIcon from '@mui/icons-material/CallReceived'
 import { apiCall } from '../../config/api'
 import SipRegistration from '../../components/sip/SipRegistration'
 import WebphoneAudio from '../../components/sip/WebphoneAudio'
+import WebPhoneDialer from '../../components/sip/WebPhoneDialer'
+import '../Leads/CallLogsWebpage.css'
 
 const CallMonitor = () => {
   const [businessId, setBusinessId] = useState('')
@@ -25,6 +32,7 @@ const CallMonitor = () => {
   const [liveCalls, setLiveCalls] = useState([])
   const [logicalCalls, setLogicalCalls] = useState([])
   const pollingRef = useRef(null)
+  
   const [regStatus, setRegStatus] = useState('disconnected')
   const [ua, setUa] = useState(null)
   const [monitorSession, setMonitorSession] = useState(null)
@@ -33,6 +41,11 @@ const CallMonitor = () => {
   const [whisperCall, setWhisperCall] = useState(null)
   const [bargeSession, setBargeSession] = useState(null)
   const [bargeCall, setBargeCall] = useState(null)
+
+  // SIP configuration state
+  const [sipConfig, setSipConfig] = useState(null)
+  const [loadingSipConfig, setLoadingSipConfig] = useState(false)
+  const [supervisorNumber, setSupervisorNumber] = useState(null)
 
   const fetchBusinessIdIfNeeded = async () => {
     if (businessId) return businessId
@@ -47,6 +60,79 @@ const CallMonitor = () => {
       // ignore; will show error on fetch
     }
     return null
+  }
+
+  const isIpAddress = (domain) => {
+    // Check if domain is an IP address (IPv4 or IPv6)
+    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/
+    const ipv6Pattern = /^(\[?([a-f0-9:]+)\]?)$/
+    return ipv4Pattern.test(domain) || ipv6Pattern.test(domain)
+  }
+
+  const fetchSipConfiguration = async () => {
+    const bId = await fetchBusinessIdIfNeeded()
+    if (!bId) {
+      console.warn('Business ID not available for SIP config fetch')
+      return
+    }
+
+    setLoadingSipConfig(true)
+    try {
+      // Fetch supervisor-number endpoint which now returns password
+      const supervisorRes = await apiCall(`/businesses/${encodeURIComponent(bId)}/supervisor-number`, 'GET')
+      
+      console.log('[CallMonitor] Supervisor-Number Response:', supervisorRes)
+      
+      if (supervisorRes?.success && supervisorRes?.numberDetails) {
+        const details = supervisorRes.numberDetails
+        let domain = details.sip_domain || 'pbx.justconnect.biz'
+        
+        // Store supervisor number
+        const supervisorNum = supervisorRes.supervisorNumber || supervisorRes.numberDetails?.number
+        setSupervisorNumber(supervisorNum)
+        
+        // If domain is an IP address, use WS (non-secure) instead of WSS
+        // because SSL certificates don't support IP addresses
+        const isIP = isIpAddress(domain)
+        const shouldUseWSS = !isIP && (details.sip_transport === 'wss' || details.sip_transport === 'WSS')
+        
+        const config = {
+          sip_domain: domain,
+          extension: details.sip_endpoint || details.extension || '1010',
+          sip_password: details.sip_password || '',
+          ws_port: details.sip_port || 8089,
+          ws_path: '/ws',
+          wss: shouldUseWSS,
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        }
+        setSipConfig(config)
+        console.log('[CallMonitor] SIP configuration ready with credentials:', {
+          domain: config.sip_domain,
+          isIP: isIP,
+          extension: config.extension,
+          hasPassword: !!config.sip_password,
+          port: config.ws_port,
+          transport: config.wss ? 'WSS' : 'WS',
+          note: isIP ? 'Using WS instead of WSS because domain is IP address' : ''
+        })
+      } else {
+        console.warn('[CallMonitor] Invalid SIP configuration response:', supervisorRes)
+      }
+    } catch (err) {
+      console.error('[CallMonitor] Failed to fetch SIP configuration:', err)
+      // Use fallback config
+      setSipConfig({
+        sip_domain: 'pbx.justconnect.biz',
+        extension: '1010',
+        sip_password: '',
+        ws_port: 8089,
+        ws_path: '/ws',
+        wss: true,
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      })
+    } finally {
+      setLoadingSipConfig(false)
+    }
   }
 
   const fetchLiveCalls = async () => {
@@ -82,6 +168,7 @@ const CallMonitor = () => {
   useEffect(() => {
     // initial fetch
     fetchLiveCalls()
+    fetchSipConfiguration()
 
     // poll every 5 seconds
     pollingRef.current = setInterval(() => {
@@ -94,11 +181,13 @@ const CallMonitor = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // SIP config (using credentials provided)
-  const sipCfg = {
+  
+
+  // Use fetched SIP config if available, fallback to default
+  const sipCfg = sipConfig || {
     sip_domain: 'pbx.justconnect.biz',
-    extension: '1036',
-    sip_password: 'secure_password_1036',
+    extension: '1010',
+    sip_password: '',
     ws_port: 8089,
     ws_path: '/ws',
     wss: true,
@@ -106,98 +195,216 @@ const CallMonitor = () => {
   }
 
   const extractExtension = (call) => {
+    if (!call) return null
+
+    // Strategy 1: Try assignedAgent object
     const assigned = call?.assignedAgent || call?.agent
     if (assigned) {
       if (typeof assigned === 'object') {
-        if (assigned.extension) return String(assigned.extension)
-        if (assigned.ext) return String(assigned.ext)
-        if (assigned.sipExtension) return String(assigned.sipExtension)
-      } else if (typeof assigned === 'string' && /^\d+$/.test(assigned)) {
-        return assigned
+        if (assigned.extension) {
+          const ext = String(assigned.extension).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+        if (assigned.ext) {
+          const ext = String(assigned.ext).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+        if (assigned.sipExtension) {
+          const ext = String(assigned.sipExtension).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+        if (assigned.sip) {
+          const ext = String(assigned.sip).trim()
+          if (/^\d{3,}$/.test(ext)) return ext
+        }
+      } else if (typeof assigned === 'string') {
+        // extract digits if it's a string
+        const digits = assigned.replace(/\D/g, '')
+        if (digits && /^\d{3,}$/.test(digits)) return digits
       }
     }
 
+    // Strategy 2: Parse from channel (SIP channel usually has format like "SIP/1234-xyz")
     const channel = call?.channel || call?.legs?.[0]?.channel
     if (channel && typeof channel === 'string') {
-      const m = channel.match(/\/(\d+)(?:-|$)/)
+      const m = channel.match(/[/:@](\d{3,})(?:[/-]|$)/)
+      if (m && m[1]) {
+        const ext = String(m[1]).trim()
+        if (/^\d{3,}$/.test(ext)) return ext
+      }
+      // Try alternative pattern
+      const m2 = channel.match(/(\d{3,})/)
+      if (m2 && m2[1]) return m2[1]
+    }
+
+    // Strategy 3: Try other agent-related fields
+    if (call?.agentExtension) {
+      const ext = String(call.agentExtension).trim()
+      if (/^\d{3,}$/.test(ext)) return ext
+    }
+    if (call?.agentId && /^\d{3,}$/.test(String(call.agentId).trim())) {
+      return String(call.agentId).trim()
+    }
+
+    // Strategy 4: Extract from raw if available
+    if (call?.raw && typeof call.raw === 'string') {
+      const m = call.raw.match(/(\d{3,})/)
       if (m && m[1]) return m[1]
     }
 
-    if (call?.agent && typeof call.agent === 'string' && /\d+/.test(call.agent)) {
-      const m = call.agent.match(/(\d{3,})/)
-      if (m) return m[1]
-    }
-
+    console.warn('Could not extract extension from call:', call)
     return null
   }
 
-  const handleBargeClick = async (call) => {
+  // Helper to initiate monitor/whisper/barge with proper session listeners
+  const initiateCall = async (callType, call) => {
     const ext = extractExtension(call)
+    
+    console.log(`[${callType}] Attempting call:`, {
+      ext,
+      callData: {
+        assignedAgent: call?.assignedAgent,
+        agent: call?.agent,
+        channel: call?.channel,
+        raw: call?.raw?.slice(0, 100),
+      }
+    })
+
     if (!ext) {
-      alert('Could not determine extension to barge for this call.')
+      alert(`Could not determine extension to ${callType} for this call.\n\nDebug Info:\nAgent: ${call?.assignedAgent?.name || call?.agent || 'unknown'}\nNo valid extension found in call data.`)
       return
     }
+
+    // Validate extension format
+    if (!/^\d{3,}$/.test(ext)) {
+      alert(`Invalid extension format: "${ext}". Extension must be at least 3 digits.`)
+      return
+    }
+
     if (!ua) {
       alert('SIP UA not ready; please wait for registration.')
       return
     }
+
     const domain = (ua.configuration && ua.configuration.uri && ua.configuration.uri.host) || sipCfg.sip_domain || ''
-    const dial = `*92${ext}`
+    
+    // Build dial string based on callType
+    let dial = ''
+    if (callType === 'monitor') dial = `*90${ext}`
+    else if (callType === 'whisper') dial = `*91${ext}`
+    else if (callType === 'barge') dial = `*92${ext}`
+    else return
+
     const target = domain ? `sip:${dial}@${domain}` : `sip:${dial}`
+
     try {
-      const options = { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: sipCfg.iceServers } }
+      // Request microphone access BEFORE initiating call
+      let localStream = null
+      try {
+        console.log(`[${callType}] Requesting microphone access...`)
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false
+        })
+        console.log(`[${callType}] Microphone access granted, local stream:`, localStream)
+      } catch (micErr) {
+        console.warn(`[${callType}] Microphone access failed (this may prevent two-way audio):`, micErr)
+        alert(`Microphone access denied. ${callType} will be audio-out-only.\n\nPlease allow microphone access in browser settings.`)
+        // Continue anyway - at least they can listen
+      }
+
+      const options = {
+        mediaConstraints: { audio: true, video: false },
+        pcConfig: { 
+          iceServers: sipCfg.iceServers,
+          // Ensure ICE consent check is enabled
+          iceTransportPolicy: 'all',
+        },
+        // Pass local stream if available so it gets added to peer connection
+        ...(localStream && { mediaStream: localStream })
+      }
+      
+      console.log(`[${callType}] Initiating SIP call to: ${target}`)
+      
+      // Create session
       const session = ua.call(target, options)
-      setBargeSession(session)
-      setBargeCall(call)
-      session.on && session.on('ended', () => { setBargeSession(null); setBargeCall(null) })
-      session.on && session.on('failed', () => { setBargeSession(null); setBargeCall(null) })
+
+      // Helper to clean up session
+      const cleanup = () => {
+        // Stop local stream tracks
+        if (localStream) {
+          localStream.getTracks().forEach(track => {
+            try { track.stop() } catch (e) {}
+          })
+        }
+
+        if (callType === 'monitor') { setMonitorSession(null); setMonitorCall(null) }
+        else if (callType === 'whisper') { setWhisperSession(null); setWhisperCall(null) }
+        else if (callType === 'barge') { setBargeSession(null); setBargeCall(null) }
+      }
+
+      // Attach event listeners BEFORE storing in state to ensure they fire
+      // This prevents race conditions where the session might end before listeners attach
+      if (session && typeof session.on === 'function') {
+        session.on('progress', () => {
+          console.debug(`[${callType}] Call in progress to ${target}`)
+        })
+        session.on('confirmed', () => {
+          console.debug(`[${callType}] Call confirmed to ${target}`)
+          // Ensure local stream is added to peer connection if not already
+          if (localStream && session.connection) {
+            try {
+              localStream.getTracks().forEach(track => {
+                const senders = session.connection.getSenders ? session.connection.getSenders() : []
+                const hasTrack = senders.some(s => s.track === track)
+                if (!hasTrack) {
+                  console.log(`[${callType}] Adding local ${track.kind} track to peer connection`)
+                  session.connection.addTrack(track, localStream)
+                }
+              })
+            } catch (e) {
+              console.warn(`[${callType}] Error adding local stream to peer connection:`, e)
+            }
+          }
+        })
+        session.on('ended', () => {
+          console.debug(`[${callType}] Call ended`)
+          cleanup()
+        })
+        session.on('failed', (data) => {
+          const errorMsg = data?.cause || (data?.message && data.message.reason) || 'Unknown error'
+          console.error(`[${callType}] Call failed:`, { cause: errorMsg, data, dial, ext, target })
+          alert(`${callType.charAt(0).toUpperCase() + callType.slice(1)} failed (${errorMsg}).\n\nDial: ${dial}\nExt: ${ext}`)
+          cleanup()
+        })
+      }
+
+      // NOW store the session in state - listeners are already attached
+      if (callType === 'monitor') { setMonitorSession(session); setMonitorCall(call) }
+      else if (callType === 'whisper') { setWhisperSession(session); setWhisperCall(call) }
+      else if (callType === 'barge') { setBargeSession(session); setBargeCall(call) }
+
+      console.debug(`[${callType}] Session created`, { session, ext, target, localStream })
     } catch (err) {
-      console.error('Barge failed', err)
-      alert('Barge failed: ' + String(err))
+      console.error(`[${callType}] Failed:`, err)
+      alert(`${callType.charAt(0).toUpperCase() + callType.slice(1)} failed: ${String(err.message || err)}\n\nExt: ${ext}`)
     }
   }
 
-  const handleMonitorClick = async (call) => {
-    const ext = extractExtension(call)
-    if (!ext) {
-      alert('Could not determine extension to monitor for this call.')
-      return
-    }
-    if (!ua) { alert('SIP UA not ready; please wait for registration.'); return }
-    const domain = (ua.configuration && ua.configuration.uri && ua.configuration.uri.host) || sipCfg.sip_domain || ''
-    const dial = `*90${ext}`
-    const target = domain ? `sip:${dial}@${domain}` : `sip:${dial}`
-    try {
-      const options = { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: sipCfg.iceServers } }
-      const session = ua.call(target, options)
-      setMonitorSession(session)
-      setMonitorCall(call)
-      session.on && session.on('ended', () => { setMonitorSession(null); setMonitorCall(null) })
-      session.on && session.on('failed', () => { setMonitorSession(null); setMonitorCall(null) })
-    } catch (err) {
-      console.error('Monitor failed', err)
-      alert('Monitor failed: ' + String(err))
-    }
+  const handleBargeClick = (call) => {
+    initiateCall('barge', call)
   }
 
-  const handleWhisperClick = async (call) => {
-    const ext = extractExtension(call)
-    if (!ext) { alert('Could not determine extension to whisper for this call.'); return }
-    if (!ua) { alert('SIP UA not ready; please wait for registration.'); return }
-    const domain = (ua.configuration && ua.configuration.uri && ua.configuration.uri.host) || sipCfg.sip_domain || ''
-    const dial = `*91${ext}`
-    const target = domain ? `sip:${dial}@${domain}` : `sip:${dial}`
-    try {
-      const options = { mediaConstraints: { audio: true, video: false }, pcConfig: { iceServers: sipCfg.iceServers } }
-      const session = ua.call(target, options)
-      setWhisperSession(session)
-      setWhisperCall(call)
-      session.on && session.on('ended', () => { setWhisperSession(null); setWhisperCall(null) })
-      session.on && session.on('failed', () => { setWhisperSession(null); setWhisperCall(null) })
-    } catch (err) {
-      console.error('Whisper failed', err)
-      alert('Whisper failed: ' + String(err))
-    }
+  const handleMonitorClick = (call) => {
+    initiateCall('monitor', call)
+  }
+
+  const handleWhisperClick = (call) => {
+    initiateCall('whisper', call)
   }
 
   // Heuristic to determine if a live call is inbound or outbound.
@@ -236,158 +443,249 @@ const CallMonitor = () => {
 
   return (
     <>
-    <CRow>
-      <CCol>
-        <CCard>
-          <CCardBody>
-            <SipRegistration sipConfig={sipCfg} enableDebug={false} onRegistrationStatus={setRegStatus} onUaReady={(u) => setUa(u)} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <h3 style={{ margin: 0 }}>Call Monitor</h3>
-                <CBadge color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'secondary'}>{regStatus}</CBadge>
-              </div>
-              <div>
-                <CButton color="primary" onClick={fetchLiveCalls} disabled={loading}>
-                  {loading ? <><CSpinner size="sm" />&nbsp;Refreshing</> : 'Refresh'}
-                </CButton>
-              </div>
-            </div>
+    <Box className="page-container" sx={{ p: 2 }}>
+      {/* Two-column layout: Webphone on left, Call Monitor on right */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '320px 1fr' }, gap: 2, minHeight: 'calc(100vh - 100px)' }}>
+        {/* LEFT SIDEBAR: Webphone Dialer */}
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column' }}>
+          <WebPhoneDialer ua={ua} regStatus={regStatus} sipDomain={sipCfg.sip_domain} businessId={businessId} supervisorNumber={supervisorNumber} />
+        </Box>
 
-            {error && <div style={{ color: 'var(--cui-danger)' }}>{error}</div>}
+        {/* RIGHT MAIN: Call Monitor Table and SIP Registration */}
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Card>
+            <CardHeader
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600, m: 0 }}>Call Monitor</Typography>
+                  <Chip
+                    label={regStatus === 'registered' ? 'Online' : regStatus === 'connecting' ? 'Connecting' : 'Offline'}
+                    size="small"
+                    color={regStatus === 'registered' ? 'success' : regStatus === 'connected' ? 'info' : regStatus === 'connecting' ? 'warning' : 'default'}
+                    variant="outlined"
+                  />
+                </Box>
+              }
+              action={
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+                  onClick={fetchLiveCalls}
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing' : 'Refresh'}
+                </Button>
+              }
+              sx={{ pb: 2 }}
+            />
+            <CardContent>
+              <Box sx={{ mb: 3 }}>
+                {loadingSipConfig ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+                    <CircularProgress size={24} sx={{ mr: 2 }} />
+                    <Typography variant="body2">Loading SIP configuration...</Typography>
+                  </Box>
+                ) : !sipConfig?.sip_password ? (
+                  <Alert severity="warning">
+                    SIP password not configured. Please configure it in Settings &gt; Call Settings.
+                  </Alert>
+                ) : (
+                  <SipRegistration sipConfig={sipCfg} enableDebug={false} onRegistrationStatus={setRegStatus} onUaReady={(u) => setUa(u)} />
+                )}
+              </Box>
 
-            <div style={{ marginTop: 12 }}>
+              {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+
               {loading && !liveCalls.length ? (
-                <div style={{ padding: 20 }}><CSpinner />&nbsp;Loading live calls...</div>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress sx={{ mr: 2 }} />
+                  <Typography>Loading live calls...</Typography>
+                </Box>
+              ) : liveCalls.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Chip label="No active calls" color="default" />
+                </Box>
               ) : (
-                <>
-                  {liveCalls.length === 0 ? (
-                    <div style={{ padding: 20 }}><CBadge color="secondary">No active calls</CBadge></div>
-                  ) : (
-                    <CTable striped hover responsive>
-                      <CTableHead>
-                        <CTableRow>
-                          <CTableHeaderCell>Direction</CTableHeaderCell>
-                          <CTableHeaderCell>Channel</CTableHeaderCell>
-                          <CTableHeaderCell>Status</CTableHeaderCell>
-                          <CTableHeaderCell>Duration</CTableHeaderCell>
-                          <CTableHeaderCell>DID</CTableHeaderCell>
-                          <CTableHeaderCell>Agent</CTableHeaderCell>
-                          <CTableHeaderCell>Branch</CTableHeaderCell>
-                          <CTableHeaderCell>Raw</CTableHeaderCell>
-                          <CTableHeaderCell>Actions</CTableHeaderCell>
-                        </CTableRow>
-                      </CTableHead>
-                      <CTableBody>
-                        {liveCalls.map((c, idx) => (
-                          <CTableRow key={`${c.channel || c.groupId || idx}-${idx}`}>
-                            <CTableDataCell>
-                              {(() => {
-                                const dir = detectDirection(c)
-                                return (
-                                  <CBadge color={dir === 'Outgoing' ? 'primary' : dir === 'Inbound' ? 'info' : 'secondary'}>
-                                    {dir}
-                                  </CBadge>
-                                )
-                              })()}
-                            </CTableDataCell>
-                            <CTableDataCell>{c.channel || '-'}</CTableDataCell>
-                            <CTableDataCell>
-                              <CBadge color={String(c.status || '').toLowerCase() === 'up' ? 'success' : String(c.status || '').toLowerCase() === 'ring' ? 'warning' : 'secondary'}>
-                                {c.status || '-'}
-                              </CBadge>
-                            </CTableDataCell>
-                            <CTableDataCell>{c.duration || '-'}</CTableDataCell>
-                            <CTableDataCell>{c.did?.number || c.tokens?.[3] || '-'}</CTableDataCell>
-                            <CTableDataCell>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</CTableDataCell>
-                            <CTableDataCell>{c.branch?.branchName || '-'}</CTableDataCell>
-                            <CTableDataCell style={{ maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.raw || '-'}</CTableDataCell>
-                            <CTableDataCell>
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <CButton
-                                  size="sm"
-                                  color="info"
-                                  onClick={() => handleMonitorClick(c)}
-                                  disabled={regStatus !== 'registered' || !ua}
-                                  title={regStatus === 'registered' && ua ? 'Monitor' : `Disabled: waiting for SIP registration (${regStatus})`}
-                                >
-                                  Monitor
-                                </CButton>
-                                <CButton
-                                  size="sm"
-                                  color="warning"
-                                  onClick={() => handleWhisperClick(c)}
-                                  disabled={regStatus !== 'registered' || !ua}
-                                  title={regStatus === 'registered' && ua ? 'Whisper' : `Disabled: waiting for SIP registration (${regStatus})`}
-                                >
-                                  Whisper
-                                </CButton>
-                                <CButton
-                                  size="sm"
-                                  color="success"
-                                  onClick={() => handleBargeClick(c)}
-                                  disabled={regStatus !== 'registered' || !ua}
-                                  title={regStatus === 'registered' && ua ? 'Barge' : `Disabled: waiting for SIP registration (${regStatus})`}
-                                >
-                                  Barge
-                                </CButton>
-                              </div>
-                            </CTableDataCell>
-                          </CTableRow>
-                        ))}
-                      </CTableBody>
-                    </CTable>
-                  )}
-                </>
+                <Paper variant="outlined" className="calllogs-table-container">
+                  <Table size="small" sx={{ '& th, & td': { py: 1, px: 1.5, lineHeight: 1.15 }, '& td': { overflow: 'hidden', textOverflow: 'ellipsis' } }}>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: '#f3f4f6' }}>
+                        <TableCell sx={{ fontWeight: 600 }}>Direction</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Channel</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>DID</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Agent</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {liveCalls.map((c, idx) => (
+                        <TableRow key={`${c.channel || c.groupId || idx}-${idx}`} hover>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            {(() => {
+                              const dir = detectDirection(c)
+                              return (
+                                <Chip
+                                  icon={dir === 'Outgoing' ? <CallMissedIcon /> : <CallReceivedIcon />}
+                                  label={dir}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: dir === 'Outgoing' ? '#e3f2fd' : dir === 'Inbound' ? '#f3e5f5' : '#f5f5f5',
+                                    color: dir === 'Outgoing' ? '#1565c0' : dir === 'Inbound' ? '#6a1b9a' : '#616161',
+                                    fontWeight: 500,
+                                  }}
+                                />
+                              )
+                            })()}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.channel || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Chip
+                              label={c.status || '-'}
+                              size="small"
+                              sx={{
+                                backgroundColor: String(c.status || '').toLowerCase() === 'up' ? '#c8e6c9' : String(c.status || '').toLowerCase() === 'ring' ? '#ffe0b2' : '#e0e0e0',
+                                color: String(c.status || '').toLowerCase() === 'up' ? '#2e7d32' : String(c.status || '').toLowerCase() === 'ring' ? '#f57c00' : '#424242',
+                                fontWeight: 500,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.duration || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.did?.number || c.tokens?.[3] || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{c.assignedAgent?.name || c.assignedAgent?.email || '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' }, fontSize: '0.75rem', py: 0.5, px: 1 }}
+                                onClick={() => handleMonitorClick(c)}
+                                disabled={regStatus !== 'registered' || !ua}
+                              >
+                                Monitor
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ backgroundColor: '#f59e0b', '&:hover': { backgroundColor: '#d97706' }, fontSize: '0.75rem', py: 0.5, px: 1 }}
+                                onClick={() => handleWhisperClick(c)}
+                                disabled={regStatus !== 'registered' || !ua}
+                              >
+                                Whisper
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                sx={{ backgroundColor: '#10b981', '&:hover': { backgroundColor: '#059669' }, fontSize: '0.75rem', py: 0.5, px: 1 }}
+                                onClick={() => handleBargeClick(c)}
+                                disabled={regStatus !== 'registered' || !ua}
+                              >
+                                Barge
+                              </Button>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
               )}
-            </div>
-          </CCardBody>
-        </CCard>
-      </CCol>
-      </CRow>
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
+    </Box>
 
       {/* Monitor session audio playback */}
       {monitorSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>Monitoring <strong>{monitorCall?.assignedAgent?.name || monitorCall?.assignedAgent?.email || monitorCall?.agent || 'agent'}</strong></div>
-            <div>
-              <CButton size="sm" color="danger" onClick={() => { try { monitorSession.terminate(); } catch(e){} setMonitorSession(null); setMonitorCall(null); }}>Hangup</CButton>
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 2, borderRadius: 1, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1110 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2">
+              Monitoring <strong>{monitorCall?.assignedAgent?.name || monitorCall?.assignedAgent?.email || monitorCall?.agent || 'agent'}</strong>
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                try {
+                  if (monitorSession && typeof monitorSession.terminate === 'function') {
+                    monitorSession.terminate()
+                  }
+                } catch(e){ console.warn('Error terminating monitor session', e) }
+                setMonitorSession(null)
+                setMonitorCall(null)
+              }}
+            >
+              Hangup
+            </Button>
+          </Box>
+          <Box>
             <WebphoneAudio session={monitorSession} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       {/* Whisper session audio playback */}
       {whisperSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1100 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>Whispering to <strong>{whisperCall?.assignedAgent?.name || whisperCall?.assignedAgent?.email || whisperCall?.agent || 'agent'}</strong></div>
-            <div>
-              <CButton size="sm" color="danger" onClick={() => { try { whisperSession.terminate(); } catch(e){} setWhisperSession(null); setWhisperCall(null); }}>Hangup</CButton>
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 2, borderRadius: 1, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1100 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2">
+              Whispering to <strong>{whisperCall?.assignedAgent?.name || whisperCall?.assignedAgent?.email || whisperCall?.agent || 'agent'}</strong>
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                try {
+                  if (whisperSession && typeof whisperSession.terminate === 'function') {
+                    whisperSession.terminate()
+                  }
+                } catch(e){ console.warn('Error terminating whisper session', e) }
+                setWhisperSession(null)
+                setWhisperCall(null)
+              }}
+            >
+              Hangup
+            </Button>
+          </Box>
+          <Box>
             <WebphoneAudio session={whisperSession} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
 
       {/* Barge session audio playback */}
       {bargeSession && (
-        <div style={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1090 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>Barging into <strong>{bargeCall?.assignedAgent?.name || bargeCall?.assignedAgent?.email || bargeCall?.agent || 'agent'}</strong></div>
-            <div>
-              <CButton size="sm" color="danger" onClick={() => { try { bargeSession.terminate(); } catch(e){} setBargeSession(null); setBargeCall(null); }}>Hangup</CButton>
-            </div>
-          </div>
-          <div style={{ marginTop: 8 }}>
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16, width: 360, background: 'white', padding: 2, borderRadius: 1, boxShadow: '0 6px 18px rgba(0,0,0,0.1)', zIndex: 1090 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2">
+              Barging into <strong>{bargeCall?.assignedAgent?.name || bargeCall?.assignedAgent?.email || bargeCall?.agent || 'agent'}</strong>
+            </Typography>
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              onClick={() => {
+                try {
+                  if (bargeSession && typeof bargeSession.terminate === 'function') {
+                    bargeSession.terminate()
+                  }
+                } catch(e){ console.warn('Error terminating barge session', e) }
+                setBargeSession(null)
+                setBargeCall(null)
+              }}
+            >
+              Hangup
+            </Button>
+          </Box>
+          <Box>
             <WebphoneAudio session={bargeSession} />
-          </div>
-        </div>
+          </Box>
+        </Box>
       )}
     </>
   )

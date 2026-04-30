@@ -48,8 +48,21 @@ const log = (type, ...args) => {
   }
 }
 
-// Generate fallback data based on endpoint
+// Throttle fallback. NEVER fabricates user identity, role, or businessId —
+// returning a fake authenticated user from the client is a privilege-
+// escalation vector (the UI will believe the user is logged in as someone
+// they aren't, and any subsequent write that trusts the cached value will
+// hit the wrong tenant). Throttling only returns inert empty payloads;
+// auth-bearing endpoints fall through to the network so a real failure
+// becomes a real error.
 const generateFallbackData = (url) => {
+  if (
+    url.includes('/user/details') ||
+    url.includes('/user/login') ||
+    url.includes('/auth')
+  ) {
+    return null
+  }
   if (url.includes('/config')) {
     return {
       success: true,
@@ -57,33 +70,44 @@ const generateFallbackData = (url) => {
       data: { theme: 'default', features: [] }
     }
   }
-  
-  if (url.includes('/user/details')) {
-    return {
-      success: true,
-      message: 'Fallback user data - reducing API load',
-      user: {
-        role: 'business_admin',
-        name: 'Admin User',
-        email: 'admin@example.com',
-        businessId: '684fe39da8254e8906e99aad',
-        accessTo: {
-          'dashboard': true,
-          'contacts': true,
-          'billing': true,
-          'branches': true,
-          'call-logs': true,
-          'virtual-numbers': true
-        }
-      }
-    }
-  }
-  
-  // For other endpoints, return empty array
   return {
     success: true,
     message: 'Fallback data - reducing API load',
     data: []
+  }
+}
+
+// Endpoints whose response shape includes mutable per-tenant state; any
+// successful write should invalidate cached GETs that share the same prefix
+// so the next read pulls fresh data.
+const CACHE_INVALIDATION_PREFIXES = [
+  '/contacts',
+  '/contact-list',
+  '/branches',
+  '/numbers',
+  '/call-logs',
+  '/billing',
+  '/invoices',
+  '/tickets',
+  '/departments',
+  '/leads',
+  '/business',
+  '/user',
+  '/plans',
+  '/dispositions',
+]
+
+const invalidateCacheFor = (url = '') => {
+  if (!url) return
+  // Drop any cached GET whose URL shares an invalidation prefix with the
+  // mutated URL. This is intentionally coarse — better to refetch a few
+  // extra GETs than to serve stale data after a write.
+  const matched = CACHE_INVALIDATION_PREFIXES.filter((p) => url.includes(p))
+  if (matched.length === 0) return
+  for (const key of Array.from(apiCache.keys())) {
+    if (matched.some((p) => key.includes(p))) {
+      apiCache.delete(key)
+    }
   }
 }
 
@@ -100,15 +124,19 @@ export const setupAxiosInterceptors = () => {
   // This can be explicitly overridden by setting `REACT_APP_USE_DIRECT_BACKEND=true`
   // and optionally `REACT_APP_DIRECT_BACKEND_URL` for a custom URL.
   if (process.env.REACT_APP_USE_DIRECT_BACKEND === 'true') {
-    axios.defaults.baseURL = process.env.REACT_APP_DIRECT_BACKEND_URL || 'https://api.justconnect.biz'
-    console.log('✅ Axios configured to use direct backend:', axios.defaults.baseURL)
+    axios.defaults.baseURL = process.env.REACT_APP_DIRECT_BACKEND_URL || ''
+    if (!axios.defaults.baseURL) {
+      console.error('[axios] REACT_APP_USE_DIRECT_BACKEND=true but REACT_APP_DIRECT_BACKEND_URL is empty')
+    }
   } else if (!axios.defaults.baseURL) {
     if (process.env.NODE_ENV === 'development') {
-      axios.defaults.baseURL = 'http://localhost:5040'
+      axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5040'
     } else {
-      axios.defaults.baseURL = 'https://api.justconnect.biz'
+      // In prod the backend is configured via build-time env vars (see config/api.js).
+      // Falling back to same-origin avoids accidentally targeting a hardcoded host.
+      axios.defaults.baseURL =
+        process.env.REACT_APP_PROD_API_URL || process.env.REACT_APP_BASE_URL || ''
     }
-    console.log('✅ Axios baseURL set to:', axios.defaults.baseURL)
   }
   
   // Enhanced URL rewriting interceptor with session management
@@ -130,9 +158,11 @@ export const setupAxiosInterceptors = () => {
           }
         }      // Add retry configuration for important requests
       if (!config.retry) {
+        // Disable automatic retries by default to reduce added latency.
+        // Individual requests can enable retries if needed.
         config.retry = {
-          retries: 3,
-          retryDelay: 1000,
+          retries: 0,
+          retryDelay: 500,
           retryCondition: (error) => {
             return error.code === 'ERR_NETWORK' || 
                    error.code === 'ERR_CONNECTION_REFUSED' ||
@@ -143,13 +173,23 @@ export const setupAxiosInterceptors = () => {
       
       // Clean up any URLs to prevent double api paths
       if (config.url) {
-        // Clean up any double api in the path
         config.url = config.url.replace(/\/api\/api\//g, '/api/')
-        
-        // Strip absolute production host if present so axios uses relative paths
-        // Only do this when not explicitly configured to use the direct backend.
-        if (process.env.REACT_APP_USE_DIRECT_BACKEND !== 'true' && config.url.includes('https://api.justconnect.biz')) {
-          config.url = config.url.replace('https://api.justconnect.biz', '')
+
+        // If anyone leaked a fully-qualified backend URL into a call site,
+        // strip it so axios honours the configured baseURL instead of
+        // talking to a hardcoded host. The list comes from env so prod
+        // hosts aren't baked into source.
+        const knownHosts = [
+          process.env.REACT_APP_PROD_API_URL,
+          process.env.REACT_APP_BASE_URL,
+          process.env.REACT_APP_DIRECT_BACKEND_URL,
+        ].filter(Boolean)
+        if (process.env.REACT_APP_USE_DIRECT_BACKEND !== 'true') {
+          for (const host of knownHosts) {
+            if (host && config.url.includes(host)) {
+              config.url = config.url.replace(host, '')
+            }
+          }
         }
       }
       
@@ -166,7 +206,12 @@ export const setupAxiosInterceptors = () => {
       // Intelligent caching for GET requests with connection quality awareness
       if (config.method === 'get' || !config.method) {
         const url = config.url || ''
-        const cacheKey = `${config.method || 'get'}_${url}`
+        // Include a short hash of the auth token in the cache key so that
+        // logging out and back in as a different user doesn't serve the
+        // previous user's cached responses.
+        const _tok = (typeof localStorage !== 'undefined' && localStorage.getItem('authToken')) || ''
+        const _tokKey = _tok ? _tok.slice(-12) : 'anon'
+        const cacheKey = `${config.method || 'get'}_${url}_${_tokKey}`
         const cached = apiCache.get(cacheKey)
         
         // For frequently called endpoints, use longer cache duration
@@ -182,7 +227,11 @@ export const setupAxiosInterceptors = () => {
         if (connectionQuality === 'poor') {
           cacheDuration = CACHE_DURATION * 2 // Use longer cache for poor connections
         } else if (connectionQuality === 'offline') {
-          cacheDuration = Infinity // Use cached data indefinitely when offline
+          // Previously: cacheDuration = Infinity. Once a cluster of failures
+          // tripped 'offline', the cache stayed stale forever even after the
+          // network recovered. Cap at 30 minutes so a recovered network is
+          // visible within a sane bound.
+          cacheDuration = CACHE_DURATION * 3
         }
         
         const effectiveCacheDuration = isFrequentEndpoint ? cacheDuration : cacheDuration / 2
@@ -211,26 +260,19 @@ export const setupAxiosInterceptors = () => {
             requestLimit = Math.floor(MAX_REQUESTS_PER_MINUTE / 2)
           }
           
-          // If we've made too many requests recently, serve cached data or fallback
-          if (requestTimestamps.length >= requestLimit) {
-            // Remove throttle warning
-            
-            // Serve cached data even if expired, or fallback data
-            if (cached) {
-              config.metadata = { 
-                ...config.metadata,
-                fromCache: true, 
-                cachedResponse: cached.data,
-                throttled: true
-              }
-            } else {
-              // Serve fallback data based on endpoint
-              config.metadata = { 
-                ...config.metadata,
-                fromCache: true, 
-                cachedResponse: generateFallbackData(url),
-                throttled: true
-              }
+          // If we've made too many requests recently, serve any real
+          // cached response we have (still the user's actual data), but
+          // do NOT fabricate an empty success response when no cache
+          // exists — that masked legitimate failures and made the UI
+          // render "0 contacts" when really the request was rate-limited.
+          // Without cache we let the request through; the server will
+          // 429 us if it needs to and the UI can react to that honestly.
+          if (requestTimestamps.length >= requestLimit && cached) {
+            config.metadata = {
+              ...config.metadata,
+              fromCache: true,
+              cachedResponse: cached.data,
+              throttled: true
             }
           } else {
             // Allow request and track it
@@ -248,9 +290,13 @@ export const setupAxiosInterceptors = () => {
   // Enhanced response interceptor with retry logic and connection monitoring
   axios.interceptors.response.use(
     (response) => {
-      // Track successful requests for connection quality
-      failedRequestCount = Math.max(0, failedRequestCount - 1)
-      if (failedRequestCount === 0 && connectionQuality !== 'good') {
+      // Track successful requests for connection quality. Any successful
+      // response is strong evidence the network is back, so reset the
+      // counter aggressively rather than only when it reaches zero — the
+      // old code could stay 'offline' indefinitely if a single failure
+      // happened during recovery.
+      failedRequestCount = 0
+      if (connectionQuality !== 'good') {
         connectionQuality = 'good'
         console.log('🟢 Connection quality improved to good')
       }
@@ -268,15 +314,22 @@ export const setupAxiosInterceptors = () => {
       
       // Cache successful responses for ALL GET requests to improve performance
       const url = response.config.url || ''
-      if (response.config.method === 'get' || !response.config.method) {
-        const cacheKey = `${response.config.method || 'get'}_${url}`
+      const method = (response.config.method || 'get').toLowerCase()
+      if (method === 'get') {
+        const _tok = (typeof localStorage !== 'undefined' && localStorage.getItem('authToken')) || ''
+        const _tokKey = _tok ? _tok.slice(-12) : 'anon'
+        const cacheKey = `${method}_${url}_${_tokKey}`
         apiCache.set(cacheKey, {
           data: response.data,
           timestamp: Date.now()
         })
-        console.log(`💾 Cached successful response for: ${url}`)
+      } else if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        // Mutations on a resource invalidate any cached GETs for that resource;
+        // otherwise the UI would render the pre-mutation snapshot until the
+        // 10-minute TTL elapses.
+        invalidateCacheFor(url)
       }
-      
+
       return response
     },
     async (error) => {
@@ -330,31 +383,22 @@ export const setupAxiosInterceptors = () => {
                          error.message.includes('Failed to fetch') ||
                          error.code === 'ERR_BLOCKED_BY_CLIENT'
       
-      // Handle authentication errors specially for long sessions
+      // Handle authentication errors. The previous implementation fired a
+      // `GET /user/details` then `return axios(config)` on the original
+      // request — that re-drove the same 401-producing call in a recursion
+      // loop and caused duplicate POSTs (double-billed payments / duplicate
+      // contacts). Now we force logout once and reject; let the user log
+      // back in cleanly.
       if (isAuthError) {
-        console.warn('🚨 Authentication error detected - session may have expired')
-        
-        // Try to refresh token or validate session
-        const token = localStorage.getItem('authToken')
-        if (token) {
-          try {
-            // Try a simple auth check
-            const authCheck = await axios.get('/api/v1/user/details', {
-              headers: { 'Authorization': `Bearer ${token}` },
-              timeout: 10000
-            })
-            
-            if (authCheck.data) {
-              console.log('✅ Session still valid, retrying original request')
-              return axios(config)
-            }
-          } catch (authError) {
-            console.error('❌ Session validation failed, forcing logout')
-            localStorage.removeItem('authToken')
+        console.warn('🚨 Authentication error detected - forcing logout')
+        if (!config || !config.__authRetried) {
+          try { localStorage.removeItem('authToken') } catch (e) {}
+          try { sessionStorage.removeItem('authToken') } catch (e) {}
+          if (typeof window !== 'undefined' && window.location.pathname !== '/') {
             window.location.href = '/'
-            return Promise.reject(error)
           }
         }
+        return Promise.reject(error)
       }
       
       if (isNetworkError || isTimeoutError || isRateLimited || isCorsError || is404Error) {
@@ -372,7 +416,9 @@ export const setupAxiosInterceptors = () => {
         const url = error.config?.url || ''
         
         // Enhanced cache serving - prioritize any cached data over fallbacks
-        const cacheKey = `${error.config?.method || 'get'}_${url}`
+        const _tok = (typeof localStorage !== 'undefined' && localStorage.getItem('authToken')) || ''
+        const _tokKey = _tok ? _tok.slice(-12) : 'anon'
+        const cacheKey = `${error.config?.method || 'get'}_${url}_${_tokKey}`
         const cached = apiCache.get(cacheKey)
         
         if (cached) {
@@ -386,166 +432,24 @@ export const setupAxiosInterceptors = () => {
           })
         }
         
-        // Enhanced fallback data generation for common endpoints
-        // Handle user details API calls
-        if (url.includes('/user/details') || url.includes('/api/v1/user/details')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock user data - ${errorType}`,
-              user: {
-                role: 'business_admin',
-                name: 'Admin User',
-                email: 'admin@example.com',
-                businessId: '684fe39da8254e8906e99aad',
-                accessTo: {
-                  'dashboard': true,
-                  'contacts': true,
-                  'billing': true,
-                  'reports': true,
-                  'settings': true
-                }
-              }
-            }
-          })
+        // Auth-bearing endpoints must never get a fabricated success response —
+        // a fake "logged in" user causes the UI to render an authenticated
+        // shell using a hardcoded businessId, which is a privilege-escalation
+        // vector. Force these failures to surface so ProtectedRoute logs out.
+        if (
+          url.includes('/user/details') ||
+          url.includes('/user/login') ||
+          url.includes('/auth')
+        ) {
+          return Promise.reject(error)
         }
-        
-        // Handle config API calls  
-        if (url.includes('/config') || url.includes('/api/config')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock config data - ${errorType}`,
-              result: [
-                {
-                  logo: [
-                    {
-                      Headerlogo: '',
-                      Footerlogo: '',
-                      Adminlogo: ''
-                    }
-                  ],
-                  copyrightMessage: 'ImpactVibes Cloud'
-                }
-              ]
-            }
-          })
-        }
-        
-        // Handle billing API calls
-        if (url.includes('/billing/business') || url.includes('/api/billing/business')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock billing data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle invoice API calls
-        if (url.includes('/invoices/') || url.includes('/api/invoices/')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock invoice data - ${errorType}`,
-              data: {
-                planId: {
-                  planName: 'Premium Plan',
-                  rental: 3000,
-                  discountPercent: 25,
-                  displayDiscount: 750,
-                  totalAfterDiscount: 2250,
-                  duration: 90,
-                  gracePeriod: 10
-                },
-                totalAmount: 2250,
-                balance: 2655,
-                gst: 405,
-                paymentMode: 'Yearly',
-                amount: 3000
-              }
-            }
-          })
-        }
-        
-        // Handle contacts API calls
-        if (url.includes('/contacts') || url.includes('/api/contacts')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock contacts data - ${errorType}`,
-              data: [],
-              totalContacts: 0
-            }
-          })
-        }
-        
-        // Handle contact lists API calls
-        if (url.includes('/contact-list') || url.includes('/api/contact-list')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock contact lists data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle call logs API calls
-        if (url.includes('/call-logs') || url.includes('/api/call-logs')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock call logs data - ${errorType}`,
-              data: [],
-              totalCallLogs: 0
-            }
-          })
-        }
-        
-        // Handle branches API calls
-        if (url.includes('/branches') || url.includes('/api/branches')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock branches data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle virtual numbers API calls
-        if (url.includes('/numbers') || url.includes('/api/numbers')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock virtual numbers data - ${errorType}`,
-              data: []
-            }
-          })
-        }
-        
-        // Handle any other common endpoints
-        if (url.includes('/api/')) {
-          return Promise.resolve({
-            data: {
-              success: true,
-              message: `Mock data - ${errorType}`,
-              data: [],
-              result: []
-            }
-          })
-        }
-        
-        // For other endpoints during failures, return a standard error response
-        return Promise.resolve({
-          data: {
-            success: false,
-            message: `Service temporarily unavailable - ${errorType}`,
-            data: null
-          }
-        })
+
+        // No fabricated-success fallback. Previously this block returned a
+        // mock 200 with fake invoices (₹2250), fake contacts (John Doe /
+        // Jane Smith), fake billing — operators could act on rows that
+        // didn't exist on the server, and outage detection was impossible.
+        // Now: surface the real error so the UI's empty/error state shows.
+        return Promise.reject(error)
       }
       
       // For other HTTP errors (401, 403, 404, 500, etc.), let components handle them normally

@@ -117,10 +117,7 @@ const ContactLists = () => {
           let businessId = '';
           const authToken = localStorage.getItem('authToken');
           if (authToken) {
-            const userResponse = await fetch('/api/v1/user/details', {
-              headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            const userData = await userResponse.json();
+            const userData = await apiCall('/v1/user/details', 'GET')
             businessId = userData?.user?.businessId || localStorage.getItem('businessId');
           } else {
             businessId = localStorage.getItem('businessId');
@@ -140,20 +137,21 @@ const ContactLists = () => {
           throw new Error('No response received from API')
         }
         
-        let data = response.data || response
-        
-        // Handle different API response formats
+        const data = response?.data ?? response ?? null
+
+        // Handle different API response formats. Order matters: explicit
+        // success === false short-circuits before the loose array checks
+        // so an error envelope isn't treated as data.
         let listData = []
-        if (data && data.success && Array.isArray(data.data)) {
+        if (data && data.success === false) {
+          throw new Error(data.message || 'API returned error')
+        } else if (data && data.success === true && Array.isArray(data.data)) {
           listData = data.data
         } else if (data && Array.isArray(data.data)) {
           listData = data.data
         } else if (Array.isArray(data)) {
           listData = data
-        } else if (data && data.success === false) {
-          throw new Error(data.message || 'API returned error')
         } else {
-          console.log('Unexpected API response format:', data)
           listData = []
         }
         
@@ -206,65 +204,15 @@ const ContactLists = () => {
         }))
         
         setContacts(formattedContacts)
-        
-        // If no contacts from API, provide helpful mock data for testing
-        if (formattedContacts.length === 0) {
-          const mockContacts = [
-            {
-              id: 'mock-contact-1',
-              name: 'John Doe',
-              phone: '+1234567890',
-              email: 'john.doe@example.com',
-              company: 'Example Corp'
-            },
-            {
-              id: 'mock-contact-2',
-              name: 'Jane Smith',
-              phone: '+0987654321',
-              email: 'jane.smith@example.com',
-              company: 'Tech Solutions'
-            },
-            {
-              id: 'mock-contact-3',
-              name: 'Bob Wilson',
-              phone: '+1122334455',
-              email: 'bob.wilson@example.com',
-              company: 'Business Inc'
-            }
-          ]
-          
-          setContacts(mockContacts)
-        }
-        
+        // Empty list previously seeded John Doe / Jane Smith / Bob Wilson
+        // mock contacts that were selectable and POSTed back to the server
+        // with `mock-contact-*` IDs that didn't exist — corrupting the list.
+        // Render an honest empty state instead.
+
       } catch (err) {
         console.error('Failed to fetch contacts:', err)
-        
-        // Provide fallback mock data for development
-        const mockContacts = [
-          {
-            id: 'mock-contact-1',
-            name: 'John Doe',
-            phone: '+1234567890',
-            email: 'john.doe@example.com',
-            company: 'Example Corp'
-          },
-          {
-            id: 'mock-contact-2',
-            name: 'Jane Smith',
-            phone: '+0987654321',
-            email: 'jane.smith@example.com',
-            company: 'Tech Solutions'
-          },
-          {
-            id: 'mock-contact-3',
-            name: 'Bob Wilson',
-            phone: '+1122334455',
-            email: 'bob.wilson@example.com',
-            company: 'Business Inc'
-          }
-        ]
-        
-        setContacts(mockContacts)
+        // Show empty list + the catch-block error rather than fake contacts.
+        setContacts([])
       } finally {
         setContactsLoading(false)
       }
@@ -437,10 +385,7 @@ const ContactLists = () => {
         let branchId = '';
         const authToken = localStorage.getItem('authToken');
         if (authToken) {
-          const userResponse = await fetch('/api/v1/user/details', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
-          const userData = await userResponse.json();
+          const userData = await apiCall('/v1/user/details', 'GET')
           businessId = userData?.user?.businessId || localStorage.getItem('businessId');
           branchId = userData?.user?.branchId || localStorage.getItem('branchId');
         } else {
@@ -492,10 +437,7 @@ const ContactLists = () => {
         let branchId = '';
         const authToken = localStorage.getItem('authToken');
         if (authToken) {
-          const userResponse = await fetch('/api/v1/user/details', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
-          const userData = await userResponse.json();
+          const userData = await apiCall('/v1/user/details', 'GET')
           businessId = userData?.user?.businessId || localStorage.getItem('businessId');
           branchId = userData?.user?.branchId || localStorage.getItem('branchId');
         } else {

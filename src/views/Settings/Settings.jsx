@@ -1,48 +1,44 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
-  CCard,
-  CCardBody,
-  CNav,
-  CNavItem,
-  CNavLink,
-  CTabContent,
-  CTabPane,
-  CFormInput,
-  CButton,
-  CFormSelect,
-  CRow,
-  CCol,
-  CTable,
-  CTableHead,
-  CTableBody,
-  CTableHeaderCell,
-  CTableRow,
-  CTableDataCell,
-  CFormCheck,
-  CInputGroup,
-  CInputGroupText,
-  CFormLabel,
-  CBadge,
-  CBadgeProps
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { 
-  cilBell, 
-  cilLockLocked, 
-  cilEnvelopeClosed, 
-  cilUser, 
-  cilPhone, 
-  cilSpeech,
-  cilSettings,
-  cilClock,
-  cilShieldAlt,
-  cilBan,
-  cilKey,
-  cilX,
-  cilCheck,
-  cilLink
-} from '@coreui/icons'
+  Box,
+  Card,
+  CardContent,
+  Tabs,
+  Tab,
+  Button,
+  TextField,
+  Select,
+  MenuItem,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Grid,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  InputAdornment,
+  Typography,
+  Paper,
+  Switch,
+  FormControlLabel,
+  CircularProgress,
+  FormControl,
+  InputLabel
+} from '@mui/material'
+import SearchIcon from '@mui/icons-material/Search'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import PhoneIcon from '@mui/icons-material/Phone'
+import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
+import LockIcon from '@mui/icons-material/Lock'
 import './Settings.css'
+import axios from 'axios'
+import { isAutheticated } from 'src/auth'
 
 function Settings() {
   const [activeKey, setActiveKey] = useState(1)
@@ -51,8 +47,29 @@ function Settings() {
   const [workEndTime, setWorkEndTime] = useState('00:00')
   const [breakStartTime, setBreakStartTime] = useState('00:00')
   const [breakEndTime, setBreakEndTime] = useState('00:00')
+  // Business fields to PATCH
+  const [businessName, setBusinessName] = useState('')
+  const [contactPersonName, setContactPersonName] = useState('')
+  const [contactPersonEmail, setContactPersonEmail] = useState('')
+  const [contactPersonPhone, setContactPersonPhone] = useState('')
+  const [gstNumber, setGstNumber] = useState('')
+  const [country, setCountry] = useState('')
+  const [stateName, setStateName] = useState('')
+  const [city, setCity] = useState('')
+  const [address1, setAddress1] = useState('')
+  const [address2, setAddress2] = useState('')
+  const [pincode, setPincode] = useState('')
+  const [status, setStatus] = useState('Active')
+  const [ivrEnabled, setIvrEnabled] = useState(true)
+  const [savingBusiness, setSavingBusiness] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [masterPassword, setMasterPassword] = useState('')
+  const [confirmMasterPassword, setConfirmMasterPassword] = useState('')
+  const [creatingMaster, setCreatingMaster] = useState(false)
+  const [masterMessage, setMasterMessage] = useState(null)
+  const [showMasterPasswordField, setShowMasterPasswordField] = useState(false)
+  const [showConfirmMasterPasswordField, setShowConfirmMasterPasswordField] = useState(false)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -67,10 +84,20 @@ function Settings() {
     firstName: '',
     lastName: '',
     email: '',
-    countryCode: '+1',
+    countryCode: '+91',
     phoneNumber: '',
     role: ''
   })
+
+  // Call Settings state
+  const [supervisorNumber, setSupervisorNumber] = useState('')
+  const [supervisorNumberDetails, setSupervisorNumberDetails] = useState(null)
+  const [selectedSupervisorNumber, setSelectedSupervisorNumber] = useState('')
+  const [assignedNumbers, setAssignedNumbers] = useState([])
+  const [sipPassword, setSipPassword] = useState('')
+  const [loadingCallSettings, setLoadingCallSettings] = useState(false)
+  const [savingCallSettings, setSavingCallSettings] = useState(false)
+  const [callSettingsMessage, setCallSettingsMessage] = useState(null)
   
   // Integrations data with categories
   const integrations = [
@@ -226,6 +253,62 @@ function Settings() {
   const handleCategoryChange = (e) => {
     setSelectedCategory(e.target.value)
   }
+
+  // Fetch existing business details and prefill form
+  useEffect(() => {
+    const load = async () => {
+      const businessId = localStorage.getItem('businessId') || ''
+      if (!businessId) return
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      try {
+        const res = await axios.get(`/api/businesses/get_one/${encodeURIComponent(businessId)}`, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' },
+        })
+        const data = res?.data?.data || res?.data || null
+        if (!data) return
+        // map contact person to form values
+        const contact = data.contactPerson || {}
+        const fullName = contact.name || ''
+        const parts = fullName.trim().split(' ')
+        const first = parts.length ? parts[0] : ''
+        const last = parts.length > 1 ? parts.slice(1).join(' ') : ''
+        setFormValues((prev) => ({ ...prev, firstName: first, lastName: last, email: contact.email || '', phoneNumber: contact.phone || '' }))
+
+        setBusinessName(data.businessName || '')
+        setGstNumber(data.gstNumber || '')
+        setCountry(data.country || '')
+        setStateName(data.state || '')
+        setCity(data.city || '')
+        setAddress1(data.address1 || '')
+        setAddress2(data.address2 || '')
+        setPincode(data.pincode || '')
+        setStatus(data.status || 'Active')
+        setIvrEnabled(Boolean(data.ivrEnabled))
+
+        // business hours
+        try {
+          const bh = data.businessHours || {}
+          if (bh.start) setWorkStartTime(bh.start)
+          if (bh.end) setWorkEndTime(bh.end)
+        } catch (e) {}
+
+        // business days -> selectedDays array
+        try {
+          const bd = data.businessDays || {}
+          const revMap = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }
+          const days = []
+          Object.keys(revMap).forEach(k => {
+            const v = bd[k]
+            if (v === '1' || v === 1 || v === true || String(v) === 'true') days.push(revMap[k])
+          })
+          setSelectedDays(days)
+        } catch (e) {}
+      } catch (err) {
+        console.error('Failed to load business settings', err)
+      }
+    }
+    load()
+  }, [])
   
   // Clear all filters and search
   const clearFilters = () => {
@@ -336,21 +419,63 @@ function Settings() {
   }
   
   const handleSaveChanges = () => {
-    // Handle saving changes here
-    console.log({
-      formValues,
-      selectedDays,
-      workTimes: { start: workStartTime, end: workEndTime },
-      breakTimes: { start: breakStartTime, end: breakEndTime }
+    // Save to API
+    saveBusinessSettings()
+  }
+
+  const buildBusinessDaysPayload = () => {
+    const map = { Monday: 'mon', Tuesday: 'tue', Wednesday: 'wed', Thursday: 'thu', Friday: 'fri', Saturday: 'sat', Sunday: 'sun' }
+    const out = {}
+    Object.keys(map).forEach((day) => {
+      out[map[day]] = selectedDays.includes(day) ? '1' : '0'
     })
-    
-    // Show success message
-    setShowSuccessMessage(true)
-    
-    // Hide the success message after 3 seconds
-    setTimeout(() => {
-      setShowSuccessMessage(false)
-    }, 3000)
+    return out
+  }
+
+  const saveBusinessSettings = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      console.error('Missing businessId in localStorage')
+      return
+    }
+    const token = localStorage.getItem('authToken') || isAutheticated()
+    const payload = {
+      businessName: businessName || formValues.firstName || '',
+      contactPersonName: contactPersonName || `${formValues.firstName || ''} ${formValues.lastName || ''}`.trim(),
+      contactPersonEmail: contactPersonEmail || formValues.email || '',
+      contactPersonPhone: contactPersonPhone || formValues.phoneNumber || '',
+      gstNumber: gstNumber || '',
+      country: country || '',
+      state: stateName || '',
+      city: city || '',
+      address1: address1 || '',
+      address2: address2 || '',
+      pincode: pincode || '',
+      status: status || 'Active',
+      ivrEnabled: !!ivrEnabled,
+      businessHours: { start: workStartTime, end: workEndTime },
+      businessDays: buildBusinessDaysPayload(),
+    }
+
+    try {
+      setSavingBusiness(true)
+      const res = await axios.patch(`/api/businesses/edit/${encodeURIComponent(businessId)}`, payload, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+      })
+      if (res && (res.data && (res.data.success || res.data.updated) || res.status === 200)) {
+        setShowSuccessMessage(true)
+        setTimeout(() => setShowSuccessMessage(false), 3000)
+      } else {
+        console.error('Failed to save business settings', res)
+      }
+    } catch (err) {
+      console.error('Error saving business settings', err)
+    } finally {
+      setSavingBusiness(false)
+    }
   }
   
   const handleFormChange = (field, value) => {
@@ -360,19 +485,19 @@ function Settings() {
     })
   }
   
-  // API Key functions
+  // API Key functions. Previous implementation generated a Math.random key
+  // entirely client-side and never registered it with the backend, so the
+  // displayed key was meaningless — any API call using it would 401.
+  // Until the backend exposes a real "create API key" endpoint, we disable
+  // local key generation and tell the user why instead of pretending.
   const generateApiKey = () => {
-    // Generate a random API key
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let key = '';
-    for (let i = 0; i < 24; i++) {
-      key += characters.charAt(Math.floor(Math.random() * characters.length));
+    setApiKey('')
+    setShowApiKey(false)
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(
+        'API key generation is not yet available. Please contact your administrator to request API access.'
+      )
     }
-    
-    // Format the key with dashes
-    const formattedKey = `${key.slice(0, 8)}-${key.slice(8, 16)}-${key.slice(16, 24)}`;
-    setApiKey(formattedKey);
-    setShowApiKey(true);
   }
   
   const copyApiKey = () => {
@@ -385,6 +510,42 @@ function Settings() {
         .catch(err => {
           console.error('Failed to copy API key: ', err);
         });
+    }
+  }
+
+  // Master password functions
+  const createMasterPassword = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setMasterMessage({ type: 'error', text: 'Missing businessId in localStorage' })
+      return
+    }
+    if (!masterPassword) {
+      setMasterMessage({ type: 'error', text: 'Please enter a master password' })
+      return
+    }
+    if (masterPassword !== confirmMasterPassword) {
+      setMasterMessage({ type: 'error', text: 'Passwords do not match' })
+      return
+    }
+    try {
+      setCreatingMaster(true)
+      setMasterMessage(null)
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      const res = await axios.post(`/api/business/${encodeURIComponent(businessId)}/master-password`, { masterPassword }, {
+        headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+      })
+      if (res && (res.status === 200 || (res.data && res.data.success))) {
+        setMasterMessage({ type: 'success', text: 'Master password created successfully' })
+        setMasterPassword('')
+        setConfirmMasterPassword('')
+      } else {
+        setMasterMessage({ type: 'error', text: (res?.data?.message) || 'Failed to create master password' })
+      }
+    } catch (err) {
+      setMasterMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Request failed' })
+    } finally {
+      setCreatingMaster(false)
     }
   }
   
@@ -492,703 +653,985 @@ function Settings() {
   const handleCloseContactForm = () => {
     setShowContactForm(false)
   }
+
+  // Call Settings functions
+  const fetchCallSettings = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setCallSettingsMessage({ type: 'error', text: 'Business ID not found' })
+      return
+    }
+
+    setLoadingCallSettings(true)
+    try {
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      
+      // Fetch supervisor number and assigned numbers in parallel
+      const [supervisorRes, numbersRes] = await Promise.all([
+        axios.get(
+          `/api/businesses/${encodeURIComponent(businessId)}/supervisor-number`,
+          {
+            headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+          }
+        ).catch(err => {
+          console.warn('Failed to fetch supervisor number details:', err)
+          return { data: {} }
+        }),
+        axios.get(
+          `/api/businesses/${encodeURIComponent(businessId)}/assigned-numbers`,
+          {
+            headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+          }
+        )
+      ])
+      
+      // Get supervisor number from the dedicated endpoint
+      const supervisorNumberFromEndpoint = supervisorRes?.data?.supervisorNumber || ''
+      const supervisorDetailsFromEndpoint = supervisorRes?.data?.numberDetails || null
+      const supervisorNumberFromList = numbersRes?.data?.currentSupervisorNumber || ''
+      const currentSupervisor = supervisorNumberFromEndpoint || supervisorNumberFromList
+      
+      // Get SIP password directly from numberDetails
+      const password = supervisorDetailsFromEndpoint?.sip_password || ''
+      
+      console.log('[CallSettings] Supervisor Number & SIP Details:', {
+        number: currentSupervisor,
+        details: supervisorDetailsFromEndpoint,
+        hasPassword: !!password,
+        domain: supervisorDetailsFromEndpoint?.sip_domain,
+        extension: supervisorDetailsFromEndpoint?.sip_endpoint || supervisorDetailsFromEndpoint?.extension,
+      })
+      
+      setSupervisorNumber(currentSupervisor)
+      setSupervisorNumberDetails(supervisorDetailsFromEndpoint)
+      setSelectedSupervisorNumber(currentSupervisor)
+      setSipPassword(password)
+
+      // Extract numbersDetail array
+      const numbers = Array.isArray(numbersRes?.data?.numbersDetail) ? numbersRes?.data?.numbersDetail : []
+      setAssignedNumbers(numbers)
+    } catch (err) {
+      console.error('Failed to fetch call settings:', err)
+      setCallSettingsMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to load call settings' })
+    } finally {
+      setLoadingCallSettings(false)
+    }
+  }
+
+  const saveSupervisorNumber = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setCallSettingsMessage({ type: 'error', text: 'Business ID not found' })
+      return
+    }
+
+    if (!selectedSupervisorNumber.trim()) {
+      setCallSettingsMessage({ type: 'error', text: 'Please select or enter a supervisor number' })
+      return
+    }
+
+    setSavingCallSettings(true)
+    setCallSettingsMessage(null)
+    try {
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      
+      // Update supervisor number via the dedicated endpoint
+      const supervisorRes = await axios.patch(
+        `/api/businesses/${encodeURIComponent(businessId)}/supervisor-number`,
+        { supervisorNumber: selectedSupervisorNumber },
+        {
+          headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+        }
+      )
+      
+      if (!supervisorRes || !(supervisorRes.status === 200 || (supervisorRes.data && supervisorRes.data.success))) {
+        throw new Error(supervisorRes?.data?.message || 'Failed to update supervisor number')
+      }
+      
+      // Get the new password from the response if available
+      const newPassword = supervisorRes?.data?.numberDetails?.sip_password || sipPassword
+      setSipPassword(newPassword)
+      
+      setSupervisorNumber(selectedSupervisorNumber)
+      setCallSettingsMessage({ type: 'success', text: 'Supervisor number updated successfully' })
+    } catch (err) {
+      console.error('Failed to save supervisor number:', err)
+      setCallSettingsMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to save supervisor number' })
+    } finally {
+      setSavingCallSettings(false)
+    }
+  }
+
+  const releaseSupervisorNumber = async () => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setCallSettingsMessage({ type: 'error', text: 'Business ID not found' })
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to release this supervisor number? It will revert to a normal number.')) {
+      return
+    }
+
+    setSavingCallSettings(true)
+    setCallSettingsMessage(null)
+    try {
+      const token = localStorage.getItem('authToken') || isAutheticated()
+      
+      // Delete supervisor number via the dedicated endpoint
+      const res = await axios.delete(
+        `/api/businesses/${encodeURIComponent(businessId)}/supervisor-number`,
+        {
+          headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' }
+        }
+      )
+      
+      if (!res || !(res.status === 200 || (res.data && res.data.success))) {
+        setCallSettingsMessage({ type: 'error', text: 'Failed to release supervisor number' })
+        return
+      }
+      
+      // Reset the supervisor number state
+      setSupervisorNumber('')
+      setSelectedSupervisorNumber('')
+      setSipPassword('')
+      setSupervisorNumberDetails(null)
+      setCallSettingsMessage({ type: 'success', text: 'Supervisor number released successfully' })
+    } catch (err) {
+      console.error('Failed to release supervisor number:', err)
+      setCallSettingsMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to release supervisor number' })
+    } finally {
+      setSavingCallSettings(false)
+    }
+  }
+
+  // Load call settings when component mounts
+  useEffect(() => {
+    fetchCallSettings()
+  }, [])
   
   // Integrations data is already defined above
   
   return (
-    <div className="settings-container">
-      <CCard className="mb-4">
-        <CCardBody>
-          <CNav variant="tabs" role="tablist">
-            <CNavItem>
-              <CNavLink
-                active={activeKey === 1}
-                onClick={() => setActiveKey(1)}
-                className="tab-link"
-              >
-                General
-              </CNavLink>
-            </CNavItem>
-            <CNavItem>
-              <CNavLink
-                active={activeKey === 2}
-                onClick={() => setActiveKey(2)}
-                className="tab-link"
-              >
-                Calling
-              </CNavLink>
-            </CNavItem>
-            <CNavItem>
-              <CNavLink
-                active={activeKey === 3}
-                onClick={() => setActiveKey(3)}
-                className="tab-link"
-              >
-                Account
-              </CNavLink>
-            </CNavItem>
-          </CNav>
-          
-          <CTabContent>
-            <CTabPane role="tabpanel" visible={activeKey === 1}>
-              <div className="settings-tab-content">
-                <div className="general-card profile-card">
-                  <h2 className="card-title">Profile</h2>
-                  
-                  <div className="profile-form">
-                    <div className="form-row">
-                      <div className="form-col">
-                        <label className="form-label">First name<span className="required-mark">*</span></label>
-                        <CFormInput 
-                          placeholder="Enter first name" 
-                          className="form-input"
-                          required
-                          value={formValues.firstName}
-                          onChange={(e) => handleFormChange('firstName', e.target.value)}
-                        />
-                      </div>
-                      <div className="form-col">
-                        <label className="form-label">Last name<span className="required-mark">*</span></label>
-                        <CFormInput 
-                          placeholder="Enter last name" 
-                          className="form-input"
-                          required
-                          value={formValues.lastName}
-                          onChange={(e) => handleFormChange('lastName', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Email<span className="required-mark">*</span></label>
-                      <CFormInput 
-                        placeholder="Enter email address" 
-                        className="form-input"
+    <Box sx={{ p: 2 }}>
+      {/* Header Section */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Settings</Typography>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>Manage your profile, business hours, and account settings</Typography>
+        </Box>
+      </Box>
+
+      {/* Tabs */}
+      <Paper variant="outlined" sx={{ mb: 3 }}>
+        <Tabs 
+          value={activeKey - 1} 
+          onChange={(e, newValue) => setActiveKey(newValue + 1)}
+          sx={{ borderBottom: '1px solid #e5e7eb' }}
+        >
+          <Tab label="General" />
+          <Tab label="Account" />
+          <Tab label="Call Settings" />
+        </Tabs>
+      </Paper>
+
+      {/* Tab Content */}
+      {activeKey === 1 && (
+        <Box>
+          <Grid container spacing={3}>
+            {/* Profile Card */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>Profile</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="First name"
+                        placeholder="Enter first name"
+                        required
+                        value={formValues.firstName}
+                        onChange={(e) => handleFormChange('firstName', e.target.value)}
+                        size="small"
+                        InputLabelProps={{ required: false }}
+                        inputProps={{
+                          style: { fontSize: '14px' }
+                        }}
+                        FormHelperTextProps={{ style: { fontSize: '12px' } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Last name"
+                        placeholder="Enter last name"
+                        required
+                        value={formValues.lastName}
+                        onChange={(e) => handleFormChange('lastName', e.target.value)}
+                        size="small"
+                        InputLabelProps={{ required: false }}
+                        inputProps={{
+                          style: { fontSize: '14px' }
+                        }}
+                        FormHelperTextProps={{ style: { fontSize: '12px' } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Email"
                         type="email"
+                        placeholder="Enter email address"
                         required
                         value={formValues.email}
                         onChange={(e) => handleFormChange('email', e.target.value)}
+                        size="small"
+                        InputLabelProps={{ required: false }}
+                        inputProps={{
+                          style: { fontSize: '14px' }
+                        }}
                       />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Phone number<span className="required-mark">*</span></label>
-                      <div className="phone-input-group">
-                        <CFormSelect 
-                          className="country-code-select"
-                          value={formValues.countryCode}
-                          onChange={(e) => handleFormChange('countryCode', e.target.value)}
-                          required
-                        >
-                          <option value="+91">+91</option>
-                          <option value="+1">+1</option>
-                          <option value="+44">+44</option>
-                        </CFormSelect>
-                        <CFormInput 
-                          placeholder="Enter phone number" 
-                          className="phone-number-input"
-                          required
-                          value={formValues.phoneNumber}
-                          onChange={(e) => handleFormChange('phoneNumber', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Role<span className="required-mark">*</span></label>
-                      <CFormSelect 
-                        className="form-select"
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <Select
+                        fullWidth
+                        value={formValues.countryCode}
+                        onChange={(e) => handleFormChange('countryCode', e.target.value)}
+                        size="small"
+                      >
+                        <MenuItem value="+91">+91</MenuItem>
+                        <MenuItem value="+1">+1</MenuItem>
+                        <MenuItem value="+44">+44</MenuItem>
+                      </Select>
+                    </Grid>
+                    <Grid item xs={12} sm={8}>
+                      <TextField
+                        fullWidth
+                        label="Phone number"
+                        placeholder="Enter phone number"
                         required
-                        value={formValues.role}
-                        onChange={(e) => handleFormChange('role', e.target.value)}
-                      >
-                        <option value="admin">Admin</option>
-                        <option value="manager">Manager</option>
-                        <option value="agent">Agent</option>
-                      </CFormSelect>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="general-card business-hours-card">
-                  <h2 className="card-title">Business Hours</h2>
+                        value={formValues.phoneNumber}
+                        onChange={(e) => handleFormChange('phoneNumber', e.target.value)}
+                        size="small"
+                        InputLabelProps={{ required: false }}
+                        inputProps={{
+                          style: { fontSize: '14px' }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Business Hours Card */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>Business Hours</Typography>
                   
-                  <div className="business-hours-form">
-                    <div className="form-group">
-                      <label className="form-label">Working Days<span className="required-mark">*</span></label>
-                      <div className="days-container">
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                          <button 
-                            key={day} 
-                            className={`day-btn ${isDaySelected(day) ? 'active' : ''}`}
-                            onClick={() => toggleDay(day)}
-                            type="button"
-                          >
-                            {day}
-                          </button>
-                        ))}
-                      </div>
-                      {selectedDays.length === 0 && (
-                        <div className="days-validation-message">Please select at least one working day</div>
-                      )}
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Work Timings<span className="required-mark">*</span></label>
-                      <div className="time-container">
-                        <div className="time-input">
-                          <CFormInput 
-                            type="time" 
-                            value={workStartTime}
-                            onChange={(e) => setWorkStartTime(e.target.value)}
-                            className="time-control"
-                            required
-                          />
-                        </div>
-                        <span className="time-separator">to</span>
-                        <div className="time-input">
-                          <CFormInput 
-                            type="time" 
-                            value={workEndTime}
-                            onChange={(e) => setWorkEndTime(e.target.value)}
-                            className="time-control"
-                            required
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="form-group">
-                      <label className="form-label">Break Timings<span className="required-mark">*</span></label>
-                      <div className="time-container">
-                        <div className="time-input">
-                          <CFormInput 
-                            type="time" 
-                            value={breakStartTime}
-                            onChange={(e) => setBreakStartTime(e.target.value)}
-                            className="time-control"
-                            required
-                          />
-                        </div>
-                        <span className="time-separator">to</span>
-                        <div className="time-input">
-                          <CFormInput 
-                            type="time" 
-                            value={breakEndTime}
-                            onChange={(e) => setBreakEndTime(e.target.value)}
-                            className="time-control"
-                            required
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {showSuccessMessage && (
-                      <div className="success-message">
-                        Settings saved successfully!
-                      </div>
-                    )}
-                    
-                    <div className="save-changes-container">
-                      <CButton 
-                        color="primary" 
-                        className="save-changes-btn"
-                        onClick={handleSaveChanges}
+                  {/* Working Days */}
+                  <Typography variant="subtitle2" sx={{ fontWeight: '600', mb: 1.5 }}>Working Days</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                      <Button
+                        key={day}
+                        variant={isDaySelected(day) ? 'contained' : 'outlined'}
+                        onClick={() => toggleDay(day)}
+                        sx={{
+                          px: 2,
+                          py: 0.75,
+                          fontWeight: '500',
+                          fontSize: '13px',
+                          borderRadius: '6px',
+                          backgroundColor: isDaySelected(day) ? '#6366f1' : 'transparent',
+                          color: isDaySelected(day) ? '#fff' : '#374151',
+                          border: isDaySelected(day) ? '2px solid #6366f1' : '2px solid #d1d5db',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            backgroundColor: isDaySelected(day) ? '#4f46e5' : '#f3f4f6',
+                            borderColor: '#6366f1'
+                          }
+                        }}
+                        size="small"
                       >
-                        Save Changes
-                      </CButton>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CTabPane>
-            
-            <CTabPane role="tabpanel" visible={activeKey === 2}>
-              <div className="settings-tab-content">
-                <h2 className="settings-page-title">Virtual Numbers</h2>
-                
-                <div className="virtual-numbers-table-container">
-                  <CTable hover className="virtual-numbers-table">
-                    <CTableHead>
-                      <CTableRow>
-                        <CTableHeaderCell>NUMBER NAME</CTableHeaderCell>
-                        <CTableHeaderCell>VIRTUAL NUMBER</CTableHeaderCell>
-                        <CTableHeaderCell>LOCATION</CTableHeaderCell>
-                        <CTableHeaderCell>CALLS</CTableHeaderCell>
-                        <CTableHeaderCell>TYPE</CTableHeaderCell>
-                      </CTableRow>
-                    </CTableHead>
-                    <CTableBody>
-                      {virtualNumbers.map((number) => (
-                        <CTableRow key={number.id}>
-                          <CTableDataCell>{number.name}</CTableDataCell>
-                          <CTableDataCell>{number.number}</CTableDataCell>
-                          <CTableDataCell>{number.location}</CTableDataCell>
-                          <CTableDataCell>{number.calls}</CTableDataCell>
-                          <CTableDataCell>
-                            <CBadge color="info" shape="rounded-pill" className="type-badge">
-                              {number.type}
-                            </CBadge>
-                          </CTableDataCell>
-                        </CTableRow>
-                      ))}
-                    </CTableBody>
-                  </CTable>
-                  
-                  <div className="table-footer">
-                    <div className="rows-per-page">
-                      <span className="rows-text">Rows per page:</span>
-                      <CFormSelect className="rows-select" size="sm">
-                        <option value="10">10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                      </CFormSelect>
-                    </div>
-                    <div className="pagination-info">
-                      1-{virtualNumbers.length} of {virtualNumbers.length}
-                    </div>
-                    <div className="pagination-controls">
-                      <button className="pagination-button" disabled>
-                        &lt;
-                      </button>
-                      <button className="pagination-button" disabled>
-                        &gt;
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                <h2 className="settings-section-title">Connected to</h2>
-                <div className="connected-to-section">
-                  <div className="phone-input-group">
-                    <CFormSelect className="country-code-select">
-                      <option value="+91">+91</option>
-                      <option value="+1">+1</option>
-                      <option value="+44">+44</option>
-                    </CFormSelect>
-                    <CFormInput 
-                      type="text"
-                      placeholder="Enter phone number" 
-                      className="phone-number-input"
-                    />
-                  </div>
-                  <div className="save-button-container">
-                    <CButton 
-                      color="primary" 
-                      className="save-button" 
-                      onClick={() => {
-                        setShowSuccessMessage(true);
-                        setTimeout(() => setShowSuccessMessage(false), 3000);
+                        {day.substring(0, 3)}
+                      </Button>
+                    ))}
+                  </Box>
+                  {selectedDays.length === 0 && (
+                    <Typography sx={{ color: '#ef4444', fontSize: '12px', mb: 2 }}>Please select at least one working day</Typography>
+                  )}
+
+                  {/* Work Timings */}
+                  <Typography variant="subtitle2" sx={{ fontWeight: '600', mb: 1.5 }}>Work Timings</Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="time"
+                        label="Start Time"
+                        value={workStartTime}
+                        onChange={(e) => setWorkStartTime(e.target.value)}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="time"
+                        label="End Time"
+                        value={workEndTime}
+                        onChange={(e) => setWorkEndTime(e.target.value)}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  {/* Break Timings */}
+                  <Typography variant="subtitle2" sx={{ fontWeight: '600', mb: 1.5 }}>Break Timings</Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="time"
+                        label="Break Start"
+                        value={breakStartTime}
+                        onChange={(e) => setBreakStartTime(e.target.value)}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        type="time"
+                        label="Break End"
+                        value={breakEndTime}
+                        onChange={(e) => setBreakEndTime(e.target.value)}
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  {/* Success Message */}
+                  {showSuccessMessage && (
+                    <Box sx={{ mb: 2, p: 1.5, bgcolor: '#dcfce7', border: '1px solid #86efac', borderRadius: '6px' }}>
+                      <Typography sx={{ color: '#166534', fontSize: '14px', fontWeight: '500' }}>
+                        ✓ Settings saved successfully!
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Save Button */}
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveChanges}
+                      disabled={savingBusiness}
+                      sx={{
+                        bgcolor: '#6366f1',
+                        color: '#fff',
+                        fontWeight: '600',
+                        textTransform: 'none',
+                        fontSize: '14px',
+                        px: 3,
+                        py: 1,
+                        '&:hover': {
+                          bgcolor: '#4f46e5'
+                        },
+                        '&:disabled': {
+                          bgcolor: '#d1d5db',
+                          color: '#9ca3af'
+                        }
                       }}
                     >
-                      Save
-                    </CButton>
-                  </div>
-                  {showSuccessMessage && (
-                    <div className="mt-2 success-message">
-                      <CIcon icon={cilCheck} className="me-1" />
-                      Connected number saved successfully
-                    </div>
-                  )}
-                </div>
-                
-                <h2 className="settings-section-title">Call settings</h2>
-                <div className="browser-calling-section">
-                  <div className="browser-calling-option">
-                    <div className="option-text">
-                      <h4 className="option-title">Browser calling</h4>
-                      <p className="option-description">Make calls directly from desktop, without involving mobile phone.</p>
-                    </div>
-                    <div className="toggle-switch-container">
-                      <label className="toggle-switch">
-                        <input type="checkbox" defaultChecked={true} />
-                        <span className="slider round"></span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CTabPane>
-            
-            <CTabPane role="tabpanel" visible={activeKey === 3}>
-              <div className="settings-tab-content">
-                {/* Call Attributes Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">📞</span>
-                    <h2 className="account-section-title">Call Attributes</h2>
-                  </div>
+                      {savingBusiness ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+
+      {activeKey === 2 && (
+        <Box>
+          <Grid container spacing={3}>
+            {/* Master Password Card */}
+            <Grid item xs={12}>
+              <Card sx={{ border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <LockIcon sx={{ fontSize: '24px', color: '#6366f1' }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Master Password</Typography>
+                  </Box>
                   
-                  <div className="account-section-content">
-                    <div className="attribute-group">
-                      <label className="attribute-label">Call Reason</label>
-                      <div className="select-with-button">
-                        <CFormSelect className="attribute-select" value={selectedCallReason} onChange={(e) => setSelectedCallReason(e.target.value)}>
-                          {callReasonOptions.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </CFormSelect>
-                        <CButton color="primary" className="add-button" onClick={handleAddCallReason}>Add</CButton>
-                      </div>
-                      
-                      <div className="added-attributes">
-                        {addedCallReasons.map((reason, index) => (
-                          <CBadge 
-                            key={index} 
-                            color="primary" 
-                            className="added-attribute-badge"
-                            onClick={() => handleRemoveCallReason(reason)}
-                          >
-                            {reason} <CIcon icon={cilX} className="remove-icon" />
-                          </CBadge>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="attribute-group">
-                      <label className="attribute-label">Call Outcome</label>
-                      <div className="select-with-button">
-                        <CFormSelect className="attribute-select" value={selectedCallOutcome} onChange={(e) => setSelectedCallOutcome(e.target.value)}>
-                          {callOutcomeOptions.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </CFormSelect>
-                        <CButton color="primary" className="add-button" onClick={handleAddCallOutcome}>Add</CButton>
-                      </div>
-                      
-                      <div className="added-attributes">
-                        {addedCallOutcomes.map((outcome, index) => (
-                          <CBadge 
-                            key={index} 
-                            color="primary" 
-                            className="added-attribute-badge"
-                            onClick={() => handleRemoveCallOutcome(outcome)}
-                          >
-                            {outcome} <CIcon icon={cilX} className="remove-icon" />
-                          </CBadge>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="attribute-group">
-                      <label className="attribute-label">Custom Tags</label>
-                      <CFormInput 
-                        type="text" 
-                        placeholder="Type and press Enter to create..." 
-                        className="tags-input" 
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Notifications Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🔔</span>
-                    <h2 className="account-section-title">Notifications</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="notification-item">
-                      <div className="notification-info">
-                        <h3 className="notification-title">Call Records</h3>
-                        <p className="notification-description">Receive notification when a new call is recorded</p>
-                        <div className="notification-channels">
-                          <span className="channel-label">Email</span>
-                          <span className="channel-separator">•</span>
-                          <span className="channel-label">SMS</span>
-                          <span className="channel-separator">•</span>
-                          <span className="channel-label">Push</span>
-                        </div>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={true} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div className="notification-item">
-                      <div className="notification-info">
-                        <h3 className="notification-title">Call Recording Database server</h3>
-                        <p className="notification-description">Notify me when recordings that are of being uploaded</p>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={false} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Privacy & Security Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🔒</span>
-                    <h2 className="account-section-title">Privacy & Security</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="security-item">
-                      <div className="security-info">
-                        <h3 className="security-title">Require Recording</h3>
-                        <p className="security-description">Mandate recording this week for privacy</p>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={false} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div className="security-item">
-                      <div className="security-info">
-                        <h3 className="security-title">Two Factor Authentication</h3>
-                        <p className="security-description">Use an app or device verification code for all users</p>
-                      </div>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={false} />
-                          <span className="slider round"></span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Block List Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🚫</span>
-                    <h2 className="account-section-title">Block List</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="block-list-description">
-                      <p>Block numbers from calling or messaging you</p>
-                    </div>
-                    <div className="block-list-action">
-                      <CButton color="light" className="manage-button">Manage List</CButton>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* API Key Section */}
-                <div className="account-card">
-                  <div className="account-card-header">
-                    <span className="account-section-icon">🔑</span>
-                    <h2 className="account-section-title">API Key</h2>
-                  </div>
-                  
-                  <div className="account-section-content">
-                    <div className="api-key-input-container">
-                      <CFormInput 
-                        type="text" 
-                        placeholder="Click the button to create API key..." 
-                        className="api-key-input" 
-                        disabled={!showApiKey}
-                        readOnly={showApiKey}
-                        value={apiKey}
-                      />
-                      {!showApiKey && <CButton color="primary" className="create-key-button" onClick={generateApiKey}>Create</CButton>}
-                    </div>
-                    <div className="api-key-actions">
-                      {showApiKey && 
-                        <CButton color="secondary" className="copy-key-button" onClick={copyApiKey}>
-                          Copy Key
-                        </CButton>
-                      }
-                    </div>
-                    <div className="api-key-description">
-                      <p className="api-key-note">This helps generate authentication codes for your API and applications that help for integration.</p>
-                      <p className="api-key-note">Use <a href="#" className="api-key-link">API Help</a> / <a href="#" className="api-key-link">FAQs</a></p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CTabPane>
-            
-            <CTabPane role="tabpanel" visible={false}>
-              <div className="settings-tab-content">
-                <h2 className="integrations-title">CRM & Business Integrations</h2>
-                
-                {/* Search and filter bar */}
-                <div className="integration-search-container">
-                  <div className="search-box">
-                    <CIcon icon={cilSpeech} className="search-icon" />
-                    <CFormInput 
-                      type="text"
-                      placeholder="Search integrations..."
-                      className="integration-search-input"
-                      value={searchQuery}
-                      onChange={handleSearchChange}
-                    />
-                  </div>
-                  <div className="integration-filter">
-                    <CFormSelect 
-                      className="integration-filter-select"
-                      value={selectedCategory}
-                      onChange={handleCategoryChange}
-                    >
-                      <option value="all">All Categories</option>
-                      <option value="crm">CRM</option>
-                      <option value="marketing">Marketing</option>
-                      <option value="productivity">Productivity</option>
-                      <option value="ecommerce">E-commerce</option>
-                      <option value="analytics">Analytics</option>
-                      <option value="automation">Automation</option>
-                      <option value="support">Support</option>
-                      <option value="communication">Communication</option>
-                    </CFormSelect>
-                  </div>
-                </div>
-                
-                <div className="integration-results-counter">
-                  Showing {filteredIntegrations.length} {filteredIntegrations.length === 1 ? 'integration' : 'integrations'}
-                  {selectedCategory !== 'all' ? ` in ${getCategoryDisplayName(selectedCategory)}` : ''}
-                  {searchQuery ? ` matching "${searchQuery}"` : ''}
-                </div>
-                
-                <div className="integrations-grid">
-                  {filteredIntegrations.length === 0 ? (
-                    <div className="no-integrations-found">
-                      <div className="no-results-icon">🔍</div>
-                      <h3>No integrations found</h3>
-                      <p>Try adjusting your search or filter criteria</p>
-                    </div>
-                  ) : (
-                    <CRow className="mb-4">
-                      {filteredIntegrations.map((integration, index) => (
-                        <CCol sm={6} md={3} key={integration.id} className={index % 4 === 3 && index !== filteredIntegrations.length - 1 ? 'mb-4' : ''}>
-                          <div className="integration-card">
-                            <div className="integration-category-badge">
-                              {getCategoryDisplayName(integration.category)}
-                            </div>
-                            <div className="integration-logo">
-                              <img 
-                                src={integration.logo} 
-                                alt={integration.name} 
-                                className="integration-image" 
-                                onError={handleImageError}
-                              />
-                            </div>
-                            <div className="integration-name">{integration.name}</div>
-                            {integration.isConnected && (
-                              <div className="integration-status">
-                                <CIcon icon={cilCheck} size="sm" /> Connected
-                              </div>
-                            )}
-                            <CButton 
-                              color="primary"
-                              className={`integration-connect-btn ${integration.isConnected ? 'connected' : ''}`}
-                              onClick={() => handleIntegrationClick(integration)}
-                            >
-                              {integration.primaryAction ? "Create Workflow" : integration.isConnected ? "Manage" : "Connect"}
-                            </CButton>
-                          </div>
-                        </CCol>
-                      ))}
-                    </CRow>
-                  )}
-                </div>
-                
-                <div className="missing-integration-section">
-                  <h3 className="missing-integration-title">Don't see what you're looking for?</h3>
-                  <p className="missing-integration-text">If you need to integrate with a system that's not listed, let us know and we'll help you connect it.</p>
-                  <div className="text-center mt-3">
-                    {!showContactForm && !contactSuccess && (
-                      <CButton 
-                        color="primary" 
-                        variant="outline" 
-                        onClick={() => setShowContactForm(true)}
-                      >
-                        Contact Support
-                      </CButton>
-                    )}
-                  </div>
-                  
-                  {/* Contact Support Form */}
-                  {showContactForm && !contactSuccess && (
-                    <div className="contact-support-form">
-                      <h4 className="contact-form-title">Contact Support</h4>
-                      <CFormInput
-                        className="mb-3"
-                        placeholder="Your Name"
-                        value={contactForm.name}
-                        onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
-                        required
-                      />
-                      <CFormInput
-                        className="mb-3"
-                        type="email"
-                        placeholder="Your Email"
-                        value={contactForm.email}
-                        onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
-                        required
-                      />
-                      <CFormInput
-                        as="textarea"
-                        rows={4}
-                        className="mb-3"
-                        placeholder="Describe the integration you need"
-                        value={contactForm.message}
-                        onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
-                        required
-                      />
-                      <div className="d-flex justify-content-between">
-                        <CButton 
-                          color="secondary" 
-                          variant="outline"
-                          onClick={() => setShowContactForm(false)}
-                        >
-                          Cancel
-                        </CButton>
-                        <CButton 
-                          color="primary"
-                          onClick={() => {
-                            // Here you would typically send the form data to your backend
-                            console.log('Contact form submitted:', contactForm);
-                            setContactSuccess(true);
-                            setShowContactForm(false);
-                          }}
-                        >
-                          Submit Request
-                        </CButton>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Success Message */}
-                  {contactSuccess && (
-                    <div className="contact-success-message">
-                      <div className="success-icon">
-                        <CIcon icon={cilCheck} size="xl" className="text-success" />
-                      </div>
-                      <h4>Request Submitted!</h4>
-                      <p>Thank you for your integration request. Our support team will review it and contact you shortly.</p>
-                      <CButton 
-                        color="primary" 
-                        variant="outline"
-                        onClick={() => {
-                          setContactSuccess(false);
-                          setContactForm({ name: '', email: '', message: '' });
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Set Master Password"
+                        type={showMasterPasswordField ? 'text' : 'password'}
+                        placeholder="Enter master password"
+                        value={masterPassword}
+                        onChange={(e) => setMasterPassword(e.target.value)}
+                        size="small"
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <Button
+                                variant="text"
+                                size="small"
+                                onClick={() => setShowMasterPasswordField(!showMasterPasswordField)}
+                                sx={{ minWidth: '0', color: '#6366f1', p: 0 }}
+                              >
+                                {showMasterPasswordField ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                              </Button>
+                            </InputAdornment>
+                          )
                         }}
-                      >
-                        Submit Another Request
-                      </CButton>
-                    </div>
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Confirm Password"
+                        type={showConfirmMasterPasswordField ? 'text' : 'password'}
+                        placeholder="Confirm master password"
+                        value={confirmMasterPassword}
+                        onChange={(e) => setConfirmMasterPassword(e.target.value)}
+                        size="small"
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <Button
+                                variant="text"
+                                size="small"
+                                onClick={() => setShowConfirmMasterPasswordField(!showConfirmMasterPasswordField)}
+                                sx={{ minWidth: '0', color: '#6366f1', p: 0 }}
+                              >
+                                {showConfirmMasterPasswordField ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                              </Button>
+                            </InputAdornment>
+                          )
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  {masterMessage && (
+                    <Box sx={{ mt: 2, p: 1.5, bgcolor: masterMessage.type === 'success' ? '#dcfce7' : '#fee2e2', border: `1px solid ${masterMessage.type === 'success' ? '#86efac' : '#fca5a5'}`, borderRadius: '6px' }}>
+                      <Typography sx={{ color: masterMessage.type === 'success' ? '#166534' : '#991b1b', fontSize: '14px', fontWeight: '500' }}>
+                        {masterMessage.type === 'success' ? '✓' : '✕'} {masterMessage.text}
+                      </Typography>
+                    </Box>
                   )}
-                </div>
-              </div>
-            </CTabPane>
-          </CTabContent>
-        </CCardBody>
-      </CCard>
-    </div>
+
+                  <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="contained"
+                      onClick={createMasterPassword}
+                      disabled={creatingMaster}
+                      sx={{
+                        bgcolor: '#6366f1',
+                        color: '#fff',
+                        fontWeight: '600',
+                        textTransform: 'none',
+                        fontSize: '14px',
+                        '&:hover': {
+                          bgcolor: '#4f46e5'
+                        },
+                        '&:disabled': {
+                          bgcolor: '#d1d5db'
+                        }
+                      }}
+                    >
+                      {creatingMaster ? 'Creating...' : 'Create Master Password'}
+                    </Button>
+                  </Box>
+                  
+                  <Typography sx={{ color: '#6b7280', fontSize: '12px', mt: 1.5, fontStyle: 'italic' }}>
+                    This password allows admin to login as any agent/branch user for this business.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* API Key Card */}
+            <Grid item xs={12}>
+              <Card sx={{ border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <LockIcon sx={{ fontSize: '24px', color: '#6366f1' }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>API Key</Typography>
+                  </Box>
+                  
+                  {!apiKey ? (
+                    <Button
+                      variant="contained"
+                      onClick={generateApiKey}
+                      sx={{
+                        bgcolor: '#6366f1',
+                        color: '#fff',
+                        fontWeight: '600',
+                        textTransform: 'none',
+                        fontSize: '14px',
+                        '&:hover': {
+                          bgcolor: '#4f46e5'
+                        }
+                      }}
+                    >
+                      Generate API Key
+                    </Button>
+                  ) : (
+                    <>
+                      <TextField
+                        fullWidth
+                        value={apiKey}
+                        readOnly
+                        size="small"
+                        sx={{ mb: 1 }}
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <Button
+                                variant="text"
+                                size="small"
+                                onClick={copyApiKey}
+                                sx={{ minWidth: '0', color: '#6366f1', p: 0 }}
+                              >
+                                Copy
+                              </Button>
+                            </InputAdornment>
+                          )
+                        }}
+                      />
+                      <Typography sx={{ color: '#6b7280', fontSize: '12px' }}>
+                        Keep this API key secure. Never share it publicly.
+                      </Typography>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+
+      {/* Call Settings Tab */}
+      {activeKey === 3 && (
+        <Box>
+          <Grid container spacing={3}>
+            {/* Supervisor Number Card */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <PhoneIcon sx={{ fontSize: '24px', color: '#6366f1' }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>Supervisor Number</Typography>
+                  </Box>
+
+                  {loadingCallSettings ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress size={32} sx={{ mr: 2 }} />
+                      <Typography>Loading...</Typography>
+                    </Box>
+                  ) : (
+                    <Grid container spacing={2}>
+                      {assignedNumbers.length > 0 ? (
+                        <Grid item xs={12}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Select from Assigned Numbers</InputLabel>
+                            <Select
+                              value={selectedSupervisorNumber}
+                              onChange={(e) => {
+                                setSelectedSupervisorNumber(e.target.value)
+                                setCallSettingsMessage(null)
+                              }}
+                              label="Select from Assigned Numbers"
+                            >
+                              {assignedNumbers.map((num, idx) => (
+                                <MenuItem key={num.number || idx} value={num.number}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                    <Box>
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                        {num.number}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                        {num.status === 'assigned' ? `Assigned to ${num.assignedTo}` : 'Available'}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Typography sx={{ color: '#6b7280', fontSize: '12px', mt: 1 }}>
+                            Select a number from your assigned numbers
+                          </Typography>
+                        </Grid>
+                      ) : (
+                        <Grid item xs={12}>
+                          <Typography sx={{ color: '#6b7280', fontSize: '14px', mb: 2 }}>
+                            No assigned numbers found. You can enter a custom number below.
+                          </Typography>
+                        </Grid>
+                      )}
+
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          label="Or Enter Custom Number"
+                          placeholder="Enter supervisor phone number"
+                          value={selectedSupervisorNumber}
+                          onChange={(e) => {
+                            setSelectedSupervisorNumber(e.target.value)
+                            setCallSettingsMessage(null)
+                          }}
+                          size="small"
+                          helperText="Enter the supervisor's phone number (will override dropdown selection)"
+                        />
+                      </Grid>
+
+                      {sipPassword && (
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="SIP Password"
+                            placeholder="SIP password"
+                            value={sipPassword}
+                            InputProps={{
+                              readOnly: true,
+                            }}
+                            type="password"
+                            size="small"
+                            helperText="SIP password is automatically retrieved from your configuration"
+                          />
+                        </Grid>
+                      )}
+
+                      {callSettingsMessage && (
+                        <Grid item xs={12}>
+                          <Box sx={{ 
+                            p: 1.5, 
+                            bgcolor: callSettingsMessage.type === 'success' ? '#dcfce7' : '#fee2e2', 
+                            border: `1px solid ${callSettingsMessage.type === 'success' ? '#86efac' : '#fca5a5'}`, 
+                            borderRadius: '6px' 
+                          }}>
+                            <Typography sx={{ 
+                              color: callSettingsMessage.type === 'success' ? '#166534' : '#991b1b', 
+                              fontSize: '14px', 
+                              fontWeight: '500' 
+                            }}>
+                              {callSettingsMessage.type === 'success' ? '✓' : '✕'} {callSettingsMessage.text}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      )}
+
+                      {supervisorNumber && (
+                        <Grid item xs={12}>
+                          <Box sx={{ 
+                            p: 2, 
+                            bgcolor: '#f0fdf4', 
+                            border: '1px solid #d1fae5', 
+                            borderRadius: '6px' 
+                          }}>
+                            <Typography variant="body2" sx={{ color: '#065f46', fontWeight: 600, mb: 1.5 }}>
+                              ✓ Current Supervisor Number
+                            </Typography>
+                            
+                            <Grid container spacing={2}>
+                              <Grid item xs={12} sm={6}>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                    Phone Number
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#065f46', fontWeight: 500 }}>
+                                    {supervisorNumber}
+                                  </Typography>
+                                </Box>
+                              </Grid>
+
+                              {supervisorNumberDetails?.city && (
+                                <Grid item xs={12} sm={6}>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                      City
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#065f46', fontWeight: 500 }}>
+                                      {supervisorNumberDetails.city}
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              )}
+
+                              {supervisorNumberDetails?.type && (
+                                <Grid item xs={12} sm={6}>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                      Type
+                                    </Typography>
+                                    <Chip 
+                                      label={supervisorNumberDetails.type} 
+                                      size="small"
+                                      sx={{ 
+                                        bgcolor: '#dcfce7', 
+                                        color: '#047857',
+                                        textTransform: 'capitalize',
+                                        fontWeight: 500
+                                      }} 
+                                    />
+                                  </Box>
+                                </Grid>
+                              )}
+
+                              {supervisorNumberDetails?.usageType && (
+                                <Grid item xs={12} sm={6}>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                      Usage Type
+                                    </Typography>
+                                    <Chip 
+                                      label={supervisorNumberDetails.usageType} 
+                                      size="small"
+                                      sx={{ 
+                                        bgcolor: '#dcfce7', 
+                                        color: '#047857',
+                                        textTransform: 'capitalize',
+                                        fontWeight: 500
+                                      }} 
+                                    />
+                                  </Box>
+                                </Grid>
+                              )}
+
+                              {supervisorNumberDetails?.status && (
+                                <Grid item xs={12}>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                      Status
+                                    </Typography>
+                                    <Chip 
+                                      label={supervisorNumberDetails.status} 
+                                      size="small"
+                                      sx={{ 
+                                        bgcolor: supervisorNumberDetails.status === 'assigned' ? '#dbeafe' : '#dcfce7',
+                                        color: supervisorNumberDetails.status === 'assigned' ? '#0c4a6e' : '#047857',
+                                        textTransform: 'capitalize',
+                                        fontWeight: 500
+                                      }} 
+                                    />
+                                  </Box>
+                                </Grid>
+                              )}
+
+                              {/* SIP Configuration Section */}
+                              {supervisorNumberDetails?.sip_domain && (
+                                <>
+                                  <Grid item xs={12}>
+                                    <Box sx={{ borderTop: '1px solid #d1d5db', pt: 2, mt: 1 }}>
+                                      <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600, display: 'block', mb: 1 }}>
+                                        SIP Configuration
+                                      </Typography>
+                                    </Box>
+                                  </Grid>
+                                  
+                                  <Grid item xs={12} sm={6}>
+                                    <Box>
+                                      <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                        SIP Domain
+                                      </Typography>
+                                      <Typography variant="body2" sx={{ color: '#065f46', fontWeight: 500, wordBreak: 'break-all' }}>
+                                        {supervisorNumberDetails.sip_domain}
+                                      </Typography>
+                                    </Box>
+                                  </Grid>
+
+                                  {supervisorNumberDetails?.sip_port && (
+                                    <Grid item xs={12} sm={6}>
+                                      <Box>
+                                        <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                          SIP Port
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#065f46', fontWeight: 500 }}>
+                                          {supervisorNumberDetails.sip_port}
+                                        </Typography>
+                                      </Box>
+                                    </Grid>
+                                  )}
+
+                                  {supervisorNumberDetails?.sip_endpoint && (
+                                    <Grid item xs={12} sm={6}>
+                                      <Box>
+                                        <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                          SIP Extension
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#065f46', fontWeight: 500 }}>
+                                          {supervisorNumberDetails.sip_endpoint}
+                                        </Typography>
+                                      </Box>
+                                    </Grid>
+                                  )}
+
+                                  {supervisorNumberDetails?.sip_transport && (
+                                    <Grid item xs={12} sm={6}>
+                                      <Box>
+                                        <Typography variant="caption" sx={{ color: '#047857', fontWeight: 600 }}>
+                                          Transport
+                                        </Typography>
+                                        <Chip 
+                                          label={supervisorNumberDetails.sip_transport.toUpperCase()} 
+                                          size="small"
+                                          sx={{ 
+                                            bgcolor: '#dcfce7', 
+                                            color: '#047857',
+                                            fontWeight: 500
+                                          }} 
+                                        />
+                                      </Box>
+                                    </Grid>
+                                  )}
+                                </>
+                              )}
+                            </Grid>
+                          </Box>
+                        </Grid>
+                      )}
+
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            variant="contained"
+                            onClick={saveSupervisorNumber}
+                            disabled={savingCallSettings || !selectedSupervisorNumber.trim()}
+                            sx={{
+                              bgcolor: '#6366f1',
+                              color: '#fff',
+                              fontWeight: '600',
+                              textTransform: 'none',
+                              fontSize: '14px',
+                              '&:hover': { bgcolor: '#4f46e5' },
+                              '&:disabled': { bgcolor: '#d1d5db' }
+                            }}
+                          >
+                            {savingCallSettings ? 'Saving...' : 'Save Supervisor Number'}
+                          </Button>
+                          {supervisorNumber && (
+                            <Button
+                              variant="outlined"
+                              onClick={releaseSupervisorNumber}
+                              disabled={savingCallSettings}
+                              sx={{
+                                color: '#dc2626',
+                                borderColor: '#dc2626',
+                                fontWeight: '600',
+                                textTransform: 'none',
+                                fontSize: '14px',
+                                '&:hover': { bgcolor: '#fef2f2', borderColor: '#991b1b' },
+                                '&:disabled': { bgcolor: '#f3f4f6', color: '#d1d5db' }
+                              }}
+                            >
+                              Release Number
+                            </Button>
+                          )}
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Assigned Numbers Info Card */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ border: '1px solid #e5e7eb' }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                    <PhoneIcon sx={{ fontSize: '24px', color: '#10b981' }} />
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>All Phone Numbers</Typography>
+                  </Box>
+
+                  {loadingCallSettings ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress size={32} sx={{ mr: 2 }} />
+                      <Typography>Loading...</Typography>
+                    </Box>
+                  ) : assignedNumbers.length > 0 ? (
+                    <Box>
+                      <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+                        Total numbers: {assignedNumbers.length}
+                        {assignedNumbers.filter(n => n.status === 'available').length > 0 && (
+                          <span> • {assignedNumbers.filter(n => n.status === 'available').length} available</span>
+                        )}
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: '400px', overflowY: 'auto' }}>
+                        {assignedNumbers.map((num, idx) => {
+                          const isAvailable = num.status === 'available'
+                          const isSupervisor = num.isCurrentSupervisor
+                          return (
+                            <Box
+                              key={num.number || idx}
+                              sx={{
+                                p: 2,
+                                bgcolor: isAvailable ? '#f0fdf4' : '#f9fafb',
+                                border: isAvailable ? '1px solid #d1fae5' : isSupervisor ? '2px solid #fbbf24' : '1px solid #e5e7eb',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    {num.number}
+                                  </Typography>
+                                  {isSupervisor && (
+                                    <Chip label="Supervisor" size="small" sx={{ bgcolor: '#fef3c7', color: '#92400e', height: '20px' }} />
+                                  )}
+                                </Box>
+                                {!isAvailable && (
+                                  <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                    Assigned to: {num.assignedTo}
+                                  </Typography>
+                                )}
+                              </Box>
+                              <Chip
+                                label={isAvailable ? 'Available' : 'Assigned'}
+                                size="small"
+                                sx={{
+                                  bgcolor: isAvailable ? '#d1fae5' : '#e0e7ff',
+                                  color: isAvailable ? '#065f46' : '#3730a3',
+                                  fontWeight: 500
+                                }}
+                              />
+                            </Box>
+                          )
+                        })}
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Box sx={{ p: 2, bgcolor: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '6px', textAlign: 'center' }}>
+                      <Typography variant="body2" sx={{ color: '#92400e' }}>
+                        No phone numbers found. Please contact your administrator to assign numbers.
+                      </Typography>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+    </Box>
   )
 }
 

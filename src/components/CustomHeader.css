@@ -1,0 +1,370 @@
+.jc-header {
+  position: sticky;
+  top: 0;
+  z-index: 3000;
+  background: #ffffff;
+  box-shadow: 0 1px 6px rgba(15,23,42,0.06);
+  height: 48px !important;
+  min-height: 48px !important;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.jc-header-inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  box-sizing: border-box;
+  height: 48px !important;
+}
+
+.jc-left { display:flex; align-items:center; gap:12px; height:48px }
+.jc-title { font-size:0.95rem; font-weight:600; color:#0f1724 }
+
+.jc-icon-btn { 
+  background: #3b82f6; 
+  border: 1px solid rgba(15,23,42,0.1); 
+  padding: 8px; 
+  cursor: pointer; 
+  border-radius: 8px; 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #ffffff;
+}
+.jc-icon-btn:hover { 
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+}
+
+.jc-left .jc-icon-btn {
+  background: #f3f4f6;
+  color: #0f1724;
+  border: 1px solid rgba(15,23,42,0.08);
+}
+.jc-left .jc-icon-btn:hover {
+  background: #e5e7eb;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+
+.jc-actions { display:flex; align-items:center; gap:10px; height:48px }
+.jc-divider { width:2px; height:24px; background:rgba(15,23,42,0.25) }
+.jc-pill { background:#fff; border:1px solid #e6e6e6; padding:6px 10px; border-radius:18px; font-size:0.9rem; cursor:pointer }
+.jc-pill-icon { display:flex; gap:8px; align-items:center }
+.jc-avatar { width:28px; height:28px; border-radius:50%; background:linear-gradient(180deg,#e6eef9,#dfeefc); display:inline-flex; align-items:center; justify-content:center; font-weight:600; border:1px solid rgba(15,23,42,0.06) }
+
+.jc-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.jc-user-icon {
+  width: 34px;
+  height: 34px;
+  padding: 3px; /* gap between outer border and inner background */
+  border-radius: 50%;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px #0f1724; /* dark outer border */
+  box-sizing: border-box;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.jc-user-chip:hover .jc-user-icon,
+.jc-user-chip:focus .jc-user-icon { 
+  transform: scale(1.08); 
+  box-shadow: 0 0 0 2px #0f1724, 0 0 12px rgba(15, 23, 42, 0.16);
+}
+
+.jc-user-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #000; /* inner black background */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff; /* white initial */
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.jc-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.jc-user-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f1724;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jc-user-email {
+  font-size: 0.8rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dropdown menu */
+.jc-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid rgba(15,23,42,0.08);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.12);
+  border-radius: 8px;
+  padding: 6px 6px;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  transform-origin: top right;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 4000;
+  pointer-events: none;
+}
+
+.jc-dropdown-menu.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.jc-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-size: 0.9rem;
+  color: #0f1724;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.jc-dropdown-item:hover {
+  background: rgba(15,23,42,0.04);
+}
+
+.jc-item-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+}
+
+/* Signout variant: light red background and red icon/text */
+.jc-dropdown-item.jc-signout {
+  background: #fff1f0;
+  color: #b91c1c;
+}
+.jc-dropdown-item.jc-signout .jc-item-icon,
+.jc-dropdown-item.jc-signout svg {
+  color: #b91c1c;
+}
+.jc-dropdown-item.jc-signout:hover {
+  background: #ffe5e4;
+}
+
+.jc-dropdown-divider { height: 1px; background: rgba(15,23,42,0.06); margin: 6px 4px; border-radius: 1px }
+
+.jc-user-text { display:flex; flex-direction:column; align-items:flex-start }
+
+.jc-user-name { font-size: 0.82rem; font-weight: 600; color: #0f1724; line-height:1 }
+.jc-user-email { font-size: 0.68rem; color: #6b7280; margin-top: 1px; line-height:1 }
+
+/* Ensure nothing else can stretch the header */
+.jc-header, .jc-header * { box-sizing: border-box }
+
+@media (max-width: 767px) {
+  .jc-title { display:none }
+  .jc-pill { display:none }
+}
+
+/* Soft UI / Modern styles for inline user activity menu */
+.user-activity-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  min-width: 220px;
+  box-sizing: border-box;
+}
+
+.user-activity-section {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111827;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(250,250,250,0.6));
+  border: 1px solid rgba(15,23,42,0.03);
+}
+
+.user-activity-item,
+.user-activity-item.button-like {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border-radius: 10px;
+  border: 1px solid rgba(15,23,42,0.04);
+  cursor: pointer;
+  color: #0f1724;
+  font-size: 0.92rem;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+/* Account info (name + last seen) should stack vertically */
+.user-activity-item.pb-2 {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.user-activity-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
+}
+
+.user-activity-item.active {
+  background: linear-gradient(180deg, #eef2ff, #eef4ff);
+  border-color: rgba(59,130,246,0.18);
+  box-shadow: 0 6px 18px rgba(59,130,246,0.06);
+}
+
+.user-activity-item .me-2 { margin-right: 8px }
+
+.user-activity-divider { height: 1px; background: rgba(15,23,42,0.04); border-radius: 2px; margin: 6px 0 }
+
+/* Make icons softer */
+.user-activity-item svg, .user-activity-item .c-avatar, .user-activity-item .c-badge {
+  opacity: 0.95;
+}
+
+/* Improve dropdown scrollbar appearance */
+.jc-dropdown-menu {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15,23,42,0.12) transparent;
+}
+.jc-dropdown-menu::-webkit-scrollbar { width: 8px; }
+.jc-dropdown-menu::-webkit-scrollbar-track { background: transparent; }
+.jc-dropdown-menu::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.08); border-radius: 8px; }
+
+/* Smaller text for last-seen and meta */
+.user-activity-item[aria-disabled] { cursor: default; opacity: 0.98 }
+.user-activity-item[aria-disabled] small { color: #6b7280; font-size: 0.78rem }
+
+/* Ensure header dropdown uses modern rounded container */
+.jc-dropdown-menu {
+  border-radius: 12px;
+  padding: 8px;
+}
+
+/* Status popover shown on hover of status label */
+.status-label-wrapper { position: relative; display: inline-block }
+
+.status-popover {
+  position: absolute;
+  /* Place to the left of the status item / main modal */
+  top: 0;
+  right: 100%;
+  margin-right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: linear-gradient(180deg,#ffffff,#fbfdff);
+  border: 1px solid rgba(15,23,42,0.06);
+  box-shadow: 0 10px 30px rgba(2,6,23,0.08);
+  padding: 8px;
+  border-radius: 10px;
+  z-index: 5000;
+  min-width: 160px;
+  transform-origin: right top;
+}
+
+.status-hover-wrap { position: relative; display: block; width: 100%; box-sizing: border-box }
+.status-hover-wrap .status-popover { right: 100%; top: 0 }
+
+.status-popover .user-activity-item { width: 100%; display:flex; justify-content:space-between; align-items:center }
+
+.status-option-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(15,23,42,0.03);
+  transition: background 120ms ease, transform 120ms ease;
+}
+.user-activity-item:hover .status-option-icon { background: rgba(15,23,42,0.06); transform: translateY(-1px) }
+.status-option-label { flex: 1; text-align: left }
+
+.status-label-wrapper .user-activity-item { cursor: pointer }
+
+/* Align status title and current value on same row */
+.status-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+.status-row .status-title { display:block }
+.status-combined { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:8px 10px }
+.status-combined .status-title { font-weight:600; color:#4b5563; margin-right: 12px }
+.status-combined .status-current-wrap { display:flex; align-items:center; gap:8px }
+.status-combined .status-current-text { font-weight:600; color:#0f1724 }
+
+/* Small pill label that sits next to current status */
+.status-label-pill {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-right: 8px;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.03);
+}
+
+.status-label-pill .status-icon-inline svg { width:18px; height:18px }
+.status-label-pill .status-current-text { color: inherit }
+.status-icon-inline { display:inline-flex; align-items:center }
+
+/* Fallback: on narrow screens, render popover below the item */
+@media (max-width: 640px) {
+  .status-popover {
+    right: auto;
+    left: 0;
+    top: 100%;
+    margin-right: 0;
+    margin-top: 8px;
+    transform-origin: top left;
+  }
+}

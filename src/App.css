@@ -2,6 +2,46 @@
    Minimal sensible defaults so the app has a consistent baseline
    More specific styles remain in SCSS files and component CSS. */
 
+/* Inter font for modern SaaS look */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Typography: Inter usage
+   - Headings/Greeting: 600-700
+   - Section titles: 500-600
+   - Body: 400
+   - Secondary text: 400 + muted color */
+:root {
+  --text-default: #0f1724;
+  --text-muted: #6b7280;
+}
+
+body, input, button, textarea, select {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-weight: 400;
+  color: var(--text-default);
+}
+
+h1, .h1 { font-weight: 700; letter-spacing: -0.02em }
+h2, .h2 { font-weight: 600 }
+h3, .h3 { font-weight: 600 }
+h4, .h4 { font-weight: 600 }
+h5, .h5 { font-weight: 500 }
+h6, .h6 { font-weight: 500 }
+
+/* Greeting / large title used on dashboard */
+.contact-list-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+  color: var(--text-default);
+}
+
+.section-title { font-weight: 600; color: var(--text-default); letter-spacing: -0.01em }
+.muted { color: var(--text-muted); font-weight: 400 }
+.text-muted { color: var(--text-muted) }
+
+
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -9,6 +49,18 @@ html, body, #root {
   background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide native browser scrollbars visually but preserve scrolling functionality */
+/* Apply hide-scrollbar to all scrollable containers */
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
 }
 
 /* Ensure the main wrapper occupies full height */
@@ -53,4 +105,14 @@ a {
 @keyframes sk-scaleout {
   0% { transform: scale(0); }
   100% { transform: scale(1); opacity: 0; }
+}
+
+/* Hide per-page "Show" selectors globally. Pagination is fixed to 10 rows per page. */
+.dataTables_length {
+  display: none !important;
+}
+
+/* Backstop: some pages use custom labels around selects */
+.dataTables_length label {
+  display: none !important;
 }

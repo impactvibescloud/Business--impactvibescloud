@@ -4,7 +4,8 @@ import { getBaseURL, getHeaders } from './api';
 // Create axios instance with default config
 const axiosInstance = axios.create({
   baseURL: getBaseURL(),  // Base URL without /api
-  headers: getHeaders()
+  headers: getHeaders(),
+  timeout: 10000 // 10s global timeout for axios instance
 });
 
 // Add request interceptor to update headers before each request

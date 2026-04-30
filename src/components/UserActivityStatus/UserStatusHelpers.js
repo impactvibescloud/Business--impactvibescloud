@@ -9,7 +9,7 @@ import {
   cilWatch, 
   cilAvTimer 
 } from '@coreui/icons';
-import { USER_STATUSES, STATUS_CONFIG } from '../../context/UserActivityContext';
+import { STATUS_OPTIONS as USER_STATUSES, STATUS_COLORS as STATUS_CONFIG } from '../../context/UserActivityContext';
 
 // Map status IDs to icons
 const statusIcons = {
