@@ -36,6 +36,7 @@ import AddIcon from '@mui/icons-material/Add'
 import SearchIcon from '@mui/icons-material/Search'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 import BusinessIcon from '@mui/icons-material/Business'
 import axios from 'axios'
 import Swal from 'sweetalert2'
@@ -76,6 +77,8 @@ function Department() {
   const [syncingMap, setSyncingMap] = useState({})
   const [selectedMemberIds, setSelectedMemberIds] = useState([]) // For multi-select UI
   const [selectedDepartmentHeadBranchId, setSelectedDepartmentHeadBranchId] = useState('') // For department head dropdown UI
+  const [showViewDialog, setShowViewDialog] = useState(false)
+  const [viewDepartment, setViewDepartment] = useState(null)
   const [formData, setFormData] = useState({
     businessId: '',
     name: '',
@@ -520,6 +523,16 @@ function Department() {
     setShowDepartmentModal(true)
   }
 
+  const handleViewDepartment = (department) => {
+    setViewDepartment(department)
+    setShowViewDialog(true)
+  }
+
+  const handleCloseViewDialog = () => {
+    setShowViewDialog(false)
+    setViewDepartment(null)
+  }
+
   const handleDeleteConfirm = (id) => {
     setDeleteId(id)
     setShowDeleteModal(true)
@@ -759,34 +772,94 @@ function Department() {
       }
       const didId = didObj.id || didObj._id
 
-      const branchIds = []
+      const branchTargets = []
+      const addBranchTarget = (branch) => {
+        if (branch && branch._id && !branchTargets.some((b) => String(b._id) === String(branch._id))) {
+          branchTargets.push(branch)
+        }
+      }
       if (Array.isArray(department.members) && department.members.length) {
         department.members.forEach(m => {
           const memberUserId = m.userId || m.user || m._id || m.id
           const branch = availableBranches.find(b => String(b.userId) === String(memberUserId) || String(b._id) === String(memberUserId) || String(b.id) === String(memberUserId) || String(b.didNumber) === String(m.didNumber))
-          if (branch && branch._id && !branchIds.includes(branch._id)) branchIds.push(branch._id)
+          addBranchTarget(branch)
         })
       }
 
       // Also include department head's branch if present
       const departmentHeadUserId = typeof department.departmentHead === 'object' ? (department.departmentHead._id || department.departmentHead.id) : department.departmentHead
       const headBranch = availableBranches.find(b => String(b.userId) === String(departmentHeadUserId))
-      if (headBranch && headBranch._id && !branchIds.includes(headBranch._id)) branchIds.push(headBranch._id)
+      addBranchTarget(headBranch)
 
-      if (branchIds.length === 0) {
+      if (branchTargets.length === 0) {
         Swal.fire('No agents found', 'Could not identify any agents to assign the DID to.', 'info')
         return
       }
 
-      const confirm = await Swal.fire({ title: 'Sync DID', html: `Assign DID <b>${department.didNumber}</b> to <b>${branchIds.length}</b> agents?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, sync' })
+      const confirm = await Swal.fire({ title: 'Sync DID', html: `Assign DID <b>${department.didNumber}</b> to <b>${branchTargets.length}</b> agents?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, sync' })
       if (!confirm.isConfirmed) return
 
-      // Simple sync: update each branch's didNumbers via branch edit API
+      const departmentDid = String(department.didNumber).trim()
+      const resolveBranchExtension = async (branch) => {
+        const assigned = Array.isArray(branch.assignedNumbers) ? branch.assignedNumbers : []
+        const assignedExt = assigned.find(n => n?.extensionNumber)?.extensionNumber
+        if (assignedExt) return String(assignedExt)
+
+        const direct = branch.extension || branch.extensionNumber || branch.sip_endpoint || branch.ext
+        if (direct) return String(direct)
+
+        const branchDids = Array.isArray(branch.didNumbers)
+          ? branch.didNumbers
+          : (branch.didNumber ? [branch.didNumber] : [])
+        const candidates = [
+          ...branchDids.filter(d => String(d) !== departmentDid),
+          ...branchDids.filter(d => String(d) === departmentDid),
+        ]
+
+        for (const did of candidates) {
+          try {
+            const res = await apiCall(`/api/v1/numbers/business/by-number/${encodeURIComponent(did)}`, 'GET')
+            const data = res?.data || res
+            const ext = data?.extension_number || data?.extension || data?.sip_endpoint || data?.extensionNumber || data?.ext
+            if (ext) return String(ext)
+          } catch (err) {
+            console.warn('Failed to resolve extension for branch DID', did, err)
+          }
+        }
+        return null
+      }
+
+      // Append the department DID to each branch and create a per-agent
+      // NumberAssignment for that branch's own SIP extension. The shared DID
+      // must not replace the agent's primary DID, because the dialer uses the
+      // primary DID/extension to register SIP.
       const failed = []
 
-      for (const branchId of branchIds) {
+      for (const branch of branchTargets) {
+        const branchId = branch._id
         try {
-          await apiCall(`/branch/edit/${branchId}`, 'PATCH', { didNumbers: [department.didNumber] })
+          const existingDids = Array.isArray(branch.didNumbers)
+            ? branch.didNumbers.map(d => String(d).trim()).filter(Boolean)
+            : (branch.didNumber ? [String(branch.didNumber).trim()] : [])
+          const nextDids = existingDids.includes(departmentDid)
+            ? existingDids
+            : [...existingDids, departmentDid]
+          const extension = await resolveBranchExtension(branch)
+
+          await apiCall(`/branch/edit/${branchId}`, 'PATCH', {
+            didNumbers: nextDids,
+            ...(extension ? { extension } : {}),
+          })
+
+          if (extension) {
+            await apiCall(`/numbers/${didId}/assign`, 'POST', {
+              extensionNumber: extension,
+              assignedToBranch: branchId,
+              assignedToBusiness: currentBusinessId,
+            })
+          } else {
+            console.warn('Could not resolve branch extension for department DID sync', branchId)
+          }
         } catch (err) {
           console.warn('Failed to update branch DID', branchId, err)
           failed.push(branchId)
@@ -803,7 +876,7 @@ function Department() {
       }
 
       if (failed.length === 0) Swal.fire('Synced', 'All agents updated successfully', 'success')
-      else Swal.fire('Partial sync', `${branchIds.length - failed.length} succeeded, ${failed.length} failed`, 'warning')
+      else Swal.fire('Partial sync', `${branchTargets.length - failed.length} succeeded, ${failed.length} failed`, 'warning')
 
       setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
 
@@ -872,24 +945,32 @@ function Department() {
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
-              <TextField
-                placeholder="Search departments..."
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                size="small"
-                fullWidth
-                InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small"/></InputAdornment>) }}
-              />
-            </Box>
-            <Box>
-              <Button size="small" variant="outlined" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</Button>
-              <Typography component="span" sx={{ mx: 1 }}>Page {currentPage}</Typography>
-              <Button size="small" variant="outlined" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</Button>
-              <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleNewDepartment} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>New Department</Button>
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                Departments
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                Create and manage departments
+              </Typography>
             </Box>
           </Box>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+                <TextField
+                  placeholder="Search departments..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  size="small"
+                  fullWidth
+                  InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small"/></InputAdornment>) }}
+                />
+              </Box>
+              <Box>
+                <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleNewDepartment} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>New Department</Button>
+              </Box>
+            </Box>
 
           <TableContainer component={Paper} className="calllogs-table-container">
             <Table size="small" className="compact-table" sx={{ minWidth: 700 }}>
@@ -897,26 +978,25 @@ function Department() {
                 <TableRow>
                   <TableCell>S.NO</TableCell>
                   <TableCell>DEPARTMENT NAME</TableCell>
-                  <TableCell>DESCRIPTION</TableCell>
-                  <TableCell>DEPARTMENT HEAD</TableCell>
+                  <TableCell>HEAD</TableCell>
                   <TableCell>DID NUMBER</TableCell>
                   <TableCell>MEMBERS</TableCell>
                   <TableCell>STATUS</TableCell>
                   <TableCell>DEFAULT</TableCell>
-                  <TableCell>ACTIONS</TableCell>
+                  <TableCell align="center">ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                       <CircularProgress />
                       <div className="mt-3">Loading departments...</div>
                     </TableCell>
                   </TableRow>
                 ) : currentDepartments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                       <div className="empty-state">
                         <div className="empty-state-icon"><BusinessIcon sx={{ fontSize: 40 }} /></div>
                         <Typography variant="h6">No departments found</Typography>
@@ -927,36 +1007,37 @@ function Department() {
                   </TableRow>
                 ) : (
                   currentDepartments.map((department, index) => (
-                    <TableRow key={department.id || department._id} hover>
+                      <TableRow key={department.id || department._id} hover>
                       <TableCell>{indexOfFirstItem + index + 1}</TableCell>
                       <TableCell>{department.name}</TableCell>
-                      <TableCell>{department.description || 'No description'}</TableCell>
                       <TableCell>{getDepartmentHeadName(department)}</TableCell>
                       <TableCell>{getDepartmentHeadDidNumber(department)}</TableCell>
                       <TableCell><Chip label={`${department.members && Array.isArray(department.members) ? department.members.length : 0} Members`} size="small" /></TableCell>
                       <TableCell>{getStatusBadge(department.status)}</TableCell>
                       <TableCell>{department.default ? <Chip label="Default" size="small" color="primary" variant="filled" /> : '-'}</TableCell>
-                      <TableCell>
-                        {syncingMap[department._id || department.id] ? (
-                          <CircularProgress size={20} />
-                        ) : (
-                          <IconButton size="small" onClick={() => syncDepartmentDid(department)} title="Sync DID"><SyncIcon fontSize="small" /></IconButton>
-                        )}
-                        <IconButton size="small" onClick={() => handleEdit(department)}><EditIcon fontSize="small"/></IconButton>
-                        <IconButton size="small" onClick={() => handleDeleteConfirm(department.id || department._id)}><DeleteIcon fontSize="small"/></IconButton>
+                      <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+                          {syncingMap[department._id || department.id] ? (
+                            <CircularProgress size={20} />
+                          ) : (
+                            <IconButton size="small" color="info" onClick={(e) => { e.stopPropagation(); syncDepartmentDid(department); }} title="Sync DID"><SyncIcon fontSize="small" /></IconButton>
+                          )}
+                          <IconButton size="small" color="primary" onClick={(e) => { e.stopPropagation(); handleViewDepartment(department); }} title="View Department"><VisibilityIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEdit(department); }} title="Edit Department"><EditIcon fontSize="small"/></IconButton>
+                          <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleDeleteConfirm(department.id || department._id); }} title="Delete Department"><DeleteIcon fontSize="small"/></IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
-            </Table>
-          </TableContainer>
-
-          {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Pagination count={totalPages} page={currentPage} onChange={(e, page) => handlePageChange(page)} color="primary" />
-            </Box>
-          )}
+              </Table>
+              {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Pagination count={totalPages} page={currentPage} onChange={(e, page) => handlePageChange(page)} color="primary" />
+                </Box>
+              )}
+            </TableContainer>
         </CardContent>
       </Card>
 
@@ -970,9 +1051,9 @@ function Department() {
             <TextField name="description" label="Description" value={formData.description} onChange={handleInputChange} fullWidth />
             <TextField label="Business" value={businessName} disabled fullWidth />
             <FormControl fullWidth>
-              <InputLabel id="department-head-label">Department Head</InputLabel>
-              <Select labelId="department-head-label" name="departmentHead" value={selectedDepartmentHeadBranchId || ''} label="Department Head" onChange={handleInputChange}>
-                <MenuItem value=""><em>Select Department Head</em></MenuItem>
+              <InputLabel id="department-head-label">Head</InputLabel>
+              <Select labelId="department-head-label" name="departmentHead" value={selectedDepartmentHeadBranchId || ''} label="Head" onChange={handleInputChange}>
+                <MenuItem value=""><em>Select Head</em></MenuItem>
                 {availableBranches.map(branch => (
                   <MenuItem key={branch._id || branch.id} value={branch._id || branch.id}>{branch.branchName || branch.name}</MenuItem>
                 ))}
@@ -1049,6 +1130,69 @@ function Department() {
         <DialogActions>
           <Button onClick={handleDeleteCancel} disabled={isDeleting}>Cancel</Button>
           <Button color="error" variant="contained" onClick={handleDelete} disabled={isDeleting || deleteSuccess}>{isDeleting ? <CircularProgress size={18} sx={{ mr: 1 }} /> : null}Delete</Button>
+        </DialogActions>
+      </Dialog>
+      {/* View Department Dialog */}
+      <Dialog open={showViewDialog} onClose={handleCloseViewDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Department Details</DialogTitle>
+        <DialogContent dividers>
+          {viewDepartment ? (
+            <Box sx={{ p: 1 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Name</Typography>
+                  <Typography variant="body1">{viewDepartment.name}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Head</Typography>
+                  <Typography variant="body1">{getDepartmentHeadName(viewDepartment)}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">DIDs</Typography>
+                  <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {(Array.isArray(viewDepartment.didNumbers) && viewDepartment.didNumbers.length > 0) ? viewDepartment.didNumbers.map(d => (
+                      <Chip key={d} label={d} size="small" />
+                    )) : (
+                      <Chip label={getDepartmentHeadDidNumber(viewDepartment)} size="small" />
+                    )}
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Members</Typography>
+                  <Box sx={{ mt: 0.5, border: '1px solid #e0e0e0', borderRadius: 1, p: 1, maxHeight: 120, overflowY: 'auto', minHeight: 40 }}>
+                    {viewDepartment.members && Array.isArray(viewDepartment.members) && viewDepartment.members.length > 0 ? (
+                      viewDepartment.members.map((m, i) => {
+                        const name = m?.name || m?.fullName || m?.displayName || m?.user?.name || (() => {
+                          const found = availableBranches.find(b => String(b.userId) === String(m.userId) || String(b._id) === String(m.userId) || String(b.id) === String(m.userId));
+                          return found ? (found.branchName || found.name) : (m?.userId || m?.phone || 'Unknown');
+                        })()
+                        return (
+                          <Typography key={i} variant="body2" sx={{ mb: 0.5 }}>{name}</Typography>
+                        )
+                      })
+                    ) : (
+                      <Typography variant="body2">0 members</Typography>
+                    )}
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="caption" color="text.secondary">Description</Typography>
+                  <Typography variant="body1">{viewDepartment.description || '-'}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Status</Typography>
+                  <Box sx={{ mt: 0.5 }}>{getStatusBadge(viewDepartment.status)}</Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Default</Typography>
+                  <Typography variant="body1">{viewDepartment.default ? 'Yes' : 'No'}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseViewDialog}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

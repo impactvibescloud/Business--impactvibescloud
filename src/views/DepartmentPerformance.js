@@ -166,6 +166,7 @@ const DepartmentPerformance = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [period, setPeriod] = useState('alltime');
   const [user, setUser] = useState({});
+  
   const token = localStorage.getItem('authToken');
 
   useEffect(() => {
@@ -477,51 +478,42 @@ const DepartmentPerformance = () => {
             borderBottom: '1px solid #e5e7eb',
           }}
         />
-        <CardContent sx={{ p: 0 }}>
-          <TableContainer>
-            <Table size="small" sx={{ minWidth: 650 }}>
-              <TableHead sx={{ backgroundColor: '#f9fafb' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Department Name</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Members</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Online</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Answered</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Missed</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Busy</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Not Answered</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Avg AHT (sec)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Avg ASA (sec)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total Talk (sec)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Occupancy %</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} align="center" sx={{ py: 3, color: '#6b7280' }}>
-                      No departments found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((dept) => (
-                    <TableRow key={dept.departmentId || dept._id || dept.departmentName} hover>
-                      <TableCell sx={{ fontWeight: 500 }}>{dept.departmentName}</TableCell>
-                      <TableCell align="right">{dept.membersCount ?? '-'}</TableCell>
-                      <TableCell align="right">{dept.onlineAgentsCount ?? 0}</TableCell>
-                      <TableCell align="right">{dept.answeredCalls ?? 0}</TableCell>
-                      <TableCell align="right">{dept.missedCalls ?? 0}</TableCell>
-                      <TableCell align="right">{dept.busyCalls ?? 0}</TableCell>
-                      <TableCell align="right">{dept.notAnsweredOutbound ?? 0}</TableCell>
-                      <TableCell align="right">{dept.avgAHTSeconds ? dept.avgAHTSeconds.toFixed(2) : '-'}</TableCell>
-                      <TableCell align="right">{dept.avgASASeconds ? dept.avgASASeconds.toFixed(2) : '-'}</TableCell>
-                      <TableCell align="right">{dept.totalTalkSeconds ?? 0}</TableCell>
-                      <TableCell align="right">{dept.occupancyPercent ? dept.occupancyPercent.toFixed(2) : '-'}%</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        <CardContent sx={{ p: 2 }}>
+          {filtered.length === 0 ? (
+            <Box sx={{ py: 3, color: '#6b7280' }}>No departments found</Box>
+          ) : (
+            <Grid container spacing={2}>
+              {filtered.map((dept) => {
+                const id = dept.departmentId || dept._id || dept.departmentName
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={id}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{dept.departmentName}</Typography>
+                          </Box>
+                        </Box>
+
+                        <Grid container spacing={1} sx={{ mt: 1 }}>
+                          <Grid item xs={6}><Typography variant="caption" color="text.secondary">Members</Typography><Typography variant="body2">{dept.membersCount ?? '-'}</Typography></Grid>
+                          <Grid item xs={6}><Typography variant="caption" color="text.secondary">Online</Typography><Typography variant="body2">{dept.onlineAgentsCount ?? 0}</Typography></Grid>
+                          <Grid item xs={6}><Typography variant="caption" color="text.secondary">Answered</Typography><Typography variant="body2">{dept.answeredCalls ?? 0}</Typography></Grid>
+                          <Grid item xs={6}><Typography variant="caption" color="text.secondary">Missed</Typography><Typography variant="body2">{dept.missedCalls ?? 0}</Typography></Grid>
+                          <Grid item xs={6}><Typography variant="caption" color="text.secondary">Busy</Typography><Typography variant="body2">{dept.busyCalls ?? 0}</Typography></Grid>
+                          <Grid item xs={6}><Typography variant="caption" color="text.secondary">Not Answered</Typography><Typography variant="body2">{dept.notAnsweredOutbound ?? 0}</Typography></Grid>
+                          <Grid item xs={12} sm={6}><Typography variant="caption" color="text.secondary">Avg AHT (sec)</Typography><Typography variant="body2">{dept.avgAHTSeconds ? dept.avgAHTSeconds.toFixed(2) : '-'}</Typography></Grid>
+                          <Grid item xs={12} sm={6}><Typography variant="caption" color="text.secondary">Avg ASA (sec)</Typography><Typography variant="body2">{dept.avgASASeconds ? dept.avgASASeconds.toFixed(2) : '-'}</Typography></Grid>
+                          <Grid item xs={12} sm={6}><Typography variant="caption" color="text.secondary">Total Talk (sec)</Typography><Typography variant="body2">{dept.totalTalkSeconds ?? 0}</Typography></Grid>
+                          <Grid item xs={12} sm={6}><Typography variant="caption" color="text.secondary">Occupancy %</Typography><Typography variant="body2">{dept.occupancyPercent ? dept.occupancyPercent.toFixed(2) : '-'}%</Typography></Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )
+              })}
+            </Grid>
+          )}
         </CardContent>
       </Card>
     </Box>

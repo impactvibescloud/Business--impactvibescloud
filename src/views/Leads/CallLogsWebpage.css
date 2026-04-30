@@ -52,6 +52,11 @@
 .calllogs-table-container table{ min-width:640px; }
 .draggable-over{ background: #f8fafc !important; }
 
+/* Prevent table header text from wrapping onto multiple lines */
+.calllogs-table-container thead th {
+  white-space: nowrap;
+}
+
 /* Responsive tweaks */
 @media (max-width: 768px){
   .page-container{ padding:12px; }

@@ -78,12 +78,18 @@ const WebPhoneDialer = ({ ua, regStatus, sipDomain = 'pbx.justconnect.biz', busi
 
   const handleCallerIdChange = async (newNumber) => {
     if (!newNumber || newNumber === callerId) return
+
+    // Optimistically update UI so selection feels instant. Revert on failure.
+    const previous = callerId
+    setError(null)
+    setCallerId(newNumber)
     setCallerIdSaving(true)
     try {
       await apiCall('/numbers/my-caller-id', 'PUT', { number: newNumber })
-      setCallerId(newNumber)
+      // success — nothing else to do since UI already updated
     } catch (err) {
-      // Server enforces ownership; surface the message rather than silently failing.
+      // Revert optimistic update on failure and surface error
+      setCallerId(previous)
       const msg = err?.response?.data?.message || err?.message || 'Failed to update caller-ID'
       setError(msg)
     } finally {
@@ -650,20 +656,28 @@ const WebPhoneDialer = ({ ua, regStatus, sipDomain = 'pbx.justconnect.biz', busi
         {/* Caller-ID picker. Only shown when the agent has more than one DID
             assigned — single-DID users have nothing to choose. */}
         {callStatus === 'idle' && myNumbers.length > 1 && (
-          <FormControl fullWidth size="small" disabled={callerIdSaving}>
-            <InputLabel>Call from</InputLabel>
-            <Select
-              value={callerId}
-              label="Call from"
-              onChange={(e) => handleCallerIdChange(e.target.value)}
-            >
-              {myNumbers.map((n) => (
-                <MenuItem key={n._id || n.number} value={n.number}>
-                  {n.number}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Box sx={{ position: 'relative' }}>
+            <FormControl fullWidth size="small" disabled={callerIdSaving}>
+              <InputLabel>Call from</InputLabel>
+              <Select
+                value={callerId}
+                label="Call from"
+                onChange={(e) => handleCallerIdChange(e.target.value)}
+                renderValue={(val) => (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                    <Typography sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</Typography>
+                    {callerIdSaving && <CircularProgress size={16} />}
+                  </Box>
+                )}
+              >
+                {myNumbers.map((n) => (
+                  <MenuItem key={n._id || n.number} value={n.number}>
+                    {n.number}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
         )}
 
         {/* Mode Selector */}

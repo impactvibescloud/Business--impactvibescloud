@@ -63,7 +63,10 @@ const CallLogs = () => {
   const [audioError, setAudioError] = useState(null)
   const [agentMap, setAgentMap] = useState({})
   const [agentByNumberMap, setAgentByNumberMap] = useState({})
-  const [activeFilter, setActiveFilter] = useState('All Calls')
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [agentFilter, setAgentFilter] = useState('all')
+  const [agentOptions, setAgentOptions] = useState([])
   const [businessId, setBusinessId] = useState(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -185,18 +188,17 @@ const CallLogs = () => {
     const filterParam = params.get('filter')
     const fromParam = params.get('from')
     const toParam = params.get('to')
+    const statusParam = params.get('status')
 
-    // Set filter if provided
+    // Set filter if provided. Map legacy filter params to direction/status.
     if (filterParam) {
-      // Map filter names from dashboard redirects to CallLogs filter names
-      const filterMap = {
-        'Answered': 'Answered',
-        'Missed': 'Missed',
-        'Outgoing': 'Outgoing',
-        'Incoming': 'Incoming'
-      }
-      const mappedFilter = filterMap[filterParam] || filterParam
-      setActiveFilter(mappedFilter)
+      const fp = String(filterParam || '')
+      const lower = fp.toLowerCase()
+      if (lower === 'answered') setStatusFilter('answered')
+      else if (lower === 'missed') setStatusFilter('missed')
+      else if (lower === 'outgoing' || lower === 'outbound') setActiveFilter('outbound')
+      else if (lower === 'incoming' || lower === 'inbound') setActiveFilter('inbound')
+      else setActiveFilter('all')
     }
 
     // Set date range if provided
@@ -205,6 +207,18 @@ const CallLogs = () => {
     }
     if (toParam) {
       setDateTo(toParam)
+    }
+
+    // Set status filter if provided via URL (normalize common values)
+    if (statusParam) {
+      try {
+        const s = String(statusParam)
+        const lower = s.toLowerCase()
+        if (lower === 'not answered' || lower === 'not-answered') setStatusFilter('not-answered')
+        else setStatusFilter(lower)
+      } catch (e) {
+        setStatusFilter(statusParam)
+      }
     }
   }, [location.search])
 
@@ -249,13 +263,15 @@ const CallLogs = () => {
       }
     }
 
-    // Normalize active filter to backend parameters (status / callType)
-    // Note: Don't send status=missed to backend as it may not be recognized
-    // Instead rely on client-side filtering for missed calls
-    if (activeFilter && activeFilter !== 'All Calls' && activeFilter !== 'Missed') {
-      if (activeFilter === 'Answered') endpoint += `&status=answered`
-      else if (activeFilter === 'Outgoing') endpoint += `&callType=outbound`
-      else if (activeFilter === 'Incoming') endpoint += `&callType=inbound`
+    // Prefer explicit statusFilter when provided; fall back to activeFilter mapping
+    // Note: treat 'all' as no-filter; backend may not recognize 'missed' consistently
+    if (statusFilter && statusFilter !== 'all') {
+      if (statusFilter !== 'missed') {
+        endpoint += `&status=${encodeURIComponent(statusFilter)}`
+      }
+    } else if (activeFilter && activeFilter !== 'all') {
+      if (activeFilter === 'outbound') endpoint += `&callType=outbound`
+      else if (activeFilter === 'inbound') endpoint += `&callType=inbound`
     }
     return endpoint
   }
@@ -267,10 +283,13 @@ const CallLogs = () => {
       setLoading(true);
       setError(null);
       try {
-        // If user has active date filters, request a larger page size and fetch page 1
-        // so we can perform client-side pagination. This is a fallback for backends
-        // that return incorrect pagination totals when filters are applied.
-        const requestingAllFiltered = Boolean(dateFrom || dateTo)
+        // If user has active date filters, agent filter, or a client-only status
+        // filter (e.g. 'missed'), request a larger page size and fetch page 1 so
+        // we can perform client-side pagination. This avoids relying on server
+        // pagination totals when the backend doesn't support those filters.
+        const requestingAllFiltered = Boolean(
+          dateFrom || dateTo || (agentFilter && agentFilter !== 'all') || (statusFilter && statusFilter === 'missed')
+        )
         const requestLimit = requestingAllFiltered ? 1000 : pageSize
         const requestPage = requestingAllFiltered ? 1 : currentPage
         const endpoint = buildLogsEndpoint(requestPage, requestLimit)
@@ -278,7 +297,7 @@ const CallLogs = () => {
         // Build a simple key for the current date filters so we can cache the
         // filtered dataset and avoid refetching when the user only changes page.
         // IMPORTANT: Include searchTerm in the key so that search term changes trigger a refetch
-        const dateFilterKey = `${dateFrom || ''}|${dateTo || ''}|${searchTerm || ''}|${businessId || ''}`
+        const dateFilterKey = `${dateFrom || ''}|${dateTo || ''}|${searchTerm || ''}|${businessId || ''}|${statusFilter || ''}|${activeFilter || ''}|${agentFilter || ''}`
 
         let res = null
         let logs = []
@@ -361,7 +380,7 @@ const CallLogs = () => {
       }
     };
       fetchCallLogs();
-    }, [businessId, currentPage, searchTerm, pageSize, dateFrom, dateTo, activeFilter, refreshTrigger]);
+    }, [businessId, currentPage, searchTerm, pageSize, dateFrom, dateTo, activeFilter, statusFilter, agentFilter, refreshTrigger]);
 
   // Auto-refresh interval: when enabled, increment `refreshTrigger` every 3s
   useEffect(() => {
@@ -448,6 +467,7 @@ const CallLogs = () => {
 
       const idMap = {}
       const numMap = {}
+      const agentEntries = new Map()
 
       list.forEach((branch) => {
         const u = branch.user || branch.manager || branch.owner || null
@@ -459,6 +479,8 @@ const CallLogs = () => {
             ks.forEach(k => { idMap[k] = name; idMap[String(k).toLowerCase()] = name })
             const digits = String(id).replace(/[^0-9]/g, '')
             if (digits) idMap[digits] = name
+            // record a canonical agent entry (prefer id, fallback to email)
+            try { agentEntries.set(String(id), name) } catch (e) {}
           }
           if (u.extension) {
             numMap[String(u.extension)] = name
@@ -478,6 +500,7 @@ const CallLogs = () => {
               ks.forEach(k => { idMap[k] = name; idMap[String(k).toLowerCase()] = name })
               const digits = String(id).replace(/[^0-9]/g, '')
               if (digits) idMap[digits] = name
+              try { agentEntries.set(String(id), name) } catch (e) {}
             }
             if (m.extension) {
               numMap[String(m.extension)] = name
@@ -522,6 +545,7 @@ const CallLogs = () => {
             ks.forEach(k => { idMap[k] = name; idMap[String(k).toLowerCase()] = name })
             const digits = String(id).replace(/[^0-9]/g, '')
             if (digits) idMap[digits] = name
+            try { agentEntries.set(String(id), name) } catch (e) {}
           }
           if (u.extension) {
             numMap[String(u.extension)] = name
@@ -540,6 +564,13 @@ const CallLogs = () => {
 
       setAgentMap(idMap)
       setAgentByNumberMap(numMap)
+      try {
+        const opts = Array.from(agentEntries.entries()).map(([id,name]) => ({ id: String(id), name }))
+        opts.sort((a,b) => String(a.name).localeCompare(String(b.name)))
+        setAgentOptions(opts)
+      } catch (e) {
+        setAgentOptions([])
+      }
     } catch (e) {
       setAgentMap({})
       setAgentByNumberMap({})
@@ -725,23 +756,69 @@ const CallLogs = () => {
     const status = String(log.status || '').toLowerCase();
     let matches = true;
 
-    // activeFilter can be: All Calls, Answered, Missed, Outgoing, Incoming
-    if (activeFilter && activeFilter !== 'All Calls') {
-      if (activeFilter === 'Answered') {
-        matches = status === 'answered' || status === 'success'
-      } else if (activeFilter === 'Missed') {
-        // Check for multiple variations of missed call status
-        const isMissedCall = status.includes('miss') || 
-                            status.includes('unanswer') || 
-                            status.includes('no_answer') ||
-                            String(log.hangupby || '').toLowerCase() === 'caller' ||
-                            String(log.hangUpBy || '').toLowerCase() === 'caller'
-        matches = isMissedCall
-      } else if (activeFilter === 'Outgoing') {
+    // direction filter: activeFilter now represents direction ('all' | 'outbound' | 'inbound')
+    if (activeFilter && activeFilter !== 'all') {
+      if (activeFilter === 'outbound') {
         matches = callType === 'outbound' || callType === 'outgoing'
-      } else if (activeFilter === 'Incoming') {
+      } else if (activeFilter === 'inbound') {
         matches = callType === 'inbound' || callType === 'incoming'
       }
+    }
+
+    // explicit status filter (based on the `status` column). Ignore when 'all'.
+    if (matches && statusFilter && statusFilter !== 'all') {
+      const sf = String(statusFilter).toLowerCase()
+      if (sf === 'missed') {
+        const isMissedCall = status.includes('miss') || status.includes('unanswer') || status.includes('no_answer') || String(log.hangupby || '').toLowerCase() === 'caller' || String(log.hangUpBy || '').toLowerCase() === 'caller'
+        if (!isMissedCall) matches = false
+      } else {
+        // accept exact match or substring or formatted label match
+        if (!(status === sf || status.includes(sf) || formatCallStatus(status).toLowerCase() === sf)) matches = false
+      }
+    }
+
+    // agent filter: match by agent id (preferred) or display name when 'all' not selected
+    if (matches && agentFilter && agentFilter !== 'all') {
+      const selectedAgentId = String(agentFilter)
+      const selectedAgentOption = (agentOptions || []).find(o => String(o.id) === selectedAgentId)
+      const selectedAgentName = selectedAgentOption ? String(selectedAgentOption.name).toLowerCase() : (agentMap && (agentMap[selectedAgentId] || agentMap[String(selectedAgentId).toLowerCase()]) ? String(agentMap[selectedAgentId] || agentMap[String(selectedAgentId).toLowerCase()]).toLowerCase() : null)
+
+      let agentsArr = []
+      if (Array.isArray(log.agents) && log.agents.length) agentsArr = log.agents
+      else if (log.agent) agentsArr = [log.agent]
+      else if (Array.isArray(log.callReceivedBy)) agentsArr = log.callReceivedBy
+      else if (log.callReceivedBy && typeof log.callReceivedBy === 'string') agentsArr = [log.callReceivedBy]
+      else agentsArr = []
+
+      const matchesAgent = (entry) => {
+        if (!entry) return false
+        if (typeof entry === 'object') {
+          const id = String(entry._id || entry.id || entry.email || '')
+          if (id && id === selectedAgentId) return true
+          const name = (entry.name || entry.fullName || `${entry.firstName || ''} ${entry.lastName || ''}`).trim()
+          if (name && selectedAgentName && String(name).toLowerCase().includes(selectedAgentName)) return true
+          if (entry.email && String(entry.email).toLowerCase() === String(selectedAgentId).toLowerCase()) return true
+          return false
+        }
+        const s = String(entry).trim()
+        if (!s) return false
+        if (s === selectedAgentId) return true
+        if (selectedAgentName && s.toLowerCase().includes(selectedAgentName)) return true
+        // check mapping tables
+        if (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) {
+          const mappedName = String(agentMap[s] || agentMap[s.toLowerCase()]).toLowerCase()
+          if (selectedAgentName && mappedName.includes(selectedAgentName)) return true
+        }
+        const digits = s.replace(/[^0-9]/g, '')
+        if (digits && agentByNumberMap && (agentByNumberMap[digits] || agentByNumberMap[s])) {
+          const mapped = String(agentByNumberMap[digits] || agentByNumberMap[s]).toLowerCase()
+          if (selectedAgentName && mapped.includes(selectedAgentName)) return true
+        }
+        return false
+      }
+
+      const found = (agentsArr || []).some(matchesAgent)
+      if (!found) matches = false
     }
 
     // callTypeFilter removed: rely on `activeFilter` for call type/status filtering
@@ -1140,7 +1217,7 @@ const CallLogs = () => {
     }
     setExporting(true)
     try {
-      const requestingAllFiltered = Boolean(dateFrom || dateTo)
+      const requestingAllFiltered = Boolean(dateFrom || dateTo || (agentFilter && agentFilter !== 'all') || (statusFilter && statusFilter === 'missed'))
       const limit = 100 // Use reasonable page size (API may not support 1000)
       let logs = []
       let totalFetched = 0
@@ -1194,6 +1271,65 @@ const CallLogs = () => {
             return true
           })
           console.log(`Page ${page}: date filter: ${beforeFilter} → ${pageLogs.length} records`)
+        }
+
+        // Apply client-side status filter if needed
+        if (requestingAllFiltered && statusFilter && statusFilter !== 'all') {
+          const sf = String(statusFilter).toLowerCase()
+          const before = pageLogs.length
+          pageLogs = pageLogs.filter(l => {
+            const s = String(l.status || '').toLowerCase()
+            if (sf === 'missed') {
+              return s.includes('miss') || s.includes('unanswer') || s.includes('no_answer') || String(l.hangupby || '').toLowerCase() === 'caller' || String(l.hangUpBy || '').toLowerCase() === 'caller'
+            }
+            return (s === sf || s.includes(sf) || formatCallStatus(s).toLowerCase() === sf)
+          })
+          console.log(`Page ${page}: status filter (${statusFilter}): ${before} → ${pageLogs.length} records`)
+        }
+
+        // Apply client-side agent filter if needed
+        if (requestingAllFiltered && agentFilter && agentFilter !== 'all') {
+          const selectedAgentId = String(agentFilter)
+          const selectedAgentOption = (agentOptions || []).find(o => String(o.id) === selectedAgentId)
+          const selectedAgentName = selectedAgentOption ? String(selectedAgentOption.name).toLowerCase() : (agentMap && (agentMap[selectedAgentId] || agentMap[String(selectedAgentId).toLowerCase()]) ? String(agentMap[selectedAgentId] || agentMap[String(selectedAgentId).toLowerCase()]).toLowerCase() : null)
+          const before = pageLogs.length
+          pageLogs = pageLogs.filter(l => {
+            let agentsArr = []
+            if (Array.isArray(l.agents) && l.agents.length) agentsArr = l.agents
+            else if (l.agent) agentsArr = [l.agent]
+            else if (Array.isArray(l.callReceivedBy)) agentsArr = l.callReceivedBy
+            else if (l.callReceivedBy && typeof l.callReceivedBy === 'string') agentsArr = [l.callReceivedBy]
+            else agentsArr = []
+
+            const check = (entry) => {
+              if (!entry) return false
+              if (typeof entry === 'object') {
+                const id = String(entry._id || entry.id || entry.email || '')
+                if (id && id === selectedAgentId) return true
+                const name = (entry.name || entry.fullName || `${entry.firstName || ''} ${entry.lastName || ''}`).trim()
+                if (name && selectedAgentName && String(name).toLowerCase().includes(selectedAgentName)) return true
+                if (entry.email && String(entry.email).toLowerCase() === String(selectedAgentId).toLowerCase()) return true
+                return false
+              }
+              const s = String(entry).trim()
+              if (!s) return false
+              if (s === selectedAgentId) return true
+              if (selectedAgentName && s.toLowerCase().includes(selectedAgentName)) return true
+              if (agentMap && (agentMap[s] || agentMap[s.toLowerCase()])) {
+                const mappedName = String(agentMap[s] || agentMap[s.toLowerCase()]).toLowerCase()
+                if (selectedAgentName && mappedName.includes(selectedAgentName)) return true
+              }
+              const digits = s.replace(/[^0-9]/g, '')
+              if (digits && agentByNumberMap && (agentByNumberMap[digits] || agentByNumberMap[s])) {
+                const mapped = String(agentByNumberMap[digits] || agentByNumberMap[s]).toLowerCase()
+                if (selectedAgentName && mapped.includes(selectedAgentName)) return true
+              }
+              return false
+            }
+
+            return (agentsArr || []).some(check)
+          })
+          console.log(`Page ${page}: agent filter: ${before} → ${pageLogs.length} records`)
         }
 
         if (pageLogs.length > 0) {
@@ -1342,11 +1478,36 @@ const CallLogs = () => {
               onChange={e => { setActiveFilter(e.target.value); setCurrentPage(1) }}
               sx={{ minWidth: 150 }}
             >
-              <MenuItem value="All Calls">All Calls</MenuItem>
-              <MenuItem value="Answered">Answered</MenuItem>
-              <MenuItem value="Missed">Missed</MenuItem>
-              <MenuItem value="Outgoing">Outgoing</MenuItem>
-              <MenuItem value="Incoming">Incoming</MenuItem>
+              <MenuItem value="all">All Directions</MenuItem>
+              <MenuItem value="outbound">Outbound</MenuItem>
+              <MenuItem value="inbound">Inbound</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              size="small"
+              value={statusFilter}
+              onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1) }}
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value="all">All Statuses</MenuItem>
+              <MenuItem value="answered">Answered</MenuItem>
+              <MenuItem value="missed">Missed</MenuItem>
+              <MenuItem value="busy">Busy</MenuItem>
+              <MenuItem value="not-answered">Not Answered</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              size="small"
+              value={agentFilter}
+              onChange={e => { setAgentFilter(e.target.value); setCurrentPage(1) }}
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="all">All Agents</MenuItem>
+              {(agentOptions || []).map((a) => (
+                <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>
+              ))}
             </TextField>
 
             <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
@@ -1409,7 +1570,7 @@ const CallLogs = () => {
                     <TableCell sx={{ fontWeight: 600 }}>Customer No.</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>DID No.</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Solution</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Direction</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Agents</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Recording</TableCell>
@@ -1550,6 +1711,8 @@ const CallLogs = () => {
                                 if (log.status === 'answered') return '#f1f8e9'
                                 if (log.status === 'busy') return '#e3f2fd'
                                 if (log.status === 'not-answered') return '#fff3e0'
+                                if (log.status === 'failed') return '#fff3f3'
+                                if (log.status === 'ringing') return '#eef7ff'
                                 return '#f5f5f5'
                               })(),
                               color: (() => {
@@ -1557,6 +1720,8 @@ const CallLogs = () => {
                                 if (log.status === 'answered') return '#388e3c'
                                 if (log.status === 'busy') return '#1976d2'
                                 if (log.status === 'not-answered') return '#f57c00'
+                                if (log.status === 'failed') return '#d32f2f'
+                                if (log.status === 'ringing') return '#0288d1'
                                 return '#6b7280'
                               })(),
                             }}
@@ -1588,14 +1753,18 @@ const CallLogs = () => {
                             const isAnswered = log.status === 'answered'
                             const isBusy = log.status === 'busy'
                             const isNotAnswered = log.status === 'not-answered'
+                            const isFailed = log.status === 'failed'
+                            const isRinging = log.status === 'ringing'
                             const isIncoming = log.callType === 'inbound' || log.callType === 'Inbound'
                             const isOutgoing = log.callType === 'outbound' || log.callType === 'Outbound'
                             
                             // Determine color based on status
                             let statusColor = '#6b7280' // default gray
                             if (isMissed) statusColor = '#d32f2f' // red
+                            else if (isFailed) statusColor = '#d32f2f' // failed -> red
                             else if (isAnswered) statusColor = '#388e3c' // green
                             else if (isBusy) statusColor = '#1976d2' // blue
+                            else if (isRinging) statusColor = '#0288d1' // ringing -> info blue
                             else if (isNotAnswered) statusColor = '#f57c00' // orange
                             
                             // Determine icon based on call direction
@@ -1609,8 +1778,8 @@ const CallLogs = () => {
                           <Chip 
                             label={formatCallStatus(log.status)} 
                             size="small"
-                            color={log.status === 'missed' ? 'error' : log.status === 'answered' ? 'success' : log.status === 'busy' ? 'primary' : log.status === 'not-answered' ? 'warning' : 'default'}
-                            variant={log.status === 'missed' || log.status === 'answered' || log.status === 'busy' || log.status === 'not-answered' ? 'filled' : 'outlined'}
+                            color={log.status === 'missed' ? 'error' : log.status === 'failed' ? 'error' : log.status === 'answered' ? 'success' : log.status === 'busy' ? 'primary' : log.status === 'ringing' ? 'info' : log.status === 'not-answered' ? 'warning' : 'default'}
+                            variant={(log.status === 'missed' || log.status === 'failed' || log.status === 'answered' || log.status === 'busy' || log.status === 'not-answered' || log.status === 'ringing') ? 'filled' : 'outlined'}
                           />
                         </Box>
                       </TableCell>
@@ -1640,7 +1809,7 @@ const CallLogs = () => {
                       </TableCell>
 
                       <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
-                        {log.status === 'missed' || log.status === 'busy' || log.status === 'not-answered' ? (
+                        {log.status === 'missed' || log.status === 'busy' || log.status === 'not-answered' || log.status === 'failed' || log.status === 'ringing' ? (
                           <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>No recording available</Typography>
                         ) : (
                           <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>

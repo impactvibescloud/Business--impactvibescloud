@@ -26,8 +26,6 @@ import {
   Grid,
 } from '@mui/material'
 import GetAppIcon from '@mui/icons-material/GetApp'
-import SearchIcon from '@mui/icons-material/Search'
-import RefreshIcon from '@mui/icons-material/Refresh'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import StopIcon from '@mui/icons-material/Stop'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
@@ -133,7 +131,7 @@ const CDR = () => {
       if (fromNumber) qp.push(`from=${encodeURIComponent(fromNumber)}`)
       if (toNumber) qp.push(`to=${encodeURIComponent(toNumber)}`)
       if (agentFilter) qp.push(`agent=${encodeURIComponent(agentFilter)}`)
-      if (typeFilter) qp.push(`type=${encodeURIComponent(typeFilter)}`)
+      if (typeFilter) qp.push(`callType=${encodeURIComponent(typeFilter)}`)
       const endpoint = `/call-logs?${qp.join('&')}`
       const res = await apiCall(endpoint, 'GET')
       if (res && res.success) {
@@ -171,6 +169,22 @@ const CDR = () => {
   }
 
   useEffect(() => { fetchRecords(page) }, [page, businessId])
+
+  // Auto-apply filters: when any filter changes, reset to first page and fetch
+  useEffect(() => {
+    const apply = async () => {
+      const target = 1
+      if (page !== target) {
+        setPage(target)
+        // fetchRecords will run via the [page] effect
+      } else {
+        fetchRecords(target)
+      }
+    }
+    apply()
+    // Only re-run when filter inputs change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromNumber, toNumber, agentFilter, typeFilter, startDateFilter, endDateFilter])
 
   // load saved columns selection
   useEffect(() => {
@@ -629,23 +643,7 @@ const CDR = () => {
               <TextField label="To Date" type="date" size="small" fullWidth value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} InputLabelProps={{ shrink: true }} />
             </Grid>
             <Grid item xs={12} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={resetFilters}
-                disabled={loading}
-              >
-                Reset
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<SearchIcon />}
-                onClick={applyFilters}
-                disabled={loading}
-                sx={{ backgroundColor: '#6c5ce7', '&:hover': { backgroundColor: '#5a46eb' } }}
-              >
-                Search
-              </Button>
+              {/* Reset and Search buttons removed — filters auto-apply on change */}
               <Button
                 variant="contained"
                 startIcon={exporting ? <CircularProgress size={18} /> : <GetAppIcon />}
