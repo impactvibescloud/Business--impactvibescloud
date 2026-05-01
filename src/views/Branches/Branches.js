@@ -44,7 +44,6 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import axios from 'axios'
 import { apiCall, getBaseURL } from '../../config/api'
-import { formatLastActivity } from '../../components/UserActivityStatus/UserStatusHelpers'
 import Swal from 'sweetalert2'
 import '../Leads/CallLogsWebpage.css'
 import { API_CONFIG } from '../../config/api'
@@ -128,90 +127,7 @@ const Branches = () => {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [callDetails, setCallDetails] = useState({});
   const [loadingCallDetails, setLoadingCallDetails] = useState({});
-  const [branchActivities, setBranchActivities] = useState({})
-  const [teamStatuses, setTeamStatuses] = useState({})
   const token = isAuthenticated();
-
-  // Helper: normalize array responses from multiple possible shapes
-  const normalizeArrayResponse = (res) => {
-    if (!res) return []
-    if (Array.isArray(res)) return res
-    if (res.data && Array.isArray(res.data)) return res.data
-    if (res.data && res.data.data && Array.isArray(res.data.data)) return res.data.data
-    if (res.data && res.data.users && Array.isArray(res.data.users)) return res.data.users
-    if (res.data && res.data.length) return res.data
-    return []
-  }
-
-  const formatMinutes = (mins) => {
-    if (mins == null) return '-'
-    const m = Number(mins)
-    if (!Number.isFinite(m) || m <= 0) return '0m'
-    const h = Math.floor(m / 60)
-    const r = Math.round(m % 60)
-    return h > 0 ? `${h}h ${r}m` : `${r}m`
-  }
-
-  const formatTime = (iso) => {
-    if (!iso) return '-'
-    try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } catch (e) { return String(iso) }
-  }
-
-  const fetchTeamStatuses = async (businessId) => {
-    if (!businessId) return
-    try {
-      // Use business agents status endpoint
-      const res = await apiCall(`/business/agents/status?businessId=${encodeURIComponent(businessId)}`, 'GET')
-      const payload = res?.data || res || {}
-      const list = Array.isArray(payload.agents) ? payload.agents : (Array.isArray(res) ? res : [])
-      const map = {}
-      list.forEach(a => {
-        const id = a.id || a._id || a.agentId || a.email
-        if (id) map[String(id)] = a
-      })
-      setTeamStatuses(map)
-      return map
-    } catch (e) {
-      console.warn('fetchTeamStatuses failed', e)
-      setTeamStatuses({})
-      return {}
-    }
-  }
-
-  const fetchBranchActivities = async (branchesList, teamMap = null) => {
-    if (!branchesList || branchesList.length === 0) return
-    const statuses = teamMap || teamStatuses || {}
-    const map = {}
-    branchesList.forEach((b) => {
-      const managerId = b.manager?.userId || b.manager?._id || b.manager?.id || null
-      // Try direct id match, otherwise match by email/name
-      let agent = null
-      if (managerId && statuses[String(managerId)]) agent = statuses[String(managerId)]
-      if (!agent) {
-        const byEmail = Object.values(statuses).find(x => x && x.email && b.manager?.email && String(x.email).toLowerCase() === String(b.manager.email).toLowerCase())
-        if (byEmail) agent = byEmail
-      }
-      if (!agent) {
-        const byName = Object.values(statuses).find(x => x && x.name && b.manager?.name && String(x.name).toLowerCase() === String(b.manager.name).toLowerCase())
-        if (byName) agent = byName
-      }
-      if (!agent) {
-        map[b.id] = null
-        return
-      }
-      map[b.id] = {
-        loginTime: agent.lastSeen || agent.joinedAt || null,
-        // Detailed durations aren't available from this endpoint; leave null/placeholder
-        totalActive: null,
-        breakDuration: null,
-        idle: null,
-        currentStatus: agent.status || agent.current_status || 'unknown',
-        lastSeen: agent.lastSeen || null,
-        raw: agent
-      }
-    })
-    setBranchActivities(map)
-  }
 
   useEffect(() => {
     if (!token) return;
@@ -287,15 +203,6 @@ const Branches = () => {
 
       setBranches(formattedBranches);
       setLoading(false);
-
-      // Fetch today's activity/status for branch managers to populate "Active Hours"
-      try {
-        const teamMap = await fetchTeamStatuses(user.businessId)
-        await fetchBranchActivities(formattedBranches, teamMap)
-      } catch (e) {
-        // ignore activity errors — keep branch list visible
-        console.warn('Failed to fetch branch activities', e)
-      }
     } catch (error) {
       console.error("Error fetching branches:", error);
       setLoading(false);
@@ -906,25 +813,17 @@ const Branches = () => {
 
         <Card className="mb-4" sx={{ mb: 3 }}>
           <CardContent>
-            <Box sx={{ mb: 3 }}>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                  Agents
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                  Create and manage agents
-                </Typography>
-              </Box>
-            </Box>
-
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
+              <Box>
+                <Typography variant="h6">Agents</Typography>
+                <Typography variant="body2" color="text.secondary">Create and manage agents</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <TextField
                   placeholder="Search agents..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   size="small"
-                  fullWidth
                   sx={{ minWidth: 200 }}
                   autoComplete="off"
                   InputProps={{
@@ -935,8 +834,9 @@ const Branches = () => {
                     ),
                   }}
                 />
-              </Box>
-              <Box>
+                <Button variant="outlined" size="small" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</Button>
+                <Typography variant="body2" sx={{ mx: 1 }}>Page {currentPage}</Typography>
+                <Button variant="outlined" size="small" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</Button>
                 <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleAddBranch} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>
                   Add Agent
                 </Button>
@@ -949,23 +849,24 @@ const Branches = () => {
                   <TableRow>
                     <TableCell>S.NO</TableCell>
                     <TableCell>AGENT NAME</TableCell>
+                    <TableCell>EMAIL ADDRESS</TableCell>
                     <TableCell>DEPARTMENT</TableCell>
                     <TableCell>STATUS</TableCell>
-                    <TableCell>ASSIGNED DID</TableCell>
+                    <TableCell>ASSIGNED NUMBER</TableCell>
                     <TableCell align="center">ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                         <CircularProgress />
                         <div className="mt-3">Loading agents...</div>
                       </TableCell>
                     </TableRow>
                   ) : currentBranches.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                         <div className="empty-state">
                           <div className="empty-state-icon">
                             <AddIcon style={{ fontSize: 40 }} />
@@ -984,6 +885,7 @@ const Branches = () => {
                         <TableRow hover onClick={() => handleAgentRowClick(branch)} sx={{ cursor: 'pointer' }}>
                           <TableCell>{indexOfFirstItem + index + 1}</TableCell>
                           <TableCell>{branch.branchName}</TableCell>
+                          <TableCell>{branch.manager?.email || '-'}</TableCell>
                           <TableCell>{branch.department ? (typeof branch.department === 'object' ? (branch.department.name || 'No Name') : String(branch.department)) : 'Not Assigned'}</TableCell>
                           <TableCell>
                             <Chip label={branch.isSuspended ? 'Suspended' : 'Active'} color={branch.isSuspended ? 'warning' : 'success'} size="small" />
@@ -1010,105 +912,85 @@ const Branches = () => {
                           </TableCell>
                         </TableRow>
                         <TableRow>
-                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
                             <Collapse in={expandedAgent === branch._id} timeout="auto" unmountOnExit>
                               <Box sx={{ margin: 2, backgroundColor: '#f8f9fa', p: 2, borderRadius: 1 }}>
                                 <Grid container spacing={2}>
                                   <Grid item xs={12}>
                                     <Typography variant="subtitle1">Agent Details - {branch.branchName}</Typography>
                                   </Grid>
-                                  {/* Call Details section removed as requested */}
-                                  {/* Working Hours section removed as requested */}
                                   <Grid item xs={12}>
-                                      {(() => {
-                                        const key = branch.id || branch._id
-                                        const act = branchActivities && branchActivities[key] ? branchActivities[key] : null
-                                        const currentStatus = act ? (act.currentStatus || '-') : '-'
-                                        const lastAct = act ? formatLastActivity(act.lastSeen) : '-'
-                                        const userObj = branch.user || branch.manager || branch.owner || {}
-                                        const businessName = (branch.business && (branch.business.businessName || branch.business.business_name)) || branch.business || '-'
-                                        const dids = Array.isArray(branch.didNumbers) ? branch.didNumbers.join(', ') : (branch.didNumbers || 'Not Assigned')
-                                        const deptName = branch.department ? (branch.department.name || branch.department) : 'Not Assigned'
-                                        const formatShift = (s) => (s && String(s).length === 4) ? `${String(s).slice(0,2)}:${String(s).slice(2)}` : (s || '-')
-                                        const shiftDisplay = (branch.defaultShiftStart && branch.defaultShiftEnd) ? `${formatShift(branch.defaultShiftStart)} - ${formatShift(branch.defaultShiftEnd)}` : (branch.timeGroup || '-')
-                                        const formatDate = (d) => { try { return d ? (new Date(d)).toLocaleString() : '-' } catch (e) { return d } }
-                                        const extShifts = (Array.isArray(branch.extensionShifts) && branch.extensionShifts.length) ? branch.extensionShifts.map(s => `${s.extension}: ${formatShift(s.start)}-${formatShift(s.end)}`).join(', ') : ''
-
-                                        const statusColor = (() => {
-                                          const low = String(currentStatus || '').toLowerCase()
-                                          if (low === 'online' || low === 'available' || low === 'active') return 'success'
-                                          if (low === 'offline') return 'default'
-                                          if (low === 'lunch' || low === 'break') return 'warning'
-                                          if (low === 'busy' || low === 'oncall' || low === 'ringing') return 'info'
-                                          return 'default'
-                                        })()
-
-                                        return (
-                                          <Box sx={{ mt: 1 }}>
-                                            <Grid container spacing={2}>
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Current Status</Typography>
-                                                <Box sx={{ mt: 0.5 }}>
-                                                  <Chip label={String(currentStatus).toUpperCase()} color={statusColor} variant="outlined" size="small" />
-                                                </Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Last Activity</Typography>
-                                                <Typography variant="body2">{lastAct}</Typography>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Email</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={userObj?.email || '-'} variant="outlined" color="info" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Phone</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={userObj?.phone || userObj?.mobile || '-'} variant="outlined" color="secondary" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Business</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={businessName} variant="outlined" color="success" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Department</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={deptName} color="primary" variant="outlined" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Shift</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={shiftDisplay} variant="outlined" color="warning" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12}>
-                                                <Typography variant="caption" color="text.secondary">DIDs</Typography>
-                                                <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                                  {Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers.map(d => (
-                                                    <Chip key={d} label={d} variant="outlined" color="info" size="small" />
-                                                  )) : (
-                                                    <Chip label={dids} variant="outlined" color="info" size="small" />
-                                                  )}
-                                                </Box>
-                                              </Grid>
-
-                                              
-
-                                              <Grid item xs={12} sm={6}>
-                                                <Typography variant="caption" color="text.secondary">Created</Typography>
-                                                <Typography variant="body2">{formatDate(branch.createdAt)}</Typography>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6}>
-                                                <Typography variant="caption" color="text.secondary">Updated</Typography>
-                                                <Typography variant="body2">{formatDate(branch.updatedAt)}</Typography>
-                                              </Grid>
-                                            </Grid>
-                                          </Box>
-                                        )
-                                      })()}
+                                    <Typography variant="subtitle2">Call Details</Typography>
+                                    {(() => {
+                                      const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
+                                      return loadingCallDetails[userId] ? (
+                                        <Box sx={{ textAlign: 'center', py: 2 }}>
+                                          <CircularProgress size={24} />
+                                          <Typography variant="body2">Loading call details...</Typography>
+                                        </Box>
+                                      ) : (
+                                        <Grid container spacing={2}>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="primary">{callDetails[userId]?.outboundCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Outbound Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="success.main">{callDetails[userId]?.inboundCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Inbound Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="warning.main">{callDetails[userId]?.missedCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Missed Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                          <Grid item xs={6} sm={3}>
+                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                              <Typography variant="h6" color="error.main">{callDetails[userId]?.hangCalls || 0}</Typography>
+                                              <Typography variant="caption" color="text.secondary">Hang Calls</Typography>
+                                            </Paper>
+                                          </Grid>
+                                        </Grid>
+                                      );
+                                    })()}
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Working Hours</Typography>
+                                    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                                      <Grid container>
+                                        <Grid item xs={12} sm={6}>
+                                          <Typography><strong>Start Time:</strong> 9:00 AM</Typography>
+                                          <Typography><strong>End Time:</strong> 6:00 PM</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                          <Typography><strong>Break Time:</strong> 1:00 PM - 2:00 PM</Typography>
+                                          <Typography><strong>Total Hours:</strong> 8 hours</Typography>
+                                        </Grid>
+                                      </Grid>
+                                    </Paper>
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Active Hours (Today)</Typography>
+                                    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                                      <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography><strong>Login Time:</strong> 9:15 AM</Typography>
+                                          <Typography><strong>Total Active Time:</strong> 6h 45m</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography><strong>Break Duration:</strong> 1h 15m</Typography>
+                                          <Typography><strong>Idle Time:</strong> 30m</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography><strong>Current Status:</strong> <Chip label="Online" color="success" sx={{ ml: 1 }} /></Typography>
+                                          <Typography variant="body2"><strong>Last Activity:</strong> 2 minutes ago</Typography>
+                                        </Grid>
+                                      </Grid>
+                                    </Paper>
                                   </Grid>
                                 </Grid>
                               </Box>
