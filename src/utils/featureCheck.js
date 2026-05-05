@@ -15,6 +15,7 @@ const NAV_FEATURE_MAP = {
   '/calluses': 'call_uses',
   '/callmonitor': 'call_monitor',
   '/call-settings': 'call_settings',
+  '/sticky-agents': 'call_settings',
   '/ivr-management': 'ivr_management',
   '/virtual-numbers': 'virtual_numbers',
   '/contacts': 'contacts',

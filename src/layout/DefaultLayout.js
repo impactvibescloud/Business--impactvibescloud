@@ -7,8 +7,14 @@ import {
 } from "../components/index";
 import CustomHeader from "../components/CustomHeader";
 import { getMaintenanceConfig, isInMaintenanceWindow } from "../config/maintenanceConfig";
+import useIdleLogout from "../hooks/useIdleLogout";
 
 const DefaultLayout = () => {
+  // Auto-logout after 30 min of no input. Mounted on the protected layout
+  // so it runs only while the user is signed in; unmounting (e.g., on
+  // manual sign-out) clears the timers cleanly.
+  useIdleLogout();
+
   const [maintenanceConfig, setMaintenanceConfig] = useState({
     active: false,
     title: "",

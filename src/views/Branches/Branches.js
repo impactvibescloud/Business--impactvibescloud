@@ -44,7 +44,6 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import axios from 'axios'
 import { apiCall, getBaseURL } from '../../config/api'
-import { formatLastActivity } from '../../components/UserActivityStatus/UserStatusHelpers'
 import Swal from 'sweetalert2'
 import '../Leads/CallLogsWebpage.css'
 import { API_CONFIG } from '../../config/api'
@@ -128,90 +127,8 @@ const Branches = () => {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [callDetails, setCallDetails] = useState({});
   const [loadingCallDetails, setLoadingCallDetails] = useState({});
-  const [branchActivities, setBranchActivities] = useState({})
-  const [teamStatuses, setTeamStatuses] = useState({})
+  const [agentStatusMap, setAgentStatusMap] = useState({});
   const token = isAuthenticated();
-
-  // Helper: normalize array responses from multiple possible shapes
-  const normalizeArrayResponse = (res) => {
-    if (!res) return []
-    if (Array.isArray(res)) return res
-    if (res.data && Array.isArray(res.data)) return res.data
-    if (res.data && res.data.data && Array.isArray(res.data.data)) return res.data.data
-    if (res.data && res.data.users && Array.isArray(res.data.users)) return res.data.users
-    if (res.data && res.data.length) return res.data
-    return []
-  }
-
-  const formatMinutes = (mins) => {
-    if (mins == null) return '-'
-    const m = Number(mins)
-    if (!Number.isFinite(m) || m <= 0) return '0m'
-    const h = Math.floor(m / 60)
-    const r = Math.round(m % 60)
-    return h > 0 ? `${h}h ${r}m` : `${r}m`
-  }
-
-  const formatTime = (iso) => {
-    if (!iso) return '-'
-    try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } catch (e) { return String(iso) }
-  }
-
-  const fetchTeamStatuses = async (businessId) => {
-    if (!businessId) return
-    try {
-      // Use business agents status endpoint
-      const res = await apiCall(`/business/agents/status?businessId=${encodeURIComponent(businessId)}`, 'GET')
-      const payload = res?.data || res || {}
-      const list = Array.isArray(payload.agents) ? payload.agents : (Array.isArray(res) ? res : [])
-      const map = {}
-      list.forEach(a => {
-        const id = a.id || a._id || a.agentId || a.email
-        if (id) map[String(id)] = a
-      })
-      setTeamStatuses(map)
-      return map
-    } catch (e) {
-      console.warn('fetchTeamStatuses failed', e)
-      setTeamStatuses({})
-      return {}
-    }
-  }
-
-  const fetchBranchActivities = async (branchesList, teamMap = null) => {
-    if (!branchesList || branchesList.length === 0) return
-    const statuses = teamMap || teamStatuses || {}
-    const map = {}
-    branchesList.forEach((b) => {
-      const managerId = b.manager?.userId || b.manager?._id || b.manager?.id || null
-      // Try direct id match, otherwise match by email/name
-      let agent = null
-      if (managerId && statuses[String(managerId)]) agent = statuses[String(managerId)]
-      if (!agent) {
-        const byEmail = Object.values(statuses).find(x => x && x.email && b.manager?.email && String(x.email).toLowerCase() === String(b.manager.email).toLowerCase())
-        if (byEmail) agent = byEmail
-      }
-      if (!agent) {
-        const byName = Object.values(statuses).find(x => x && x.name && b.manager?.name && String(x.name).toLowerCase() === String(b.manager.name).toLowerCase())
-        if (byName) agent = byName
-      }
-      if (!agent) {
-        map[b.id] = null
-        return
-      }
-      map[b.id] = {
-        loginTime: agent.lastSeen || agent.joinedAt || null,
-        // Detailed durations aren't available from this endpoint; leave null/placeholder
-        totalActive: null,
-        breakDuration: null,
-        idle: null,
-        currentStatus: agent.status || agent.current_status || 'unknown',
-        lastSeen: agent.lastSeen || null,
-        raw: agent
-      }
-    })
-    setBranchActivities(map)
-  }
 
   useEffect(() => {
     if (!token) return;
@@ -252,8 +169,31 @@ const Branches = () => {
       fetchBranches();
       fetchDidNumbers();
       fetchDepartments();
+      fetchAgentStatus();
     }
   }, [user?.businessId]); // Changed dependency to specifically watch businessId changes
+
+  const fetchAgentStatus = async () => {
+    try {
+      const response = await apiCall('/api/business/agents/status', 'GET');
+      const statusData = response.data?.agents || [];
+      
+      // Create a map of agentId/branchId -> status
+      const statusMap = {};
+      statusData.forEach(agent => {
+        if (agent.branchId) {
+          statusMap[agent.branchId] = agent.status; // online, offline, break, lunch
+        }
+        if (agent.id) {
+          statusMap[agent.id] = agent.status;
+        }
+      });
+      
+      setAgentStatusMap(statusMap);
+    } catch (error) {
+      console.error("Error fetching agent status:", error);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -266,8 +206,13 @@ const Branches = () => {
         manager: {
           name: branch.user?.name || '',
           email: branch.user?.email || '',
+          phone: branch.user?.phone || branch.phone || '',
           userId: branch.user?._id || ''
         },
+        business: branch.business ? {
+          _id: branch.business._id,
+          name: branch.business.businessName || branch.business.name || 'Not assigned'
+        } : { name: 'Not assigned' },
         // Normalize department object to ensure UI can always read .name
         department: (function() {
           const d = branch.department || branch.deparment || branch.dept;
@@ -287,15 +232,6 @@ const Branches = () => {
 
       setBranches(formattedBranches);
       setLoading(false);
-
-      // Fetch today's activity/status for branch managers to populate "Active Hours"
-      try {
-        const teamMap = await fetchTeamStatuses(user.businessId)
-        await fetchBranchActivities(formattedBranches, teamMap)
-      } catch (e) {
-        // ignore activity errors — keep branch list visible
-        console.warn('Failed to fetch branch activities', e)
-      }
     } catch (error) {
       console.error("Error fetching branches:", error);
       setLoading(false);
@@ -908,12 +844,8 @@ const Branches = () => {
           <CardContent>
             <Box sx={{ mb: 3 }}>
               <Box sx={{ mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                  Agents
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                  Create and manage agents
-                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Agents</Typography>
+                <Typography variant="body2" sx={{ color: '#6b7280' }}>Create and manage agents</Typography>
               </Box>
             </Box>
 
@@ -925,7 +857,6 @@ const Branches = () => {
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   size="small"
                   fullWidth
-                  sx={{ minWidth: 200 }}
                   autoComplete="off"
                   InputProps={{
                     startAdornment: (
@@ -951,7 +882,7 @@ const Branches = () => {
                     <TableCell>AGENT NAME</TableCell>
                     <TableCell>DEPARTMENT</TableCell>
                     <TableCell>STATUS</TableCell>
-                    <TableCell>ASSIGNED DID</TableCell>
+                    <TableCell>EMAIL</TableCell>
                     <TableCell align="center">ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
@@ -988,7 +919,7 @@ const Branches = () => {
                           <TableCell>
                             <Chip label={branch.isSuspended ? 'Suspended' : 'Active'} color={branch.isSuspended ? 'warning' : 'success'} size="small" />
                           </TableCell>
-                          <TableCell>{Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers[0] : 'Not Assigned'}</TableCell>
+                          <TableCell>{branch.manager?.email || '-'}</TableCell>
                           <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
                               <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditBranch(branch); }} title="Edit Agent">
@@ -1017,98 +948,78 @@ const Branches = () => {
                                   <Grid item xs={12}>
                                     <Typography variant="subtitle1">Agent Details - {branch.branchName}</Typography>
                                   </Grid>
-                                  {/* Call Details section removed as requested */}
-                                  {/* Working Hours section removed as requested */}
                                   <Grid item xs={12}>
-                                      {(() => {
-                                        const key = branch.id || branch._id
-                                        const act = branchActivities && branchActivities[key] ? branchActivities[key] : null
-                                        const currentStatus = act ? (act.currentStatus || '-') : '-'
-                                        const lastAct = act ? formatLastActivity(act.lastSeen) : '-'
-                                        const userObj = branch.user || branch.manager || branch.owner || {}
-                                        const businessName = (branch.business && (branch.business.businessName || branch.business.business_name)) || branch.business || '-'
-                                        const dids = Array.isArray(branch.didNumbers) ? branch.didNumbers.join(', ') : (branch.didNumbers || 'Not Assigned')
-                                        const deptName = branch.department ? (branch.department.name || branch.department) : 'Not Assigned'
-                                        const formatShift = (s) => (s && String(s).length === 4) ? `${String(s).slice(0,2)}:${String(s).slice(2)}` : (s || '-')
-                                        const shiftDisplay = (branch.defaultShiftStart && branch.defaultShiftEnd) ? `${formatShift(branch.defaultShiftStart)} - ${formatShift(branch.defaultShiftEnd)}` : (branch.timeGroup || '-')
-                                        const formatDate = (d) => { try { return d ? (new Date(d)).toLocaleString() : '-' } catch (e) { return d } }
-                                        const extShifts = (Array.isArray(branch.extensionShifts) && branch.extensionShifts.length) ? branch.extensionShifts.map(s => `${s.extension}: ${formatShift(s.start)}-${formatShift(s.end)}`).join(', ') : ''
-
-                                        const statusColor = (() => {
-                                          const low = String(currentStatus || '').toLowerCase()
-                                          if (low === 'online' || low === 'available' || low === 'active') return 'success'
-                                          if (low === 'offline') return 'default'
-                                          if (low === 'lunch' || low === 'break') return 'warning'
-                                          if (low === 'busy' || low === 'oncall' || low === 'ringing') return 'info'
-                                          return 'default'
-                                        })()
-
-                                        return (
-                                          <Box sx={{ mt: 1 }}>
-                                            <Grid container spacing={2}>
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Current Status</Typography>
-                                                <Box sx={{ mt: 0.5 }}>
-                                                  <Chip label={String(currentStatus).toUpperCase()} color={statusColor} variant="outlined" size="small" />
-                                                </Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Last Activity</Typography>
-                                                <Typography variant="body2">{lastAct}</Typography>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Email</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={userObj?.email || '-'} variant="outlined" color="info" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Phone</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={userObj?.phone || userObj?.mobile || '-'} variant="outlined" color="secondary" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Business</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={businessName} variant="outlined" color="success" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Department</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={deptName} color="primary" variant="outlined" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6} md={4}>
-                                                <Typography variant="caption" color="text.secondary">Shift</Typography>
-                                                <Box sx={{ mt: 0.5 }}><Chip label={shiftDisplay} variant="outlined" color="warning" size="small" /></Box>
-                                              </Grid>
-
-                                              <Grid item xs={12}>
-                                                <Typography variant="caption" color="text.secondary">DIDs</Typography>
-                                                <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                                  {Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers.map(d => (
-                                                    <Chip key={d} label={d} variant="outlined" color="info" size="small" />
-                                                  )) : (
-                                                    <Chip label={dids} variant="outlined" color="info" size="small" />
-                                                  )}
-                                                </Box>
-                                              </Grid>
-
-                                              
-
-                                              <Grid item xs={12} sm={6}>
-                                                <Typography variant="caption" color="text.secondary">Created</Typography>
-                                                <Typography variant="body2">{formatDate(branch.createdAt)}</Typography>
-                                              </Grid>
-
-                                              <Grid item xs={12} sm={6}>
-                                                <Typography variant="caption" color="text.secondary">Updated</Typography>
-                                                <Typography variant="body2">{formatDate(branch.updatedAt)}</Typography>
-                                              </Grid>
-                                            </Grid>
-                                          </Box>
-                                        )
-                                      })()}
+                                    <Grid container spacing={2}>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Current Status</Typography>
+                                          {(() => {
+                                            const status = agentStatusMap[branch._id] || 'offline';
+                                            const statusColors = {
+                                              'online': 'success',
+                                              'offline': 'default',
+                                              'break': 'warning',
+                                              'lunch': 'info'
+                                            };
+                                            return <Chip label={status.toUpperCase()} color={statusColors[status] || 'default'} variant="outlined" size="small" />;
+                                          })()}
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Last Activity</Typography>
+                                          <Typography variant="body2">{branch.updatedAt ? new Date(branch.updatedAt).toLocaleString() : 'N/A'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Email</Typography>
+                                          <Typography variant="body2" sx={{ color: '#2563eb', cursor: 'pointer' }}>{branch.manager?.email || '-'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Phone</Typography>
+                                          <Chip label={branch.manager?.phone || 'Not assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Business</Typography>
+                                          <Chip label={branch.business?.name || 'Not assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Department</Typography>
+                                          <Chip label={branch.department ? (typeof branch.department === 'object' ? branch.department.name : branch.department) : 'Not Assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Shift</Typography>
+                                          <Chip label={branch.defaultShiftStart && branch.defaultShiftEnd ? `${branch.defaultShiftStart.slice(0, 2)}:${branch.defaultShiftStart.slice(2)} - ${branch.defaultShiftEnd.slice(0, 2)}:${branch.defaultShiftEnd.slice(2)}` : 'Not set'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>DIDs</Typography>
+                                          <Chip label={Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers.join(', ') : 'Not assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Created</Typography>
+                                          <Typography variant="body2">{branch.createdAt ? new Date(branch.createdAt).toLocaleString() : 'N/A'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={6}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Updated</Typography>
+                                          <Typography variant="body2">{branch.updatedAt ? new Date(branch.updatedAt).toLocaleString() : 'N/A'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                    </Grid>
                                   </Grid>
                                 </Grid>
                               </Box>

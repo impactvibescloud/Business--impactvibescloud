@@ -102,6 +102,13 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "Sticky Agents",
+    icon: <Phone className="nav-icon" />,
+    to: "/sticky-agents",
+    group: "Settings",
+  },
+  {
+    component: CNavItem,
     name: "IVR Management",
     icon: <Activity className="nav-icon" />,
     to: "/ivr-management",
