@@ -161,6 +161,7 @@ const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
 const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagement"));
+const StickyAgents = React.lazy(() => import("./views/StickyAgents/StickyAgents"));
 const ContactLists = React.lazy(() => import("./views/Contacts/ContactLists.jsx"));
 const Contacts = React.lazy(() => import("./views/Contacts/Contacts.jsx"));
 const Leads = React.lazy(() => import("./views/Leads/Leads"));
@@ -891,6 +892,12 @@ const routes = [
     path: '/call-settings',
     name: 'Call Settings',
     element: CallSettings,
+    navName: "Settings",
+  },
+  {
+    path: '/sticky-agents',
+    name: 'Sticky Agents',
+    element: StickyAgents,
     navName: "Settings",
   },
   {

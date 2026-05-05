@@ -189,7 +189,7 @@ const Login = () => {
           swal("Error!", "please try with admin credential!!", "error");
         }
       } else {
-        swal("Error!", "Invalid Credentials", "error");
+        swal("Error!", res?.data?.message || "Invalid Credentials", "error");
       }
     } catch (error) {
       if (axios.isCancel(error) || error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
@@ -197,7 +197,15 @@ const Login = () => {
         // show an error toast — that would be misleading.
         return;
       }
-      swal("Error!", "Invalid Credentials", "error");
+      // Surface the real server message (suspended tenant, role mismatch,
+      // rate limit, 503 cold-start). The previous always-generic
+      // "Invalid Credentials" toast hid these and made server hiccups look
+      // like password failures, which is the "first attempt fails" symptom
+      // users were seeing.
+      const msg =
+        error?.response?.data?.message ||
+        (error?.code === 'ERR_NETWORK' ? 'Network error — please try again' : 'Invalid Credentials');
+      swal("Error!", msg, "error");
     } finally {
       // Only clear flags if this controller is still the active one;
       // otherwise a superseding call has already taken over.

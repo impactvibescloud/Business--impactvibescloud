@@ -26,7 +26,7 @@ import swal from 'sweetalert';
 
 import userImage from './../../assets/images/avatars/1.jpeg'
 import { Link } from 'react-router-dom'
-// import { signout } from 'src/auth'
+import { signOutAsync } from '../../auth';
 import { useNavigate } from "react-router-dom";
 import { useEffect } from 'react';
 import axios from 'axios';
@@ -36,10 +36,18 @@ import { useState } from 'react';
 const AppHeaderDropdown = () => {
   const [userData, setUserData] = useState()
   let history = useNavigate();
-  const signout = async () => {
-    localStorage.removeItem('authToken')
+  // Use signOutAsync from auth.js so the backend gets notified (status flips
+  // to 'offline', activity record closed). It's now fire-and-forget on the
+  // network call so a hung API can't block the redirect.
+  //
+  // Hard navigate via window.location, NOT React Router's history(). React
+  // Router keeps the app shell + page state mounted, so user-specific UI
+  // continued rendering after "logout" — looking like the user was still
+  // signed in. A full page load wipes every cache and forces fresh auth.
+  const signout = () => {
+    signOutAsync();
     swal("success!", "Logged Out", "success");
-    history("/");
+    window.location.href = "/";
   }
 
   //for user image 

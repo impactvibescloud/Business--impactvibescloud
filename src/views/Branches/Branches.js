@@ -127,6 +127,7 @@ const Branches = () => {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [callDetails, setCallDetails] = useState({});
   const [loadingCallDetails, setLoadingCallDetails] = useState({});
+  const [agentStatusMap, setAgentStatusMap] = useState({});
   const token = isAuthenticated();
 
   useEffect(() => {
@@ -168,8 +169,31 @@ const Branches = () => {
       fetchBranches();
       fetchDidNumbers();
       fetchDepartments();
+      fetchAgentStatus();
     }
   }, [user?.businessId]); // Changed dependency to specifically watch businessId changes
+
+  const fetchAgentStatus = async () => {
+    try {
+      const response = await apiCall('/api/business/agents/status', 'GET');
+      const statusData = response.data?.agents || [];
+      
+      // Create a map of agentId/branchId -> status
+      const statusMap = {};
+      statusData.forEach(agent => {
+        if (agent.branchId) {
+          statusMap[agent.branchId] = agent.status; // online, offline, break, lunch
+        }
+        if (agent.id) {
+          statusMap[agent.id] = agent.status;
+        }
+      });
+      
+      setAgentStatusMap(statusMap);
+    } catch (error) {
+      console.error("Error fetching agent status:", error);
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -182,8 +206,13 @@ const Branches = () => {
         manager: {
           name: branch.user?.name || '',
           email: branch.user?.email || '',
+          phone: branch.user?.phone || branch.phone || '',
           userId: branch.user?._id || ''
         },
+        business: branch.business ? {
+          _id: branch.business._id,
+          name: branch.business.businessName || branch.business.name || 'Not assigned'
+        } : { name: 'Not assigned' },
         // Normalize department object to ensure UI can always read .name
         department: (function() {
           const d = branch.department || branch.deparment || branch.dept;
@@ -813,18 +842,21 @@ const Branches = () => {
 
         <Card className="mb-4" sx={{ mb: 3 }}>
           <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Box>
-                <Typography variant="h6">Agents</Typography>
-                <Typography variant="body2" color="text.secondary">Create and manage agents</Typography>
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Agents</Typography>
+                <Typography variant="body2" sx={{ color: '#6b7280' }}>Create and manage agents</Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            </Box>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 200, maxWidth: '70%' }}>
                 <TextField
                   placeholder="Search agents..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   size="small"
-                  sx={{ minWidth: 200 }}
+                  fullWidth
                   autoComplete="off"
                   InputProps={{
                     startAdornment: (
@@ -834,9 +866,8 @@ const Branches = () => {
                     ),
                   }}
                 />
-                <Button variant="outlined" size="small" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1 || loading}>Prev</Button>
-                <Typography variant="body2" sx={{ mx: 1 }}>Page {currentPage}</Typography>
-                <Button variant="outlined" size="small" onClick={() => setCurrentPage((p) => p + 1)} disabled={loading}>Next</Button>
+              </Box>
+              <Box>
                 <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleAddBranch} sx={{ ml: 1, bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>
                   Add Agent
                 </Button>
@@ -849,24 +880,23 @@ const Branches = () => {
                   <TableRow>
                     <TableCell>S.NO</TableCell>
                     <TableCell>AGENT NAME</TableCell>
-                    <TableCell>EMAIL ADDRESS</TableCell>
                     <TableCell>DEPARTMENT</TableCell>
                     <TableCell>STATUS</TableCell>
-                    <TableCell>ASSIGNED NUMBER</TableCell>
+                    <TableCell>EMAIL</TableCell>
                     <TableCell align="center">ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                         <CircularProgress />
                         <div className="mt-3">Loading agents...</div>
                       </TableCell>
                     </TableRow>
                   ) : currentBranches.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                         <div className="empty-state">
                           <div className="empty-state-icon">
                             <AddIcon style={{ fontSize: 40 }} />
@@ -885,12 +915,11 @@ const Branches = () => {
                         <TableRow hover onClick={() => handleAgentRowClick(branch)} sx={{ cursor: 'pointer' }}>
                           <TableCell>{indexOfFirstItem + index + 1}</TableCell>
                           <TableCell>{branch.branchName}</TableCell>
-                          <TableCell>{branch.manager?.email || '-'}</TableCell>
                           <TableCell>{branch.department ? (typeof branch.department === 'object' ? (branch.department.name || 'No Name') : String(branch.department)) : 'Not Assigned'}</TableCell>
                           <TableCell>
                             <Chip label={branch.isSuspended ? 'Suspended' : 'Active'} color={branch.isSuspended ? 'warning' : 'success'} size="small" />
                           </TableCell>
-                          <TableCell>{Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers[0] : 'Not Assigned'}</TableCell>
+                          <TableCell>{branch.manager?.email || '-'}</TableCell>
                           <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
                               <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditBranch(branch); }} title="Edit Agent">
@@ -912,7 +941,7 @@ const Branches = () => {
                           </TableCell>
                         </TableRow>
                         <TableRow>
-                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
                             <Collapse in={expandedAgent === branch._id} timeout="auto" unmountOnExit>
                               <Box sx={{ margin: 2, backgroundColor: '#f8f9fa', p: 2, borderRadius: 1 }}>
                                 <Grid container spacing={2}>
@@ -920,77 +949,77 @@ const Branches = () => {
                                     <Typography variant="subtitle1">Agent Details - {branch.branchName}</Typography>
                                   </Grid>
                                   <Grid item xs={12}>
-                                    <Typography variant="subtitle2">Call Details</Typography>
-                                    {(() => {
-                                      const userId = branch.manager?.userId || branch.userId || branch.managerId || branch._id;
-                                      return loadingCallDetails[userId] ? (
-                                        <Box sx={{ textAlign: 'center', py: 2 }}>
-                                          <CircularProgress size={24} />
-                                          <Typography variant="body2">Loading call details...</Typography>
+                                    <Grid container spacing={2}>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Current Status</Typography>
+                                          {(() => {
+                                            const status = agentStatusMap[branch._id] || 'offline';
+                                            const statusColors = {
+                                              'online': 'success',
+                                              'offline': 'default',
+                                              'break': 'warning',
+                                              'lunch': 'info'
+                                            };
+                                            return <Chip label={status.toUpperCase()} color={statusColors[status] || 'default'} variant="outlined" size="small" />;
+                                          })()}
                                         </Box>
-                                      ) : (
-                                        <Grid container spacing={2}>
-                                          <Grid item xs={6} sm={3}>
-                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                                              <Typography variant="h6" color="primary">{callDetails[userId]?.outboundCalls || 0}</Typography>
-                                              <Typography variant="caption" color="text.secondary">Outbound Calls</Typography>
-                                            </Paper>
-                                          </Grid>
-                                          <Grid item xs={6} sm={3}>
-                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                                              <Typography variant="h6" color="success.main">{callDetails[userId]?.inboundCalls || 0}</Typography>
-                                              <Typography variant="caption" color="text.secondary">Inbound Calls</Typography>
-                                            </Paper>
-                                          </Grid>
-                                          <Grid item xs={6} sm={3}>
-                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                                              <Typography variant="h6" color="warning.main">{callDetails[userId]?.missedCalls || 0}</Typography>
-                                              <Typography variant="caption" color="text.secondary">Missed Calls</Typography>
-                                            </Paper>
-                                          </Grid>
-                                          <Grid item xs={6} sm={3}>
-                                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                                              <Typography variant="h6" color="error.main">{callDetails[userId]?.hangCalls || 0}</Typography>
-                                              <Typography variant="caption" color="text.secondary">Hang Calls</Typography>
-                                            </Paper>
-                                          </Grid>
-                                        </Grid>
-                                      );
-                                    })()}
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Working Hours</Typography>
-                                    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
-                                      <Grid container>
-                                        <Grid item xs={12} sm={6}>
-                                          <Typography><strong>Start Time:</strong> 9:00 AM</Typography>
-                                          <Typography><strong>End Time:</strong> 6:00 PM</Typography>
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                          <Typography><strong>Break Time:</strong> 1:00 PM - 2:00 PM</Typography>
-                                          <Typography><strong>Total Hours:</strong> 8 hours</Typography>
-                                        </Grid>
                                       </Grid>
-                                    </Paper>
-                                  </Grid>
-                                  <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Active Hours (Today)</Typography>
-                                    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
-                                      <Grid container spacing={2}>
-                                        <Grid item xs={12} sm={4}>
-                                          <Typography><strong>Login Time:</strong> 9:15 AM</Typography>
-                                          <Typography><strong>Total Active Time:</strong> 6h 45m</Typography>
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                          <Typography><strong>Break Duration:</strong> 1h 15m</Typography>
-                                          <Typography><strong>Idle Time:</strong> 30m</Typography>
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                          <Typography><strong>Current Status:</strong> <Chip label="Online" color="success" sx={{ ml: 1 }} /></Typography>
-                                          <Typography variant="body2"><strong>Last Activity:</strong> 2 minutes ago</Typography>
-                                        </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Last Activity</Typography>
+                                          <Typography variant="body2">{branch.updatedAt ? new Date(branch.updatedAt).toLocaleString() : 'N/A'}</Typography>
+                                        </Box>
                                       </Grid>
-                                    </Paper>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Email</Typography>
+                                          <Typography variant="body2" sx={{ color: '#2563eb', cursor: 'pointer' }}>{branch.manager?.email || '-'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Phone</Typography>
+                                          <Chip label={branch.manager?.phone || 'Not assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Business</Typography>
+                                          <Chip label={branch.business?.name || 'Not assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Department</Typography>
+                                          <Chip label={branch.department ? (typeof branch.department === 'object' ? branch.department.name : branch.department) : 'Not Assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Shift</Typography>
+                                          <Chip label={branch.defaultShiftStart && branch.defaultShiftEnd ? `${branch.defaultShiftStart.slice(0, 2)}:${branch.defaultShiftStart.slice(2)} - ${branch.defaultShiftEnd.slice(0, 2)}:${branch.defaultShiftEnd.slice(2)}` : 'Not set'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>DIDs</Typography>
+                                          <Chip label={Array.isArray(branch.didNumbers) && branch.didNumbers.length > 0 ? branch.didNumbers.join(', ') : 'Not assigned'} variant="outlined" size="small" />
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={4}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Created</Typography>
+                                          <Typography variant="body2">{branch.createdAt ? new Date(branch.createdAt).toLocaleString() : 'N/A'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} sm={6}>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ color: '#6b7280' }}>Updated</Typography>
+                                          <Typography variant="body2">{branch.updatedAt ? new Date(branch.updatedAt).toLocaleString() : 'N/A'}</Typography>
+                                        </Box>
+                                      </Grid>
+                                    </Grid>
                                   </Grid>
                                 </Grid>
                               </Box>
