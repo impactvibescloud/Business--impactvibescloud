@@ -1192,7 +1192,15 @@ const CallLogs = () => {
       case 'rejected_by': return log.callRejectedBy || ''
       case 'team': return log.team || ''
       case 'hangup_by': return log.hangUpBy || log.hangupBy || ''
-      case 'duration': return formatDuration(log.callDuration)
+      // Talk-time only for ANSWERED calls. For Busy / Not-Answered /
+      // Missed / Failed the call never connected, so ring-time is NOT
+      // duration — show 00:00. Answered calls fall back to the total
+      // duration when BillableSeconds was missed by Asterisk.
+      case 'duration': {
+        const s = String(log.status || '').toLowerCase()
+        const answered = s === 'answered' || s === 'completed' || s === 'connected'
+        return formatDuration(answered ? (log.callDuration || log.duration || 0) : (log.callDuration || 0))
+      }
       case 'cost': return log.cost != null ? Number(log.cost).toFixed(2) : ''
       case 'notes': return log.notes || log.notebyagent || ''
       case 'status': return formatCallStatus(log.status)
@@ -1387,7 +1395,11 @@ const CallLogs = () => {
             csvEscape(log.callRejectedBy || ''),
             csvEscape(log.team || ''),
             csvEscape(log.hangUpBy || ''),
-            csvEscape(formatDuration(log.callDuration)),
+            csvEscape((() => {
+              const s = String(log.status || '').toLowerCase()
+              const answered = s === 'answered' || s === 'completed' || s === 'connected'
+              return formatDuration(answered ? (log.callDuration || log.duration || 0) : (log.callDuration || 0))
+            })()),
             csvEscape(log.cost != null ? Number(log.cost).toFixed(2) : ''),
             csvEscape(log.notes || log.notebyagent || ''),
             csvEscape(formatCallStatus(log.status)),
@@ -1582,7 +1594,9 @@ const CallLogs = () => {
                     const callType = String((log.callType || log.type || '').toLowerCase())
                     const isIncoming = callType === 'inbound' || callType === 'incoming'
                     const isMissed = (log.status || '').toLowerCase().includes('miss') || (log.hangupby || '').toLowerCase() === 'caller'
-                    const duration = formatDuration(log.callDuration);
+                    const _statusLc = String(log.status || '').toLowerCase();
+                    const _isAnswered = _statusLc === 'answered' || _statusLc === 'completed' || _statusLc === 'connected';
+                    const duration = formatDuration(_isAnswered ? (log.callDuration || log.duration || 0) : (log.callDuration || 0));
                     const callId = log.callId || log.call_id || log._id || '';
                     const solution = log.solution || log.callType || '';
                     let agents = []
@@ -1973,7 +1987,11 @@ const CallLogs = () => {
                 <Typography variant="body2">Rejected By: {selectedLog.callRejectedBy || 'N/A'}</Typography>
                 <Typography variant="body2">Team: {selectedLog.team || 'N/A'}</Typography>
                 <Typography variant="body2">Hang Up By: {selectedLog.hangUpBy || 'Unknown'}</Typography>
-                <Typography variant="body2">Duration: {formatDuration(selectedLog.callDuration)}</Typography>
+                <Typography variant="body2">Duration: {(() => {
+                  const s = String(selectedLog.status || '').toLowerCase();
+                  const answered = s === 'answered' || s === 'completed' || s === 'connected';
+                  return formatDuration(answered ? (selectedLog.callDuration || selectedLog.duration || 0) : (selectedLog.callDuration || 0));
+                })()}</Typography>
                 <Typography variant="body2">Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</Typography>
                 <Typography variant="body2">Status: {formatCallStatus(selectedLog.status)}</Typography>
                 <Typography variant="body2">Notes: {selectedLog.notes || selectedLog.notebyagent || 'N/A'}</Typography>
