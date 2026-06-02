@@ -1138,9 +1138,27 @@ const CallLogs = () => {
     }
   }
 
+  // Talk-time only — counts from when the customer picked up. For
+  // ANSWERED calls we read callDuration (Asterisk's BillableSeconds);
+  // for non-answered statuses (busy, not-answered, missed) we show 0
+  // because no real conversation happened.
+  const computeDisplayDuration = (log) => {
+    if (!log) return 0
+    const billable = Number(log.callDuration) || 0
+    const total = Number(log.duration) || 0
+    const status = String(log.status || '').toLowerCase()
+    const answered = status === 'answered' || status === 'completed' || status === 'connected'
+    if (answered) {
+      if (billable > 0) return billable
+      if (total > 0) return total
+      return 0
+    }
+    return billable
+  }
+
   const formatDuration = (duration) => {
     if (!duration) return '00:00'
-    
+
     const seconds = parseInt(duration)
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
@@ -1199,7 +1217,7 @@ const CallLogs = () => {
       case 'duration': {
         const s = String(log.status || '').toLowerCase()
         const answered = s === 'answered' || s === 'completed' || s === 'connected'
-        return formatDuration(answered ? (log.callDuration || log.duration || 0) : (log.callDuration || 0))
+        return formatDuration(computeDisplayDuration(log))
       }
       case 'cost': return log.cost != null ? Number(log.cost).toFixed(2) : ''
       case 'notes': return log.notes || log.notebyagent || ''
@@ -1398,7 +1416,7 @@ const CallLogs = () => {
             csvEscape((() => {
               const s = String(log.status || '').toLowerCase()
               const answered = s === 'answered' || s === 'completed' || s === 'connected'
-              return formatDuration(answered ? (log.callDuration || log.duration || 0) : (log.callDuration || 0))
+              return formatDuration(computeDisplayDuration(log))
             })()),
             csvEscape(log.cost != null ? Number(log.cost).toFixed(2) : ''),
             csvEscape(log.notes || log.notebyagent || ''),
@@ -1596,7 +1614,7 @@ const CallLogs = () => {
                     const isMissed = (log.status || '').toLowerCase().includes('miss') || (log.hangupby || '').toLowerCase() === 'caller'
                     const _statusLc = String(log.status || '').toLowerCase();
                     const _isAnswered = _statusLc === 'answered' || _statusLc === 'completed' || _statusLc === 'connected';
-                    const duration = formatDuration(_isAnswered ? (log.callDuration || log.duration || 0) : (log.callDuration || 0));
+                    const duration = formatDuration(computeDisplayDuration(log));
                     const callId = log.callId || log.call_id || log._id || '';
                     const solution = log.solution || log.callType || '';
                     let agents = []
@@ -1709,7 +1727,8 @@ const CallLogs = () => {
                   }
 
                   return (
-                    <TableRow key={log._id || index} hover>
+                    <React.Fragment key={log._id || index}>
+                    <TableRow hover>
                       <TableCell sx={{ py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Box
@@ -1876,6 +1895,28 @@ const CallLogs = () => {
                         )}
                       </TableCell>
                     </TableRow>
+                    {/* Inline audio player — appears below the row when
+                        Play is clicked. Native controls so the agent can
+                        scrub through the recording. */}
+                    {(() => {
+                      const rowKey = log._id || callId || index
+                      const isThisRowPlaying = playingId === String(rowKey) && audioBlobUrl
+                      if (!isThisRowPlaying) return null
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={20} sx={{ bgcolor: '#f9fafb', py: 1.5 }}>
+                            <audio
+                              controls
+                              autoPlay
+                              src={audioBlobUrl}
+                              style={{ width: '100%' }}
+                              onEnded={handleStopPlayback}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })()}
+                  </React.Fragment>
                   )
                 })}
                 </TableBody>
@@ -1990,7 +2031,7 @@ const CallLogs = () => {
                 <Typography variant="body2">Duration: {(() => {
                   const s = String(selectedLog.status || '').toLowerCase();
                   const answered = s === 'answered' || s === 'completed' || s === 'connected';
-                  return formatDuration(answered ? (selectedLog.callDuration || selectedLog.duration || 0) : (selectedLog.callDuration || 0));
+                  return formatDuration(computeDisplayDuration(selectedLog));
                 })()}</Typography>
                 <Typography variant="body2">Cost: {selectedLog.cost != null ? `$${Number(selectedLog.cost).toFixed(2)}` : 'N/A'}</Typography>
                 <Typography variant="body2">Status: {formatCallStatus(selectedLog.status)}</Typography>

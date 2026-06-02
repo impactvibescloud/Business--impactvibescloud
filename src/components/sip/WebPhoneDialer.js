@@ -116,9 +116,15 @@ const WebPhoneDialer = ({ ua, regStatus, sipDomain = 'pbx.justconnect.biz', busi
       durationIntervalRef.current = setInterval(() => {
         setCallDuration((d) => d + 1)
       }, 1000)
-    } else if (callStatus !== 'connected' && durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current)
-      durationIntervalRef.current = null
+    } else if (callStatus !== 'connected') {
+      // Clear any running timer AND reset the visible counter, so when the
+      // dialer reopens between calls it shows 00:00 instead of the last
+      // value from the previous call (was sticking at e.g. 00:04).
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current)
+        durationIntervalRef.current = null
+      }
+      setCallDuration(0)
     }
 
     return () => {

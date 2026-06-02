@@ -224,17 +224,43 @@ const CallMonitor = () => {
       }
     }
 
-    // Strategy 2: Parse from channel (SIP channel usually has format like "SIP/1234-xyz")
-    const channel = call?.channel || call?.legs?.[0]?.channel
-    if (channel && typeof channel === 'string') {
-      const m = channel.match(/[/:@](\d{3,})(?:[/-]|$)/)
-      if (m && m[1]) {
-        const ext = String(m[1]).trim()
-        if (/^\d{3,}$/.test(ext)) return ext
-      }
-      // Try alternative pattern
-      const m2 = channel.match(/(\d{3,})/)
-      if (m2 && m2[1]) return m2[1]
+    // Strategy 2: Parse from channel. For a call between trunk and
+    // extension Asterisk gives us TWO channels (e.g.
+    //   Channel:     PJSIP/1009-00001f43        ← extension leg
+    //   DestChannel: PJSIP/tata-trunk-92-...    ← trunk leg
+    // ). Older code grabbed `legs[0]` blindly, which on inbound calls is
+    // the trunk leg — and the regex then matched the trunk's tail digits
+    // (e.g. "00001" or "92") and we'd try to spy on a non-existent
+    // extension. Walk both legs and prefer the one that is NOT a trunk.
+    const candidateChannels = [
+      call?.channel,
+      call?.destinationChannel,
+      call?.destChannel,
+      ...(Array.isArray(call?.legs) ? call.legs.map((l) => l?.channel || l?.destinationChannel) : []),
+    ].filter((c) => typeof c === 'string' && c.length > 0)
+
+    const isTrunkChannel = (ch) => /trunk/i.test(ch)
+    const extFromChannel = (ch) => {
+      // Match the SIP user portion: "PJSIP/<user>-<id>"
+      const userPart = ch.split('/')[1] || ''
+      const userOnly = userPart.split('-')[0]
+      // Only treat as an extension if it's a 3–6 digit number (typical
+      // extension range — filters out trunk names like "tata" and
+      // garbage tail-IDs like "00001f44").
+      if (/^\d{3,6}$/.test(userOnly)) return userOnly
+      return null
+    }
+
+    // Prefer non-trunk channels first.
+    for (const ch of candidateChannels) {
+      if (isTrunkChannel(ch)) continue
+      const ext = extFromChannel(ch)
+      if (ext) return ext
+    }
+    // Fall back to any channel if no non-trunk produced an extension.
+    for (const ch of candidateChannels) {
+      const ext = extFromChannel(ch)
+      if (ext) return ext
     }
 
     // Strategy 3: Try other agent-related fields

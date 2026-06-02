@@ -159,19 +159,47 @@ const Branches = () => {
       });
       console.log('Processed Departments:', processedDepartments);
       setDepartments(processedDepartments);
+      // Return the fresh list so a caller awaiting fetchDepartments can
+      // use it immediately, without waiting for React to re-render the
+      // state. (Without this, fetchBranches called right after closes
+      // over the OLD empty `departments` array and resolves every dept
+      // name to '', so every row renders "Not Assigned".)
+      return processedDepartments;
     } catch (error) {
       console.error("Error fetching departments:", error);
+      return [];
     }
   };
 
   useEffect(() => {
     if (user?.businessId) {
-      fetchBranches();
+      // Load departments BEFORE branches so the agent table's department
+      // column can resolve names. Pass the fresh list straight into
+      // fetchBranches — relying on state would still see an empty array
+      // here because React hasn't re-rendered yet.
+      (async () => {
+        const freshDepts = await fetchDepartments();
+        await fetchBranches(freshDepts);
+      })();
       fetchDidNumbers();
-      fetchDepartments();
       fetchAgentStatus();
     }
   }, [user?.businessId]); // Changed dependency to specifically watch businessId changes
+
+  // If departments load AFTER branches (e.g., on slow network) and some
+  // rows came back without a resolved name, refetch using the now-loaded
+  // department list so the column populates.
+  useEffect(() => {
+    if (departments && departments.length && branches && branches.length) {
+      const needsRefresh = branches.some(
+        (b) =>
+          (!b.departmentNames || b.departmentNames.length === 0) &&
+          (b.departmentIds?.length || b.department)
+      );
+      if (needsRefresh) fetchBranches(departments);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments]);
 
   const fetchAgentStatus = async () => {
     try {
@@ -195,40 +223,79 @@ const Branches = () => {
     }
   };
 
-  const fetchBranches = async () => {
+  const fetchBranches = async (deptListOverride) => {
     try {
   const response = await apiCall(`/branch/${user.businessId}/branches`, 'GET');
       const branchesData = response.data || response.branches || [];
-      
+
+      // Build a name lookup from the freshest department list we have.
+      // Callers can pass an override (the immediate return value from
+      // fetchDepartments) to avoid the React state-closure problem where
+      // `departments` is still empty right after `await fetchDepartments()`.
+      const deptSource =
+        Array.isArray(deptListOverride) && deptListOverride.length
+          ? deptListOverride
+          : departments;
+      const deptNameById = new Map();
+      try {
+        (deptSource || []).forEach((dept) => {
+          if (dept && dept._id) deptNameById.set(String(dept._id), dept.name || '');
+        });
+      } catch (e) { /* ignore */ }
+
+      const resolveDeptName = (d) => {
+        if (!d) return '';
+        if (typeof d === 'object') {
+          return (
+            d.name ||
+            d.departmentName ||
+            d.label ||
+            deptNameById.get(String(d._id || d.id || d.departmentId)) ||
+            ''
+          );
+        }
+        // Primitive (ObjectId string): look it up
+        return deptNameById.get(String(d)) || '';
+      };
+
       // Map the data to match our component's expected structure
-      const formattedBranches = branchesData.map(branch => ({
-        ...branch,
-        manager: {
-          name: branch.user?.name || '',
-          email: branch.user?.email || '',
-          phone: branch.user?.phone || branch.phone || '',
-          userId: branch.user?._id || ''
-        },
-        business: branch.business ? {
-          _id: branch.business._id,
-          name: branch.business.businessName || branch.business.name || 'Not assigned'
-        } : { name: 'Not assigned' },
-        // Normalize department object to ensure UI can always read .name
-        department: (function() {
-          const d = branch.department || branch.deparment || branch.dept;
-          if (!d) return null;
-          if (typeof d === 'object') {
-            return {
-              _id: d._id || d.id || d.departmentId || null,
-              name: d.name || d.departmentName || d.label || ''
-            };
-          }
-          // If department is a primitive (string id or name), attempt to treat it as name
-          return { _id: String(d), name: String(d) };
-        })(),
-        id: branch._id,
-        didNumber: branch.assignedNumbers?.[0]?.number || branch.didNumbers?.[0] || '',
-      }));
+      const formattedBranches = branchesData.map(branch => {
+        // Prefer the new multi-department field; fall back to legacy single.
+        const rawDeptList =
+          (Array.isArray(branch.departmentIds) && branch.departmentIds.length
+            ? branch.departmentIds
+            : null) ||
+          (branch.department ? [branch.department] : null);
+
+        const deptNames = (rawDeptList || [])
+          .map(resolveDeptName)
+          .filter(Boolean);
+
+        // Keep legacy `.department.name` for old call sites that still
+        // read it. Use the FIRST resolved department as the canonical
+        // single-value mirror.
+        const primaryDept = deptNames.length
+          ? { _id: null, name: deptNames.join(', ') }
+          : null;
+
+        return {
+          ...branch,
+          manager: {
+            name: branch.user?.name || '',
+            email: branch.user?.email || '',
+            phone: branch.user?.phone || branch.phone || '',
+            userId: branch.user?._id || ''
+          },
+          business: branch.business ? {
+            _id: branch.business._id,
+            name: branch.business.businessName || branch.business.name || 'Not assigned'
+          } : { name: 'Not assigned' },
+          department: primaryDept,
+          departmentNames: deptNames,
+          id: branch._id,
+          didNumber: branch.assignedNumbers?.[0]?.number || branch.didNumbers?.[0] || '',
+        };
+      });
 
       setBranches(formattedBranches);
       setLoading(false);

@@ -109,19 +109,43 @@ const AgentRealTime = () => {
 
       let merged = []
 
+      // Format a timestamp as "since" duration (e.g. "5m", "2h 14m").
+      // Used for the "Availability Duration" column so it shows how long
+      // the agent has been in the current status — NOT the raw ISO time.
+      const formatSinceDuration = (iso) => {
+        if (!iso) return '-'
+        const t = new Date(iso).getTime()
+        if (!t || Number.isNaN(t)) return '-'
+        const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000))
+        if (diffSec < 60) return `${diffSec}s`
+        const m = Math.floor(diffSec / 60)
+        if (m < 60) return `${m}m`
+        const h = Math.floor(m / 60)
+        const remM = m % 60
+        return remM ? `${h}h ${remM}m` : `${h}h`
+      }
+
       if (statusAgents.length) {
         merged = statusAgents.map(s => {
           const id = s.id || s._id || s._id || s.email || s.phone || null
           const name = s.name || s.fullName || s.email || ''
           const perf = (id && perfById.get(String(id))) || (name && perfByName.get(String(name).toLowerCase())) || null
+          const statusRaw = s.status || s.current_status || 'unknown'
           return {
             id: id || name || `agent-${Math.random().toString(36).slice(2,8)}`,
             name: name || perf?.agentName || perf?.name || 'Unknown',
             // API returns `status` and `lastSeen`
-            status: s.status || s.current_status || 'unknown',
-            // show lastSeen as availability/duration column (formatted)
-            duration: s.lastSeen || s.joinedAt || '',
-            callStatus: s.status || 'Not on call',
+            status: statusRaw,
+            // show lastSeen as a "duration since last change" — was previously
+            // rendering the raw ISO timestamp directly into the table.
+            duration: formatSinceDuration(s.lastSeen || s.joinedAt),
+            // Call status: only show "On call" when the agent's status is
+            // explicitly busy/on-call. Otherwise reflect availability.
+            callStatus: (statusRaw === 'online') ? 'Available'
+                      : (statusRaw === 'offline') ? 'Offline'
+                      : (statusRaw === 'break') ? 'On break'
+                      : (statusRaw === 'lunch') ? 'On lunch'
+                      : 'Not on call',
             dept: s.branchId || s.dept || perf?.branchName || perf?.branch || '',
             answered: perf ? (perf.answeredCalls || perf.answered || 0) : 0,
             missed: perf ? (perf.missedCalls || perf.missed || 0) : 0,
