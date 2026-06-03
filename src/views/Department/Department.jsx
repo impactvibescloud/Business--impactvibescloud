@@ -435,8 +435,16 @@ function Department() {
       selectedIds.push(branchId)
       const branch = availableBranches.find(b => (b._id === branchId || b.id === branchId))
       if (branch) {
+        // userId MUST be the linked User._id, not the Branch._id —
+        // otherwise the Agents page reverse lookup (members.userId →
+        // User._id) can't match and the row shows "Not Assigned".
+        const userId = branch.userId || branch.user?._id || branch.user?.id || ''
+        if (!userId) {
+          console.warn('[Department] Skipping member — no linked user for branch', branchId)
+          return
+        }
         selectedMembers.push({
-          userId: branch.userId || branch._id || branch.id,
+          userId,
           phone: branch.phone || branch.didNumber || '',
           didNumber: branch.didNumber || branch.did || '',
           role: branch.role || 'branch'
@@ -490,11 +498,18 @@ function Department() {
     }
     
     setSelectedMemberIds(memberIds)
-    // Normalize members to ensure didNumber is included where possible
+    // Normalize members to ensure didNumber is included where possible.
+    // CRITICAL: when the stored userId is actually a Branch._id (legacy
+    // bad data from an earlier bug), upgrade it to the real User._id
+    // from the matching branch so the Agents page can resolve the
+    // membership going forward.
     const normalizedMembers = (department.members && Array.isArray(department.members)) ? department.members.map(m => {
       const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
+      // Prefer the live User._id from the matching branch over whatever
+      // (possibly stale) value is stored on the member.
+      const userId = (matchingBranch && matchingBranch.userId) || m.userId || m.user || m._id || ''
       return {
-        userId: m.userId || m.user || m._id || '',
+        userId,
         phone: m.phone || (matchingBranch && (matchingBranch.phone || matchingBranch.didNumber)) || '',
         didNumber: m.didNumber || (matchingBranch && (matchingBranch.didNumber || matchingBranch.did)) || '',
         role: m.role || 'branch',
@@ -632,16 +647,20 @@ function Department() {
         setFormData(prev => ({ ...prev, name: normalizedName }))
       }
 
-      // Prepare department data and ensure each member has didNumber
+      // Prepare department data and ensure each member has didNumber.
+      // Always prefer the matchingBranch.userId (the real User._id) over
+      // whatever was previously stored — this self-heals any old members
+      // whose userId was mistakenly saved as a Branch._id.
       const normalizedMembers = (formData.members && Array.isArray(formData.members)) ? formData.members.map(m => {
         const matchingBranch = availableBranches.find(b => b.userId === m.userId || b._id === m.userId || b.id === m.userId)
+        const resolvedUserId = (matchingBranch && matchingBranch.userId) || m.userId || m._id || m.id || ''
         return {
-          userId: m.userId || m._id || m.id || '',
+          userId: resolvedUserId,
           phone: m.phone || (matchingBranch && (matchingBranch.phone || matchingBranch.didNumber)) || '',
           didNumber: m.didNumber || (matchingBranch && (matchingBranch.didNumber || matchingBranch.did)) || '',
           role: m.role || 'branch'
         }
-      }) : []
+      }).filter(m => m.userId) : []
 
       // Build the canonical didNumbers[] from the multi-select value, falling
       // back to the legacy singular `didNumber` if the form pre-dates the

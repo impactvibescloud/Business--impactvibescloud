@@ -149,13 +149,21 @@ const Branches = () => {
       const departmentsData = response.departments || response.data || response.data?.departments || [];
       const processedDepartments = departmentsData.map(dept => {
         if (typeof dept === 'object') {
+          // PRESERVE members and departmentHead — the Agents page reverse
+          // lookup needs them to resolve which department each agent
+          // belongs to. Stripping these fields silently broke that
+          // lookup so every agent showed "Not Assigned".
           return {
             _id: dept._id || dept.id,
             name: dept.name || 'Unnamed Department',
-            status: dept.status
+            status: dept.status,
+            departmentHead: dept.departmentHead || null,
+            members: Array.isArray(dept.members) ? dept.members : [],
+            didNumber: dept.didNumber || null,
+            didNumbers: Array.isArray(dept.didNumbers) ? dept.didNumbers : [],
           };
         }
-        return { _id: dept, name: String(dept) };
+        return { _id: dept, name: String(dept), members: [], departmentHead: null };
       });
       console.log('Processed Departments:', processedDepartments);
       setDepartments(processedDepartments);
@@ -265,14 +273,161 @@ const Branches = () => {
         return String(d);
       };
 
+      // Reverse-lookup map: userId → department doc. Built from the
+      // departments list, so we can find a department for an agent by
+      // matching their Branch.user._id against department.departmentHead
+      // or any entry in department.members[].userId — even when the
+      // backend hasn't yet populated branch.department.
+      const deptByUserId = new Map();
+      const deptByEmail = new Map();
+      const deptByPhone = new Map();
+      try {
+        (deptSource || []).forEach((dept) => {
+          if (!dept) return;
+          if (dept.departmentHead) {
+            const head = dept.departmentHead;
+            const headId = String(
+              typeof head === 'object'
+                ? head._id || head.id
+                : head,
+            );
+            if (headId && !deptByUserId.has(headId)) deptByUserId.set(headId, dept);
+            // Email fallback for the head (populated when the dept list
+            // came back with .populate("departmentHead", "name email ..."))
+            if (typeof head === 'object' && head.email) {
+              const email = String(head.email).toLowerCase();
+              if (!deptByEmail.has(email)) deptByEmail.set(email, dept);
+            }
+          }
+          (dept.members || []).forEach((m) => {
+            const uid = String(m?.userId || '');
+            if (uid && !deptByUserId.has(uid)) deptByUserId.set(uid, dept);
+            // Member.phone is sometimes the agent's DID — useful join key.
+            if (m?.phone) {
+              const p = String(m.phone);
+              if (!deptByPhone.has(p)) deptByPhone.set(p, dept);
+            }
+          });
+        });
+      } catch (e) { /* ignore */ }
+
       // Map the data to match our component's expected structure
       const formattedBranches = branchesData.map(branch => {
-        // Prefer the new multi-department field; fall back to legacy single.
-        const rawDeptList =
-          (Array.isArray(branch.departmentIds) && branch.departmentIds.length
-            ? branch.departmentIds
-            : null) ||
-          (branch.department ? [branch.department] : null);
+        // Build the FULL list of departments this agent belongs to —
+        // the backend only ships ONE in `branch.department`, so we
+        // also walk every department in deptSource and include any
+        // where this user is the head or a member. Without this,
+        // agents in 2+ departments (e.g. a head of one + member of
+        // another) only showed a single department on the Agents
+        // page.
+        const collected = [];
+        const seenIds = new Set();
+        const pushDept = (d) => {
+          if (!d) return;
+          const id = String(d._id || d.id || '');
+          if (id && seenIds.has(id)) return;
+          if (id) seenIds.add(id);
+          collected.push(d);
+        };
+
+        // 1. The populated single dept from the /branch endpoint (fresh,
+        // canonical — usually the "primary" department).
+        if (branch.department && typeof branch.department === 'object' && (branch.department.name || branch.department._id)) {
+          pushDept(branch.department);
+        }
+
+        // 2. Union with every department in the loaded list that has
+        // this agent as departmentHead OR in members[].userId. Matches
+        // by Branch.user._id (the User._id, which is what gets stored
+        // in members[].userId). Also try Branch._id and email as
+        // resilient fallbacks.
+        const uid = String(branch.user?._id || branch.user || '');
+        const bid = String(branch._id || '');
+        const email = String(branch.user?.email || '').toLowerCase();
+        (deptSource || []).forEach((dept) => {
+          if (!dept) return;
+          const headRef = dept.departmentHead;
+          const headId = headRef
+            ? String(typeof headRef === 'object' ? (headRef._id || headRef.id) : headRef)
+            : '';
+          const headEmail =
+            headRef && typeof headRef === 'object' && headRef.email
+              ? String(headRef.email).toLowerCase()
+              : '';
+          let belongs = false;
+          if (uid && (headId === uid)) belongs = true;
+          if (!belongs && bid && (headId === bid)) belongs = true;
+          if (!belongs && email && headEmail && email === headEmail) belongs = true;
+          if (!belongs && Array.isArray(dept.members)) {
+            for (const m of dept.members) {
+              const mid = String(m?.userId || '');
+              if (mid && (mid === uid || mid === bid)) { belongs = true; break; }
+            }
+          }
+          if (belongs) pushDept(dept);
+        });
+
+        // 3. Legacy fallback: if we found nothing above, look up
+        // departmentIds[] in the lookup map (some of those IDs may be
+        // stale — that's expected, they're filtered out by name-resolution).
+        if (!collected.length && Array.isArray(branch.departmentIds) && branch.departmentIds.length) {
+          for (const did of branch.departmentIds) {
+            const id = String(did || '');
+            if (!id || seenIds.has(id)) continue;
+            const dept = (deptSource || []).find((d) => String(d._id) === id);
+            if (dept) pushDept(dept);
+          }
+        }
+
+        let rawDeptList = collected.length ? collected : null;
+
+        // Frontend reverse-lookup fallback. If the backend hasn't joined
+        // department info onto this branch (it shipped `department: null`
+        // and `departmentIds: []`), try multiple strategies in order:
+        // 1. branch.user._id matches dept.departmentHead OR dept.members[].userId
+        // 2. branch._id matches members[].userId (legacy bug — branch ID stored as userId)
+        // 3. branch.user.email matches dept.departmentHead.email
+        // 4. any branch.didNumbers[] matches dept.members[].phone
+        if ((!rawDeptList || !rawDeptList.length)) {
+          let matched = null;
+          const tryKeys = {
+            'branch.user._id': String(branch.user?._id || ''),
+            'branch.user (raw)': String(branch.user || ''),
+            'branch.userId': String(branch.userId || ''),
+            'branch._id': String(branch._id || ''),
+            'branch.user.email': String(branch.user?.email || '').toLowerCase(),
+            'branch.didNumbers': Array.isArray(branch.didNumbers) ? branch.didNumbers : [],
+          };
+
+          // 1. user id (try multiple shapes)
+          for (const k of [tryKeys['branch.user._id'], tryKeys['branch.user (raw)'], tryKeys['branch.userId']]) {
+            if (k) { matched = deptByUserId.get(k) || null; if (matched) break; }
+          }
+          // 2. branch id (legacy)
+          if (!matched && tryKeys['branch._id']) {
+            matched = deptByUserId.get(tryKeys['branch._id']) || null;
+          }
+          // 3. user email
+          if (!matched && tryKeys['branch.user.email']) {
+            matched = deptByEmail.get(tryKeys['branch.user.email']) || null;
+          }
+          // 4. DID/phone match
+          if (!matched) {
+            for (const did of tryKeys['branch.didNumbers']) {
+              matched = deptByPhone.get(String(did)) || null;
+              if (matched) break;
+            }
+          }
+
+          if (!matched) {
+            console.warn('[Branches] No dept match for branch', {
+              branchName: branch.branchName,
+              email: branch.user?.email || branch.manager?.email,
+              tryKeys,
+            });
+          }
+          if (matched) rawDeptList = [matched];
+        }
 
         const deptNames = (rawDeptList || [])
           .map(resolveDeptName)
