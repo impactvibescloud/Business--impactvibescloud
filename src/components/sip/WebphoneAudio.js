@@ -54,8 +54,13 @@ const WebphoneAudio = ({ session }) => {
     }
   }, [session])
 
+  // Hidden audio element — the dialer UI already shows the call
+  // duration/status, so the native HTML5 audio controls are redundant
+  // (and confusing because they appear UNDER the dialer with their own
+  // time counter and volume slider). Audio still plays via the WebRTC
+  // stream attached above; we just don't render the player chrome.
   return (
-    <audio ref={audioRef} style={{ width: '100%' }} controls autoPlay />
+    <audio ref={audioRef} autoPlay style={{ display: 'none' }} />
   )
 }
 

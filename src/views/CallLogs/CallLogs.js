@@ -85,6 +85,11 @@ const CallLogs = () => {
   const audioBufferRef = useRef(null)
   const audioSourceRef = useRef(null)
   const tempAudioRef = useRef(null)
+  // Ref to the inline <audio> element rendered below the call-log row.
+  // Without this, handleStopPlayback couldn't actually pause it — the
+  // element was only being "unmounted" via state, which lets the audio
+  // continue playing in memory until the next React reconciliation.
+  const inlineAudioRef = useRef(null)
   const [audioCtxPlaying, setAudioCtxPlaying] = useState(false)
   const [recordingInfo, setRecordingInfo] = useState(null)
   const [downloadLoadingMap, setDownloadLoadingMap] = useState({})
@@ -1047,11 +1052,24 @@ const CallLogs = () => {
   }
 
   const handleStopPlayback = () => {
+    // Stop the modal audio element (if any).
     try {
       if (audioRef.current) {
         try { audioRef.current.pause() } catch (e) {}
         try { audioRef.current.currentTime = 0 } catch (e) {}
         try { audioRef.current.src = '' } catch (e) {}
+      }
+    } catch (e) {}
+    // Stop the inline-row audio element (the one rendered below the
+    // call-log row). This was previously NOT stopped explicitly, so
+    // even after the UI showed "Play", the audio kept playing in
+    // memory until React unmounted the element.
+    try {
+      if (inlineAudioRef.current) {
+        try { inlineAudioRef.current.pause() } catch (e) {}
+        try { inlineAudioRef.current.currentTime = 0 } catch (e) {}
+        try { inlineAudioRef.current.src = '' } catch (e) {}
+        try { inlineAudioRef.current.load() } catch (e) {}
       }
     } catch (e) {}
     try { stopWebAudio() } catch (e) {}
@@ -1061,6 +1079,22 @@ const CallLogs = () => {
         try { tempAudioRef.current.pause() } catch (e) {}
         try { tempAudioRef.current.src = '' } catch (e) {}
         tempAudioRef.current = null
+      }
+    } catch (e) {}
+    // Safety net — pause every <audio> element on the page. Belt and
+    // braces in case the recording is playing through some element we
+    // don't hold a ref to (modal reopen, multiple rows etc).
+    try {
+      document.querySelectorAll('audio').forEach((el) => {
+        try { el.pause() } catch (e) {}
+        try { el.currentTime = 0 } catch (e) {}
+      })
+    } catch (e) {}
+    // Free the blob URL so the browser truly drops the audio data.
+    try {
+      if (audioBlobUrl) {
+        URL.revokeObjectURL(audioBlobUrl)
+        setAudioBlobUrl(null)
       }
     } catch (e) {}
     setPlayingUrl(null)
@@ -1906,6 +1940,7 @@ const CallLogs = () => {
                         <TableRow>
                           <TableCell colSpan={20} sx={{ bgcolor: '#f9fafb', py: 1.5 }}>
                             <audio
+                              ref={inlineAudioRef}
                               controls
                               autoPlay
                               src={audioBlobUrl}
