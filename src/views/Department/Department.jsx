@@ -588,7 +588,20 @@ function Department() {
       
     } catch (error) {
       errorLog('Error deleting department:', error)
-      setDeleteError('An error occurred while deleting the department. Please try again.')
+      // Surface the real server message — the generic message was hiding
+      // backend failures (audit-log save error, missing perms, etc.) and
+      // making this impossible to diagnose.
+      const serverMsg =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        ''
+      const statusCode = error?.response?.status
+      setDeleteError(
+        serverMsg
+          ? `${serverMsg}${statusCode ? ` (HTTP ${statusCode})` : ''}`
+          : 'An error occurred while deleting the department. Please try again.'
+      )
     } finally {
       setIsDeleting(false)
     }
@@ -676,7 +689,9 @@ function Department() {
             members: departmentData.members,
             default: formData.default,
           },
-          { headers }
+          // Override the global 10s axios timeout — department updates
+          // can take longer than that when Asterisk sync runs inline.
+          { headers, timeout: 60000 }
         );
         
         console.log('Update response:', response);
@@ -701,7 +716,9 @@ function Department() {
         response = await axios.default.post(
           `${baseUrl}/api/departments`,
           departmentData,
-          { headers }
+          // Override the global 10s axios timeout for the same reason as
+          // the PUT path above.
+          { headers, timeout: 60000 }
         );
         
         console.log('Create response:', response);
