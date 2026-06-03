@@ -258,6 +258,13 @@ const Branches = () => {
         return deptNameById.get(String(d)) || '';
       };
 
+      // Extract a usable ObjectId (string) from whatever shape the API returns.
+      const extractId = (d) => {
+        if (!d) return null;
+        if (typeof d === 'object') return String(d._id || d.id || d.departmentId || '');
+        return String(d);
+      };
+
       // Map the data to match our component's expected structure
       const formattedBranches = branchesData.map(branch => {
         // Prefer the new multi-department field; fall back to legacy single.
@@ -271,11 +278,19 @@ const Branches = () => {
           .map(resolveDeptName)
           .filter(Boolean);
 
-        // Keep legacy `.department.name` for old call sites that still
-        // read it. Use the FIRST resolved department as the canonical
-        // single-value mirror.
+        // ALWAYS preserve the real ObjectId(s) — the edit form reads
+        // `branch.department._id` and `branch.departmentIds` to hydrate
+        // the dept multi-select. Setting `_id: null` here (as the
+        // previous version did) caused the edit hydration to fall
+        // through to stringifying the whole object, producing
+        // "[object Object]" which the server then failed to cast to
+        // ObjectId on save ("Branch validation failed: departmentIds.0:
+        // Cast to [ObjectId] failed").
+        const deptIdList = (rawDeptList || []).map(extractId).filter(Boolean);
+
+        // Display object — combined name + first real ObjectId.
         const primaryDept = deptNames.length
-          ? { _id: null, name: deptNames.join(', ') }
+          ? { _id: deptIdList[0] || null, name: deptNames.join(', ') }
           : null;
 
         return {
@@ -291,6 +306,9 @@ const Branches = () => {
             name: branch.business.businessName || branch.business.name || 'Not assigned'
           } : { name: 'Not assigned' },
           department: primaryDept,
+          // Replace the raw API value with clean string IDs so the edit
+          // form's multi-select always sees real ObjectId strings.
+          departmentIds: deptIdList,
           departmentNames: deptNames,
           id: branch._id,
           didNumber: branch.assignedNumbers?.[0]?.number || branch.didNumbers?.[0] || '',
