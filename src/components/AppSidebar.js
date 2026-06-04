@@ -137,6 +137,10 @@ const AppSidebar = () => {
     // Step 1: Filter by user access (accessTo)
     if (userdata.accessTo) {
       filtered = filtered.filter((item) => {
+        // Items marked alwaysVisible bypass the per-name accessTo check
+        // (e.g., the v2 Migrations & Ops control panel — the page's own
+        // API endpoints enforce role-based authorization server-side).
+        if (item.alwaysVisible) return true;
         if (userdata.accessTo[item.name]) {
           return true;
         }

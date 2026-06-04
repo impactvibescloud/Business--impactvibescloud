@@ -26,6 +26,7 @@ const CallLogsLegacy = React.lazy(() => import("./views/ReportsAnalytics/CDR"));
 const Payments = React.lazy(() => import("./views/Payments/Payments"));
 const Settings = React.lazy(() => import("./views/Settings/Settings"));
 const Department = React.lazy(() => import("./views/Department/Department"));
+const Migrations = React.lazy(() => import("./views/Migrations/Migrations"));
 
 // Products
 const Products = React.lazy(() => import("./views/Products/Products"));
@@ -941,6 +942,15 @@ const routes = [
     name: "Settings",
     element: Settings,
     navName: "Settings",
+  },
+  {
+    path: "/migrations",
+    name: "Migrations & Ops",
+    element: Migrations,
+    navName: "Settings",
+    // Bypass accessTo + feature-flag gates — the page's own API enforces
+    // role-based authorization server-side.
+    alwaysVisible: true,
   },
   {
     path: "/agent-performance",

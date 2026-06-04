@@ -77,7 +77,25 @@ const AppContent = () => {
         <Suspense fallback={<CSpinner color="primary" />}>
           <Routes>
             {appRoutes.map((route, idx) => {
-              // Show routes if user is admin OR if no specific access control needed OR if user has access
+              // Show routes if user is admin OR if no specific access control needed OR if user has access.
+              // Routes explicitly marked `alwaysVisible` bypass both the
+              // accessTo check and the feature-flag gate — used for
+              // critical admin pages whose access is enforced by the
+              // page's own server-side endpoints (e.g., Migrations & Ops).
+              if (route.alwaysVisible) {
+                return (
+                  route.element && (
+                    <Route
+                      key={idx}
+                      path={route.path}
+                      exact={route.exact}
+                      name={route.name}
+                      element={<route.element />}
+                    />
+                  )
+                );
+              }
+
               const baseAccess =
                 userper?.role === "business_admin" ||
                 !route.navName ||
