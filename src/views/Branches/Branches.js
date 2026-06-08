@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Box,
   Card,
@@ -179,20 +179,38 @@ const Branches = () => {
     }
   };
 
+  // Centralized "refresh everything on this page" so we can trigger it
+  // both on initial mount AND on tab focus / visibility change. Without
+  // the focus-trigger, edits made in Departments (DID assignment,
+  // member add/remove) wouldn't reflect here until a full page reload.
+  const refreshAll = useCallback(async () => {
+    if (!user?.businessId) return;
+    const freshDepts = await fetchDepartments();
+    await fetchBranches(freshDepts);
+    fetchDidNumbers();
+    fetchAgentStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.businessId]);
+
   useEffect(() => {
-    if (user?.businessId) {
-      // Load departments BEFORE branches so the agent table's department
-      // column can resolve names. Pass the fresh list straight into
-      // fetchBranches — relying on state would still see an empty array
-      // here because React hasn't re-rendered yet.
-      (async () => {
-        const freshDepts = await fetchDepartments();
-        await fetchBranches(freshDepts);
-      })();
-      fetchDidNumbers();
-      fetchAgentStatus();
-    }
-  }, [user?.businessId]); // Changed dependency to specifically watch businessId changes
+    refreshAll();
+  }, [refreshAll]);
+
+  // Auto-refresh when the user switches BACK to this tab/window — so
+  // updates made on the Departments page reflect here without a manual
+  // reload. Cheap (~4 GETs), runs only when window regains focus or
+  // tab becomes visible.
+  useEffect(() => {
+    const trigger = () => {
+      if (document.visibilityState === 'visible') refreshAll();
+    };
+    window.addEventListener('focus', refreshAll);
+    document.addEventListener('visibilitychange', trigger);
+    return () => {
+      window.removeEventListener('focus', refreshAll);
+      document.removeEventListener('visibilitychange', trigger);
+    };
+  }, [refreshAll]);
 
   // If departments load AFTER branches (e.g., on slow network) and some
   // rows came back without a resolved name, refetch using the now-loaded
@@ -1083,9 +1101,25 @@ const Branches = () => {
         <Card className="mb-4" sx={{ mb: 3 }}>
           <CardContent>
             <Box sx={{ mb: 3 }}>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Agents</Typography>
-                <Typography variant="body2" sx={{ color: '#6b7280' }}>Create and manage agents</Typography>
+              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Agents</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>Create and manage agents</Typography>
+                </Box>
+                <button
+                  onClick={refreshAll}
+                  style={{
+                    padding: '6px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    background: '#fff',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                  title="Refresh agent + department + DID data"
+                >
+                  ↻ Refresh
+                </button>
               </Box>
             </Box>
 

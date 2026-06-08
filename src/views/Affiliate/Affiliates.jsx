@@ -10,8 +10,13 @@ const Affiliates = () => {
   const navigate = useNavigate();
   const [apiData, setApiData] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Per-row "suspending" map so each Suspend/Activate button can show
+  // its own spinner without affecting siblings.
+  const [suspendingMap, setSuspendingMap] = useState({});
 
   const handelSuspend = (id, active) => {
+    if (suspendingMap[id]) return; // guard against double-click
+    setSuspendingMap((m) => ({ ...m, [id]: true }));
     axios
       .patch(
         "api/v1/affiliate/suspend",
@@ -33,6 +38,12 @@ const Affiliates = () => {
         const message =
           error?.response?.data?.message || "Something went wrong!";
         console.log(message);
+      })
+      .finally(() => {
+        setSuspendingMap((m) => {
+          const { [id]: _, ...rest } = m;
+          return rest;
+        });
       });
   };
 
@@ -291,6 +302,7 @@ const Affiliates = () => {
                               handelSuspend(item._id, item.is_affiliate_active)
                             }
                             type="button"
+                            disabled={!!suspendingMap[item._id]}
                             className="
                                       btn  btn-sm
                                     waves-effect waves-light
@@ -299,7 +311,11 @@ const Affiliates = () => {
                                     mt-1
                                   "
                           >
-                            {item.is_affiliate_active ? "Suspend" : "Activate"}
+                            {suspendingMap[item._id]
+                              ? "..."
+                              : item.is_affiliate_active
+                                ? "Suspend"
+                                : "Activate"}
                           </button>
                           {item.total_earning - item.paid_amount != 0 ? (
                             <Link to={`/affiliate/affiliates/pay/${item._id}`}>

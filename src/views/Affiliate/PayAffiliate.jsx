@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import toast, { Toaster } from "react-hot-toast";
-import { Button, Box, TextField, Typography } from "@mui/material";
+import { Button, Box, TextField, Typography, CircularProgress } from "@mui/material";
 import { isAutheticated } from "src/auth";
 const PayAffiliate = () => {
   const token = isAutheticated();
@@ -31,10 +31,14 @@ const PayAffiliate = () => {
   const [transecId, setTransecId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  // Track in-flight payment submission so the button shows a spinner
+  // and double-clicks are blocked. Critical for a financial action —
+  // without this, slow networks could trigger duplicate payments.
+  const [paying, setPaying] = useState(false);
   //Handel Pay
   const handlePay = (e) => {
     e.preventDefault();
-    // console.log(amount, transecId, date);
+    if (paying) return; // guard against double-submit
     const formDataObject = {
       noOfCoupons,
       amountToPay,
@@ -43,6 +47,7 @@ const PayAffiliate = () => {
       date,
       time,
     };
+    setPaying(true);
     axios
       .post(`/api/v1/affiliate/pay/${id}`, formDataObject, {
         headers: {
@@ -59,12 +64,14 @@ const PayAffiliate = () => {
         navigate("/affiliate/affiliates");
       })
       .catch((error) => {
-        // Handle errors
         const message = error.response?.data?.message
           ? error.response?.data?.message
           : "Something went wrong!";
         toast.error(message);
         console.error("Error in Payment:", error);
+      })
+      .finally(() => {
+        setPaying(false);
       });
   };
 
@@ -326,12 +333,14 @@ const PayAffiliate = () => {
                     />
 
                     <Button
-                      sx={{ marginTop: "-20px" }}
+                      sx={{ marginTop: "-20px", minWidth: 160 }}
                       type="submit"
                       variant="contained"
                       color="success"
+                      disabled={paying}
+                      startIcon={paying ? <CircularProgress size={16} color="inherit" /> : null}
                     >
-                      Save Payment
+                      {paying ? "Saving…" : "Save Payment"}
                     </Button>
                   </div>
                 </div>

@@ -25,6 +25,7 @@ const CallSettings = () => {
   const [savingClickIds, setSavingClickIds] = useState([]);
   const [savingForwardIds, setSavingForwardIds] = useState([]);
   const [numberExtensions, setNumberExtensions] = useState({});
+  const [refreshTick, setRefreshTick] = useState(0);
   const token = isAutheticated();
 
   useEffect(() => {
@@ -47,30 +48,127 @@ const CallSettings = () => {
       if (!user?.businessId) return;
       setLoading(true);
       try {
-        const res = await apiCall(`/branch/${user.businessId}/branches`, "GET");
+        // Fetch branches AND departments in parallel. An agent who is
+        // a member of multiple departments (but whose branch only has
+        // ONE assigned DID) still needs a row per dept membership so
+        // the page can show each department's DID + the agent's
+        // extension in that dept.
+        const [branchRes, deptRes] = await Promise.all([
+          apiCall(`/branch/${user.businessId}/branches`, "GET"),
+          apiCall(`/api/departments?businessId=${user.businessId}`, "GET").catch(
+            () => ({ data: [] }),
+          ),
+        ]);
+        const res = branchRes;
         const list = res.data || res.branches || res;
         const formatted = Array.isArray(list) ? list : list.data || [];
+
+        // Build userId → [{ didNumber, deptName }] map from departments.
+        // We'll add rows for each (agent, dept) the agent is a member
+        // of, in addition to rows from their own branch's assignedNumbers.
+        const deptList = (deptRes?.data?.departments || deptRes?.departments || deptRes?.data || deptRes || []);
+        const deptsByUser = new Map();
+        const deptArr = Array.isArray(deptList) ? deptList : [];
+        for (const d of deptArr) {
+          const did = d?.didNumber || (Array.isArray(d?.didNumbers) ? d.didNumbers[0] : null);
+          if (!did) continue;
+          const members = Array.isArray(d?.members) ? d.members : [];
+          for (const m of members) {
+            const uid = String(m?.userId || "");
+            if (!uid) continue;
+            if (!deptsByUser.has(uid)) deptsByUser.set(uid, []);
+            deptsByUser.get(uid).push({
+              didNumber: String(did),
+              deptName: d.name || "",
+              memberDidNumber: m?.didNumber ? String(m.didNumber) : null,
+            });
+          }
+          // Department head — count as a member too
+          const head = d?.departmentHead;
+          if (head) {
+            const uid = String(head);
+            if (!deptsByUser.has(uid)) deptsByUser.set(uid, []);
+            const list = deptsByUser.get(uid);
+            if (!list.some((x) => x.didNumber === String(did))) {
+              list.push({ didNumber: String(did), deptName: d.name || "" });
+            }
+          }
+        }
+        // ONE ROW PER AGENT. If an agent has multiple DIDs (across
+        // branch assignments + department memberships), the row shows
+        // all DIDs and all extensions comma-separated. The primary
+        // DID is still tracked separately for actions that need a
+        // single value (call forward, etc.).
         const agentsArr = formatted.map((branch) => {
           const name =
             branch.user?.name || branch.branchName || branch.manager?.name || "Unknown";
           const phone = branch.user?.phone || branch.phone || branch.didNumber || "";
-          const did =
-            (Array.isArray(branch.didNumbers) && branch.didNumbers[0]) ||
-            branch.didNumber ||
-            branch.did ||
-            branch.user?.didNumber ||
-            "";
           const sticky =
             typeof branch.callforward === "boolean" ? branch.callforward : !!branch.stickyBranch;
           const click =
             typeof branch.clickToCall === "boolean"
               ? branch.clickToCall
               : !!(branch.mobile || branch.user?.mobile || branch.callToMobile);
+
+          // Collect every DID this agent owns. Prefer the rich
+          // `assignedNumbers[]` array because each entry carries its
+          // own `extension` field; fall back to `didNumbers[]` and
+          // dept memberships when the rich data isn't available.
+          const didEntries = [];
+          const seenDid = new Set();
+          const pushDid = (num, ext) => {
+            if (!num) return;
+            const key = String(num);
+            if (seenDid.has(key)) return;
+            seenDid.add(key);
+            didEntries.push({ number: key, extension: ext || null });
+          };
+
+          if (Array.isArray(branch.assignedNumbers)) {
+            for (const an of branch.assignedNumbers) {
+              pushDid(
+                an?.number,
+                an?.extension || an?.extensionNumber || an?.sip_endpoint || null,
+              );
+            }
+          }
+          if (Array.isArray(branch.didNumbers)) {
+            for (const d of branch.didNumbers) pushDid(d, null);
+          }
+          if (branch.didNumber) pushDid(branch.didNumber, null);
+          if (branch.did) pushDid(branch.did, null);
+
+          // Merge dept-membership DIDs
+          const userId = String(branch?.user?._id || "");
+          if (userId && deptsByUser.has(userId)) {
+            for (const d of deptsByUser.get(userId)) {
+              pushDid(d.didNumber, null);
+            }
+          }
+
+          // Combined display strings — comma-separated for the row's
+          // DID + Extension cells.
+          const didsDisplay = didEntries.length
+            ? didEntries.map((e) => e.number).join(", ")
+            : "";
+          const extsDisplay = didEntries
+            .map((e) => e.extension)
+            .filter(Boolean)
+            .join(", ");
+          // Primary DID/extension — what the Save/Forward handlers use
+          // when they need a single value.
+          const primary = didEntries[0] || { number: "", extension: null };
+
           return {
             id: branch._id || branch.id,
+            branchId: branch._id || branch.id,
             name,
             phone,
-            did,
+            did: primary.number, // primary DID for backend operations
+            didsDisplay, // "9240023450, 9240023452"
+            extsDisplay, // "1002, 1085"
+            rowExtension: primary.extension,
+            allDidEntries: didEntries, // for handlers that want to iterate
             raw: branch,
             stickyBranch: sticky,
             clickToCall: click,
@@ -88,17 +186,52 @@ const CallSettings = () => {
       }
     };
     fetchAgents();
-  }, [user?.businessId]);
+  }, [user?.businessId, refreshTick]);
+
+  // Refresh when the tab/window regains focus or becomes visible — so
+  // changes made on the Department / Agents pages show up here without
+  // a full reload. Also re-fetches `numberExtensions` from scratch.
+  useEffect(() => {
+    const triggerRefresh = () => {
+      setNumberExtensions({});
+      setRefreshTick((t) => t + 1);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") triggerRefresh();
+    };
+    window.addEventListener("focus", triggerRefresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", triggerRefresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  // Exposed handler for the manual Refresh button in the header.
+  const handleManualRefresh = () => {
+    setNumberExtensions({});
+    setRefreshTick((t) => t + 1);
+  };
 
   useEffect(() => {
     if (!agents || agents.length === 0) return;
     let cancelled = false;
 
+    // Enumerate EVERY DID across all agents (not just the primary).
+    // For multi-DID agents the row shows multiple extensions; each
+    // DID needs its own /by-number/ lookup so the Extension cell
+    // can show all of them.
+    const seen = new Set();
     const toFetch = [];
-    agents.forEach((a) => {
-      const did = a.did;
-      if (did && numberExtensions[did] === undefined) toFetch.push(did);
-    });
+    for (const a of agents) {
+      const entries = a.allDidEntries || [];
+      const list = entries.length > 0 ? entries.map((e) => e.number) : [a.did];
+      for (const did of list) {
+        if (!did || seen.has(did)) continue;
+        seen.add(did);
+        if (numberExtensions[did] === undefined) toFetch.push(did);
+      }
+    }
     if (toFetch.length === 0) return;
 
     const fetchAll = async () => {
@@ -129,14 +262,19 @@ const CallSettings = () => {
   }, [agents, numberExtensions]);
 
   const handleToggleForward = async (agent) => {
-    const id = agent.id;
+    const id = agent.id; // composite row id (branchId::did)
+    const branchId = agent.branchId || id; // real MongoDB branch id
     const next = !agent.stickyBranch;
     const did = agent.did || agent.raw?.didNumber || agent.raw?.did;
+    // Per-row extension wins (correct extension for THIS DID on a
+    // multi-DID agent). Falls back to cache then branch defaults.
     const extensionFromCache = did ? numberExtensions[did] : undefined;
     const extension =
-      extensionFromCache && extensionFromCache !== "—"
-        ? extensionFromCache
-        : agent.raw?.extension || agent.raw?.extensionNumber || agent.raw?.didNumber || agent.raw?.did || null;
+      agent.rowExtension ||
+      (extensionFromCache && extensionFromCache !== "—" ? extensionFromCache : null) ||
+      agent.raw?.extension ||
+      agent.raw?.extensionNumber ||
+      null;
     const phone = (phones && phones[id]) || agent.phone || "";
 
     setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, stickyBranch: next } : a)));
@@ -150,7 +288,8 @@ const CallSettings = () => {
         await apiCall("/v1/sipdatabase/astdb/cf", "DELETE", null, { data: { extension: String(extension) } });
       }
 
-      await apiCall(`/branch/edit/${id}`, "PATCH", { stickyBranch: next, callforward: next });
+      // Branch-level toggle uses the real branch _id, not the composite row id.
+      await apiCall(`/branch/edit/${branchId}`, "PATCH", { stickyBranch: next, callforward: next });
     } catch (err) {
       setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, stickyBranch: !next } : a)));
       console.error("Failed to toggle forward for agent", id, err);
@@ -165,19 +304,25 @@ const CallSettings = () => {
   };
 
   const handleSave = async (agent) => {
-    const id = agent.id;
+    const id = agent.id; // composite row id
+    const branchId = agent.branchId || id;
     const phone = (phones && phones[id]) || "";
     setSavingIds((s) => [...s, id]);
     setSavingClickIds((s) => [...s, id]);
     try {
       const payload = { userPhone: phone };
-      await apiCall(`/branch/edit/${id}`, "PATCH", payload);
+      // Branch-level edit uses the real branch id (not the composite row id)
+      await apiCall(`/branch/edit/${branchId}`, "PATCH", payload);
       const did = agent.did || agent.raw?.didNumber || agent.raw?.did;
       const extensionFromCache = did ? numberExtensions[did] : undefined;
+      // Prefer the per-row extension so multi-DID agents map mobile to
+      // the correct extension for the displayed DID.
       const extension =
-        extensionFromCache && extensionFromCache !== "—"
-          ? extensionFromCache
-          : agent.raw?.extension || agent.raw?.extensionNumber || agent.raw?.didNumber || agent.raw?.did || null;
+        agent.rowExtension ||
+        (extensionFromCache && extensionFromCache !== "—" ? extensionFromCache : null) ||
+        agent.raw?.extension ||
+        agent.raw?.extensionNumber ||
+        null;
       try {
         if (extension) {
           if (phone && String(phone).trim() !== "") {
@@ -204,6 +349,14 @@ const CallSettings = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5">Call Settings</Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleManualRefresh}
+          disabled={loading}
+        >
+          {loading ? <CircularProgress size={16} /> : "Refresh"}
+        </Button>
       </Box>
 
       <Card className="mb-4">
@@ -249,17 +402,43 @@ const CallSettings = () => {
                   </Grid>
 
                   <Grid item xs={12} sm={3}>
-                    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} className="text-muted">
-                      {agent.did ? agent.did : "—"}
+                    <div
+                      style={{
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                      }}
+                      className="text-muted"
+                      title={agent.didsDisplay || ""}
+                    >
+                      {agent.didsDisplay || "—"}
                     </div>
                   </Grid>
 
                   <Grid item xs={6} sm={2}>
-                    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} className="text-muted">
+                    <div
+                      style={{
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
+                      }}
+                      className="text-muted"
+                    >
                       {(() => {
-                        const did = agent.did;
-                        if (did && numberExtensions[did] !== undefined) return numberExtensions[did];
-                        return agent.raw?.extension ?? agent.raw?.extensionNumber ?? "—";
+                        // One extension per DID, in the same order as
+                        // the DIDs column. If an agent has 3 DIDs,
+                        // this shows 3 extensions — even if the agent
+                        // uses the SAME extension for all (one row
+                        // per DID, e.g. "1090, 1090, 1090").
+                        const entries = agent.allDidEntries || [];
+                        if (entries.length === 0) {
+                          return agent.rowExtension || "—";
+                        }
+                        const exts = entries.map((e) => {
+                          if (e.extension) return String(e.extension);
+                          const cached = numberExtensions[e.number];
+                          if (cached && cached !== "—") return String(cached);
+                          return "—";
+                        });
+                        return exts.join(", ");
                       })()}
                     </div>
                   </Grid>

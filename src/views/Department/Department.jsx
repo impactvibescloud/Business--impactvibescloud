@@ -75,6 +75,11 @@ function Department() {
   const [availableBranches, setAvailableBranches] = useState([])
   const [didNumbers, setDidNumbers] = useState([])
   const [syncingMap, setSyncingMap] = useState({})
+  // Loader flags for action buttons. Each is set true while the
+  // corresponding async op is in-flight so the button shows a spinner
+  // + disables itself — gives the user clear feedback that the click
+  // registered.
+  const [savingDepartment, setSavingDepartment] = useState(false)
   const [selectedMemberIds, setSelectedMemberIds] = useState([]) // For multi-select UI
   const [selectedDepartmentHeadBranchId, setSelectedDepartmentHeadBranchId] = useState('') // For department head dropdown UI
   const [showViewDialog, setShowViewDialog] = useState(false)
@@ -627,7 +632,9 @@ function Department() {
       setValidationError('Department name is required')
       return
     }
+    if (savingDepartment) return // prevent double-click
 
+    setSavingDepartment(true)
     try {
       // Import axios directly
       const axios = await import('axios');
@@ -787,6 +794,8 @@ function Department() {
       
       errorLog('Error saving department:', err)
       setValidationError(`Failed to save department: ${err.message || 'Unknown error'}`)
+    } finally {
+      setSavingDepartment(false)
     }
   }
 
@@ -809,23 +818,62 @@ function Department() {
       const didId = didObj.id || didObj._id
 
       const branchTargets = []
-      const addBranchTarget = (branch) => {
-        if (branch && branch._id && !branchTargets.some((b) => String(b._id) === String(branch._id))) {
-          branchTargets.push(branch)
-        }
+      const addBranchTarget = (branch, reason) => {
+        if (!branch) return
+        const branchId = branch._id || branch.id
+        if (!branchId) return
+        if (branchTargets.some((b) => String(b._id || b.id) === String(branchId))) return
+        branchTargets.push(branch)
+        console.log(`[syncDID] added branch ${branchId} (${branch.user?.name || branch.branchName || '?'}) — reason: ${reason}`)
       }
+
+      // Helper: find a branch by ANY of the userId-equivalent fields
+      // populated on availableBranches (the data shape includes both
+      // top-level `userId` and the nested `user._id`).
+      const findBranchByUserId = (uid) => {
+        if (!uid) return null
+        const target = String(uid)
+        return availableBranches.find(b =>
+          String(b.userId || '') === target ||
+          String(b.user?._id || '') === target ||
+          String(b.user?.id || '') === target ||
+          String(b._id || '') === target ||
+          String(b.id || '') === target
+        )
+      }
+
+      console.log(`[syncDID] dept ${department.name} has ${department.members?.length || 0} members + head=${department.departmentHead ? 'yes' : 'no'}`)
+      console.log(`[syncDID] availableBranches has ${availableBranches.length} branches`)
+
       if (Array.isArray(department.members) && department.members.length) {
-        department.members.forEach(m => {
+        department.members.forEach((m, idx) => {
           const memberUserId = m.userId || m.user || m._id || m.id
-          const branch = availableBranches.find(b => String(b.userId) === String(memberUserId) || String(b._id) === String(memberUserId) || String(b.id) === String(memberUserId) || String(b.didNumber) === String(m.didNumber))
-          addBranchTarget(branch)
+          let branch = findBranchByUserId(memberUserId)
+          // Last-resort fallback: match by didNumber (rare — legacy member rows
+          // where userId is missing but didNumber points at a branch's DID).
+          if (!branch && m.didNumber) {
+            const target = String(m.didNumber)
+            branch = availableBranches.find(b =>
+              String(b.didNumber || '') === target ||
+              (Array.isArray(b.didNumbers) && b.didNumbers.some(d => String(d) === target))
+            )
+          }
+          if (branch) {
+            addBranchTarget(branch, `members[${idx}].userId=${memberUserId}`)
+          } else {
+            console.warn(`[syncDID] member[${idx}] userId=${memberUserId} didNumber=${m.didNumber} — NO branch matched`)
+          }
         })
       }
 
       // Also include department head's branch if present
       const departmentHeadUserId = typeof department.departmentHead === 'object' ? (department.departmentHead._id || department.departmentHead.id) : department.departmentHead
-      const headBranch = availableBranches.find(b => String(b.userId) === String(departmentHeadUserId))
-      addBranchTarget(headBranch)
+      const headBranch = findBranchByUserId(departmentHeadUserId)
+      if (headBranch) {
+        addBranchTarget(headBranch, `departmentHead=${departmentHeadUserId}`)
+      } else if (departmentHeadUserId) {
+        console.warn(`[syncDID] departmentHead userId=${departmentHeadUserId} — NO branch matched`)
+      }
 
       if (branchTargets.length === 0) {
         Swal.fire('No agents found', 'Could not identify any agents to assign the DID to.', 'info')
@@ -872,7 +920,8 @@ function Department() {
       const failed = []
 
       for (const branch of branchTargets) {
-        const branchId = branch._id
+        const branchId = branch._id || branch.id
+        const branchLabel = branch.user?.name || branch.branchName || branchId
         try {
           const existingDids = Array.isArray(branch.didNumbers)
             ? branch.didNumbers.map(d => String(d).trim()).filter(Boolean)
@@ -881,24 +930,48 @@ function Department() {
             ? existingDids
             : [...existingDids, departmentDid]
           const extension = await resolveBranchExtension(branch)
+          console.log(`[syncDID] branch ${branchLabel} (${branchId}) → ext=${extension}, didNumbers=[${nextDids.join(',')}]`)
 
-          await apiCall(`/branch/edit/${branchId}`, 'PATCH', {
-            didNumbers: nextDids,
-            ...(extension ? { extension } : {}),
-          })
+          try {
+            await apiCall(`/branch/edit/${branchId}`, 'PATCH', {
+              didNumbers: nextDids,
+              ...(extension ? { extension } : {}),
+            })
+          } catch (editErr) {
+            const msg = editErr?.response?.data?.message || editErr?.message || String(editErr)
+            console.error(`[syncDID] PATCH /branch/edit/${branchId} failed for ${branchLabel}: ${msg}`)
+            throw editErr
+          }
 
           if (extension) {
-            await apiCall(`/numbers/${didId}/assign`, 'POST', {
-              extensionNumber: extension,
-              assignedToBranch: branchId,
-              assignedToBusiness: currentBusinessId,
-            })
+            // The /numbers/<id>/assign endpoint rejects an extension that
+            // is already assigned to ANOTHER branch — a shared-DID setup.
+            // In that case the row already exists with the correct
+            // mapping; surface the error but don't count it as a failure.
+            try {
+              await apiCall(`/numbers/${didId}/assign`, 'POST', {
+                extensionNumber: extension,
+                assignedToBranch: branchId,
+                assignedToBusiness: currentBusinessId,
+              })
+            } catch (assignErr) {
+              const msg = assignErr?.response?.data?.message || assignErr?.message || ''
+              const isAlreadyAssigned =
+                /already assigned|duplicate|exists|11000/i.test(String(msg))
+              if (isAlreadyAssigned) {
+                console.warn(`[syncDID] assignment already exists for ext ${extension} on branch ${branchLabel} — treating as success`)
+              } else {
+                console.error(`[syncDID] POST /numbers/${didId}/assign failed for ${branchLabel}: ${msg}`)
+                throw assignErr
+              }
+            }
           } else {
-            console.warn('Could not resolve branch extension for department DID sync', branchId)
+            console.warn(`[syncDID] branch ${branchLabel} has no resolvable extension — branch.didNumbers updated but no NumberAssignment row created`)
           }
         } catch (err) {
-          console.warn('Failed to update branch DID', branchId, err)
-          failed.push(branchId)
+          const detail = err?.response?.data?.message || err?.message || String(err)
+          console.warn(`[syncDID] FAILED for branch ${branchLabel} (${branchId}): ${detail}`)
+          failed.push({ branchId, name: branchLabel, reason: detail })
         }
       }
 
@@ -911,8 +984,20 @@ function Department() {
         console.warn('Failed to refresh data after sync', e)
       }
 
-      if (failed.length === 0) Swal.fire('Synced', 'All agents updated successfully', 'success')
-      else Swal.fire('Partial sync', `${branchTargets.length - failed.length} succeeded, ${failed.length} failed`, 'warning')
+      if (failed.length === 0) {
+        Swal.fire('Synced', 'All agents updated successfully', 'success')
+      } else {
+        const failedList = failed
+          .map((f) => `<li><b>${f.name}</b>: ${f.reason || 'unknown'}</li>`)
+          .join('')
+        Swal.fire({
+          icon: 'warning',
+          title: 'Partial sync',
+          html:
+            `<p>${branchTargets.length - failed.length} succeeded, ${failed.length} failed.</p>` +
+            `<ul style="text-align:left;font-size:0.9em">${failedList}</ul>`,
+        })
+      }
 
       setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
 
@@ -1151,8 +1236,18 @@ function Department() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseModal}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveDepartment} sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' } }}>{editingDepartment ? 'Update' : 'Save'} Department</Button>
+          <Button onClick={handleCloseModal} disabled={savingDepartment}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveDepartment}
+            disabled={savingDepartment}
+            startIcon={savingDepartment ? <CircularProgress size={16} color="inherit" /> : null}
+            sx={{ bgcolor: 'var(--primary-600)', '&:hover': { bgcolor: 'var(--primary-500)' }, minWidth: 170 }}
+          >
+            {savingDepartment
+              ? (editingDepartment ? 'Updating…' : 'Saving…')
+              : `${editingDepartment ? 'Update' : 'Save'} Department`}
+          </Button>
         </DialogActions>
       </Dialog>
 
