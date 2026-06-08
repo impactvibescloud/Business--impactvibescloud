@@ -363,7 +363,12 @@ const StickyAgents = () => {
 
     setClearingAll(true);
     try {
-      const response = await apiCall(`/sticky-agents/delete-all`, "DELETE");
+      const response = await apiCall(
+        `/sticky-agents/delete-all`,
+        "DELETE",
+        null,
+        { timeout: 60000 },
+      );
       const deletedCount = response?.count || 0;
       
       // Reload data to verify deletion

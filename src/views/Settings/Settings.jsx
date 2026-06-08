@@ -92,6 +92,12 @@ function Settings() {
   // Call Settings state
   const [supervisorNumber, setSupervisorNumber] = useState('')
   const [supervisorNumberDetails, setSupervisorNumberDetails] = useState(null)
+  // Universal-caller-ID toggle — when ON, supervisor's DID overrides
+  // every agent's outbound caller ID. When OFF, supervisor exists only
+  // for call-monitor / business-dialer features and agents' per-picker
+  // outbound caller ID is preserved.
+  const [supervisorUniversalCid, setSupervisorUniversalCid] = useState(false)
+  const [supervisorCidSaving, setSupervisorCidSaving] = useState(false)
   const [selectedSupervisorNumber, setSelectedSupervisorNumber] = useState('')
   const [assignedNumbers, setAssignedNumbers] = useState([])
   const [sipPassword, setSipPassword] = useState('')
@@ -706,6 +712,9 @@ function Settings() {
       setSupervisorNumberDetails(supervisorDetailsFromEndpoint)
       setSelectedSupervisorNumber(currentSupervisor)
       setSipPassword(password)
+      setSupervisorUniversalCid(
+        Boolean(supervisorRes?.data?.supervisorUniversalCallerId),
+      )
 
       // Extract numbersDetail array
       const numbers = Array.isArray(numbersRes?.data?.numbersDetail) ? numbersRes?.data?.numbersDetail : []
@@ -715,6 +724,48 @@ function Settings() {
       setCallSettingsMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to load call settings' })
     } finally {
       setLoadingCallSettings(false)
+    }
+  }
+
+  // Toggle the "supervisor as universal outbound CID" mode.
+  // - ON  → supervisor's DID overrides every agent's outbound caller ID
+  //         (universal mode). Use for branded caller-ID across the org.
+  // - OFF → supervisor exists only for call-monitor + web-dialer.
+  //         Per-agent picker selection drives outbound caller ID.
+  const toggleSupervisorUniversalCid = async (newValue) => {
+    const businessId = localStorage.getItem('businessId') || ''
+    if (!businessId) {
+      setCallSettingsMessage({ type: 'error', text: 'Business ID not found' })
+      return
+    }
+    if (supervisorCidSaving) return
+    // Optimistic UI flip so the switch animates immediately
+    const prev = supervisorUniversalCid
+    setSupervisorUniversalCid(newValue)
+    setSupervisorCidSaving(true)
+    setCallSettingsMessage(null)
+    try {
+      const token = localStorage.getItem('authToken') || ''
+      await axios.patch(
+        `/api/business/${encodeURIComponent(businessId)}/supervisor-universal-cid`,
+        { enabled: newValue },
+        { headers: { Authorization: token ? `Bearer ${token}` : '' } },
+      )
+      setCallSettingsMessage({
+        type: 'success',
+        text: newValue
+          ? 'Universal supervisor caller ID enabled. All agents will now place outbound calls with the supervisor number as CID.'
+          : 'Universal supervisor caller ID disabled. Agents will use their picker-selected caller ID.',
+      })
+    } catch (err) {
+      // Revert on failure
+      setSupervisorUniversalCid(prev)
+      setCallSettingsMessage({
+        type: 'error',
+        text: err?.response?.data?.message || 'Failed to toggle universal caller ID',
+      })
+    } finally {
+      setSupervisorCidSaving(false)
     }
   }
 
@@ -1244,6 +1295,55 @@ function Settings() {
                     </Box>
                   ) : (
                     <Grid container spacing={2}>
+                      {/* Universal-caller-ID toggle.
+                          When ON, supervisor number overrides every agent's
+                          outbound caller ID (dialplan writes universal CID).
+                          When OFF, supervisor exists only for call-monitor
+                          + business web dialer — per-agent picker controls
+                          the actual outbound caller ID. */}
+                      <Grid item xs={12}>
+                        <Box
+                          sx={{
+                            p: 2,
+                            bgcolor: supervisorUniversalCid ? '#fff7ed' : '#f9fafb',
+                            border: `1px solid ${supervisorUniversalCid ? '#fed7aa' : '#e5e7eb'}`,
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                          }}
+                        >
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ fontWeight: 600, fontSize: 14, mb: 0.5 }}>
+                              Use supervisor number as universal outbound caller ID
+                            </Typography>
+                            <Typography sx={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+                              When <strong>ON</strong>: every outbound call from any agent in this
+                              business uses the supervisor number as the caller ID shown to
+                              customers — overrides each agent's picker selection.<br />
+                              When <strong>OFF</strong>: the supervisor number is used only for
+                              <em> call monitoring</em> and the <em>business web dialer</em>; agents'
+                              individual caller ID picks are preserved.
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                            <Switch
+                              checked={supervisorUniversalCid}
+                              onChange={(e) => toggleSupervisorUniversalCid(e.target.checked)}
+                              disabled={supervisorCidSaving || !supervisorNumber}
+                              color="warning"
+                            />
+                            {supervisorCidSaving && <CircularProgress size={14} />}
+                          </Box>
+                        </Box>
+                        {!supervisorNumber && (
+                          <Typography sx={{ fontSize: 11, color: '#9a3412', mt: 0.5 }}>
+                            Set a supervisor number below before enabling universal caller ID.
+                          </Typography>
+                        )}
+                      </Grid>
+
                       {assignedNumbers.length > 0 ? (
                         <Grid item xs={12}>
                           <FormControl fullWidth size="small">
