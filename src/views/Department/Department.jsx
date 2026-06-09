@@ -204,6 +204,11 @@ function Department() {
         console.log('Processed branch data with user info:', branchData);
       }
       setAvailableBranches(branchData);
+      // Stash fresh data on a function-scope var so we can return it at
+      // the end. Returning it (in addition to setState) lets callers
+      // that need the data immediately — e.g. handleSaveDepartment's
+      // auto-sync — operate on fresh values without waiting a render.
+      const __freshBranches = branchData;
 
       try {
         // Fetch users/agents using apiCall and query param for businessId
@@ -241,13 +246,15 @@ function Department() {
         // Use empty array instead of mock data
         setAvailableAgents([]);
       }
+      return __freshBranches;
     } catch (error) {
       console.error('Error in fetchAvailableAgents:', error);
       errorLog('Error fetching agents/branches:', error);
-      
+
       // Set empty arrays instead of mock data
       setAvailableAgents([]);
       setAvailableBranches([]);
+      return [];
     }
   }
 
@@ -261,14 +268,16 @@ function Department() {
 
   const fetchDidNumbers = async () => {
     try {
-      if (!currentBusinessId) return
+      if (!currentBusinessId) return []
       const res = await apiCall(`/numbers/assigned-to/${currentBusinessId}`, 'GET')
       const list = res?.data || res?.numbers || res || []
       const mapped = (Array.isArray(list) ? list : []).map(d => ({ id: d._id || d.id, number: d.number }))
       setDidNumbers(mapped)
+      return mapped
     } catch (err) {
       console.error('Error fetching DID numbers:', err)
       setDidNumbers([])
+      return []
     }
   }
 
@@ -331,6 +340,7 @@ function Department() {
       
       console.log('Final departments data to be used:', departmentData);
       setDepartments(departmentData);
+      return departmentData;
     } catch (error) {
       console.error('Error details when fetching departments:', error);
       
@@ -768,11 +778,42 @@ function Department() {
         }
       }
       
+      // Auto-sync DID assignments after save. Previously this required
+      // an extra "Sync DID" click (often two — first click ran on stale
+      // React state). Now we explicitly refetch branches + DIDs +
+      // departments, then run the sync silently against that fresh data
+      // for every dept that has a DID assigned. Result: a single
+      // "Update Department" click does everything in one shot.
+      try {
+        const [freshBranches, freshDids, freshDepartments] = await Promise.all([
+          fetchAvailableAgents(currentBusinessId),
+          fetchDidNumbers(),
+          fetchDepartments(),
+        ])
+        // Identify the dept we just saved (use the returned id when
+        // creating; the edit id when updating). Auto-sync ONLY that
+        // dept — we don't want every save to re-sync every dept.
+        const targetId = editingDepartment
+          ? (editingDepartment.id || editingDepartment._id)
+          : (response?.data?._id || response?.data?.id)
+        const targetDept = (freshDepartments || []).find(
+          d => String(d._id || d.id) === String(targetId),
+        )
+        if (targetDept && targetDept.didNumber) {
+          await syncDepartmentDid(targetDept, {
+            silent: true,
+            branchesOverride: freshBranches,
+            didNumbersOverride: freshDids,
+          })
+        }
+      } catch (syncErr) {
+        // Auto-sync failure is non-fatal — the dept itself saved fine.
+        // The user can still click the manual Sync button if needed.
+        console.warn('Auto-sync after department save failed:', syncErr)
+      }
+
       handleCloseModal()
-      
-      // Refresh departments list from server
-      fetchDepartments();
-      
+
       setTimeout(() => {
         setSuccessAlert({ show: false, message: '' })
       }, 5000)
@@ -799,23 +840,42 @@ function Department() {
     }
   }
 
-  const syncDepartmentDid = async (department) => {
+  const syncDepartmentDid = async (department, options = {}) => {
+    // options:
+    //   silent           — skip the confirmation Swal AND don't show
+    //                      no-DID / no-agents warnings (used by the
+    //                      auto-sync triggered from Update Department).
+    //   branchesOverride — fresh availableBranches array. Caller passes
+    //                      this when they JUST refetched (avoids the
+    //                      "needs two clicks" bug where the first click
+    //                      runs on stale React state).
+    //   didNumbersOverride — same idea for the DID list.
+    const { silent = false, branchesOverride = null, didNumbersOverride = null } = options
     // mark syncing
     setSyncingMap(prev => ({ ...prev, [department._id || department.id]: true }))
     if (!department?.didNumber) {
-      Swal.fire('No DID assigned', 'Please assign a DID to this department first.', 'warning')
+      if (!silent) Swal.fire('No DID assigned', 'Please assign a DID to this department first.', 'warning')
       setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
       return
     }
 
     try {
-      if (!didNumbers || didNumbers.length === 0) await fetchDidNumbers()
-      const didObj = (didNumbers || []).find(d => String(d.number) === String(department.didNumber) || String(d.id) === String(department.didNumber) || String(d._id) === String(department.didNumber))
+      // Always work from FRESH data. Without this, a manual Sync click
+      // right after another action (dept edit, member add) ran on the
+      // previous render's React state — first click was a no-op, second
+      // click finally saw the updates. We now refetch unconditionally
+      // when the caller didn't pre-fetch (auto-sync path), so a single
+      // click is always enough.
+      const dids = didNumbersOverride || (await fetchDidNumbers())
+      const didObj = (dids || []).find(d => String(d.number) === String(department.didNumber) || String(d.id) === String(department.didNumber) || String(d._id) === String(department.didNumber))
       if (!didObj) {
-        Swal.fire('DID not found', 'Department DID is not available in your DID list.', 'error')
+        if (!silent) Swal.fire('DID not found', 'Department DID is not available in your DID list.', 'error')
+        setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
         return
       }
       const didId = didObj.id || didObj._id
+      // Same story for branches — refresh if caller didn't pre-fetch.
+      const branchesPool = branchesOverride || (await fetchAvailableAgents(currentBusinessId)) || availableBranches
 
       const branchTargets = []
       const addBranchTarget = (branch, reason) => {
@@ -833,7 +893,7 @@ function Department() {
       const findBranchByUserId = (uid) => {
         if (!uid) return null
         const target = String(uid)
-        return availableBranches.find(b =>
+        return branchesPool.find(b =>
           String(b.userId || '') === target ||
           String(b.user?._id || '') === target ||
           String(b.user?.id || '') === target ||
@@ -843,7 +903,7 @@ function Department() {
       }
 
       console.log(`[syncDID] dept ${department.name} has ${department.members?.length || 0} members + head=${department.departmentHead ? 'yes' : 'no'}`)
-      console.log(`[syncDID] availableBranches has ${availableBranches.length} branches`)
+      console.log(`[syncDID] branchesPool has ${branchesPool.length} branches`)
 
       if (Array.isArray(department.members) && department.members.length) {
         department.members.forEach((m, idx) => {
@@ -853,7 +913,7 @@ function Department() {
           // where userId is missing but didNumber points at a branch's DID).
           if (!branch && m.didNumber) {
             const target = String(m.didNumber)
-            branch = availableBranches.find(b =>
+            branch = branchesPool.find(b =>
               String(b.didNumber || '') === target ||
               (Array.isArray(b.didNumbers) && b.didNumbers.some(d => String(d) === target))
             )
@@ -876,12 +936,18 @@ function Department() {
       }
 
       if (branchTargets.length === 0) {
-        Swal.fire('No agents found', 'Could not identify any agents to assign the DID to.', 'info')
+        if (!silent) Swal.fire('No agents found', 'Could not identify any agents to assign the DID to.', 'info')
+        setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
         return
       }
 
-      const confirm = await Swal.fire({ title: 'Sync DID', html: `Assign DID <b>${department.didNumber}</b> to <b>${branchTargets.length}</b> agents?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, sync' })
-      if (!confirm.isConfirmed) return
+      if (!silent) {
+        const confirm = await Swal.fire({ title: 'Sync DID', html: `Assign DID <b>${department.didNumber}</b> to <b>${branchTargets.length}</b> agents?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, sync' })
+        if (!confirm.isConfirmed) {
+          setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
+          return
+        }
+      }
 
       const departmentDid = String(department.didNumber).trim()
       const resolveBranchExtension = async (branch) => {
@@ -984,19 +1050,23 @@ function Department() {
         console.warn('Failed to refresh data after sync', e)
       }
 
-      if (failed.length === 0) {
-        Swal.fire('Synced', 'All agents updated successfully', 'success')
-      } else {
-        const failedList = failed
-          .map((f) => `<li><b>${f.name}</b>: ${f.reason || 'unknown'}</li>`)
-          .join('')
-        Swal.fire({
-          icon: 'warning',
-          title: 'Partial sync',
-          html:
-            `<p>${branchTargets.length - failed.length} succeeded, ${failed.length} failed.</p>` +
-            `<ul style="text-align:left;font-size:0.9em">${failedList}</ul>`,
-        })
+      if (!silent) {
+        if (failed.length === 0) {
+          Swal.fire('Synced', 'All agents updated successfully', 'success')
+        } else {
+          const failedList = failed
+            .map((f) => `<li><b>${f.name}</b>: ${f.reason || 'unknown'}</li>`)
+            .join('')
+          Swal.fire({
+            icon: 'warning',
+            title: 'Partial sync',
+            html:
+              `<p>${branchTargets.length - failed.length} succeeded, ${failed.length} failed.</p>` +
+              `<ul style="text-align:left;font-size:0.9em">${failedList}</ul>`,
+          })
+        }
+      } else if (failed.length > 0) {
+        console.warn(`[syncDID] silent auto-sync had ${failed.length} failure(s):`, failed)
       }
 
       setSyncingMap(prev => ({ ...prev, [department._id || department.id]: false }))
