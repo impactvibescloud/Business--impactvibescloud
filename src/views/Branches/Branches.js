@@ -1233,9 +1233,13 @@ const Branches = () => {
                                               'online': 'success',
                                               'offline': 'default',
                                               'break': 'warning',
-                                              'lunch': 'info'
+                                              'lunch': 'info',
+                                              'bio_break': 'secondary'
                                             };
-                                            return <Chip label={status.toUpperCase()} color={statusColors[status] || 'default'} variant="outlined" size="small" />;
+                                            const statusLabels = {
+                                              'bio_break': 'BIO BREAK',
+                                            };
+                                            return <Chip label={statusLabels[status] || status.toUpperCase()} color={statusColors[status] || 'default'} variant="outlined" size="small" />;
                                           })()}
                                         </Box>
                                       </Grid>

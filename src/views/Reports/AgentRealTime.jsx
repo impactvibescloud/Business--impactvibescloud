@@ -145,6 +145,7 @@ const AgentRealTime = () => {
                       : (statusRaw === 'offline') ? 'Offline'
                       : (statusRaw === 'break') ? 'On break'
                       : (statusRaw === 'lunch') ? 'On lunch'
+                      : (statusRaw === 'bio_break') ? 'Bio break'
                       : 'Not on call',
             dept: s.branchId || s.dept || perf?.branchName || perf?.branch || '',
             answered: perf ? (perf.answeredCalls || perf.answered || 0) : 0,

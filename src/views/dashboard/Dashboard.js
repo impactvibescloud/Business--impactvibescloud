@@ -1080,6 +1080,30 @@ const Dashboard = () => {
                       <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Lunch</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#3b82f6' }}>{agentSummary?.lunch ?? 0}</Typography>
                     </Box>
+
+                    <Box
+                      onClick={(e) => {
+                        setSelectedAgentStatus('bio_break');
+                        setAgentPopperAnchor(e.currentTarget);
+                      }}
+                      sx={{
+                        flex: 1,
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        bgcolor: 'rgba(0, 188, 212, 0.05)',
+                        border: '1px solid rgba(0, 188, 212, 0.2)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          bgcolor: 'rgba(0, 188, 212, 0.1)',
+                          borderColor: 'rgba(0, 188, 212, 0.4)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600 }}>Bio Break</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#00bcd4' }}>{agentSummary?.bio_break ?? 0}</Typography>
+                    </Box>
                   </Box>
                 </CardContent>
               </Card>
@@ -1150,18 +1174,20 @@ const Dashboard = () => {
           <CardHeader
             title={
               <Typography variant="h6" sx={{ fontWeight: 700, textTransform: 'capitalize', color: '#1f2937' }}>
-                {selectedAgentStatus === 'online' ? '🟢 Online Agents' : 
+                {selectedAgentStatus === 'online' ? '🟢 Online Agents' :
                  selectedAgentStatus === 'offline' ? '🔴 Offline Agents' :
                  selectedAgentStatus === 'break' ? '⏸️ Agents on Break' :
-                 selectedAgentStatus === 'lunch' ? '🍽️ Agents on Lunch' : 'Agents'}
+                 selectedAgentStatus === 'lunch' ? '🍽️ Agents on Lunch' :
+                 selectedAgentStatus === 'bio_break' ? '🚻 Agents on Bio Break' : 'Agents'}
               </Typography>
             }
             sx={{ 
               backgroundColor: 
-                selectedAgentStatus === 'online' ? 'rgba(0, 184, 148, 0.05)' : 
+                selectedAgentStatus === 'online' ? 'rgba(0, 184, 148, 0.05)' :
                 selectedAgentStatus === 'offline' ? 'rgba(229, 231, 235, 0.5)' :
                 selectedAgentStatus === 'break' ? 'rgba(249, 115, 22, 0.05)' :
-                selectedAgentStatus === 'lunch' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(229, 231, 235, 0.5)',
+                selectedAgentStatus === 'lunch' ? 'rgba(59, 130, 246, 0.05)' :
+                selectedAgentStatus === 'bio_break' ? 'rgba(0, 188, 212, 0.05)' : 'rgba(229, 231, 235, 0.5)',
               borderBottom: '1px solid #e5e7eb'
             }}
           />

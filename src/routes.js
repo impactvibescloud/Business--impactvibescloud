@@ -159,6 +159,7 @@ const Equipment = React.lazy(() => import("./views/Equipment/equipment"));
 const AddEquipmentsOutlet = React.lazy(() => import("./views/Outlet/AddEquipmentsOutlet"));
 const Branches = React.lazy(() => import("./views/Branches/Branches"));
 const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
+const FollowUps = React.lazy(() => import("./views/FollowUps/FollowUps.jsx"));
 const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagement"));
@@ -169,6 +170,7 @@ const Leads = React.lazy(() => import("./views/Leads/Leads"));
 const LeadFields = React.lazy(() => import("./views/Leads/LeadFields"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
 const AgentPerformance = React.lazy(() => import("./views/Reports/AgentPerformance"));
+const AgentStatusReport = React.lazy(() => import("./views/Reports/AgentStatusReport.jsx"));
 const DialerRealTime = React.lazy(() => import("./views/Reports/DialerRealTime"));
 const DepartmentPerformance = React.lazy(() => import("./views/DepartmentPerformance"));
 
@@ -870,6 +872,18 @@ const routes = [
     name: 'Call Logs',
     element: CallLogs,
     navName: "Call Logs",
+  },
+  {
+    path: '/follow-ups',
+    name: 'Follow-ups',
+    element: FollowUps,
+    navName: "Reports",
+  },
+  {
+    path: '/reports/agent-status',
+    name: 'Agent Status Report',
+    element: AgentStatusReport,
+    navName: "Reports",
   },
   {
     path: '/calluses',

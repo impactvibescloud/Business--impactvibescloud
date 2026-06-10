@@ -10,7 +10,8 @@ export const STATUS_OPTIONS = {
   ONLINE: 'online',
   OFFLINE: 'offline',
   LUNCH: 'lunch',
-  BREAK: 'break'
+  BREAK: 'break',
+  BIO_BREAK: 'bio_break'
 };
 
 // Status colors for badges

@@ -73,6 +73,20 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "Follow-ups",
+    icon: <Clock className="nav-icon" />,
+    to: "/follow-ups",
+    group: "Reports",
+  },
+  {
+    component: CNavItem,
+    name: "Agent Status Report",
+    icon: <Activity className="nav-icon" />,
+    to: "/reports/agent-status",
+    group: "Reports",
+  },
+  {
+    component: CNavItem,
     name: "Call Logs",
     icon: <Clock className="nav-icon" />,
     to: "/callogs",

@@ -589,13 +589,18 @@ function Department() {
       console.log(`Making DELETE request to: ${baseUrl}/api/departments/${deleteId}`);
       
       const response = await axios.default.delete(
-        `${baseUrl}/api/departments/${deleteId}`, 
+        `${baseUrl}/api/departments/${deleteId}`,
         {
           headers: {
             'Accept': '*/*',
             'Content-Type': 'application/json',
             'Authorization': token ? `Bearer ${token}` : ''
-          }
+          },
+          // Department delete fans out to multiple Asterisk SSH commands
+          // (DCF/DCF_MAP/dept_members/did_dept teardown + NumberAssignment
+          // cleanup). The default 10s axios timeout often fires mid-cascade
+          // even though the backend completes successfully. Give it room.
+          timeout: 60000,
         }
       );
       
@@ -618,9 +623,37 @@ function Department() {
       
     } catch (error) {
       errorLog('Error deleting department:', error)
-      // Surface the real server message — the generic message was hiding
-      // backend failures (audit-log save error, missing perms, etc.) and
-      // making this impossible to diagnose.
+      const isTimeout =
+        error?.code === 'ECONNABORTED' ||
+        /timeout/i.test(error?.message || '')
+
+      // On a client-side timeout the backend often completed the delete —
+      // confirm by re-fetching and checking whether the row is gone before
+      // showing a scary red error.
+      if (isTimeout) {
+        try {
+          const refreshed = await fetchDepartments()
+          const stillExists =
+            Array.isArray(refreshed) &&
+            refreshed.some((d) => d.id === deleteId || d._id === deleteId)
+          if (!stillExists) {
+            // Server finished — treat as success.
+            setDepartments(
+              (refreshed && Array.isArray(refreshed) ? refreshed : departments).filter(
+                (d) => d.id !== deleteId && d._id !== deleteId,
+              ),
+            )
+            setDeleteSuccess(true)
+            setTimeout(() => {
+              setShowDeleteModal(false)
+              setDeleteId(null)
+              setDeleteSuccess(false)
+            }, 1500)
+            return
+          }
+        } catch (_) {}
+      }
+
       const serverMsg =
         error?.response?.data?.error ||
         error?.response?.data?.message ||

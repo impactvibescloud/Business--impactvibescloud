@@ -16,6 +16,7 @@ import PhoneIcon from '@mui/icons-material/Phone'
 import PeopleIcon from '@mui/icons-material/People'
 import StorageIcon from '@mui/icons-material/Storage'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import EventIcon from '@mui/icons-material/Event'
 import './ReportsLanding.css'
 
 const ReportCard = ({ title, description, href, icon: Icon, badge }) => {
@@ -146,6 +147,22 @@ const ReportsLanding = () => {
               description="Get detailed information on all calls with recordings"
               href="/reports/cdr"
               icon={StorageIcon}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <ReportCard
+              title="Follow-ups"
+              description="Track scheduled follow-up calls across all agents — overdue, due today, upcoming"
+              href="/follow-ups"
+              icon={EventIcon}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <ReportCard
+              title="Agent Status Report"
+              description="Per-agent time spent in each status across a date range. Filter, drill down, export to Excel."
+              href="/reports/agent-status"
+              icon={PeopleIcon}
             />
           </Grid>
         </Grid>

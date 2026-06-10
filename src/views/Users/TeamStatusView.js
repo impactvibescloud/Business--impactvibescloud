@@ -20,6 +20,8 @@ const TeamStatusView = () => {
         return 'Lunch';
       case 'break':
         return 'Break';
+      case 'bio_break':
+        return 'Bio Break';
       default:
         return 'Unknown';
     }

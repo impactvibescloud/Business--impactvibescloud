@@ -25,6 +25,11 @@ const NAV_FEATURE_MAP = {
   '/billing': 'billing',
   '/tickets': 'support_tickets',
   '/reports/cdr': 'cdr',
+  // Follow-ups page lives under the Reports umbrella — reuse the
+  // existing `reports` feature flag rather than requiring a separate
+  // backend feature key. Any business with Reports access sees it.
+  '/follow-ups': 'reports',
+  '/reports/agent-status': 'reports',
   // Maps the v2 Migrations & Ops page to the existing 'settings' feature
   // so it shows up for anyone with Settings access — no separate backend
   // feature flag needed.
