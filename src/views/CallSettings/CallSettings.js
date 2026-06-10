@@ -299,6 +299,34 @@ const CallSettings = () => {
     }
   };
 
+  const handleToggleClickToCall = async (agent) => {
+    const id = agent.id;
+    const branchId = agent.branchId || id;
+    const next = !agent.clickToCall;
+    setAgents((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, clickToCall: next } : a)),
+    );
+    setSavingClickIds((s) => [...s, id]);
+    try {
+      await apiCall(`/branch/edit/${branchId}`, "PATCH", { clicktocall: next });
+    } catch (err) {
+      setAgents((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, clickToCall: !next } : a)),
+      );
+      console.error("Failed to toggle click-to-call for agent", id, err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update click-to-call flag",
+      });
+    } finally {
+      setSavingClickIds((s) => s.filter((x) => x !== id));
+    }
+  };
+
   const handlePhoneChange = (id, value) => {
     setPhones((p) => ({ ...p, [id]: value }));
   };
@@ -393,6 +421,11 @@ const CallSettings = () => {
                 <Grid item xs={6} sm={1} style={{ textAlign: "center" }}>
                   <Typography className="fw-semibold">Forward</Typography>
                 </Grid>
+                <Grid item xs={6} sm={1} style={{ textAlign: "center" }}>
+                  <Typography className="fw-semibold" title="When ON, the agent's CRM call rings their mobile first; pick up to bridge with the customer.">
+                    Click-to-Call
+                  </Typography>
+                </Grid>
               </Grid>
 
               {agents.map((agent) => (
@@ -477,6 +510,21 @@ const CallSettings = () => {
                           checked={!!agent.stickyBranch}
                           onChange={() => handleToggleForward(agent)}
                           disabled={savingForwardIds.includes(agent.id)}
+                          color="primary"
+                        />
+                      }
+                      label=""
+                    />
+                  </Grid>
+
+                  <Grid item xs={6} sm={1} style={{ textAlign: "center" }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          id={`c2c_switch_${agent.id}`}
+                          checked={!!agent.clickToCall}
+                          onChange={() => handleToggleClickToCall(agent)}
+                          disabled={savingClickIds.includes(agent.id)}
                           color="primary"
                         />
                       }
