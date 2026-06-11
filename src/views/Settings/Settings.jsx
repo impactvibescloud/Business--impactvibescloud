@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import DailyReportsSection from './DailyReportsSection'
 import {
   Box,
   Card,
@@ -883,6 +884,7 @@ function Settings() {
           <Tab label="General" />
           <Tab label="Account" />
           <Tab label="Call Settings" />
+          <Tab label="Daily Reports" />
         </Tabs>
       </Paper>
 
@@ -1729,6 +1731,13 @@ function Settings() {
               </Card>
             </Grid>
           </Grid>
+        </Box>
+      )}
+
+      {/* Daily Reports Tab */}
+      {activeKey === 4 && (
+        <Box>
+          <DailyReportsSection />
         </Box>
       )}
     </Box>

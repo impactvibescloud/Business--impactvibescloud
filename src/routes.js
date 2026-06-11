@@ -184,12 +184,17 @@ const routes = [
     name: "Change Password",
     element: Change_Password,
     navName: "",
+    // Personal account page — must not be feature-gated, otherwise tenants
+    // without a matching `change_password` feature flag get a blank body.
+    alwaysVisible: true,
   },
   {
     path: "/profile/edit",
     name: "Edit Profile",
     element: EditProfile,
     navName: "",
+    // Personal account page — see note on /change_password above.
+    alwaysVisible: true,
   },
   // { path: '/profile', name: 'Profile', element: Profile },
   //-----------------------Product Management Routes------------------------------------------------

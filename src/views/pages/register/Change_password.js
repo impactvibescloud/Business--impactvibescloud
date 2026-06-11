@@ -1,197 +1,221 @@
 import React, { useState } from 'react'
-import {
-  CButton,
-  CCard,
-  CCardBody,
-  CCol,
-  CContainer,
-  CForm,
-  CFormInput,
-  CInputGroup,
-  CInputGroupText,
-  CRow,
-} from '@coreui/react'
-import CIcon from '@coreui/icons-react'
-import { cilLockLocked, cilUser } from '@coreui/icons'
-import ClipLoader from "react-spinners/ClipLoader";
+import ClipLoader from 'react-spinners/ClipLoader'
 import axios from 'axios'
-import { isAutheticated } from 'src/auth'
 import Swal from 'sweetalert2'
 import { useNavigate } from 'react-router-dom'
 
-const Register = () => {
+const swal = (...args) => {
+  if (args.length === 1 && typeof args[0] === 'object') {
+    const o = args[0]
+    return Swal.fire({
+      title: o.title,
+      text: o.text,
+      icon: o.icon,
+      confirmButtonText: o.button || o.confirmButtonText || 'OK',
+    })
+  }
+  const [title, text, icon] = args
+  return Swal.fire({ title, text, icon })
+}
 
-  const [loading, setLoading] = useState(false);
-  const history = useNavigate();
+const validPasswordRegex = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[^\w\s]).{7,}$/
+
+const ChangePassword = () => {
+  const [loading, setLoading] = useState(false)
+  const history = useNavigate()
+
   const [user, setUser] = useState({
     oldPassword: '',
     newPassword: '',
     confirmPassword: '',
   })
   const [errors, setErrors] = useState({
-    confirmPasswordError: '',
-    newPasswordError: '',
     oldPasswordError: '',
-
+    newPasswordError: '',
+    confirmPasswordError: '',
   })
-  const validEmailRegex = RegExp(
-    /^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i,
-  )
-  const validPasswordRegex = RegExp(/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[^\w\s]).{7,}$/)
+  const [show, setShow] = useState({ old: false, new: false, confirm: false })
+
   const handleChange = (e) => {
     const { name, value } = e.target
+    const ruleMsg =
+      'Password must be at least 8 characters with an uppercase, a lowercase, a digit, and a special character.'
 
-    switch (name) {
-      case 'oldPassword':
-        setErrors({
-          ...errors,
-          oldPasswordError: validPasswordRegex.test(value)
-            ? ''
-            : 'Password Shoud Be 8 Characters Long, Atleast One Uppercase, Atleast One Lowercase,Atleast One Digit, Atleast One Special Character',
-        })
-
-        break
-      case 'newPassword':
-        setErrors({
-          ...errors,
-          newPasswordError: validPasswordRegex.test(value)
-            ? ''
-            : 'Password Shoud Be 8 Characters Long, Atleast One Uppercase, Atleast One Lowercase,Atleast One Digit, Atleast One Special Character',
-        })
-
-        break
-      case 'confirmPassword':
-        setErrors((errors) => ({
-          ...errors,
-          confirmPasswordError: validPasswordRegex.test(value)
-            ? ''
-            : 'Password Shoud Be 8 Characters Long, Atleast One Uppercase, Atleast One Lowercase,Atleast One Digit, Atleast One Special Character',
-        }))
-        break
-      default:
-        break
+    if (name === 'oldPassword') {
+      setErrors((p) => ({
+        ...p,
+        oldPasswordError: validPasswordRegex.test(value) ? '' : ruleMsg,
+      }))
+    } else if (name === 'newPassword') {
+      setErrors((p) => ({
+        ...p,
+        newPasswordError: validPasswordRegex.test(value) ? '' : ruleMsg,
+      }))
+    } else if (name === 'confirmPassword') {
+      setErrors((p) => ({
+        ...p,
+        confirmPasswordError: validPasswordRegex.test(value) ? '' : ruleMsg,
+      }))
     }
-
     setUser({ ...user, [name]: value })
   }
 
-
   const handleSubmit = async () => {
     if (!(user.oldPassword && user.newPassword && user.confirmPassword)) {
-
       return swal('Error!', 'All fields are required', 'error')
     }
-    if (!(user.newPassword.length >= 8)) {
-
-      return swal('Error!', 'All fields are required', 'error');
+    if (user.newPassword.length < 8) {
+      return swal('Error!', 'New password must be at least 8 characters', 'error')
     }
-    const token = localStorage.getItem("authToken")
-    setLoading({ loading: true })
-    if (user.newPassword == user.confirmPassword) {
-      let res = await axios.put('/api/v1/user/password/update',
-        {
-          ...user
-        }, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        }
-      })
+    if (user.newPassword !== user.confirmPassword) {
+      return swal('Error!', 'New password and confirm password do not match', 'error')
+    }
 
-      // console.log(res.data.success)
-      if (res.data.success == true) {
+    const token = localStorage.getItem('authToken')
+    setLoading(true)
+    try {
+      const res = await axios.put(
+        '/api/v1/user/password/update',
+        { ...user },
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (res.data.success === true) {
         Swal.fire({
           title: 'Done',
           text: 'Password Changed',
           icon: 'success',
-          confirmButtonText: 'ok',
+          confirmButtonText: 'OK',
           confirmButtonColor: '#303c54',
-          iconColor: '#303c54'
-        }).then(() => {
-          history('/dashboard')
-        });
-
+          iconColor: '#303c54',
+        }).then(() => history('/dashboard'))
       }
-      setLoading(false);
-    } else {
-      swal('Error!', 'New Password And Confirm Password is Not Match !', 'error')
-      setLoading(false);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message || 'Could not update password. Please try again.'
+      swal('Error!', message, 'error')
+    } finally {
+      setLoading(false)
     }
-
   }
 
+  const renderField = (label, name, showKey, placeholder, errorMsg) => (
+    <>
+      <label className="label-100 mt-3">{label}</label>
+      <div style={{ position: 'relative' }}>
+        <input
+          type={show[showKey] ? 'text' : 'password'}
+          name={name}
+          value={user[name]}
+          onChange={handleChange}
+          placeholder={placeholder}
+          autoComplete={name === 'oldPassword' ? 'current-password' : 'new-password'}
+          className="form-control input-field"
+          style={{ paddingRight: 70 }}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((s) => ({ ...s, [showKey]: !s[showKey] }))}
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            border: 'none',
+            background: 'transparent',
+            color: '#6c757d',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {show[showKey] ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      {errorMsg && (
+        <div className="text-danger" style={{ fontSize: 12, marginTop: 4 }}>
+          {errorMsg}
+        </div>
+      )}
+    </>
+  )
+
   return (
-    <div className="bg-light min-vh-70 d-flex flex-row align-items-flex-start">
-      <CContainer>
-        <CRow className="justify-content-center">
-          <CCol md={15} lg={20} xl={16}>
-            <CCard className="mx-4">
-              <CCardBody className="p-1">
-                <CForm>
-                  <h2 className="mb-3">Change Password</h2>
+    <div className="main-content">
+      <div className="page-content">
+        <div className="container-fluid">
+          <div className="row">
+            <div className="col-lg-12">
+              <div className="card">
+                <div className="card-body">
+                  <div className="row">
+                    <div className="col-md-12 col-lg-7 col-xl-6">
+                      <h1 className="text-left head-small">Change Password</h1>
+                      <p className="text-muted mb-3" style={{ marginTop: 6 }}>
+                        Use a strong password you don&apos;t reuse elsewhere.
+                      </p>
 
-                  <CInputGroup className="mb-3">
-                    <CInputGroupText>
-                      <CIcon icon={cilLockLocked} />
-                    </CInputGroupText>
-                    <CFormInput placeholder="Old Password" type="password" value={user.oldPassword}
-                      onChange={handleChange}
-                      autoComplete="current-password"
-                      name="oldPassword" />
-                  </CInputGroup>
-                  {errors.oldPasswordError && (
-                    <p className="text-center py-2 text-danger">{errors.oldPasswordError}</p>
-                  )}
+                      <form>
+                        <div className="row">
+                          <div className="col-lg-12">
+                            <div className="form-group">
+                              {renderField(
+                                'Old Password',
+                                'oldPassword',
+                                'old',
+                                'Enter current password',
+                                errors.oldPasswordError,
+                              )}
+                              {renderField(
+                                'New Password',
+                                'newPassword',
+                                'new',
+                                'Enter new password',
+                                errors.newPasswordError,
+                              )}
+                              {renderField(
+                                'Confirm Password',
+                                'confirmPassword',
+                                'confirm',
+                                'Re-enter new password',
+                                errors.confirmPasswordError,
+                              )}
+                            </div>
+                          </div>
+                        </div>
 
-                  <CInputGroup className="mb-3">
-                    <CInputGroupText>
-                      <CIcon icon={cilLockLocked} />
-                    </CInputGroupText>
-                    <CFormInput
-                      type="password"
-                      placeholder=" New Password"
-
-                      value={user.newPassword}
-                      onChange={handleChange}
-                      name="newPassword"
-
-                    />
-                  </CInputGroup>
-                  {errors.newPasswordError && (
-                    <p className="text-center py-2 text-danger">{errors.newPasswordError}</p>
-                  )}
-                  <CInputGroup className="mb-4">
-                    <CInputGroupText>
-                      <CIcon icon={cilLockLocked} />
-                    </CInputGroupText>
-                    {errors.passwordError && (
-                      <p className="text-center py-2 text-danger">{errors.passwordError}</p>
-                    )}
-                    <CFormInput
-                      type="password"
-
-                      placeholder="Confirm password "
-                      value={user.confirmPassword}
-                      onChange={handleChange}
-                      name="confirmPassword"
-                    />
-                  </CInputGroup>
-                  {errors.confirmPasswordError && (
-                    <p className="text-center py-2 text-danger">{errors.confirmPasswordError}</p>
-                  )}
-                  <div className="d-grid">
-                    <CButton color="success" onClick={handleSubmit}>
-                      <ClipLoader loading={loading} size={18} />
-                      {!loading && "Submit"}
-                    </CButton>
+                        <div className="row mt-4">
+                          <div className="col-lg-12">
+                            <div className="form-group text-left">
+                              <button
+                                type="button"
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className="btn btn-success btn-login waves-effect waves-light me-3 pt-2 pb-2 pr-4 pl-4"
+                              >
+                                <ClipLoader loading={loading} size={18} />
+                                {!loading && 'Update Password'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => history('/dashboard')}
+                                className="btn btn-light waves-effect pt-2 pb-2 pr-4 pl-4"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
                   </div>
-                </CForm>
-              </CCardBody>
-            </CCard>
-          </CCol>
-        </CRow>
-      </CContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-export default Register
+export default ChangePassword
