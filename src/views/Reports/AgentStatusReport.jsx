@@ -501,6 +501,12 @@ const AgentStatusReport = () => {
                                   { key: 'bio_break', label: 'Bio Break', icon: <WcIcon fontSize="small" />, color: '#0097a7' },
                                 ].map(({ key, label, icon, color }) => {
                                   const sessions = a.sessionDetails?.[key] || []
+                                  // Show only the LATEST 4 sessions inline.
+                                  // Sessions are sorted earliest-first by the
+                                  // backend, so the most recent are at the end.
+                                  const PREVIEW_COUNT = 4
+                                  const visible = sessions.slice(-PREVIEW_COUNT).reverse()
+                                  const hiddenCount = Math.max(0, sessions.length - visible.length)
                                   return (
                                     <Card key={key} variant="outlined" sx={{ flex: 1, minWidth: 260, borderColor: color + '55' }}>
                                       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -530,9 +536,9 @@ const AgentStatusReport = () => {
                                               </TableRow>
                                             </TableHead>
                                             <TableBody>
-                                              {sessions.map((s, i) => (
+                                              {visible.map((s, i) => (
                                                 <TableRow key={`${key}-${i}`}>
-                                                  <TableCell sx={{ py: 0.25 }}>{i + 1}</TableCell>
+                                                  <TableCell sx={{ py: 0.25 }}>{sessions.length - i}</TableCell>
                                                   <TableCell sx={{ py: 0.25, fontSize: '0.75rem' }}>{formatClock(s.start)}</TableCell>
                                                   <TableCell sx={{ py: 0.25, fontSize: '0.75rem' }}>
                                                     {s.ongoing ? <em>ongoing</em> : formatClock(s.end)}
@@ -545,11 +551,29 @@ const AgentStatusReport = () => {
                                             </TableBody>
                                           </Table>
                                         )}
+                                        {hiddenCount > 0 && (
+                                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#6b7280', fontStyle: 'italic' }}>
+                                            +{hiddenCount} more — click "Show full details" below.
+                                          </Typography>
+                                        )}
                                       </CardContent>
                                     </Card>
                                   )
                                 })}
                               </Stack>
+                              <Box sx={{ mt: 1.5, textAlign: 'right' }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  endIcon={<KeyboardArrowRightIcon />}
+                                  onClick={() => {
+                                    const qs = new URLSearchParams({ from, to }).toString()
+                                    window.location.href = `/reports/agent-status/${a.userId}?${qs}`
+                                  }}
+                                >
+                                  Show full details
+                                </Button>
+                              </Box>
                             </Box>
                           </Collapse>
                         </TableCell>
