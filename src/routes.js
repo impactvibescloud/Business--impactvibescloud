@@ -897,6 +897,8 @@ const routes = [
     name: 'IVR Reports',
     element: IvrReports,
     navName: "Reports",
+  },
+  {
     path: '/reports/agent-status/:userId',
     name: 'Agent Status Detail',
     element: AgentStatusDetail,
