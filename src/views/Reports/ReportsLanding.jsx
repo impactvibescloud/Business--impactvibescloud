@@ -17,6 +17,7 @@ import PeopleIcon from '@mui/icons-material/People'
 import StorageIcon from '@mui/icons-material/Storage'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import EventIcon from '@mui/icons-material/Event'
+import CallSplitIcon from '@mui/icons-material/CallSplit'
 import './ReportsLanding.css'
 
 const ReportCard = ({ title, description, href, icon: Icon, badge }) => {
@@ -163,6 +164,14 @@ const ReportsLanding = () => {
               description="Per-agent time spent in each status across a date range. Filter, drill down, export to Excel."
               href="/reports/agent-status"
               icon={PeopleIcon}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <ReportCard
+              title="IVR Reports"
+              description="Track how callers move through your IVR menus — keypress paths, routing to agents or departments, and abandoned calls."
+              href="/ivr-reports"
+              icon={CallSplitIcon}
             />
           </Grid>
         </Grid>

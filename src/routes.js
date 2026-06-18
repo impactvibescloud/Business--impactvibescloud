@@ -160,6 +160,7 @@ const AddEquipmentsOutlet = React.lazy(() => import("./views/Outlet/AddEquipment
 const Branches = React.lazy(() => import("./views/Branches/Branches"));
 const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
 const FollowUps = React.lazy(() => import("./views/FollowUps/FollowUps.jsx"));
+const IvrReports = React.lazy(() => import("./views/IvrReports/IvrReports"));
 const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagement"));
@@ -171,6 +172,7 @@ const LeadFields = React.lazy(() => import("./views/Leads/LeadFields"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
 const AgentPerformance = React.lazy(() => import("./views/Reports/AgentPerformance"));
 const AgentStatusReport = React.lazy(() => import("./views/Reports/AgentStatusReport.jsx"));
+const AgentStatusDetail = React.lazy(() => import("./views/Reports/AgentStatusDetail.jsx"));
 const DialerRealTime = React.lazy(() => import("./views/Reports/DialerRealTime"));
 const DepartmentPerformance = React.lazy(() => import("./views/DepartmentPerformance"));
 
@@ -889,6 +891,20 @@ const routes = [
     name: 'Agent Status Report',
     element: AgentStatusReport,
     navName: "Reports",
+  },
+  {
+    path: '/ivr-reports',
+    name: 'IVR Reports',
+    element: IvrReports,
+    navName: "Reports",
+    path: '/reports/agent-status/:userId',
+    name: 'Agent Status Detail',
+    element: AgentStatusDetail,
+    navName: "Reports",
+    // Slugified name doesn't match the parent "Agent Status Report"
+    // feature key, so without this the route gets dropped by the
+    // feature-gate in AppContent.js and the page renders blank.
+    alwaysVisible: true,
   },
   {
     path: '/calluses',
