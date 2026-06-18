@@ -808,6 +808,37 @@ const IVRManagement = () => {
     } catch (e) { return [] }
   }, [ivrs])
 
+  // DIDs that already have an ACTIVE IVR bound to them. The create / edit
+  // form hides these from the DID picker so the user can't pick a number
+  // that's already in use — they must deactivate the current IVR on that
+  // DID first (use the Activate/Deactivate button in the IVR list).
+  // Exception: when editing an existing IVR, keep ITS own DID visible so
+  // the user can save without re-selecting.
+  const didsWithActiveIvr = React.useMemo(() => {
+    const set = new Set()
+    for (const ivr of ivrs) {
+      const isActive = ivr?.status === 'active' || ivr?.status === 'on'
+      if (isActive && ivr?.did) set.add(String(ivr.did))
+    }
+    return set
+  }, [ivrs])
+
+  const selectableDids = React.useMemo(() => {
+    // When editing, allow the IVR's own DID to stay in the list.
+    const ownDid = editingNode
+      ? (() => {
+          const ed = ivrs.find(i => (i.node || i.name) === editingNode)
+          return ed?.did ? String(ed.did) : null
+        })()
+      : null
+    return (availableDids || []).filter(d => {
+      const num = String(d?.number || '')
+      if (!num) return false
+      if (didsWithActiveIvr.has(num) && num !== ownDid) return false
+      return true
+    })
+  }, [availableDids, didsWithActiveIvr, editingNode, ivrs])
+
   const toggleRow = (id) => {
     const newExpanded = new Set(expandedRows)
     if (newExpanded.has(id)) newExpanded.delete(id)
@@ -1244,6 +1275,44 @@ const IVRManagement = () => {
       console.error('Error deleting IVR node', err)
     } finally {
       setDeletingNode(null)
+    }
+  }
+
+  // Activate / deactivate an IVR. Backend enforces "one active IVR
+  // per DID per business" — if another IVR is already active on this
+  // DID, the API returns 409 and we surface the message so the user
+  // knows to deactivate the other one first.
+  const [togglingIvrId, setTogglingIvrId] = useState(null)
+  const toggleIvrActive = async (ivr) => {
+    const ivrId = ivr?._id || ivr?.id
+    if (!ivrId) return
+    const currentlyActive = ivr.status === 'active' || ivr.status === 'on'
+    setTogglingIvrId(ivrId)
+    try {
+      const res = await apiCall(`/ivr/${encodeURIComponent(ivrId)}/toggle-active`, 'POST', {
+        active: !currentlyActive,
+      })
+      if (res?.success) {
+        fetchIvrs(page)
+      } else if (res?.message) {
+        // Only surface a message when the user explicitly tried to
+        // activate while another IVR was already active on the same DID
+        // — this is the one case where they need to take action.
+        alert(res.message)
+      }
+    } catch (err) {
+      const apiMsg = err?.response?.data?.message
+      const code = err?.response?.data?.code
+      if (code === 'DID_HAS_ACTIVE_IVR') {
+        alert(apiMsg || 'This DID already has an active IVR. Deactivate it first.')
+      } else {
+        // Don't pop a generic "failed" alert — log so devs can see the
+        // real cause; the user just sees the toggle stay in its previous
+        // state and can retry.
+        console.error('toggleIvrActive failed', err?.response?.data || err)
+      }
+    } finally {
+      setTogglingIvrId(null)
     }
   }
 
@@ -1727,7 +1796,7 @@ const IVRManagement = () => {
                   <InputLabel>DID Number (optional)</InputLabel>
                   <Select label="DID Number (optional)" value={selectedDid || ''} onChange={(e) => setSelectedDid(e.target.value)}>
                     <MenuItem value="">(No DID)</MenuItem>
-                    {availableDids.map(d => (
+                    {selectableDids.map(d => (
                       <MenuItem key={d.id || d.number} value={d.number}>{d.number}</MenuItem>
                     ))}
                   </Select>
@@ -2156,11 +2225,18 @@ const IVRManagement = () => {
                         }
                       }
                     } catch (err) {
-                      console.error('Error creating IVR', err)
+                      // The dropdown already hides DIDs with an active IVR
+                      // so DID_HAS_ACTIVE_IVR should be unreachable here.
+                      // Keep a quiet fallback for any other API errors —
+                      // log to console only, no popup. (The user already
+                      // saw a successful submit attempt; if the API rejects
+                      // for some other reason, the modal will stay open
+                      // and the dev console will show what happened.)
+                      console.error('Error creating IVR', err?.response?.data || err)
                     }
                   }
                 } catch (err) {
-                  console.error('Error saving IVR', err)
+                  console.error('Error saving IVR', err?.response?.data || err)
                 } finally {
                   setSaving(false)
                 }
@@ -2289,6 +2365,22 @@ const IVRManagement = () => {
                       )}
                       <IconButton size="small" onClick={(e) => { e.stopPropagation(); openDetails(root) }} title="View"><IoEyeOutline style={{ fontSize: '1em', verticalAlign: 'middle', lineHeight: 1 }} /></IconButton>
                       <IconButton size="small" onClick={(e) => { e.stopPropagation(); openEdit(root) }} title="Edit"><CIcon icon={cilPencil} /></IconButton>
+                      {/* Activate / Deactivate. One active IVR allowed per DID. */}
+                      <Button
+                        size="small"
+                        variant={root.status === 'active' || root.status === 'on' ? 'contained' : 'outlined'}
+                        color={root.status === 'active' || root.status === 'on' ? 'success' : 'warning'}
+                        disabled={togglingIvrId === (root._id || root.id)}
+                        onClick={(e) => { e.stopPropagation(); toggleIvrActive(root) }}
+                        sx={{ minWidth: 96, ml: 0.5, textTransform: 'none', fontWeight: 600 }}
+                        title={root.status === 'active' || root.status === 'on'
+                          ? 'Deactivate this IVR (releases the DID so a new IVR can be created on it)'
+                          : `Activate this IVR${root.did ? ` on DID ${root.did}` : ''}`}
+                      >
+                        {togglingIvrId === (root._id || root.id)
+                          ? '…'
+                          : (root.status === 'active' || root.status === 'on' ? 'Deactivate' : 'Activate')}
+                      </Button>
                       <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); const nodeId = (root.name || root.node || root._id || root.id); if (!nodeId) return; setNodeToDelete(nodeId); setDeleteModalOpen(true); }} title="Delete"><CIcon icon={cilTrash} /></IconButton>
                     </Box>
                   </Box>

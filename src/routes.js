@@ -172,6 +172,7 @@ const LeadFields = React.lazy(() => import("./views/Leads/LeadFields"));
 import AudioCampaign from "./views/Campaigns/AudioCampaign";
 const AgentPerformance = React.lazy(() => import("./views/Reports/AgentPerformance"));
 const AgentStatusReport = React.lazy(() => import("./views/Reports/AgentStatusReport.jsx"));
+const AgentStatusDetail = React.lazy(() => import("./views/Reports/AgentStatusDetail.jsx"));
 const DialerRealTime = React.lazy(() => import("./views/Reports/DialerRealTime"));
 const DepartmentPerformance = React.lazy(() => import("./views/DepartmentPerformance"));
 
@@ -896,6 +897,14 @@ const routes = [
     name: 'IVR Reports',
     element: IvrReports,
     navName: "Reports",
+    path: '/reports/agent-status/:userId',
+    name: 'Agent Status Detail',
+    element: AgentStatusDetail,
+    navName: "Reports",
+    // Slugified name doesn't match the parent "Agent Status Report"
+    // feature key, so without this the route gets dropped by the
+    // feature-gate in AppContent.js and the page renders blank.
+    alwaysVisible: true,
   },
   {
     path: '/calluses',

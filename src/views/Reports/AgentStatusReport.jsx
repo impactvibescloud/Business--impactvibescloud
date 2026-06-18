@@ -3,11 +3,13 @@ import {
   Box,
   Card,
   CardContent,
+  Collapse,
   Typography,
   Button,
   Chip,
   CircularProgress,
   Alert,
+  IconButton,
   Table,
   TableHead,
   TableBody,
@@ -24,7 +26,37 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import DownloadIcon from '@mui/icons-material/Download'
 import SearchIcon from '@mui/icons-material/Search'
 import EventIcon from '@mui/icons-material/Event'
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'
+import CoffeeIcon from '@mui/icons-material/Coffee'
+import RestaurantIcon from '@mui/icons-material/Restaurant'
+import WcIcon from '@mui/icons-material/Wc'
 import { apiCall } from '../../config/api'
+
+const formatClock = (iso) => {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString([], {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  } catch {
+    return iso
+  }
+}
+
+const formatMinutes = (sec) => {
+  if (!sec) return '0m'
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  if (m === 0) return `${s}s`
+  if (s === 0) return `${m}m`
+  return `${m}m ${s}s`
+}
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
@@ -82,17 +114,21 @@ const AgentStatusReport = () => {
   const [error, setError] = useState(null)
   const [businessId, setBusinessId] = useState(localStorage.getItem('businessId') || '')
 
-  const today = new Date()
-  const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const [from, setFrom] = useState(toDateInput(sevenDaysAgo))
-  const [to, setTo] = useState(toDateInput(today))
+  // Single date picker — pick any day, defaults to today. The backend
+  // expects from/to so we send the same value for both (full-day window).
+  const [reportDate, setReportDate] = useState(toDateInput(new Date()))
+  const from = reportDate
+  const to = reportDate
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   const [agents, setAgents] = useState([])
   const [totals, setTotals] = useState(null)
   const [page, setPage] = useState(1)
+  const [expandedUserId, setExpandedUserId] = useState(null)
   const ROWS_PER_PAGE = 25
+  const toggleExpand = (userId) =>
+    setExpandedUserId((prev) => (prev === userId ? null : userId))
 
   const resolveBusinessId = async () => {
     if (businessId) return businessId
@@ -215,8 +251,8 @@ const AgentStatusReport = () => {
           Agent Status Report
         </Typography>
         <Typography variant="body2" sx={{ color: '#6b7280' }}>
-          Per-agent time spent in each status across a date range. Use filters to
-          narrow down, then export to Excel.
+          Per-agent time spent in each status for <strong>today</strong>. Click any
+          row to see the exact break / lunch / bio break times and durations.
         </Typography>
       </Box>
 
@@ -230,23 +266,23 @@ const AgentStatusReport = () => {
             useFlexGap
           >
             <TextField
-              label="From"
+              label="Date"
               type="date"
               size="small"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 160 }}
+              sx={{ minWidth: 170 }}
+              inputProps={{ max: toDateInput(new Date()) }}
             />
-            <TextField
-              label="To"
-              type="date"
+            <Button
               size="small"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 160 }}
-            />
+              variant="outlined"
+              onClick={() => setReportDate(toDateInput(new Date()))}
+              disabled={reportDate === toDateInput(new Date())}
+            >
+              Today
+            </Button>
             <TextField
               select
               label="Current status"
@@ -348,14 +384,15 @@ const AgentStatusReport = () => {
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow sx={{ '& th': { fontWeight: 700, backgroundColor: '#f8fafc' } }}>
+                      <TableCell sx={{ width: 36 }} />
                       <TableCell>Agent</TableCell>
                       <TableCell>Departments</TableCell>
                       <TableCell>Current Status</TableCell>
                       <TableCell>Last Seen</TableCell>
-                      <TableCell align="right">Online</TableCell>
-                      <TableCell align="right">Break</TableCell>
-                      <TableCell align="right">Lunch</TableCell>
-                      <TableCell align="right">Bio Break</TableCell>
+                      <TableCell align="right">Logged Hours</TableCell>
+                      <TableCell align="right">Break (×)</TableCell>
+                      <TableCell align="right">Lunch (×)</TableCell>
+                      <TableCell align="right">Bio Break (×)</TableCell>
                       <TableCell align="right">Offline</TableCell>
                       <TableCell align="right">Total</TableCell>
                     </TableRow>
@@ -363,13 +400,25 @@ const AgentStatusReport = () => {
                   <TableBody>
                     {pagedAgents.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={10} align="center" sx={{ color: 'text.secondary' }}>
+                        <TableCell colSpan={11} align="center" sx={{ color: 'text.secondary' }}>
                           No agents match the current filters.
                         </TableCell>
                       </TableRow>
                     )}
-                    {pagedAgents.map((a) => (
-                      <TableRow key={a.userId} hover>
+                    {pagedAgents.map((a) => {
+                      const isOpen = expandedUserId === a.userId
+                      return (
+                      <React.Fragment key={a.userId}>
+                      <TableRow
+                        hover
+                        sx={{ cursor: 'pointer', '& > *': { borderBottom: 'unset' } }}
+                        onClick={() => toggleExpand(a.userId)}
+                      >
+                        <TableCell>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); toggleExpand(a.userId) }}>
+                            {isOpen ? <KeyboardArrowDownIcon /> : <KeyboardArrowRightIcon />}
+                          </IconButton>
+                        </TableCell>
                         <TableCell>
                           <Stack>
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -406,17 +455,29 @@ const AgentStatusReport = () => {
                         <TableCell>
                           <Typography variant="caption">{formatLastSeen(a.lastSeen)}</Typography>
                         </TableCell>
-                        <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
+                        <TableCell align="right" sx={{ fontFamily: 'monospace', fontWeight: 700, color: '#15803d' }}>
                           {formatSeconds(a.seconds?.online)}
+                          <Typography component="span" variant="caption" sx={{ ml: 0.5, color: '#6b7280', fontWeight: 400 }}>
+                            · {a.sessions?.online || 0}×
+                          </Typography>
                         </TableCell>
                         <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
                           {formatSeconds(a.seconds?.break)}
+                          <Typography component="span" variant="caption" sx={{ ml: 0.5, color: '#6b7280' }}>
+                            · {a.sessions?.break || 0}×
+                          </Typography>
                         </TableCell>
                         <TableCell align="right" sx={{ fontFamily: 'monospace' }}>
                           {formatSeconds(a.seconds?.lunch)}
+                          <Typography component="span" variant="caption" sx={{ ml: 0.5, color: '#6b7280' }}>
+                            · {a.sessions?.lunch || 0}×
+                          </Typography>
                         </TableCell>
                         <TableCell align="right" sx={{ fontFamily: 'monospace', color: '#0097a7' }}>
                           {formatSeconds(a.seconds?.bio_break)}
+                          <Typography component="span" variant="caption" sx={{ ml: 0.5, color: '#0097a7', fontWeight: 600 }}>
+                            · {a.sessions?.bio_break || 0}×
+                          </Typography>
                         </TableCell>
                         <TableCell align="right" sx={{ fontFamily: 'monospace', color: '#6b7280' }}>
                           {formatSeconds(a.seconds?.offline)}
@@ -425,7 +486,101 @@ const AgentStatusReport = () => {
                           {formatSeconds(a.totalSeconds)}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      <TableRow>
+                        <TableCell colSpan={11} sx={{ p: 0, borderBottom: isOpen ? '1px solid #e5e7eb' : 'none' }}>
+                          <Collapse in={isOpen} unmountOnExit>
+                            <Box sx={{ p: 2, bgcolor: '#f8fafc' }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                                Status breakdown for {a.name} ({from} → {to})
+                              </Typography>
+                              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} flexWrap="wrap" useFlexGap>
+                                {[
+                                  { key: 'online', label: 'Logged Hours (Online)', icon: <EventIcon fontSize="small" />, color: '#15803d' },
+                                  { key: 'break', label: 'Break', icon: <CoffeeIcon fontSize="small" />, color: '#f59e0b' },
+                                  { key: 'lunch', label: 'Lunch', icon: <RestaurantIcon fontSize="small" />, color: '#0288d1' },
+                                  { key: 'bio_break', label: 'Bio Break', icon: <WcIcon fontSize="small" />, color: '#0097a7' },
+                                ].map(({ key, label, icon, color }) => {
+                                  const sessions = a.sessionDetails?.[key] || []
+                                  // Show only the LATEST 4 sessions inline.
+                                  // Sessions are sorted earliest-first by the
+                                  // backend, so the most recent are at the end.
+                                  const PREVIEW_COUNT = 4
+                                  const visible = sessions.slice(-PREVIEW_COUNT).reverse()
+                                  const hiddenCount = Math.max(0, sessions.length - visible.length)
+                                  return (
+                                    <Card key={key} variant="outlined" sx={{ flex: 1, minWidth: 260, borderColor: color + '55' }}>
+                                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1, color }}>
+                                          {icon}
+                                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                                            {label}
+                                          </Typography>
+                                          <Chip
+                                            label={`${sessions.length}× · ${formatSeconds(a.seconds?.[key])}`}
+                                            size="small"
+                                            sx={{ ml: 'auto', bgcolor: color + '22', color, fontWeight: 600 }}
+                                          />
+                                        </Stack>
+                                        {sessions.length === 0 ? (
+                                          <Typography variant="caption" color="text.secondary">
+                                            No {label.toLowerCase()} sessions in this range.
+                                          </Typography>
+                                        ) : (
+                                          <Table size="small">
+                                            <TableHead>
+                                              <TableRow sx={{ '& th': { py: 0.25, fontSize: '0.7rem', color: '#6b7280' } }}>
+                                                <TableCell>#</TableCell>
+                                                <TableCell>Start</TableCell>
+                                                <TableCell>End</TableCell>
+                                                <TableCell align="right">Duration</TableCell>
+                                              </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                              {visible.map((s, i) => (
+                                                <TableRow key={`${key}-${i}`}>
+                                                  <TableCell sx={{ py: 0.25 }}>{sessions.length - i}</TableCell>
+                                                  <TableCell sx={{ py: 0.25, fontSize: '0.75rem' }}>{formatClock(s.start)}</TableCell>
+                                                  <TableCell sx={{ py: 0.25, fontSize: '0.75rem' }}>
+                                                    {s.ongoing ? <em>ongoing</em> : formatClock(s.end)}
+                                                  </TableCell>
+                                                  <TableCell align="right" sx={{ py: 0.25, fontFamily: 'monospace', fontWeight: 600 }}>
+                                                    {formatMinutes(s.durationSec)}
+                                                  </TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        )}
+                                        {hiddenCount > 0 && (
+                                          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#6b7280', fontStyle: 'italic' }}>
+                                            +{hiddenCount} more — click "Show full details" below.
+                                          </Typography>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                })}
+                              </Stack>
+                              <Box sx={{ mt: 1.5, textAlign: 'right' }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  endIcon={<KeyboardArrowRightIcon />}
+                                  onClick={() => {
+                                    const qs = new URLSearchParams({ from, to }).toString()
+                                    window.location.href = `/reports/agent-status/${a.userId}?${qs}`
+                                  }}
+                                >
+                                  Show full details
+                                </Button>
+                              </Box>
+                            </Box>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                      </React.Fragment>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>
