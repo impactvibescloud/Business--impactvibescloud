@@ -474,6 +474,8 @@ const FollowUps = () => {
                 <TableCell>Contact</TableCell>
                 <TableCell>Due</TableCell>
                 <TableCell>Priority</TableCell>
+                <TableCell>Sentiment</TableCell>
+                <TableCell>Tags</TableCell>
                 <TableCell>Call Type</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell align="center">Actions</TableCell>
@@ -541,6 +543,52 @@ const FollowUps = () => {
                       color={PRIORITY_COLORS[task.priority] || 'default'}
                       sx={{ textTransform: 'capitalize' }}
                     />
+                  </TableCell>
+                  {/* Sentiment — agent's lead-qualification verdict, copied
+                      from the linked call log when the task was created.
+                      Stored under the historical field name `callInterest`. */}
+                  <TableCell>
+                    {task.callInterest ? (() => {
+                      const v = task.callInterest
+                      const positive = v === 'interested' || v === 'callback'
+                      const negative = v === 'not_interested' || v === 'do_not_call'
+                      return (
+                        <Chip
+                          label={String(v).replace(/_/g, ' ')}
+                          size="small"
+                          sx={{
+                            textTransform: 'capitalize',
+                            bgcolor: positive ? '#d1fae5' : negative ? '#fee2e2' : '#f3f4f6',
+                            color: positive ? '#065f46' : negative ? '#991b1b' : '#374151',
+                            fontWeight: 600,
+                          }}
+                        />
+                      )
+                    })() : (
+                      <Typography variant="caption" color="text.secondary">—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 180 }}>
+                    {Array.isArray(task.tags) && task.tags.length > 0 ? (
+                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                        {task.tags.slice(0, 3).map((tag, i) => (
+                          <Chip
+                            key={`${task._id}-tag-${i}`}
+                            label={tag}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 22, fontSize: '0.7rem' }}
+                          />
+                        ))}
+                        {task.tags.length > 3 && (
+                          <Typography variant="caption" color="text.secondary">
+                            +{task.tags.length - 3}
+                          </Typography>
+                        )}
+                      </Box>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">—</Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Typography variant="caption">{task.callType || '-'}</Typography>

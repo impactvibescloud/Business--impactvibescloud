@@ -120,6 +120,10 @@ const CallLogs = () => {
     { key: 'status', label: 'STATUS' },
     { key: 'virtual_number', label: 'VIRTUAL NUMBER' },
     { key: 'contact', label: 'CONTACT' },
+    // The "Sentiment" column reads `callInterest` from the call log
+    // (historical field name; UI labels it "Sentiment").
+    { key: 'sentiment', label: 'SENTIMENT' },
+    { key: 'tags', label: 'TAGS' },
   ]
   const [selectedColumns, setSelectedColumns] = useState(columnsAvailable.map(c=>c.key))
 
@@ -1258,6 +1262,10 @@ const CallLogs = () => {
       case 'status': return formatCallStatus(log.status)
       case 'virtual_number': return log.virtualNumber || ''
       case 'contact': return log.contact || log.callInitiatedBy || ''
+      // "Sentiment" reads from `callInterest` — that's the underlying
+      // CallLog field; the UI just labels it as Sentiment.
+      case 'sentiment': return log.callInterest ? String(log.callInterest).replace(/_/g, ' ') : ''
+      case 'tags': return Array.isArray(log.tags) ? log.tags.join(', ') : ''
       default: return ''
     }
   }
@@ -1637,6 +1645,8 @@ const CallLogs = () => {
                     <TableCell sx={{ fontWeight: 600 }}>Direction</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Agents</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Sentiment</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Tags</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Recording</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1873,6 +1883,51 @@ const CallLogs = () => {
                           const unique = Array.from(new Set(agentDisplays))
                           return <Typography variant="body2">{unique.length ? unique.join(', ') : '—'}</Typography>
                         })()}
+                      </TableCell>
+
+                      <TableCell sx={{ py: 1, fontSize: '0.85rem' }}>
+                        {log.callInterest ? (
+                          (() => {
+                            const v = log.callInterest
+                            const positive = v === 'interested' || v === 'callback'
+                            const negative = v === 'not_interested' || v === 'do_not_call'
+                            return (
+                              <Chip
+                                label={String(v).replace(/_/g, ' ')}
+                                size="small"
+                                sx={{
+                                  textTransform: 'capitalize',
+                                  bgcolor: positive ? '#d1fae5' : negative ? '#fee2e2' : '#f3f4f6',
+                                  color: positive ? '#065f46' : negative ? '#991b1b' : '#374151',
+                                  fontWeight: 600,
+                                }}
+                              />
+                            )
+                          })()
+                        ) : (
+                          <Typography variant="body2" sx={{ color: '#9ca3af' }}>—</Typography>
+                        )}
+                      </TableCell>
+
+                      <TableCell sx={{ py: 1, fontSize: '0.85rem', maxWidth: 200 }}>
+                        {Array.isArray(log.tags) && log.tags.length > 0 ? (
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                            {log.tags.slice(0, 3).map((tag, i) => (
+                              <Chip
+                                key={`${log._id || index}-tag-${i}`}
+                                label={tag}
+                                size="small"
+                                variant="outlined"
+                                sx={{ height: 22, fontSize: '0.7rem', bgcolor: '#e9f0fa', color: '#321fdb', borderColor: '#c7d8f3' }}
+                              />
+                            ))}
+                            {log.tags.length > 3 && (
+                              <Typography variant="caption" color="text.secondary">+{log.tags.length - 3}</Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" sx={{ color: '#9ca3af' }}>—</Typography>
+                        )}
                       </TableCell>
 
                       <TableCell sx={{ py: 1, fontSize: '0.9rem' }}>
