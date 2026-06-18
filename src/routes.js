@@ -160,6 +160,7 @@ const AddEquipmentsOutlet = React.lazy(() => import("./views/Outlet/AddEquipment
 const Branches = React.lazy(() => import("./views/Branches/Branches"));
 const CallLogs = React.lazy(() => import("./views/CallLogs/CallLogs"));
 const FollowUps = React.lazy(() => import("./views/FollowUps/FollowUps.jsx"));
+const IvrReports = React.lazy(() => import("./views/IvrReports/IvrReports"));
 const CallUses = React.lazy(() => import("./views/CallUses/CallUses"));
 const CallSettings = React.lazy(() => import("./views/CallSettings/CallSettings"));
 const IVRManagement = React.lazy(() => import("./views/CallSettings/IVRManagement"));
@@ -888,6 +889,12 @@ const routes = [
     path: '/reports/agent-status',
     name: 'Agent Status Report',
     element: AgentStatusReport,
+    navName: "Reports",
+  },
+  {
+    path: '/ivr-reports',
+    name: 'IVR Reports',
+    element: IvrReports,
     navName: "Reports",
   },
   {

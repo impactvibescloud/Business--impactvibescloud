@@ -21,6 +21,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilTrash, cilPencil, cilMediaPlay, cilMediaStop, cilSearch, cilPlus, cilCloudDownload, cilCheck } from '@coreui/icons'
 import { IoEyeOutline, IoChevronDownOutline, IoChevronUpOutline } from 'react-icons/io5'
+import { useNavigate } from 'react-router-dom'
 import { apiCall, getAuthToken } from '../../config/api'
 import '../Branches/Branches.css'
 import './IVRManagement.css'
@@ -49,8 +50,10 @@ import Collapse from '@mui/material/Collapse'
 import Alert from '@mui/material/Alert'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
+import AssessmentIcon from '@mui/icons-material/Assessment'
 
 const IVRManagement = () => {
+  const navigate = useNavigate()
   const [ivrs, setIvrs] = useState([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -1343,6 +1346,20 @@ const IVRManagement = () => {
           <h3 style={{ margin: 0, marginBottom: '0.5rem', color: '#111827', fontWeight: 700 }}>IVR Management</h3>
           <Typography variant="body2" sx={{ color: '#6b7280' }}>Create and manage interactive voice response (IVR) systems with menus, after-hours messages, and audio configurations</Typography>
         </Box>
+        <Button
+          variant="outlined"
+          startIcon={<AssessmentIcon />}
+          onClick={() => navigate('/ivr-reports')}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            color: '#6c5ce7',
+            borderColor: '#6c5ce7',
+            '&:hover': { borderColor: '#5a46eb', backgroundColor: 'rgba(108, 92, 231, 0.04)' },
+          }}
+        >
+          Reports
+        </Button>
       </Box>
 
       <Paper variant="outlined" sx={{ boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>

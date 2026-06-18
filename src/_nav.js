@@ -95,6 +95,13 @@ const _nav = [
   },
   {
     component: CNavItem,
+    name: "IVR Reports",
+    icon: <Activity className="nav-icon" />,
+    to: "/ivr-reports",
+    group: "Reports",
+  },
+  {
+    component: CNavItem,
     name: "Call Uses",
     icon: <FileText className="nav-icon" />, 
     to: "/calluses",
