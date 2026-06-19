@@ -507,6 +507,11 @@ const AgentStatusReport = () => {
                                   const PREVIEW_COUNT = 4
                                   const visible = sessions.slice(-PREVIEW_COUNT).reverse()
                                   const hiddenCount = Math.max(0, sessions.length - visible.length)
+                                  // Total time for THIS card (Online /
+                                  // Break / Lunch / Bio Break). Pulled
+                                  // from `a.seconds[key]` which the
+                                  // backend already aggregates per status.
+                                  const totalSecForKey = Number(a.seconds?.[key] || 0)
                                   return (
                                     <Card key={key} variant="outlined" sx={{ flex: 1, minWidth: 260, borderColor: color + '55' }}>
                                       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -516,11 +521,34 @@ const AgentStatusReport = () => {
                                             {label}
                                           </Typography>
                                           <Chip
-                                            label={`${sessions.length}× · ${formatSeconds(a.seconds?.[key])}`}
+                                            label={`${sessions.length}× · ${formatSeconds(totalSecForKey)}`}
                                             size="small"
                                             sx={{ ml: 'auto', bgcolor: color + '22', color, fontWeight: 600 }}
                                           />
                                         </Stack>
+                                        {/* Prominent total at the top of every
+                                            card so the agent doesn't have to
+                                            squint at the chip. Same value as
+                                            the chip — just bigger and labeled. */}
+                                        <Box
+                                          sx={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'baseline',
+                                            mb: 1,
+                                            px: 1,
+                                            py: 0.5,
+                                            bgcolor: color + '11',
+                                            borderRadius: 1,
+                                          }}
+                                        >
+                                          <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>
+                                            Total
+                                          </Typography>
+                                          <Typography variant="subtitle1" sx={{ fontFamily: 'monospace', fontWeight: 700, color }}>
+                                            {formatSeconds(totalSecForKey)}
+                                          </Typography>
+                                        </Box>
                                         {sessions.length === 0 ? (
                                           <Typography variant="caption" color="text.secondary">
                                             No {label.toLowerCase()} sessions in this range.
@@ -548,6 +576,20 @@ const AgentStatusReport = () => {
                                                   </TableCell>
                                                 </TableRow>
                                               ))}
+                                              {/* Footer Total row — uses the
+                                                  same `a.seconds[key]` total
+                                                  so it always matches the
+                                                  card header total even when
+                                                  only 4 sessions are visible
+                                                  in the table. */}
+                                              <TableRow sx={{ '& td': { borderTop: '1px solid #e5e7eb', py: 0.5 } }}>
+                                                <TableCell colSpan={3} sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#374151' }}>
+                                                  Total
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontFamily: 'monospace', fontWeight: 700, color }}>
+                                                  {formatSeconds(totalSecForKey)}
+                                                </TableCell>
+                                              </TableRow>
                                             </TableBody>
                                           </Table>
                                         )}

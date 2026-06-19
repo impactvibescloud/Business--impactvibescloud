@@ -268,6 +268,9 @@ const AgentStatusDetail = () => {
               .filter(({ key }) => activeStatus === 'all' || activeStatus === key)
               .map(({ key, label, icon, color }) => {
               const sessions = (agent.sessionDetails?.[key] || []).slice().reverse() // newest first
+              // Total time for this status (used in both the prominent
+              // top-of-card box and the table footer Total row).
+              const totalSecForKey = Number(agent.seconds?.[key] || 0)
               return (
                 <Card key={key} variant="outlined" sx={{ width: '100%', borderColor: color + '55' }}>
                   <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -275,11 +278,33 @@ const AgentStatusDetail = () => {
                       {icon}
                       <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{label}</Typography>
                       <Chip
-                        label={`${sessions.length}× · ${formatSeconds(agent.seconds?.[key])}`}
+                        label={`${sessions.length}× · ${formatSeconds(totalSecForKey)}`}
                         size="small"
                         sx={{ ml: 'auto', bgcolor: color + '22', color, fontWeight: 600 }}
                       />
                     </Stack>
+                    {/* Prominent Total box — same value as the chip, but
+                        bigger and clearly labeled so the agent sees the
+                        full-window total even when many sessions exist. */}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'baseline',
+                        mb: 1.5,
+                        px: 1.5,
+                        py: 1,
+                        bgcolor: color + '11',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Total {label.replace(' (Online)', '')}
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontFamily: 'monospace', fontWeight: 700, color }}>
+                        {formatSeconds(totalSecForKey)}
+                      </Typography>
+                    </Box>
                     {sessions.length === 0 ? (
                       <Typography variant="caption" color="text.secondary">
                         No {label.toLowerCase()} sessions.
@@ -308,6 +333,15 @@ const AgentStatusDetail = () => {
                                 </TableCell>
                               </TableRow>
                             ))}
+                            {/* Footer Total — matches the box at the top. */}
+                            <TableRow sx={{ '& td': { borderTop: '2px solid #e5e7eb', py: 0.75 } }}>
+                              <TableCell colSpan={3} sx={{ fontWeight: 700, fontSize: '0.8rem', color: '#374151' }}>
+                                Total
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontFamily: 'monospace', fontWeight: 700, color, fontSize: '0.9rem' }}>
+                                {formatSeconds(totalSecForKey)}
+                              </TableCell>
+                            </TableRow>
                           </TableBody>
                         </Table>
                       </TableContainer>
