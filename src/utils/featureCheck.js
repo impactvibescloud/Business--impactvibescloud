@@ -33,10 +33,6 @@ const NAV_FEATURE_MAP = {
   // IVR Reports also lives under the Reports umbrella — reuse the `reports`
   // feature flag so any business with Reports access can open it.
   '/ivr-reports': 'reports',
-  // Maps the v2 Migrations & Ops page to the existing 'settings' feature
-  // so it shows up for anyone with Settings access — no separate backend
-  // feature flag needed.
-  '/migrations': 'settings',
 };
 
 /**

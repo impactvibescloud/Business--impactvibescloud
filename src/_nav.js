@@ -228,18 +228,8 @@ const _nav = [
     to: "/settings",
     group: "Settings",
   },
-  {
-    component: CNavItem,
-    name: "Migrations & Ops",
-    icon: <Activity className="nav-icon" />,
-    to: "/migrations",
-    group: "Settings",
-    // Bypass the accessTo/feature filter — admin operations page should
-    // always be reachable for business_admin / Employee roles. The page
-    // itself enforces server-side authorization via authorizeRoles.
-    alwaysVisible: true,
-  },
-  
+  // Migrations & Ops moved to Admin app (inside VM Configuration tabs).
+
   
   // {
   //   component: CNavItem,
