@@ -132,6 +132,13 @@ export default function Contacts() {
     }
   }
 
+  const getCreatedBy = (c) => {
+    const cb = c?.createdBy
+    if (!cb) return '—'
+    if (typeof cb === 'string') return cb
+    return cb.name || cb.email || '—'
+  }
+
   const handleEdit = (contact) => {
     setContactForm(contact)
     setIsEditMode(true)
@@ -191,6 +198,7 @@ export default function Contacts() {
                 <TableCell>Phone</TableCell>
                 <TableCell>Company</TableCell>
                 <TableCell>Tags</TableCell>
+                <TableCell>Created By</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -204,6 +212,7 @@ export default function Contacts() {
                   <TableCell>
                     {(c.tags || []).map((t, i) => <Chip key={i} label={t} size="small" className="custom-chip" sx={{ mr: 0.5 }} />)}
                   </TableCell>
+                  <TableCell>{getCreatedBy(c)}</TableCell>
                   <TableCell>
                     <IconButton size="small" color="info" onClick={() => setViewContact(c)}><VisibilityIcon fontSize="small" /></IconButton>
                     <IconButton size="small" color="warning" onClick={() => handleEdit(c)}><EditIcon fontSize="small" /></IconButton>
@@ -236,6 +245,7 @@ export default function Contacts() {
               <Box><strong>Phone:</strong> {viewContact.phone}</Box>
               <Box><strong>Company:</strong> {viewContact.company}</Box>
               <Box><strong>Tags:</strong> {(viewContact.tags || []).join(', ')}</Box>
+              <Box><strong>Created By:</strong> {getCreatedBy(viewContact)}</Box>
             </Box>
           )}
         </DialogContent>
